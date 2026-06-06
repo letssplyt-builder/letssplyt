@@ -1,0 +1,7 @@
+At the start of every conversation, read CLAUDE.md and BUILD-PROGRESS.md before writing any code.
+
+Find the first unchecked [ ] story in BUILD-PROGRESS.md, read that story in docs/12-Build-Sequence.md, then build it. Follow all session rules in CLAUDE.md exactly.
+
+After Pawan confirms a story is done, change [ ] to [x] with today's date in BUILD-PROGRESS.md.
+
+After Pawan confirms a story is done: update BUILD-PROGRESS.md (change [ ] to [x] with today's date), then commit all changed files with message format "E##-S##: story name" (e.g. "E01-S01: monorepo scaffold"), and push to origin main.

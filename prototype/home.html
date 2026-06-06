@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LetsSplyt — Home</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif;
+  background:#F0EFFF;display:flex;height:100vh;overflow:hidden;color:#1E1B3A;}
+
+/* ── SIDEBAR ── */
+#sidebar{width:220px;background:#fff;border-right:1px solid #E8E6F0;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;}
+#sb-logo{padding:18px 16px 12px;border-bottom:1px solid #F0EEF8;}
+#sb-logo .mark{display:flex;align-items:center;gap:9px;margin-bottom:3px;}
+#sb-logo .gem{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,#6366F1,#7C3AED);display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;}
+#sb-logo .name{font-size:15px;font-weight:800;color:#1E1B3A;letter-spacing:-.3px;}
+#sb-logo .sub{font-size:9px;color:#9CA3AF;letter-spacing:.05em;text-transform:uppercase;}
+#sb-screens{flex:1;overflow-y:auto;padding:6px 0 16px;}
+#sb-screens::-webkit-scrollbar{width:0;}
+.sg-hdr{padding:10px 14px 3px;font-size:9px;font-weight:700;color:#C4C0D8;text-transform:uppercase;letter-spacing:.1em;}
+.sc{display:flex;align-items:center;gap:8px;padding:7px 14px;cursor:pointer;border-left:2px solid transparent;transition:all .12s;border-radius:0 8px 8px 0;margin-right:6px;}
+.sc:hover{background:#F5F3FF;}
+.sc.active{background:#EEF2FF;border-left-color:#6366F1;}
+.sc-badge{font-size:9px;font-weight:700;color:#6366F1;min-width:26px;opacity:.8;flex-shrink:0;}
+.sc-name{font-size:11px;color:#6B7280;line-height:1.3;}
+.sc.active .sc-name{color:#4338CA;font-weight:600;}
+
+/* ── CENTRE ── */
+#center{flex:1;display:flex;align-items:center;justify-content:center;gap:20px;padding:20px;overflow:hidden;}
+#phone-wrap{display:flex;flex-direction:column;align-items:center;gap:10px;}
+#phone{width:375px;background:#E8E6F5;border-radius:54px;padding:12px;flex-shrink:0;
+  box-shadow:0 0 0 1px rgba(99,102,241,.12),0 28px 70px rgba(99,102,241,.14),0 6px 20px rgba(0,0,0,.05);}
+#di{width:120px;height:34px;background:#D1CFF0;border-radius:20px;margin:0 auto 8px;}
+#screen-wrap{width:351px;height:724px;border-radius:42px;overflow:hidden;position:relative;background:#F8F7FF;display:flex;flex-direction:column;}
+#sb-time-bar{position:absolute;top:0;left:0;right:0;height:48px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 24px 8px;z-index:200;pointer-events:none;}
+.time{font-size:15px;font-weight:700;color:#1E1B3A;}
+.icons{display:flex;gap:5px;align-items:center;color:#1E1B3A;}
+/* main scrollable content area — leaves room for bottom tab bar */
+#app-content{flex:1;overflow-y:auto;overflow-x:hidden;padding-bottom:0;}
+#app-content::-webkit-scrollbar{width:0;}
+/* home indicator */
+#hi{height:28px;display:flex;align-items:center;justify-content:center;background:#F8F7FF;flex-shrink:0;}
+#hi div{width:120px;height:4px;border-radius:2px;background:#1E1B3A;opacity:.18;}
+
+/* ── BOTTOM TAB BAR ── */
+#tab-bar{
+  display:flex;align-items:stretch;
+  background:rgba(255,255,255,.96);
+  border-top:1px solid #F0EEF8;
+  backdrop-filter:blur(12px);
+  flex-shrink:0;
+  height:64px;
+}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:3px;cursor:pointer;position:relative;transition:all .15s;}
+.tab-icon{font-size:22px;transition:transform .2s;}
+.tab-label{font-size:9px;font-weight:600;color:#9CA3AF;letter-spacing:.02em;transition:color .15s;}
+.tab.active .tab-label{color:#6366F1;}
+.tab.active .tab-icon{transform:scale(1.08);}
+.tab-dot{position:absolute;top:8px;right:calc(50% - 16px);width:6px;height:6px;border-radius:3px;background:#EF4444;}
+
+/* ── INFO PANEL ── */
+#info{width:200px;flex-shrink:0;display:flex;flex-direction:column;gap:10px;}
+.ic{background:#fff;border:1px solid #E8E6F0;border-radius:16px;padding:13px;box-shadow:0 1px 6px rgba(99,102,241,.05);}
+.ic-label{font-size:9px;font-weight:700;color:#C4C0D8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;}
+.ic-badge{display:inline-block;background:#EEF2FF;color:#6366F1;font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;margin-bottom:6px;font-family:monospace;}
+.ic-name{font-size:12px;font-weight:600;color:#1E1B3A;margin-bottom:4px;line-height:1.3;}
+.ic-desc{font-size:11px;color:#9CA3AF;line-height:1.5;}
+#tip{background:#EEF2FF;border:1px solid #C7D2FE;border-radius:12px;padding:12px 13px;}
+#tip p{font-size:11px;color:#4338CA;line-height:1.5;}
+
+/* ── DESIGN TOKENS ── */
+:root{
+  --bg:#F8F7FF;--white:#fff;
+  --indigo:#6366F1;--indigo-lt:#EEF2FF;--indigo-dk:#4338CA;
+  --purple:#7C3AED;
+  --green:#10B981;--green-lt:#D1FAE5;
+  --amber:#F59E0B;--amber-lt:#FEF3C7;
+  --red:#EF4444;--red-lt:#FEE2E2;
+  --t1:#1E1B3A;--t2:#6B7280;--t3:#9CA3AF;
+  --border:#F0EEF8;--border2:#E0DDFF;
+}
+.card{background:var(--white);border-radius:20px;border:1px solid var(--border);box-shadow:0 2px 16px rgba(99,102,241,.07);}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:10px;font-weight:700;padding:3px 9px;border-radius:100px;}
+.pill-g{background:var(--green-lt);color:#059669;}
+.pill-i{background:var(--indigo-lt);color:var(--indigo);}
+.pill-a{background:var(--amber-lt);color:#B45309;}
+.pill-r{background:var(--red-lt);color:var(--red);}
+.av{width:36px;height:36px;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0;}
+.btn-fill{display:flex;align-items:center;justify-content:center;width:100%;height:52px;border-radius:16px;border:none;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,var(--indigo),var(--purple));color:#fff;font-size:15px;font-weight:700;box-shadow:0 4px 18px rgba(99,102,241,.28);}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+@keyframes popIn{0%{transform:scale(.4);opacity:0;}65%{transform:scale(1.1);}100%{transform:scale(1);opacity:1;}}
+@keyframes slideLeft{from{opacity:0;transform:translateX(16px);}to{opacity:1;transform:translateX(0);}}
+@keyframes slideRight{from{opacity:0;transform:translateX(-16px);}to{opacity:1;transform:translateX(0);}}
+</style>
+</head>
+<body>
+
+<aside id="sidebar">
+  <div id="sb-logo">
+    <div class="mark"><div class="gem">✦</div><div class="name">LetsSplyt</div></div>
+    <div class="sub">Home · P29–P31</div>
+  </div>
+  <div id="sb-screens">
+    <div class="sg-hdr">Dashboard</div>
+    <div class="sc active" data-id="tab_home" onclick="switchTab('home')"><span class="sc-badge">①</span><span class="sc-name">Dashboard tab</span></div>
+
+    <div class="sg-hdr" style="margin-top:4px;">Events</div>
+    <div class="sc" data-id="tab_events" onclick="switchTab('events')"><span class="sc-badge">②</span><span class="sc-name">Events tab</span></div>
+    <div class="sc" data-id="event_detail_joining" onclick="switchTab('events');setTimeout(showEventDetailJoining,120)"><span class="sc-badge">↳</span><span class="sc-name">Event detail — joining (QR live)</span></div>
+    <div class="sc" data-id="event_detail_expired" onclick="switchTab('events');setTimeout(showEventDetailExpired,120)"><span class="sc-badge">↳</span><span class="sc-name">Event detail — joining (QR expired)</span></div>
+    <div class="sc" data-id="add_member" onclick="switchTab('events');setTimeout(()=>{showEventDetailJoining();setTimeout(showAddMember,200)},120)"><span class="sc-badge">↳</span><span class="sc-name">Add member — pick type</span></div>
+    <div class="sc" data-id="add_member_phone" onclick="switchTab('events');setTimeout(()=>{showEventDetailJoining();setTimeout(showAddMemberPhone,200)},120)"><span class="sc-badge">↳</span><span class="sc-name">Add member — with phone</span></div>
+    <div class="sc" data-id="add_member_cash" onclick="switchTab('events');setTimeout(()=>{showEventDetailJoining();setTimeout(showAddMemberCash,200)},120)"><span class="sc-badge">↳</span><span class="sc-name">Add member — name only</span></div>
+    <div class="sc" data-id="event_detail" onclick="switchTab('events');setTimeout(showEventDetail,120)"><span class="sc-badge">↳</span><span class="sc-name">Event detail — settlement</span></div>
+    <div class="sc" data-id="confirm_payment" onclick="switchTab('events');setTimeout(()=>{showEventDetail();setTimeout(()=>showConfirmPayment(2),120)},120)"><span class="sc-badge">↳</span><span class="sc-name">Confirm payment</span></div>
+
+    <div class="sg-hdr" style="margin-top:4px;">Members</div>
+    <div class="sc" data-id="tab_members" onclick="switchTab('members')"><span class="sc-badge">③</span><span class="sc-name">Members tab</span></div>
+
+    <div class="sg-hdr" style="margin-top:4px;">Settings</div>
+    <div class="sc" data-id="tab_settings" onclick="switchTab('settings')"><span class="sc-badge">④</span><span class="sc-name">Settings tab</span></div>
+  </div>
+</aside>
+
+<div id="center">
+  <div id="phone-wrap">
+    <div id="phone">
+      <div id="di"></div>
+      <div id="screen-wrap">
+        <!-- Status bar -->
+        <div id="sb-time-bar">
+          <span class="time">9:41</span>
+          <div class="icons">
+            <svg width="15" height="11" viewBox="0 0 16 12"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor"/><rect x="13.5" y="1" width="2.5" height="10" rx="1" fill="currentColor" opacity=".3"/></svg>
+            <svg width="23" height="11" viewBox="0 0 25 12" fill="none"><rect x=".5" y="1" width="21" height="10" rx="2.5" stroke="currentColor" stroke-width="1.2"/><rect x="22" y="3.5" width="2.5" height="5" rx="1.2" fill="currentColor"/><rect x="2" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/></svg>
+          </div>
+        </div>
+
+        <!-- Scrollable content -->
+        <div id="app-content"></div>
+
+        <!-- Bottom tab bar -->
+        <div id="tab-bar">
+          <div class="tab active" id="tb-home" onclick="switchTab('home')">
+            <div class="tab-icon">⬡</div>
+            <div class="tab-label">Dashboard</div>
+          </div>
+          <div class="tab" id="tb-events" onclick="switchTab('events')">
+            <div class="tab-icon">◫</div>
+            <div class="tab-label">Events</div>
+            <div class="tab-dot"></div>
+          </div>
+          <div class="tab" id="tb-members" onclick="switchTab('members')">
+            <div class="tab-icon">◎</div>
+            <div class="tab-label">Members</div>
+          </div>
+          <div class="tab" id="tb-settings" onclick="switchTab('settings')">
+            <div class="tab-icon">◈</div>
+            <div class="tab-label">Settings</div>
+          </div>
+        </div>
+
+        <!-- Home indicator -->
+        <div id="hi"><div></div></div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:2px;">
+      <div style="font-size:11px;color:#9CA3AF;font-family:monospace;" id="crumb">dashboard</div>
+    </div>
+  </div>
+
+  <div id="info">
+    <div class="ic">
+      <div class="ic-label">Current Tab</div>
+      <div id="ic-badge" class="ic-badge">①</div>
+      <div id="ic-name" class="ic-name">Dashboard</div>
+      <div id="ic-desc" class="ic-desc">Net balance at a glance — owed to you vs. you owe. Urgent items surface automatically.</div>
+    </div>
+    <div id="tip"><p>✦ One number that matters: your net position. Green = you're ahead. Red = you owe more than you're owed. Everything else is detail.</p></div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════
+   DATA
+═══════════════════════════════════════ */
+const OWED_TO_ME=[
+  {l:'R',name:'Raj',   bg:'#EF4444',amt:66.64,event:'Dinner at Nobu',   status:'overdue'},
+  {l:'J',name:'Jamie', bg:'#A78BFA',amt:71.80,event:'Dinner at Nobu',   status:'disputed'},
+  {l:'K',name:'Kim',   bg:'#F59E0B',amt:67.80,event:'Nobu + Rooftop',   status:'pending'},
+  {l:'Ma',name:'Mark', bg:'#3B82F6',amt:58.20,event:'Dinner at Nobu',   status:'pending'},
+];
+const I_OWE=[
+  {organiser:'Priya',og:'P',og_bg:'#8B5CF6',event:'Team lunch — Chez TJ',amt:48.50,date:'Wed 21 May'},
+  {organiser:'Alex', og:'A',og_bg:'#EC4899',event:'Concert after-party',  amt:22.00,date:'Fri 16 May'},
+];
+const EVENTS=[
+  {name:'Barbeque Night 🔥',date:'Today · 7 PM',  people:3, total:null,   outstanding:null,  mine:true, status:'joining'},
+  {name:'Dinner at Nobu',   date:'Sat 24 May',    people:6, total:278.84, outstanding:160.14,mine:true, status:'active'},
+  {name:'Team lunch',       date:'Wed 21 May',    people:4, total:194.00, outstanding:48.50, mine:false,status:'active', host:'Priya'},
+  {name:'Concert party',    date:'Fri 16 May',    people:9, total:396.00, outstanding:22.00, mine:false,status:'active', host:'Alex'},
+  {name:'Ski trip — Tahoe', date:'Fri 10 May',    people:4, total:520.00, outstanding:0,     mine:true, status:'settled'},
+  {name:'Rooftop drinks',   date:'Sat 3 May',     people:8, total:144.50, outstanding:18.00, mine:true, status:'partial'},
+  {name:'Sushi birthday',   date:'Thu 24 Apr',    people:5, total:210.80, outstanding:0,     mine:true, status:'settled'},
+];
+const JOINING_MEMBERS=[
+  {name:'Sara',  l:'S',  bg:'#6366F1'},
+  {name:'Mike',  l:'M',  bg:'#10B981'},
+  {name:'Jamie', l:'J',  bg:'#A78BFA'},
+];
+const MEMBERS=[
+  {l:'R',name:'Raj',   bg:'#EF4444',netOwed:66.64, events:2,lastEvent:'Dinner at Nobu',   status:'overdue'},
+  {l:'J',name:'Jamie', bg:'#A78BFA',netOwed:71.80, events:1,lastEvent:'Dinner at Nobu',   status:'disputed'},
+  {l:'K',name:'Kim',   bg:'#F59E0B',netOwed:67.80, events:2,lastEvent:'Nobu + Rooftop',   status:'pending'},
+  {l:'Ma',name:'Mark', bg:'#3B82F6',netOwed:58.20, events:1,lastEvent:'Dinner at Nobu',   status:'pending'},
+  {l:'S',name:'Sara',  bg:'#6366F1',netOwed:0,     events:3,lastEvent:'Ski trip',          status:'settled'},
+  {l:'M',name:'Mike',  bg:'#10B981',netOwed:0,     events:2,lastEvent:'Dinner at Nobu',    status:'settled'},
+  {l:'P',name:'Priya', bg:'#8B5CF6',netOwed:-48.50,events:1,lastEvent:'Team lunch',        status:'i_owe'},
+  {l:'A',name:'Alex',  bg:'#EC4899',netOwed:-22.00,events:1,lastEvent:'Concert party',     status:'i_owe'},
+];
+
+const TOTAL_OWED = OWED_TO_ME.reduce((s,p)=>s+p.amt,0);
+const TOTAL_OWE  = I_OWE.reduce((s,e)=>s+e.amt,0);
+const NET        = TOTAL_OWED - TOTAL_OWE;
+
+// ── Member persona data (App Member view — they owe, not owed) ──
+const MEMBER_NAME = 'Alex';
+const MEMBER_OWE = [
+  {event:'Dinner at Nobu',  organiser:'Rohan P.',  date:'Sat 23 May', og:'R', og_bg:'#6366F1', amt:48.50},
+  {event:'Weekend Airbnb',  organiser:'Sara K.',   date:'Sun 18 May', og:'S', og_bg:'#059669', amt:36.00},
+];
+const MEMBER_TOTAL_OWE  = MEMBER_OWE.reduce((s,e)=>s+e.amt,0);
+const MEMBER_TOTAL_OWED = 12.50; // what others owe Alex
+const MEMBER_NET = MEMBER_TOTAL_OWED - MEMBER_TOTAL_OWE; // negative
+
+// ── Active persona (set by postMessage or URL param) ──
+let PERSONA = new URLSearchParams(location.search).get('persona') || 'creator';
+
+// ── Event detail mock data (Dinner at Nobu) ──
+const EVENT_DETAIL_DATA = {
+  name:'Dinner at Nobu', date:'Sat 24 May', total:278.84, outstanding:160.14,
+  members:[
+    {name:'Sara',  l:'S',  bg:'#6366F1', share:46.47, status:'confirmed',     method:'Venmo'},
+    {name:'Mike',  l:'M',  bg:'#10B981', share:46.47, status:'confirmed',     method:'Bank transfer'},
+    {name:'Jamie', l:'J',  bg:'#A78BFA', share:71.80, status:'self_reported', method:'Venmo', reportedAt:'10 min ago'},
+    {name:'Raj',   l:'R',  bg:'#EF4444', share:66.64, status:'pending'},
+    {name:'Mark',  l:'Ma', bg:'#3B82F6', share:58.20, status:'pending'},
+  ]
+};
+let confirmMemberIdx = 2; // Jamie by default
+
+/* ═══════════════════════════════════════
+   TAB SWITCHING
+═══════════════════════════════════════ */
+const TAB_META={
+  home:    {badge:'①',name:'Dashboard',desc:'Net balance at a glance — owed to you vs. you owe. Urgent items surface automatically.',tip:'✦ One number that matters: your net position. Green = you\'re ahead. Everything else is detail.'},
+  events:  {badge:'②',name:'Events',desc:'All events — ones you created and ones you were added to. Status, totals, and outstanding at a glance.',tip:'✦ Every event you\'ve touched, in one place. Yours are labelled, others show who organised.'},
+  members: {badge:'③',name:'Members',desc:'Cross-event view of every person — how much they owe you in aggregate, or you owe them.',tip:'✦ Members tab replaces per-event drilling for recurring groups. See Raj\'s total across all events at once.'},
+  settings:{badge:'④',name:'Settings',desc:'Profile, payment handles, notifications, and account management.',tip:'✦ Delete account is deliberately buried at the bottom — behind two confirmation steps.'},
+};
+
+let currentTab='home';
+function switchTab(tab){
+  currentTab=tab;
+  const c=document.getElementById('app-content');
+  c.style.opacity='0';
+  setTimeout(()=>{
+    c.innerHTML=TABS[tab]();
+    c.style.opacity='1';c.style.transition='opacity .16s';c.scrollTop=0;
+  },80);
+  // Update tab bar
+  ['home','events','members','settings'].forEach(t=>{
+    const el=document.getElementById('tb-'+t);
+    el.classList.toggle('active',t===tab);
+  });
+  // Update sidebar
+  document.querySelectorAll('.sc').forEach(e=>e.classList.toggle('active',e.dataset.id==='tab_'+tab));
+  // Update info
+  const m=TAB_META[tab];
+  document.getElementById('ic-badge').textContent=m.badge;
+  document.getElementById('ic-name').textContent=m.name;
+  document.getElementById('ic-desc').textContent=m.desc;
+  document.getElementById('tip').querySelector('p').textContent=m.tip;
+  document.getElementById('crumb').textContent=tab;
+}
+
+/* ═══════════════════════════════════════
+   EVENT DETAIL SCREEN
+═══════════════════════════════════════ */
+function showEventDetail(){
+  const c=document.getElementById('app-content');
+  c.style.opacity='0';
+  setTimeout(()=>{
+    const d=EVENT_DETAIL_DATA;
+    const confirmed=d.members.filter(m=>m.status==='confirmed');
+    const selfRep=d.members.filter(m=>m.status==='self_reported');
+    const pctConf=confirmed.reduce((s,m)=>s+m.share,0)/d.total*100;
+    const pctSelf=selfRep.reduce((s,m)=>s+m.share,0)/d.total*100;
+    const membersHtml=d.members.map((m,i)=>{
+      const sc={
+        confirmed:    {chip:'✓ Confirmed',    bg:'var(--green-lt)', c:'#059669', border:'rgba(16,185,129,.18)'},
+        self_reported:{chip:'🕐 Self-reported',bg:'var(--amber-lt)', c:'#B45309', border:'rgba(245,158,11,.25)'},
+        pending:      {chip:'⏳ Pending',      bg:'#F3F4F6',         c:'var(--t2)',border:'var(--border)'},
+      }[m.status];
+      return `
+      <div style="background:var(--white);border-radius:18px;border:1.5px solid ${sc.border};
+        padding:14px 16px;margin-bottom:8px;animation:fadeUp .2s ease ${i*.05}s both;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="av" style="background:${m.bg};">${m.l}</div>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:700;color:var(--t1);">${m.name}</div>
+            ${m.method?`<div style="font-size:10px;color:var(--t3);margin-top:1px;">via ${m.method}${m.reportedAt?' · '+m.reportedAt:''}</div>`:'<div style="font-size:10px;color:var(--t3);margin-top:1px;">Awaiting payment</div>'}
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:15px;font-weight:800;color:var(--t1);">$${m.share.toFixed(2)}</div>
+            <div style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:6px;margin-top:3px;
+              background:${sc.bg};color:${sc.c};display:inline-block;">${sc.chip}</div>
+          </div>
+        </div>
+        ${m.status==='self_reported'?`
+        <div style="display:flex;gap:6px;margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
+          <button onclick="showConfirmPayment(${i})" style="flex:2;height:34px;border-radius:10px;border:none;
+            background:linear-gradient(135deg,var(--indigo),var(--purple));color:#fff;font-size:12px;font-weight:700;
+            cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(99,102,241,.25);">✓ Confirm payment</button>
+          <button onclick="disputePayment(${i})" style="flex:1;height:34px;border-radius:10px;border:none;background:var(--red-lt);
+            color:var(--red);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">✕ Dispute</button>
+        </div>`:''}
+        ${m.status==='pending'?`
+        <div style="display:flex;gap:6px;margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
+          <button onclick="nudgeMember(${i})" style="flex:2;height:34px;border-radius:10px;border:none;background:var(--amber-lt);
+            color:#B45309;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">⏰ Nudge</button>
+          <button onclick="showCashConfirm(${i})" style="flex:1;height:34px;border-radius:10px;border:none;background:var(--green-lt);
+            color:#059669;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;">💵 Cash</button>
+        </div>`:''}
+      </div>`;
+    }).join('');
+    c.innerHTML=`
+<div style="min-height:100%;background:var(--bg);animation:slideLeft .2s ease both;">
+  <div style="position:sticky;top:0;z-index:10;background:rgba(248,247,255,.96);backdrop-filter:blur(10px);
+    padding:52px 20px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);">
+    <button onclick="switchTab('events')" style="width:30px;height:30px;border-radius:50%;border:none;
+      background:var(--border);color:var(--t2);font-size:18px;cursor:pointer;display:flex;align-items:center;
+      justify-content:center;font-family:inherit;line-height:1;">‹</button>
+    <div style="font-size:17px;font-weight:700;color:var(--t1);">Event Detail</div>
+  </div>
+  <div style="padding:16px 20px 0;">
+    <div style="background:var(--white);border-radius:20px;border:1.5px solid var(--border);padding:18px;
+      box-shadow:0 3px 16px rgba(99,102,241,.07);">
+      <div style="font-size:19px;font-weight:800;color:var(--t1);margin-bottom:3px;">${d.name}</div>
+      <div style="font-size:12px;color:var(--t3);margin-bottom:16px;">${d.date} · ${d.members.length} members · You created</div>
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <div style="flex:1;text-align:center;padding:10px;background:var(--indigo-lt);border-radius:12px;">
+          <div style="font-size:16px;font-weight:800;color:var(--indigo);">$${d.total.toFixed(2)}</div>
+          <div style="font-size:9px;color:var(--indigo);opacity:.7;margin-top:1px;">Total bill</div>
+        </div>
+        <div style="flex:1;text-align:center;padding:10px;background:var(--green-lt);border-radius:12px;">
+          <div style="font-size:16px;font-weight:800;color:var(--green);">$${(d.total-d.outstanding).toFixed(2)}</div>
+          <div style="font-size:9px;color:var(--green);opacity:.7;margin-top:1px;">Collected</div>
+        </div>
+        <div style="flex:1;text-align:center;padding:10px;background:var(--amber-lt);border-radius:12px;">
+          <div style="font-size:16px;font-weight:800;color:#B45309;">$${d.outstanding.toFixed(2)}</div>
+          <div style="font-size:9px;color:#B45309;opacity:.7;margin-top:1px;">Outstanding</div>
+        </div>
+      </div>
+      <div style="margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:10px;font-weight:700;color:var(--t3);">Settlement Progress</div>
+        <div style="font-size:10px;font-weight:700;color:var(--indigo);">${confirmed.length} of ${d.members.length} confirmed</div>
+      </div>
+      <div style="height:8px;border-radius:4px;overflow:hidden;background:#EDE9FE;display:flex;gap:1px;">
+        <div style="width:${pctConf.toFixed(1)}%;background:var(--green);border-radius:4px;transition:width .5s;"></div>
+        <div style="width:${pctSelf.toFixed(1)}%;background:var(--amber);border-radius:4px;transition:width .5s;"></div>
+      </div>
+      <div style="display:flex;gap:14px;margin-top:6px;">
+        <div style="display:flex;align-items:center;gap:4px;font-size:9px;font-weight:600;color:var(--t3);">
+          <div style="width:8px;height:8px;border-radius:2px;background:var(--green);"></div>Confirmed</div>
+        <div style="display:flex;align-items:center;gap:4px;font-size:9px;font-weight:600;color:var(--t3);">
+          <div style="width:8px;height:8px;border-radius:2px;background:var(--amber);"></div>Self-reported</div>
+        <div style="display:flex;align-items:center;gap:4px;font-size:9px;font-weight:600;color:var(--t3);">
+          <div style="width:8px;height:8px;border-radius:2px;background:#E5E7EB;"></div>Pending</div>
+      </div>
+    </div>
+  </div>
+  <div style="padding:16px 20px 30px;">
+    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Members</div>
+    ${membersHtml}
+  </div>
+</div>`;
+    c.style.opacity='1';c.style.transition='opacity .16s';c.scrollTop=0;
+  },80);
+  // Update crumb but keep events tab active in bar
+  document.getElementById('crumb').textContent='event_detail';
+}
+
+function showConfirmPayment(idx){
+  confirmMemberIdx=idx;
+  const m=EVENT_DETAIL_DATA.members[idx];
+  const c=document.getElementById('app-content');
+  c.style.opacity='0';
+  setTimeout(()=>{
+    c.innerHTML=`
+<div style="min-height:100%;background:var(--bg);animation:slideLeft .2s ease both;">
+  <div style="position:sticky;top:0;z-index:10;background:rgba(248,247,255,.96);backdrop-filter:blur(10px);
+    padding:52px 20px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);">
+    <button onclick="showEventDetail()" style="width:30px;height:30px;border-radius:50%;border:none;
+      background:var(--border);color:var(--t2);font-size:18px;cursor:pointer;display:flex;align-items:center;
+      justify-content:center;font-family:inherit;line-height:1;">‹</button>
+    <div style="font-size:17px;font-weight:700;color:var(--t1);">Confirm Payment</div>
+  </div>
+  <div style="padding:24px 20px;">
+    <div style="background:var(--white);border-radius:20px;border:1.5px solid var(--border);padding:24px;
+      box-shadow:0 3px 16px rgba(99,102,241,.07);margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+        <div class="av" style="background:${m.bg};width:48px;height:48px;font-size:18px;border-radius:24px;">${m.l}</div>
+        <div>
+          <div style="font-size:18px;font-weight:800;color:var(--t1);">${m.name}</div>
+          <div style="font-size:12px;color:var(--t3);">says they paid · ${m.reportedAt||'just now'}</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div style="display:flex;justify-content:space-between;padding:12px 14px;background:var(--bg);border-radius:12px;">
+          <div style="font-size:13px;color:var(--t3);">Amount</div>
+          <div style="font-size:15px;font-weight:800;color:var(--t1);">$${m.share.toFixed(2)}</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:12px 14px;background:var(--bg);border-radius:12px;">
+          <div style="font-size:13px;color:var(--t3);">Method</div>
+          <div style="font-size:13px;font-weight:700;color:var(--t1);">${m.method||'—'}</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:12px 14px;background:var(--bg);border-radius:12px;">
+          <div style="font-size:13px;color:var(--t3);">Event</div>
+          <div style="font-size:13px;font-weight:700;color:var(--t1);">Dinner at Nobu</div>
+        </div>
+      </div>
+    </div>
+    <div style="background:#FFF7ED;border:1.5px solid #FED7AA;border-radius:16px;padding:14px 16px;margin-bottom:20px;">
+      <div style="font-size:12px;color:#B45309;line-height:1.5;">
+        <strong>Self-reported payment</strong> — ${m.name} marked this as paid from their end.
+        Confirm once you've verified you received it.
+      </div>
+    </div>
+    <button onclick="confirmPaymentDone()" style="width:100%;height:52px;border-radius:16px;border:none;
+      background:linear-gradient(135deg,var(--indigo),var(--purple));color:#fff;font-size:16px;font-weight:700;
+      cursor:pointer;font-family:inherit;box-shadow:0 4px 18px rgba(99,102,241,.28);">✓ Confirm — Mark as settled</button>
+    <button onclick="showEventDetail()" style="width:100%;height:44px;border-radius:14px;border:1.5px solid var(--border);
+      background:transparent;color:var(--t2);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:8px;">Cancel</button>
+  </div>
+</div>`;
+    c.style.opacity='1';c.style.transition='opacity .16s';c.scrollTop=0;
+  },80);
+  document.getElementById('crumb').textContent='confirm_payment';
+}
+
+function confirmPaymentDone(){
+  // Mark member as confirmed
+  EVENT_DETAIL_DATA.members[confirmMemberIdx].status='confirmed';
+  EVENT_DETAIL_DATA.outstanding=Math.max(0,EVENT_DETAIL_DATA.outstanding-EVENT_DETAIL_DATA.members[confirmMemberIdx].share);
+  // Show a quick success flash then return to event detail
+  const c=document.getElementById('app-content');
+  c.innerHTML=`
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80%;gap:20px;padding:40px 24px;animation:popIn .35s ease both;">
+  <div style="width:72px;height:72px;border-radius:36px;background:var(--green-lt);display:flex;align-items:center;justify-content:center;">
+    <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+      <path d="M7 16.5L13 22.5L25 10" stroke="#10B981" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </div>
+  <div style="text-align:center;">
+    <div style="font-size:20px;font-weight:800;color:var(--t1);margin-bottom:6px;">Payment confirmed!</div>
+    <div style="font-size:13px;color:var(--t3);">${EVENT_DETAIL_DATA.members[confirmMemberIdx].name}'s balance is now settled.</div>
+  </div>
+</div>`;
+  setTimeout(()=>showEventDetail(),1400);
+}
+
+/* ═══════════════════════════════════════
+   EVENT DETAIL — JOINING (QR live)
+═══════════════════════════════════════ */
+function _qrMini(size){
+  const cell=Math.floor(size/7);const s=cell*7;
+  const PAT=[[1,1,1,1,1,1,1],[1,0,0,0,0,0,1],[1,0,1,1,1,0,1],[1,0,1,0,1,0,1],[1,0,1,1,1,0,1],[1,0,0,0,0,0,1],[1,1,1,1,1,1,1]];
+  let cells='';
+  for(let r=0;r<7;r++)for(let c=0;c<7;c++){
+    const f=PAT[r][c];
+    cells+=`<rect x="${c*cell}" y="${r*cell}" width="${cell}" height="${cell}" fill="${f?'#1E1B3A':'#fff'}"/>`;
+  }
+  for(let r=0;r<7;r++)for(let c=0;c<7;c++){
+    if(Math.random()>.5)cells+=`<rect x="${c*cell+Math.floor(s*.6)}" y="${r*cell+Math.floor(s*.6)}" width="${cell}" height="${cell}" fill="${Math.random()>.5?'#1E1B3A':'#fff'}"/>`;
+  }
+  return `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}" xmlns="http://www.w3.org/2000/svg" style="border-radius:6px;">${cells}</svg>`;
+}
+
+/* shared nav bar for joining sub-screens */
+function _joiningNav(backFn, title){
+  return `
+  <div style="position:sticky;top:0;z-index:10;background:rgba(248,247,255,.96);backdrop-filter:blur(10px);
+    padding:52px 20px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);">
+    <button onclick="${backFn}" style="width:30px;height:30px;border-radius:50%;border:none;
+      background:var(--border);color:var(--t2);font-size:18px;cursor:pointer;display:flex;align-items:center;
+      justify-content:center;font-family:inherit;line-height:1;">‹</button>
+    <div style="font-size:17px;font-weight:700;color:var(--t1);">${title}</div>
+  </div>`;
+}
+
+function _joiningDetailHTML(qrExpired){
+  const members=JOINING_MEMBERS;
+  return `
+<div style="min-height:100%;background:var(--bg);animation:slideLeft .2s ease both;">
+  <!-- Nav -->
+  <div style="position:sticky;top:0;z-index:10;background:rgba(248,247,255,.96);backdrop-filter:blur(10px);
+    padding:52px 20px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);">
+    <button onclick="switchTab('events')" style="width:30px;height:30px;border-radius:50%;border:none;
+      background:var(--border);color:var(--t2);font-size:18px;cursor:pointer;display:flex;align-items:center;
+      justify-content:center;font-family:inherit;line-height:1;">‹</button>
+    <div style="flex:1;">
+      <div style="font-size:17px;font-weight:700;color:var(--t1);">Barbeque Night 🔥</div>
+      <div style="font-size:11px;color:var(--t3);">Today · 7 PM</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:5px;">
+      <div class="blink" style="width:7px;height:7px;border-radius:4px;background:#10B981;"></div>
+      <div style="font-size:11px;color:#10B981;font-weight:700;">Open</div>
+    </div>
+  </div>
+
+  <div style="padding:16px 18px 100px;">
+
+    ${qrExpired ? `
+    <!-- QR expired state -->
+    <div style="background:#FEF3C7;border-radius:18px;padding:18px;margin-bottom:16px;
+      display:flex;flex-direction:column;align-items:center;gap:12px;">
+      <div style="font-size:13px;font-weight:700;color:#92400E;">QR code &amp; invite link expired</div>
+      <div style="font-size:12px;color:#B45309;text-align:center;line-height:1.5;">
+        Anyone with the old link can no longer join. Regenerate to get a fresh code.
+      </div>
+      <button onclick="showEventDetailJoining()" style="height:44px;padding:0 24px;border-radius:14px;
+        border:none;background:#F59E0B;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">
+        ↻ &nbsp;Regenerate QR &amp; link
+      </button>
+    </div>` : `
+    <!-- QR live state -->
+    <div style="background:var(--white);border-radius:18px;border:1.5px solid #A7F3D0;
+      padding:16px;margin-bottom:16px;display:flex;align-items:center;gap:14px;">
+      <div style="flex-shrink:0;padding:6px;background:#fff;border-radius:10px;
+        box-shadow:0 2px 8px rgba(0,0,0,.08);">
+        ${_qrMini(72)}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;font-weight:700;color:var(--t1);margin-bottom:4px;">Share to join</div>
+        <div style="font-size:11px;color:var(--indigo);margin-bottom:8px;
+          white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">letssplyt.app/join/bbq-may30</div>
+        <div style="display:flex;gap:6px;">
+          <button style="flex:1;height:30px;border-radius:9px;border:1.5px solid var(--indigo);
+            background:var(--indigo-lt);color:var(--indigo);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">
+            Copy link
+          </button>
+          <button style="flex:1;height:30px;border-radius:9px;border:none;
+            background:var(--indigo);color:#fff;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">
+            Share ↗
+          </button>
+        </div>
+      </div>
+    </div>
+    <!-- Expiry hint -->
+    <div style="font-size:11px;color:var(--t3);text-align:center;margin:-8px 0 14px;">
+      Expires in 18 min &nbsp;·&nbsp;
+      <span onclick="showEventDetailExpired()" style="color:var(--indigo);cursor:pointer;font-weight:600;">
+        Simulate expiry →
+      </span>
+    </div>`}
+
+    <!-- Members joined -->
+    <div style="background:var(--white);border-radius:18px;border:1px solid var(--border);padding:16px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div style="font-size:13px;font-weight:700;color:var(--t1);">
+          Members &nbsp;<span style="font-size:12px;color:var(--t3);font-weight:500;">${members.length} joined</span>
+        </div>
+        <button onclick="showAddMember()" style="font-size:11px;font-weight:700;color:var(--indigo);
+          background:var(--indigo-lt);border:none;border-radius:8px;padding:5px 10px;cursor:pointer;font-family:inherit;">
+          + Add manually
+        </button>
+      </div>
+      ${members.map(m=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);">
+        <div style="width:34px;height:34px;border-radius:11px;background:${m.bg};
+          display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0;">
+          ${m.l}
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:600;color:var(--t1);">${m.name}</div>
+          ${m.noPhone?`<div style="font-size:10px;color:var(--t3);">No phone · you manage their share</div>`:`<div style="font-size:10px;color:var(--t3);">${m.phone||'Joined via QR'}</div>`}
+        </div>
+        <div style="font-size:10px;color:${m.noPhone?'var(--amber)':'var(--green)'};font-weight:700;">
+          ${m.noPhone?'Manual':'Joined ✓'}
+        </div>
+      </div>`).join('')}
+      <div style="padding:12px 0 0;font-size:12px;color:var(--t3);text-align:center;">
+        Others can still join ${qrExpired?'after you regenerate the QR':'until you lock the group'}
+      </div>
+    </div>
+
+    <!-- Lock CTA -->
+    <button onclick="window.parent&&window.parent!==window?window.parent.postMessage({loadFile:'create-event.html',nav:'lock_confirm'},'*'):null"
+      style="width:100%;height:54px;border-radius:18px;border:none;
+      background:linear-gradient(135deg,var(--indigo),var(--purple));color:#fff;
+      font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;
+      box-shadow:0 4px 18px rgba(99,102,241,.28);margin-bottom:10px;">
+      🔒 &nbsp;Everyone's here — Lock &amp; split
+    </button>
+    <div style="font-size:11px;color:var(--t3);text-align:center;line-height:1.5;">
+      Locking closes the group. No one can join after this.
+    </div>
+
+  </div>
+</div>`;
+}
+
+function disputePayment(idx){
+  EVENT_DETAIL_DATA.members[idx].status='pending';
+  EVENT_DETAIL_DATA.members[idx].method=null;
+  EVENT_DETAIL_DATA.members[idx].reportedAt=null;
+  const c=document.getElementById('app-content');
+  c.innerHTML=`
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80%;gap:16px;padding:40px 24px;animation:popIn .3s ease both;">
+  <div style="width:64px;height:64px;border-radius:32px;background:var(--red-lt);display:flex;align-items:center;justify-content:center;font-size:28px;">✕</div>
+  <div style="text-align:center;">
+    <div style="font-size:19px;font-weight:800;color:var(--t1);margin-bottom:6px;">Payment disputed</div>
+    <div style="font-size:13px;color:var(--t3);line-height:1.5;">${EVENT_DETAIL_DATA.members[idx].name} has been moved back<br>to <strong>Awaiting payment</strong>.</div>
+  </div>
+  <button onclick="showEventDetail()" style="margin-top:8px;width:100%;height:48px;border-radius:14px;border:none;
+    background:linear-gradient(135deg,var(--indigo),var(--purple));color:#fff;font-size:15px;font-weight:700;
+    cursor:pointer;font-family:inherit;">Back to Event</button>
+</div>`;
+  document.getElementById('crumb').textContent='dispute';
+}
+
+function nudgeMember(idx){
+  const m=EVENT_DETAIL_DATA.members[idx];
+  const ts=new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+  // Gray out the nudge button by showing a brief confirmation overlay
+  const c=document.getElementById('app-content');
+  c.innerHTML=`
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80%;gap:16px;padding:40px 24px;animation:popIn .3s ease both;">
+  <div style="width:64px;height:64px;border-radius:32px;background:var(--amber-lt);display:flex;align-items:center;justify-content:center;font-size:28px;">⏰</div>
+  <div style="text-align:center;">
+    <div style="font-size:19px;font-weight:800;color:var(--t1);margin-bottom:6px;">Nudge sent!</div>
+    <div style="font-size:13px;color:var(--t3);line-height:1.5;">${m.name} was reminded to pay<br><span style="color:var(--t2);">at ${ts}</span></div>
+  </div>
+  <button onclick="showEventDetail()" style="margin-top:8px;width:100%;height:48px;border-radius:14px;border:none;
+    background:linear-gradient(135deg,var(--indigo),var(--purple));color:#fff;font-size:15px;font-weight:700;
+    cursor:pointer;font-family:inherit;">Back to Event</button>
+</div>`;
+  document.getElementById('crumb').textContent='nudge_sent';
+}
+
+function showCashConfirm(idx){
+  const m=EVENT_DETAIL_DATA.members[idx];
+  const c=document.getElementById('app-content');
+  c.style.opacity='0';
+  setTimeout(()=>{
+    c.innerHTML=`
+<div style="min-height:100%;background:var(--bg);animation:slideLeft .2s ease both;">
+  <div style="position:sticky;top:0;z-index:10;background:rgba(248,247,255,.96);backdrop-filter:blur(10px);
+    padding:52px 20px 12px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);">
+    <button onclick="showEventDetail()" style="width:30px;height:30px;border-radius:50%;border:none;
+      background:var(--border);color:var(--t2);font-size:18px;cursor:pointer;display:flex;align-items:center;
+      justify-content:center;font-family:inherit;line-height:1;">‹</button>
+    <div style="font-size:17px;font-weight:700;color:var(--t1);">Mark Cash Received</div>
+  </div>
+  <div style="padding:24px 20px;">
+    <div style="background:var(--white);border-radius:20px;border:1.5px solid var(--border);padding:24px;
+      box-shadow:0 3px 16px rgba(99,102,241,.07);margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:20px;">
+        <div class="av" style="background:${m.bg};width:48px;height:48px;font-size:18px;border-radius:24px;">${m.l}</div>
+        <div>
+          <div style="font-size:18px;font-weight:800;color:var(--t1);">${m.name}</div>
+          <div style="font-size:12px;color:var(--t3);">Cash payment · $${m.share.toFixed(2)}</div>
+        </div>
+      </div>
+      <div style="background:var(--green-lt);border-radius:12px;padding:14px 16px;">
+        <div style="font-size:12px;color:#059669;line-height:1.5;">Confirming means you received <strong>$${m.share.toFixed(2)} cash</strong> from ${m.name} in person.</div>
+      </div>
+    </div>
+    <button onclick="markCashReceived(${idx})" style="width:100%;height:52px;border-radius:16px;border:none;
+      background:linear-gradient(135deg,#10B981,#059669);color:#fff;font-size:16px;font-weight:700;
+      cursor:pointer;font-family:inherit;box-shadow:0 4px 18px rgba(16,185,129,.25);">💵 Confirm cash received</button>
+    <button onclick="showEventDetail()" style="width:100%;height:44px;border-radius:14px;border:1.5px solid var(--border);
+      background:transparent;color:var(--t2);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;margin-top:8px;">Cancel</button>
+  </div>
+</div>`;
+    c.style.opacity='1';c.style.transition='opacity .16s';c.scrollTop=0;
+  },80);
+  document.getElementById('crumb').textContent='cash_confirm';
+}
+
+function markCashReceived(idx){
+  EVENT_DETAIL_DATA.members[idx].status='confirmed';
+  EVENT_DETAIL_DATA.members[idx].method='Cash';
+  EVENT_DETAIL_DATA.members[idx].reportedAt='just now';
+  EVENT_DETAIL_DATA.outstanding=Math.max(0,EVENT_DETAIL_DATA.outstanding-EVENT_DETAIL_DATA.members[idx].share);
+  const c=document.getElementById('app-content');
+  c.innerHTML=`
+<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:80%;gap:16px;padding:40px 24px;animation:popIn .35s ease both;">
+  <div style="width:72px;height:72px;border-radius:36px;background:var(--green-lt);display:flex;align-items:center;justify-content:center;font-size:32px;">💵</div>
+  <div style="text-align:center;">
+    <div style="font-size:20px;font-weight:800;color:var(--t1);margin-bottom:6px;">Cash received!</div>
+    <div style="font-size:13px;color:var(--t3);line-height:1.5;">${EVENT_DETAIL_DATA.members[idx].name}'s share has been<br>marked as <strong style="color:#059669;">settled</strong>.</div>
+  </div>
+  <button onclick="showEventDetail()" style="margin-top:8px;width:100%;height:48px;border-radius:14px;border:none;
+    background:linear-gradient(135deg,var(--indigo),var(--purple));color:#fff;font-size:15px;font-weight:700;
+    cursor:pointer;font-family:inherit;">Back to Event</button>
+</div>`;
+  document.getElementById('crumb').textContent='cash_done';
+}
+
+function showEventDetailJoining(){
+  const c=document.getElementById('app-content');
+  c.style.opacity='0';
+  setTimeout(()=>{c.innerHTML=_joiningDetailHTML(false);c.style.opacity='1';},120);
+}
+function showEventDetailExpired(){
+  const c=document.getElementById('app-content');
+  c.style.opacity='0';
+  setTimeout(()=>{c.innerHTML=_joiningDetailHTML(true);c.style.opacity='1';},120);
+}
+
+/* ═══════════════════════════════════════
+   ADD MEMBER — type picker
+═══════════════════════════════════════ */
+function showAddMember(){
+  const c=document.getElementById('app-content');
+  c.style.opacity='0';
+  setTimeout(()=>{
+    c.innerHTML=`
+<div style="min-height:100%;background:var(--bg);animation:slideLeft .2s ease both;">
+  ${_joiningNav('showEventDetailJoining()','Add a member')}
+  <div style="padding:20px 18px;">
+
+    <!-- Option 1: with phone -->
+    <button onclick="showAddMemberPhone()" style="width:100%;background:var(--white);border-radius:18px;
+      border:1.5px solid var(--border);padding:18px 16px;margin-bottom:12px;text-align:left;
+      cursor:pointer;font-family:inherit;display:flex;align-items:flex-start;gap:14px;
+      box-shadow:0 2px 10px rgba(99,102,241,.06);">
+      <div style="width:42px;height:42px;border-radius:14px;background:var(--indigo-lt);
+        display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">📱</div>
+      <div style="flex:1;">
+        <div style="font-size:15px;font-weight:700;color:var(--t1);margin-bottom:4px;">With phone number</div>
+        <div style="font-size:12px;color:var(--t3);line-height:1.5;">
+          From your contacts or enter manually.<br>They'll receive a text invite to join.
+        </div>
+      </div>
+      <div style="font-size:18px;color:var(--t3);align-self:center;">›</div>
+    </button>
+
+    <!-- Option 2: name only -->
+    <button onclick="showAddMemberCash()" style="width:100%;background:var(--white);border-radius:18px;
+      border:1.5px solid var(--border);padding:18px 16px;margin-bottom:20px;text-align:left;
+      cursor:pointer;font-family:inherit;display:flex;align-items:flex-start;gap:14px;
+      box-shadow:0 2px 10px rgba(99,102,241,.06);">
+      <div style="width:42px;height:42px;border-radius:14px;background:#FEF3C7;
+        display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;">👤</div>
+      <div style="flex:1;">
+        <div style="font-size:15px;font-weight:700;color:var(--t1);margin-bottom:4px;">Name only — no phone</div>
+        <div style="font-size:12px;color:var(--t3);line-height:1.5;">
+          For cash payers or in-person guests.<br>No message sent. You manage their share and payments.
+        </div>
+      </div>
+      <div style="font-size:18px;color:var(--t3);align-self:center;">›</div>
+    </button>
+
+  </div>
+</div>`;
+    c.style.opacity='1';
+  },120);
+}
+
+/* ═══════════════════════════════════════
+   ADD MEMBER — with phone number
+═══════════════════════════════════════ */
+function showAddMemberPhone(){
+  const c=document.getElementById('app-content');
+  c.style.opacity='0';
+  setTimeout(()=>{
+    c.innerHTML=`
+<div style="min-height:100%;background:var(--bg);animation:slideLeft .2s ease both;">
+  ${_joiningNav('showAddMember()','With phone number')}
+  <div style="padding:20px 18px 100px;">
+
+    <!-- From contacts shortcut -->
+    <button onclick="window.parent&&window.parent!==window?window.parent.postMessage({loadFile:'create-event.html',nav:'add_contacts'},'*'):null"
+      style="width:100%;height:48px;border-radius:14px;border:1.5px solid var(--indigo);
+      background:var(--indigo-lt);color:var(--indigo);font-size:14px;font-weight:700;
+      cursor:pointer;font-family:inherit;margin-bottom:18px;display:flex;align-items:center;
+      justify-content:center;gap:8px;">
+      <span style="font-size:16px;">📋</span> Choose from contacts
+    </button>
+
+    <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;
+      letter-spacing:.07em;text-align:center;margin-bottom:16px;">or enter manually</div>
+
+    <!-- Name -->
+    <div style="margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:6px;">Name</div>
+      <input id="addphone-name" type="text" placeholder="Full name"
+        style="width:100%;height:48px;border-radius:14px;border:1.5px solid var(--border);
+        background:var(--white);font-size:15px;color:var(--t1);padding:0 14px;
+        font-family:inherit;box-sizing:border-box;outline:none;"
+        onfocus="this.style.borderColor='var(--indigo)'" onblur="this.style.borderColor='var(--border)'">
+    </div>
+
+    <!-- Phone -->
+    <div style="margin-bottom:24px;">
+      <div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:6px;">Phone number</div>
+      <div style="display:flex;gap:8px;">
+        <div style="width:64px;height:48px;border-radius:14px;border:1.5px solid var(--border);
+          background:var(--white);display:flex;align-items:center;justify-content:center;
+          font-size:13px;font-weight:700;color:var(--t2);cursor:pointer;flex-shrink:0;">
+          🇺🇸 +1
+        </div>
+        <input id="addphone-num" type="tel" placeholder="(555) 000-0000"
+          style="flex:1;height:48px;border-radius:14px;border:1.5px solid var(--border);
+          background:var(--white);font-size:15px;color:var(--t1);padding:0 14px;
+          font-family:inherit;box-sizing:border-box;outline:none;"
+          onfocus="this.style.borderColor='var(--indigo)'" onblur="this.style.borderColor='var(--border)'">
+      </div>
+    </div>
+
+    <!-- Info note -->
+    <div style="background:var(--indigo-lt);border-radius:12px;padding:12px 14px;margin-bottom:24px;
+      display:flex;gap:10px;align-items:flex-start;">
+      <div style="font-size:14px;flex-shrink:0;">💬</div>
+      <div style="font-size:12px;color:var(--indigo);line-height:1.5;">
+        They'll get a text invite with the join link. Once they tap it, they'll appear in the member list.
+      </div>
+    </div>
+
+    <button onclick="(function(){JOINING_MEMBERS.push({name:'Raj',l:'R',bg:'#EF4444',phone:'+1 (555) 012-3456'});showEventDetailJoining();})()"
+      style="width:100%;height:52px;border-radius:16px;border:none;
+      background:linear-gradient(135deg,var(--indigo),var(--purple));color:#fff;
+      font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;
+      box-shadow:0 4px 18px rgba(99,102,241,.28);">
+      Add &amp; send invite
+    </button>
+    <button onclick="showAddMember()" style="width:100%;height:44px;border-radius:14px;margin-top:8px;
+      border:1.5px solid var(--border);background:transparent;color:var(--t2);
+      font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Cancel</button>
+
+  </div>
+</div>`;
+    c.style.opacity='1';
+  },120);
+}
+
+/* ═══════════════════════════════════════
+   ADD MEMBER — name only (no phone)
+═══════════════════════════════════════ */
+function showAddMemberCash(){
+  const c=document.getElementById('app-content');
+  c.style.opacity='0';
+  setTimeout(()=>{
+    c.innerHTML=`
+<div style="min-height:100%;background:var(--bg);animation:slideLeft .2s ease both;">
+  ${_joiningNav('showAddMember()','Name only')}
+  <div style="padding:20px 18px 100px;">
+
+    <!-- Name -->
+    <div style="margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:6px;">Name</div>
+      <input id="addcash-name" type="text" placeholder="e.g. Alex"
+        style="width:100%;height:48px;border-radius:14px;border:1.5px solid var(--border);
+        background:var(--white);font-size:15px;color:var(--t1);padding:0 14px;
+        font-family:inherit;box-sizing:border-box;outline:none;"
+        onfocus="this.style.borderColor='var(--indigo)'" onblur="this.style.borderColor='var(--border)'">
+    </div>
+
+    <!-- Warning note -->
+    <div style="background:#FEF3C7;border-radius:14px;padding:14px 16px;margin-bottom:24px;">
+      <div style="font-size:12px;font-weight:700;color:#92400E;margin-bottom:6px;">No message will be sent</div>
+      <div style="font-size:12px;color:#B45309;line-height:1.6;">
+        This person won't receive a text invite or payment request. After splitting the bill, you'll need to:<br><br>
+        · Tell them their share verbally<br>
+        · Mark their payment in the app on their behalf
+      </div>
+    </div>
+
+    <button onclick="(function(){JOINING_MEMBERS.push({name:'Alex',l:'A',bg:'#F59E0B',noPhone:true});showEventDetailJoining();})()"
+      style="width:100%;height:52px;border-radius:16px;border:none;
+      background:#1E1B3A;color:#fff;
+      font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;">
+      Add to event
+    </button>
+    <button onclick="showAddMember()" style="width:100%;height:44px;border-radius:14px;margin-top:8px;
+      border:1.5px solid var(--border);background:transparent;color:var(--t2);
+      font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;">Cancel</button>
+
+  </div>
+</div>`;
+    c.style.opacity='1';
+  },120);
+}
+
+/* ═══════════════════════════════════════
+   TAB CONTENT RENDERERS
+═══════════════════════════════════════ */
+const TABS={};
+
+/* ────────────────────────────────────
+   TAB 1 — DASHBOARD
+──────────────────────────────────── */
+TABS.home=()=>{
+  const isMember = PERSONA === 'member';
+  const name     = isMember ? MEMBER_NAME : 'Pawan';
+  const net      = isMember ? MEMBER_NET  : NET;
+  const netSign  = net >= 0 ? '+' : '−';
+  const netColor = net >= 0 ? '#34D399' : '#F87171';
+  const netLabel = net >= 0 ? "you're ahead overall" : "you have outstanding balances";
+  const t_owed   = isMember ? MEMBER_TOTAL_OWED : TOTAL_OWED;
+  const t_owe    = isMember ? MEMBER_TOTAL_OWE  : TOTAL_OWE;
+  const oweList  = isMember ? MEMBER_OWE : I_OWE;
+  const owedCount= isMember ? 1 : OWED_TO_ME.length;
+
+  return `
+<div style="min-height:100%;background:var(--bg);">
+
+  <!-- Greeting -->
+  <div style="padding:56px 22px 0;display:flex;align-items:flex-end;justify-content:space-between;">
+    <div>
+      <div style="font-size:13px;color:var(--t3);margin-bottom:2px;">Good morning ☀️</div>
+      <div style="font-size:22px;font-weight:800;color:var(--t1);">${name}</div>
+    </div>
+    ${!isMember ? `<button onclick="createEvent()" style="display:flex;align-items:center;gap:6px;padding:10px 16px;
+      border-radius:20px;background:linear-gradient(135deg,#6366F1,#7C3AED);border:none;cursor:pointer;
+      color:#fff;font-size:13px;font-weight:700;font-family:inherit;
+      box-shadow:0 4px 14px rgba(99,102,241,.35);flex-shrink:0;">
+      <span style="font-size:16px;line-height:1;">＋</span> New event
+    </button>` : `<div style="display:flex;align-items:center;gap:6px;padding:7px 12px;
+      border-radius:16px;background:#EEF2FF;font-size:11px;font-weight:600;color:#6366F1;">
+      📋 2 active events
+    </div>`}
+  </div>
+
+  <!-- ══ NET BALANCE HERO CARD ══ -->
+  <div style="margin:16px 18px 0;">
+    <div style="background:linear-gradient(145deg,#1E1B3A 0%,#312E81 60%,#4C1D95 100%);
+      border-radius:28px;padding:24px 24px 20px;position:relative;overflow:hidden;">
+
+      <!-- Decorative circles -->
+      <div style="position:absolute;width:180px;height:180px;border-radius:50%;
+        background:rgba(255,255,255,.04);top:-60px;right:-40px;"></div>
+      <div style="position:absolute;width:100px;height:100px;border-radius:50%;
+        background:rgba(99,102,241,.15);bottom:-30px;left:20px;"></div>
+
+      <div style="position:relative;z-index:1;">
+        <div style="font-size:11px;font-weight:700;color:rgba(255,255,255,.45);
+          letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px;">Net balance</div>
+
+        <!-- The one number -->
+        <div style="font-size:52px;font-weight:800;color:${netColor};letter-spacing:-2px;line-height:1;margin-bottom:4px;">
+          ${netSign}$${Math.abs(net).toFixed(0)}</div>
+        <div style="font-size:13px;color:rgba(255,255,255,.4);margin-bottom:22px;">${netLabel}</div>
+
+        <!-- Two pills — order flipped for member (you owe = primary) -->
+        <div style="display:flex;gap:10px;${isMember?'flex-direction:row-reverse;':''}">
+          <div style="flex:1;background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);
+            border-radius:14px;padding:11px 14px;">
+            <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.4);margin-bottom:3px;text-transform:uppercase;letter-spacing:.06em;">Owed to you</div>
+            <div style="font-size:20px;font-weight:800;color:#34D399;">$${t_owed.toFixed(2)}</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:2px;">${owedCount} ${isMember?'event':'people'}</div>
+          </div>
+          <div style="flex:1;background:rgba(239,68,68,.${isMember?'25':'12'});border:1.5px solid rgba(239,68,68,.${isMember?'5':'25'});
+            border-radius:14px;padding:11px 14px;">
+            <div style="font-size:10px;font-weight:700;color:rgba(255,255,255,.4);margin-bottom:3px;text-transform:uppercase;letter-spacing:.06em;">You owe</div>
+            <div style="font-size:20px;font-weight:800;color:#F87171;">$${t_owe.toFixed(2)}</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:2px;">${oweList.length} events</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  ${isMember ? `
+  <!-- ══ MEMBER: YOU OWE (primary section) ══ -->
+  <div style="padding:22px 18px 0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div style="font-size:14px;font-weight:700;color:var(--t1);">You owe</div>
+      <div style="font-size:11px;color:var(--red);font-weight:600;">2 pending</div>
+    </div>
+    ${MEMBER_OWE.map((ev,i)=>`
+    <div style="background:var(--white);border-radius:18px;border:1.5px solid #FECACA;
+      padding:14px 16px;margin-bottom:8px;animation:fadeUp .25s ease ${i*.06}s both;">
+      <div style="display:flex;align-items:center;gap:11px;">
+        <div class="av" style="background:${ev.og_bg};">${ev.og}</div>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:700;color:var(--t1);">${ev.event}</div>
+          <div style="font-size:11px;color:var(--t3);margin-top:1px;">${ev.organiser} · ${ev.date}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:16px;font-weight:800;color:var(--red);">$${ev.amt.toFixed(2)}</div>
+          <button style="font-size:10px;font-weight:700;color:var(--indigo);background:var(--indigo-lt);
+            border:none;padding:3px 8px;border-radius:6px;cursor:pointer;font-family:inherit;margin-top:3px;">Pay →</button>
+        </div>
+      </div>
+    </div>`).join('')}
+  </div>
+
+  <!-- ══ MEMBER: OWED TO YOU (secondary, compact) ══ -->
+  <div style="padding:20px 18px 24px;">
+    <div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:12px;">Owed to you</div>
+    <div style="background:var(--white);border-radius:18px;border:1px solid var(--border);padding:14px 16px;">
+      <div style="display:flex;align-items:center;gap:11px;">
+        <div class="av" style="background:#8B5CF6;">P</div>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:600;color:var(--t1);">Priya S.</div>
+          <div style="font-size:11px;color:var(--t3);margin-top:1px;">Team lunch · May 21</div>
+        </div>
+        <div style="font-size:15px;font-weight:800;color:var(--green);">$12.50</div>
+      </div>
+    </div>
+  </div>
+  ` : `
+  <!-- ══ CREATOR: NEEDS ATTENTION ══ -->
+  <div style="padding:22px 18px 0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div style="font-size:14px;font-weight:700;color:var(--t1);">Needs attention</div>
+      <div style="font-size:11px;color:var(--indigo);font-weight:600;">2 urgent</div>
+    </div>
+    <div style="background:var(--white);border-radius:18px;border:1.5px solid #FECACA;
+      padding:14px 16px;margin-bottom:8px;animation:fadeUp .25s ease both;">
+      <div style="display:flex;align-items:center;gap:11px;">
+        <div class="av" style="background:#EF4444;">R</div>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:700;color:var(--t1);">Raj · $66.64</div>
+          <div style="font-size:11px;color:var(--red);margin-top:1px;">🔴 Overdue 3 days · Dinner at Nobu</div>
+        </div>
+        <button style="padding:7px 12px;border-radius:10px;border:none;background:var(--red-lt);
+          color:var(--red);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">Nudge</button>
+      </div>
+    </div>
+    <div style="background:var(--white);border-radius:18px;border:1.5px solid #FDE68A;
+      padding:14px 16px;margin-bottom:8px;animation:fadeUp .25s ease .05s both;">
+      <div style="display:flex;align-items:center;gap:11px;">
+        <div class="av" style="background:#A78BFA;">J</div>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:700;color:var(--t1);">Jamie · $71.80</div>
+          <div style="font-size:11px;color:var(--amber);margin-top:1px;">⚠️ Payment disputed · waiting</div>
+        </div>
+        <div class="pill pill-a">Disputed</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ CREATOR: YOU OWE ══ -->
+  <div style="padding:20px 18px 0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div style="font-size:14px;font-weight:700;color:var(--t1);">You owe</div>
+      <div style="font-size:11px;color:var(--t3);">Pay now ↗</div>
+    </div>
+    ${I_OWE.map((ev,i)=>`
+    <div style="background:var(--white);border-radius:18px;border:1.5px solid var(--border);
+      padding:14px 16px;margin-bottom:8px;animation:fadeUp .25s ease ${.1+i*.06}s both;">
+      <div style="display:flex;align-items:center;gap:11px;">
+        <div class="av" style="background:${ev.og_bg};">${ev.og}</div>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:700;color:var(--t1);">${ev.event}</div>
+          <div style="font-size:11px;color:var(--t3);margin-top:1px;">${ev.organiser} · ${ev.date}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:16px;font-weight:800;color:var(--red);">$${ev.amt.toFixed(2)}</div>
+          <button style="font-size:10px;font-weight:700;color:var(--indigo);background:var(--indigo-lt);
+            border:none;padding:3px 8px;border-radius:6px;cursor:pointer;font-family:inherit;margin-top:3px;">Pay →</button>
+        </div>
+      </div>
+    </div>`).join('')}
+  </div>
+
+  <!-- ══ CREATOR: OWED TO ME — compact ══ -->
+  <div style="padding:20px 18px 24px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div style="font-size:14px;font-weight:700;color:var(--t1);">Owed to you</div>
+      <div style="font-size:11px;color:var(--indigo);font-weight:600;">4 pending</div>
+    </div>
+    <div style="background:var(--white);border-radius:20px;border:1px solid var(--border);padding:6px 16px;
+      box-shadow:0 2px 12px rgba(99,102,241,.06);">
+      ${OWED_TO_ME.map((p,i)=>{
+        const c={overdue:'var(--red)',disputed:'var(--amber)',pending:'var(--t1)'}[p.status];
+        const bg={overdue:'var(--red-lt)',disputed:'var(--amber-lt)',pending:'transparent'}[p.status];
+        const tag={overdue:'🔴',disputed:'⚠️',pending:''}[p.status];
+        return `
+        <div style="display:flex;align-items:center;gap:11px;padding:11px 0;
+          border-bottom:${i<OWED_TO_ME.length-1?'1px solid var(--border)':'none'};
+          background:${bg};margin:0 -16px;padding-left:16px;padding-right:16px;
+          border-radius:${i===0?'14px 14px 0 0':i===OWED_TO_ME.length-1?'0 0 14px 14px':'0'};">
+          <div class="av" style="background:${p.bg};width:32px;height:32px;border-radius:16px;font-size:12px;">${p.l}</div>
+          <div style="flex:1;">
+            <div style="font-size:13px;font-weight:600;color:var(--t1);">${p.name}</div>
+            <div style="font-size:10px;color:var(--t3);">${p.event}</div>
+          </div>
+          <div style="font-size:14px;font-weight:800;color:${c};">${tag} $${p.amt.toFixed(2)}</div>
+        </div>`;
+      }).join('')}
+    </div>
+  </div>
+  `}
+</div>`;};
+
+/* ────────────────────────────────────
+   TAB 2 — EVENTS
+──────────────────────────────────── */
+TABS.events=()=>`
+<div style="min-height:100%;background:var(--bg);">
+  <div style="padding:56px 22px 16px;display:flex;align-items:center;justify-content:space-between;">
+    <div style="font-size:22px;font-weight:800;color:var(--t1);">Events</div>
+    <button style="width:36px;height:36px;border-radius:12px;border:none;
+      background:linear-gradient(135deg,var(--indigo),var(--purple));
+      color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+      box-shadow:0 3px 12px rgba(99,102,241,.3);" onclick="createEvent()">+</button>
+  </div>
+
+  <!-- Summary strip -->
+  <div style="padding:0 18px 16px;display:flex;gap:8px;">
+    ${[
+      {label:'Active',val:EVENTS.filter(e=>e.status!=='settled').length,c:'var(--indigo)'},
+      {label:'Settled',val:EVENTS.filter(e=>e.status==='settled').length,c:'var(--green)'},
+      {label:'Outstanding',val:'$200.64',c:'var(--amber)'},
+    ].map(s=>`
+    <div style="flex:1;background:var(--white);border-radius:14px;padding:10px 12px;
+      border:1px solid var(--border);box-shadow:0 1px 6px rgba(99,102,241,.04);">
+      <div style="font-size:18px;font-weight:800;color:${s.c};">${s.val}</div>
+      <div style="font-size:10px;color:var(--t3);margin-top:1px;">${s.label}</div>
+    </div>`).join('')}
+  </div>
+
+  <div style="padding:0 18px 24px;">
+    <!-- Active first -->
+    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Active</div>
+    ${EVENTS.filter(e=>e.status!=='settled').map((ev,i)=>{
+      if(ev.status==='joining') return `
+      <div onclick="showEventDetailJoining()" style="background:var(--white);border-radius:20px;
+        border:1.5px solid #A7F3D0;padding:16px;margin-bottom:10px;
+        box-shadow:0 3px 16px rgba(16,185,129,.10);
+        animation:fadeUp .25s ease ${i*.06}s both;cursor:pointer;">
+        <div style="display:flex;align-items:flex-start;gap:10px;">
+          <div style="width:40px;height:40px;border-radius:14px;background:#D1FAE518;
+            display:flex;align-items:center;justify-content:center;flex-shrink:0;position:relative;">
+            <div class="blink" style="width:10px;height:10px;border-radius:5px;background:#10B981;"></div>
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:15px;font-weight:700;color:var(--t1);margin-bottom:2px;">${ev.name}</div>
+            <div style="font-size:11px;color:var(--t3);">${ev.date} · ${ev.people} joined so far
+              <span style="margin-left:6px;font-size:9px;font-weight:700;background:#D1FAE5;color:#065F46;padding:2px 6px;border-radius:5px;">Open · joining</span>
+            </div>
+          </div>
+          <div style="font-size:18px;color:var(--t3);">›</div>
+        </div>
+      </div>`;
+      const dot={active:'var(--indigo)',partial:'var(--amber)'}[ev.status];
+      return `
+      <div onclick="${ev.mine?'showEventDetail()':''}" style="background:var(--white);border-radius:20px;border:1.5px solid var(--border);
+        padding:16px;margin-bottom:10px;
+        box-shadow:0 3px 16px rgba(99,102,241,.07);
+        animation:fadeUp .25s ease ${i*.06}s both;
+        cursor:${ev.mine?'pointer':'default'};">
+
+        <!-- Top row -->
+        <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;">
+          <div style="width:40px;height:40px;border-radius:14px;background:${dot}18;
+            display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <div style="width:10px;height:10px;border-radius:5px;background:${dot};"></div>
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:15px;font-weight:700;color:var(--t1);margin-bottom:2px;">${ev.name}</div>
+            <div style="font-size:11px;color:var(--t3);">${ev.date} · ${ev.people} people
+              ${ev.mine?'<span style="margin-left:6px;font-size:9px;font-weight:700;background:var(--indigo-lt);color:var(--indigo);padding:2px 6px;border-radius:5px;">You created</span>'
+              :`<span style="margin-left:6px;font-size:9px;font-weight:700;background:#F3F4F6;color:var(--t3);padding:2px 6px;border-radius:5px;">by ${ev.host}</span>`}
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:16px;font-weight:800;color:var(--t1);">$${ev.total.toFixed(2)}</div>
+            <div style="font-size:10px;color:${ev.outstanding>0?'var(--amber)':'var(--green)'};font-weight:600;margin-top:2px;">
+              ${ev.outstanding>0?`$${ev.outstanding.toFixed(2)} left`:'All settled'}</div>
+          </div>
+        </div>
+
+        <!-- Progress bar -->
+        <div style="height:4px;border-radius:2px;background:var(--border);overflow:hidden;">
+          <div style="height:4px;border-radius:2px;
+            width:${Math.round((1-ev.outstanding/ev.total)*100)}%;
+            background:${ev.outstanding>0?'var(--indigo)':'var(--green)'};transition:width .6s;"></div>
+        </div>
+      </div>`;
+    }).join('')}
+
+    <!-- Settled -->
+    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 10px;">Settled</div>
+    ${EVENTS.filter(e=>e.status==='settled').map((ev,i)=>`
+    <div style="background:var(--white);border-radius:18px;border:1px solid var(--border);
+      padding:14px 16px;margin-bottom:8px;opacity:.7;animation:fadeUp .25s ease ${i*.06}s both;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:36px;height:36px;border-radius:12px;background:var(--green-lt);
+          display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">✓</div>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:600;color:var(--t2);">${ev.name}</div>
+          <div style="font-size:11px;color:var(--t3);">${ev.date} · ${ev.people} people</div>
+        </div>
+        <div style="font-size:14px;font-weight:700;color:var(--t3);">$${ev.total.toFixed(2)}</div>
+      </div>
+    </div>`).join('')}
+  </div>
+</div>`;
+
+/* ────────────────────────────────────
+   TAB 3 — MEMBERS
+──────────────────────────────────── */
+TABS.members=()=>`
+<div style="min-height:100%;background:var(--bg);">
+  <div style="padding:56px 22px 16px;">
+    <div style="font-size:22px;font-weight:800;color:var(--t1);margin-bottom:4px;">Members</div>
+    <div style="font-size:13px;color:var(--t3);">Everyone across all your events</div>
+  </div>
+
+  <!-- Filter chips -->
+  <div style="padding:0 18px 16px;display:flex;gap:8px;overflow-x:auto;">
+    ${[['All',true],['Owed to you',false],['You owe',false],['Settled',false]].map(([l,sel])=>`
+    <div style="padding:7px 16px;border-radius:100px;white-space:nowrap;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;
+      background:${sel?'var(--indigo)':'var(--white)'};
+      color:${sel?'#fff':'var(--t2)'};
+      border:1.5px solid ${sel?'var(--indigo)':'var(--border2)'};">${l}</div>`).join('')}
+  </div>
+
+  <div style="padding:0 18px 24px;">
+    <!-- Owed to you section -->
+    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Owed to you</div>
+
+    ${MEMBERS.filter(m=>m.netOwed>0).map((m,i)=>{
+      const statusC={overdue:'var(--red)',disputed:'var(--amber)',pending:'var(--indigo)'}[m.status];
+      const statusBg={overdue:'var(--red-lt)',disputed:'var(--amber-lt)',pending:'var(--indigo-lt)'}[m.status];
+      const statusLabel={overdue:'Overdue',disputed:'Disputed',pending:'Pending'}[m.status];
+      return `
+      <div style="background:var(--white);border-radius:18px;border:1.5px solid var(--border);
+        padding:14px 16px;margin-bottom:8px;
+        box-shadow:0 2px 10px rgba(99,102,241,.05);
+        animation:fadeUp .25s ease ${i*.05}s both;">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <div class="av" style="background:${m.bg};">${m.l}</div>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:700;color:var(--t1);">${m.name}</div>
+            <div style="font-size:11px;color:var(--t3);margin-top:1px;">${m.events} event${m.events>1?'s':''} · ${m.lastEvent}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:16px;font-weight:800;color:${statusC};">$${m.netOwed.toFixed(2)}</div>
+            <div style="font-size:9px;font-weight:700;color:${statusC};background:${statusBg};
+              padding:2px 7px;border-radius:5px;margin-top:3px;display:inline-block;">${statusLabel}</div>
+          </div>
+        </div>
+        <!-- Mini action row -->
+        <div style="display:flex;gap:6px;margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
+          <button style="flex:1;height:30px;border-radius:8px;border:none;background:var(--amber-lt);
+            color:#B45309;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">⏰ Nudge</button>
+          <button style="flex:1;height:30px;border-radius:8px;border:none;background:var(--green-lt);
+            color:#059669;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">✓ Mark paid</button>
+          <button onclick="openMemberDetail('${m.name}')" style="width:30px;height:30px;border-radius:8px;border:none;background:var(--indigo-lt);
+            color:var(--indigo);font-size:13px;cursor:pointer;font-family:inherit;">›</button>
+        </div>
+      </div>`;
+    }).join('')}
+
+    <!-- Settled -->
+    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 10px;">Settled ✓</div>
+    ${MEMBERS.filter(m=>m.status==='settled').map((m,i)=>`
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;
+      background:var(--white);border:1px solid var(--green-lt);margin-bottom:7px;opacity:.75;">
+      <div class="av" style="background:${m.bg};opacity:.65;">${m.l}</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:600;color:var(--t2);">${m.name}</div>
+        <div style="font-size:10px;color:var(--t3);">${m.events} event${m.events>1?'s':''} · all clear</div>
+      </div>
+      <div class="pill pill-g">✓ Settled</div>
+    </div>`).join('')}
+
+    <!-- You owe -->
+    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 10px;">You owe</div>
+    ${MEMBERS.filter(m=>m.status==='i_owe').map((m,i)=>`
+    <div style="display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;
+      background:var(--white);border:1.5px solid var(--red-lt);margin-bottom:7px;">
+      <div class="av" style="background:${m.bg};">${m.l}</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:700;color:var(--t1);">${m.name}</div>
+        <div style="font-size:10px;color:var(--t3);">${m.lastEvent}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:14px;font-weight:800;color:var(--red);">$${Math.abs(m.netOwed).toFixed(2)}</div>
+        <button style="font-size:10px;font-weight:700;color:var(--indigo);background:var(--indigo-lt);
+          border:none;padding:3px 8px;border-radius:6px;cursor:pointer;margin-top:3px;font-family:inherit;">Pay →</button>
+      </div>
+    </div>`).join('')}
+  </div>
+</div>`;
+
+/* ────────────────────────────────────
+   TAB 4 — SETTINGS
+──────────────────────────────────── */
+TABS.settings=()=>`
+<div style="min-height:100%;background:var(--bg);">
+
+  <!-- Profile hero -->
+  <div style="padding:56px 22px 20px;display:flex;align-items:center;gap:16px;">
+    <div style="width:60px;height:60px;border-radius:30px;
+      background:linear-gradient(135deg,#6366F1,#7C3AED);
+      display:flex;align-items:center;justify-content:center;font-size:24px;color:#fff;font-weight:800;
+      box-shadow:0 4px 16px rgba(99,102,241,.3);">P</div>
+    <div>
+      <div style="font-size:20px;font-weight:800;color:var(--t1);">Pawan Lawale</div>
+      <div style="font-size:13px;color:var(--t3);">+1 (555) 012-3456</div>
+    </div>
+    <div style="margin-left:auto;font-size:13px;color:var(--indigo);font-weight:600;cursor:pointer;">Edit</div>
+  </div>
+
+  <div style="padding:0 18px 32px;">
+
+    ${[
+      {section:'Payment handles',rows:[
+        {icon:'V',ic:'#3D95CE',label:'Venmo',value:'@pawan-lawale'},
+        {icon:'P',ic:'#009CDE',label:'PayPal',value:'paypal.me/pawan'},
+        {icon:'$',ic:'#00D632',label:'Cash App',value:'$PawanL'},
+      ],action:{label:'+ Add handle',color:'var(--indigo)'}},
+      {section:'Notifications',rows:[
+        {label:'Payment received',toggle:true,on:true},
+        {label:'Nudge reminders',toggle:true,on:true},
+        {label:'Weekly digest',toggle:true,on:false},
+      ]},
+      {section:'Privacy',rows:[
+        {label:'Download my data',icon2:'↓'},
+        {label:'Privacy policy',icon2:'›'},
+        {label:'Terms of service',icon2:'›'},
+      ]},
+    ].map(({section,rows,action})=>`
+    <div style="margin-bottom:20px;">
+      <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">${section}</div>
+      <div style="background:var(--white);border-radius:18px;border:1px solid var(--border);padding:0 16px;
+        box-shadow:0 2px 10px rgba(99,102,241,.05);">
+        ${rows.map((row,i,arr)=>`
+        <div style="display:flex;align-items:center;padding:13px 0;
+          border-bottom:${i<arr.length-1?'1px solid var(--border)':'none'};">
+          ${row.icon?`<div style="width:30px;height:30px;border-radius:9px;background:${row.ic};
+            display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;
+            color:#fff;margin-right:10px;flex-shrink:0;">${row.icon}</div>`:''}
+          <div style="flex:1;font-size:14px;color:var(--t1);">${row.label}</div>
+          ${row.toggle?`
+          <div style="width:44px;height:26px;border-radius:13px;position:relative;cursor:pointer;
+            background:${row.on?'var(--indigo)':'#E5E7EB'};transition:background .2s;">
+            <div style="position:absolute;top:3px;${row.on?'right:3px':'left:3px'};
+              width:20px;height:20px;border-radius:10px;background:#fff;
+              box-shadow:0 1px 4px rgba(0,0,0,.15);transition:all .2s;"></div>
+          </div>`
+          :row.value?`<div style="font-size:12px;color:var(--t3);">${row.value}</div>`
+          :`<div style="font-size:16px;color:var(--t3);">${row.icon2}</div>`}
+        </div>`).join('')}
+        ${action?`<div style="padding:11px 0;font-size:13px;font-weight:700;color:${action.color};cursor:pointer;">${action.label}</div>`:''}
+      </div>
+    </div>`).join('')}
+
+    <!-- Danger zone -->
+    <div style="margin-bottom:20px;">
+      <div style="font-size:10px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Danger zone</div>
+      <div style="background:var(--white);border-radius:18px;border:1.5px solid #FECACA;padding:0 16px;">
+        <div style="padding:14px 0;font-size:14px;font-weight:600;color:var(--red);cursor:pointer;
+          display:flex;justify-content:space-between;align-items:center;">
+          Delete account & all data <span style="font-size:16px;">›</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="text-align:center;font-size:11px;color:var(--t3);">LetsSplyt v1.0.0 · Made with ✦</div>
+  </div>
+</div>`;
+
+/* ── INIT ── */
+const s=document.createElement('style');
+s.textContent=`
+  @keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes popIn{0%{transform:scale(.4);opacity:0;}65%{transform:scale(1.1);}100%{transform:scale(1);opacity:1;}}
+`;
+document.head.appendChild(s);
+switchTab('home');
+
+// ── OPEN MEMBER DETAIL ──
+function openMemberDetail(name){
+  if(window.parent !== window){
+    window.parent.postMessage({loadFile:'ledger.html', nav:'owed_person', memberName:name}, '*');
+  } else {
+    location.href = 'ledger.html';
+  }
+}
+
+// ── CREATE EVENT ──
+function createEvent(){
+  if(window.parent !== window){
+    // Inside simulator — ask parent to load create-event.html
+    window.parent.postMessage({loadFile:'create-event.html', nav:'create_event'}, '*');
+  } else {
+    // Standalone — navigate directly
+    location.href = 'create-event.html';
+  }
+}
+
+// ── SIM MODE ──
+(function(){
+  if(new URLSearchParams(location.search).get("sim")){
+    ["sidebar","info"].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display="none";});
+    var c=document.getElementById("center");if(c){c.style.justifyContent="center";c.style.gap="0";}
+  }
+  window.addEventListener("message",function(e){
+    if(!e.data) return;
+    if(e.data.persona){PERSONA=e.data.persona;}
+    if(e.data.nav==='event_detail'){switchTab('events');setTimeout(showEventDetail,120);return;}
+    if(e.data.nav==='event_detail_joining'){switchTab('events');setTimeout(showEventDetailJoining,120);return;}
+    if(e.data.nav==='confirm_payment'){switchTab('events');setTimeout(()=>{showEventDetail();setTimeout(()=>showConfirmPayment(2),120);},120);return;}
+    if(e.data.nav==='add_member'){switchTab('events');setTimeout(()=>{showEventDetailJoining();setTimeout(showAddMember,220);},120);return;}
+    if(e.data.nav==='add_member_phone'){switchTab('events');setTimeout(()=>{showEventDetailJoining();setTimeout(showAddMemberPhone,220);},120);return;}
+    if(e.data.nav==='add_member_cash'){switchTab('events');setTimeout(()=>{showEventDetailJoining();setTimeout(showAddMemberCash,220);},120);return;}
+    if(e.data.tab&&TABS[e.data.tab]) switchTab(e.data.tab);
+    else if(e.data.persona) switchTab(currentTab);
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LetsSplyt — Registered Participant</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F0EFFF;display:flex;min-height:100vh;}
+
+/* Layout */
+#sidebar{width:260px;background:#fff;border-right:1px solid #E8E6FF;padding:24px 16px;flex-shrink:0;}
+#center{display:flex;flex:1;align-items:center;justify-content:center;gap:32px;padding:32px;}
+#info{width:260px;flex-shrink:0;padding:24px;}
+
+/* Sidebar */
+.sidebar-logo{display:flex;align-items:center;gap:8px;margin-bottom:28px;}
+.logo-icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#6366F1,#7C3AED);display:flex;align-items:center;justify-content:center;}
+.logo-icon svg{width:18px;height:18px;}
+.logo-text{font-size:16px;font-weight:700;color:#1a1a2e;}
+.sidebar-section{font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.8px;margin:20px 0 8px;}
+.screen-btn{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;cursor:pointer;margin-bottom:2px;transition:background .15s;}
+.screen-btn:hover{background:#F0EFFF;}
+.screen-btn.active{background:#EEF2FF;}
+.screen-btn .dot{width:6px;height:6px;border-radius:50%;background:#D1D5DB;flex-shrink:0;}
+.screen-btn.active .dot{background:#6366F1;}
+.screen-btn span{font-size:12px;color:#6B7280;}
+.screen-btn.active span{color:#4338CA;font-weight:600;}
+.screen-tag{margin-left:auto;font-size:9px;padding:2px 6px;border-radius:6px;font-weight:700;}
+.tag-cp{background:#EEF2FF;color:#6366F1;}
+.tag-mvp{background:#F0FDF4;color:#16A34A;}
+
+/* Phone */
+.phone{width:375px;height:720px;background:#fff;border-radius:44px;overflow:hidden;box-shadow:0 20px 60px rgba(99,102,241,.15),0 0 0 10px #1a1a2e;position:relative;flex-shrink:0;}
+.status-bar{height:44px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 24px;flex-shrink:0;}
+.status-time{font-size:15px;font-weight:700;color:#1a1a2e;}
+.status-icons{display:flex;align-items:center;gap:6px;}
+.status-icons svg{width:16px;height:16px;color:#1a1a2e;}
+.screen-content{height:calc(720px - 44px - 64px);overflow:hidden;position:relative;display:flex;flex-direction:column;}
+
+/* Info panel */
+.info-label{font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;}
+.info-title{font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:10px;line-height:1.3;}
+.info-desc{font-size:13px;color:#6B7280;line-height:1.7;margin-bottom:16px;}
+.info-tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:4px 10px;border-radius:10px;font-weight:600;margin-right:6px;margin-bottom:6px;}
+.info-tag.ai{background:#EEF2FF;color:#6366F1;}
+.info-tag.ux{background:#F0FDF4;color:#16A34A;}
+.info-tag.flow{background:#FFFBEB;color:#D97706;}
+.info-ref{font-size:11px;color:#9CA3AF;margin-top:12px;padding-top:12px;border-top:1px solid #F3F4F6;}
+
+/* ── SHARED UI COMPONENTS ── */
+.gradient-btn{width:100%;padding:16px;border-radius:16px;background:linear-gradient(135deg,#6366F1,#7C3AED);color:#fff;font-size:16px;font-weight:700;border:none;cursor:pointer;text-align:center;}
+.ghost-btn{width:100%;padding:14px;border-radius:16px;background:transparent;border:1.5px solid #E5E7EB;color:#6B7280;font-size:15px;font-weight:600;cursor:pointer;text-align:center;margin-top:10px;}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;}
+.chip.green{background:#ECFDF5;color:#059669;}
+.chip.amber{background:#FFFBEB;color:#D97706;}
+.chip.red{background:#FEF2F2;color:#DC2626;}
+.chip.indigo{background:#EEF2FF;color:#6366F1;}
+.chip.gray{background:#F9FAFB;color:#9CA3AF;}
+
+/* ── SCREEN: join_deeplink ── */
+#s-join_deeplink{display:flex;flex-direction:column;height:100%;background:linear-gradient(160deg,#F0EFFF 0%,#fff 60%);}
+.jd-hero{padding:32px 24px 20px;display:flex;flex-direction:column;align-items:center;text-align:center;}
+.jd-event-pill{background:linear-gradient(135deg,#6366F1,#7C3AED);color:#fff;font-size:11px;font-weight:700;padding:5px 14px;border-radius:20px;margin-bottom:16px;letter-spacing:.5px;}
+.jd-event-name{font-size:22px;font-weight:800;color:#1a1a2e;margin-bottom:6px;}
+.jd-host{font-size:13px;color:#6B7280;margin-bottom:20px;}
+.jd-avatars{display:flex;align-items:center;margin-bottom:6px;}
+.jd-avatar{width:36px;height:36px;border-radius:50%;border:2.5px solid #fff;margin-left:-8px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;}
+.jd-avatar:first-child{margin-left:0;}
+.jd-members-label{font-size:12px;color:#9CA3AF;margin-top:6px;}
+.jd-card{margin:0 20px 16px;background:#fff;border-radius:20px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.06);}
+.jd-card-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F3F4F6;font-size:13px;}
+.jd-card-row:last-child{border-bottom:none;}
+.jd-card-row .label{color:#9CA3AF;}
+.jd-card-row .value{font-weight:600;color:#1a1a2e;}
+.jd-actions{padding:0 20px 24px;margin-top:auto;}
+
+/* ── SCREEN: join_expired ── */
+#s-join_expired{display:flex;flex-direction:column;height:100%;background:#fff;}
+.je-top{padding:20px 24px 0;display:flex;align-items:center;}
+.je-back{width:36px;height:36px;border-radius:12px;background:#F9FAFB;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:18px;}
+.je-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;}
+.je-icon{width:72px;height:72px;border-radius:24px;background:#FEF2F2;display:flex;align-items:center;justify-content:center;font-size:32px;margin:0 auto 20px;}
+.je-title{font-size:20px;font-weight:700;color:#1a1a2e;margin-bottom:8px;}
+.je-sub{font-size:14px;color:#6B7280;line-height:1.6;margin-bottom:28px;}
+.otp-row{display:flex;gap:10px;justify-content:center;margin-bottom:20px;}
+.otp-box{width:44px;height:52px;border-radius:12px;border:1.5px solid #E5E7EB;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#1a1a2e;}
+.otp-box.filled{border-color:#6366F1;background:#EEF2FF;}
+.otp-box.cursor{border-color:#6366F1;animation:blink 1s step-end infinite;}
+@keyframes blink{0%,100%{background:#EEF2FF;}50%{background:#fff;}}
+.je-actions{padding:0 24px 32px;}
+
+/* ── SCREEN: joined ── */
+#s-joined{display:flex;flex-direction:column;height:100%;background:#fff;}
+.joined-body{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;text-align:center;}
+.joined-check{width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#6366F1,#7C3AED);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;box-shadow:0 8px 24px rgba(99,102,241,.35);}
+.joined-check svg{width:36px;height:36px;color:#fff;}
+.joined-title{font-size:24px;font-weight:800;color:#1a1a2e;margin-bottom:8px;}
+.joined-sub{font-size:14px;color:#6B7280;line-height:1.6;margin-bottom:28px;}
+.joined-info-card{width:100%;background:#F9FAFB;border-radius:16px;padding:16px;text-align:left;margin-bottom:20px;}
+.joined-info-row{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;}
+.joined-info-label{color:#9CA3AF;}
+.joined-info-val{font-weight:600;color:#1a1a2e;}
+.joined-actions{padding:0 24px 32px;width:100%;}
+
+/* ── SCREEN: my_bill ── */
+#s-my_bill{display:flex;flex-direction:column;height:100%;background:#F9FAFB;}
+.mb-header{background:#fff;padding:20px 20px 16px;border-bottom:1px solid #F3F4F6;}
+.mb-greeting{font-size:13px;color:#9CA3AF;margin-bottom:2px;}
+.mb-title{font-size:22px;font-weight:800;color:#1a1a2e;}
+.mb-hero{margin:16px;background:linear-gradient(145deg,#1E1B3A,#312E81 60%,#4C1D95);border-radius:24px;padding:24px;color:#fff;}
+.mb-hero-label{font-size:11px;font-weight:600;opacity:.6;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;}
+.mb-hero-amount{font-size:42px;font-weight:800;letter-spacing:-1px;margin-bottom:4px;}
+.mb-hero-sub{font-size:12px;opacity:.55;}
+.mb-section-title{font-size:12px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.8px;padding:16px 20px 8px;}
+.mb-event-card{background:#fff;margin:0 16px 10px;border-radius:16px;padding:16px;box-shadow:0 1px 4px rgba(0,0,0,.05);}
+.mb-event-name{font-size:15px;font-weight:700;color:#1a1a2e;margin-bottom:4px;}
+.mb-event-meta{font-size:12px;color:#9CA3AF;margin-bottom:10px;}
+.mb-event-row{display:flex;justify-content:space-between;align-items:center;}
+.mb-event-amount{font-size:18px;font-weight:800;color:#EF4444;}
+.mb-event-actions{display:flex;gap:8px;}
+.mb-pay-btn{padding:7px 14px;border-radius:10px;background:linear-gradient(135deg,#6366F1,#7C3AED);color:#fff;font-size:12px;font-weight:700;border:none;cursor:pointer;}
+.mb-detail-btn{padding:7px 14px;border-radius:10px;background:#F0EFFF;color:#6366F1;font-size:12px;font-weight:600;border:none;cursor:pointer;}
+.mb-settled-card{background:#fff;margin:0 16px 10px;border-radius:16px;padding:14px 16px;opacity:.5;}
+
+/* ── SCREEN: event_detail ── */
+#s-event_detail{display:flex;flex-direction:column;height:100%;background:#F9FAFB;}
+.ed-header{background:#fff;padding:16px 20px 12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #F3F4F6;}
+.ed-back{width:34px;height:34px;border-radius:10px;background:#F9FAFB;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;}
+.ed-header-info{flex:1;}
+.ed-event-name{font-size:16px;font-weight:700;color:#1a1a2e;}
+.ed-host{font-size:12px;color:#9CA3AF;}
+.ed-body{flex:1;overflow-y:auto;padding:16px;}
+.ed-your-share{background:linear-gradient(135deg,#6366F1,#7C3AED);border-radius:20px;padding:20px;color:#fff;margin-bottom:16px;text-align:center;}
+.ed-share-label{font-size:11px;font-weight:600;opacity:.7;text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;}
+.ed-share-amount{font-size:36px;font-weight:800;letter-spacing:-.5px;margin-bottom:6px;}
+.ed-share-status{font-size:12px;opacity:.7;}
+.ed-section{background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;}
+.ed-section-title{font-size:12px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px;}
+.ed-item-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F9FAFB;font-size:13px;}
+.ed-item-row:last-child{border-bottom:none;}
+.ed-item-name{color:#1a1a2e;font-weight:500;}
+.ed-item-price{color:#1a1a2e;font-weight:600;}
+.ed-item-shared{font-size:11px;color:#9CA3AF;margin-top:1px;}
+.ed-member-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F9FAFB;}
+.ed-member-row:last-child{border-bottom:none;}
+.ed-member-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0;}
+.ed-member-name{flex:1;font-size:13px;font-weight:500;color:#1a1a2e;}
+.ed-member-amount{font-size:13px;font-weight:700;}
+.ed-footer{padding:16px 20px 28px;background:#fff;border-top:1px solid #F3F4F6;}
+
+/* ── SCREEN: payment_links ── */
+#s-payment_links{display:flex;flex-direction:column;height:100%;background:#fff;}
+.pl-header{padding:20px 24px 16px;border-bottom:1px solid #F3F4F6;}
+.pl-title{font-size:20px;font-weight:800;color:#1a1a2e;margin-bottom:4px;}
+.pl-sub{font-size:13px;color:#6B7280;}
+.pl-amount-card{margin:16px 20px;background:linear-gradient(135deg,#6366F1,#7C3AED);border-radius:20px;padding:20px;color:#fff;text-align:center;}
+.pl-amount-label{font-size:12px;opacity:.7;margin-bottom:4px;}
+.pl-amount{font-size:36px;font-weight:800;}
+.pl-payee{font-size:13px;opacity:.7;margin-top:4px;}
+.pl-options{padding:0 20px;flex:1;}
+.pl-option{display:flex;align-items:center;gap:14px;padding:14px 16px;background:#F9FAFB;border-radius:16px;margin-bottom:10px;cursor:pointer;transition:background .15s;border:1.5px solid transparent;}
+.pl-option:hover,.pl-option.selected{background:#EEF2FF;border-color:#6366F1;}
+.pl-option-icon{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+.pl-option-name{font-size:15px;font-weight:700;color:#1a1a2e;}
+.pl-option-desc{font-size:12px;color:#9CA3AF;margin-top:1px;}
+.pl-option-arrow{margin-left:auto;color:#9CA3AF;font-size:16px;}
+.pl-footer{padding:16px 20px 28px;}
+
+/* ── SCREEN: ive_paid ── */
+#s-ive_paid{display:flex;flex-direction:column;height:100%;background:#F9FAFB;}
+.ip-header{background:#fff;padding:16px 20px 12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #F3F4F6;}
+.ip-back{width:34px;height:34px;border-radius:10px;background:#F9FAFB;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;}
+.ip-title{font-size:17px;font-weight:700;color:#1a1a2e;}
+.ip-body{flex:1;padding:20px;overflow-y:auto;}
+.ip-info{background:#fff;border-radius:20px;padding:20px;margin-bottom:16px;}
+.ip-info-title{font-size:14px;font-weight:600;color:#9CA3AF;margin-bottom:12px;}
+.ip-info-amount{font-size:32px;font-weight:800;color:#1a1a2e;margin-bottom:4px;}
+.ip-info-event{font-size:13px;color:#6B7280;}
+.ip-method-section{background:#fff;border-radius:20px;padding:20px;margin-bottom:16px;}
+.ip-method-title{font-size:13px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.7px;margin-bottom:12px;}
+.ip-method-option{display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;border:1.5px solid #E5E7EB;margin-bottom:8px;cursor:pointer;transition:all .15s;}
+.ip-method-option.selected{border-color:#6366F1;background:#EEF2FF;}
+.ip-method-icon{font-size:22px;width:36px;text-align:center;}
+.ip-method-label{font-size:14px;font-weight:600;color:#1a1a2e;}
+.ip-radio{width:18px;height:18px;border-radius:50%;border:2px solid #D1D5DB;margin-left:auto;flex-shrink:0;}
+.ip-method-option.selected .ip-radio{border-color:#6366F1;background:radial-gradient(circle, #6366F1 6px, #fff 6px);}
+.ip-note{background:#FFFBEB;border-radius:14px;padding:14px;font-size:12px;color:#92400E;line-height:1.6;}
+.ip-footer{padding:16px 20px 32px;background:#fff;border-top:1px solid #F3F4F6;}
+
+/* ── SCREEN: report_sent ── */
+#s-report_sent{display:flex;flex-direction:column;height:100%;background:#fff;align-items:center;justify-content:center;padding:32px 24px;text-align:center;}
+.rs-icon{width:80px;height:80px;border-radius:50%;background:#ECFDF5;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;font-size:36px;}
+.rs-title{font-size:22px;font-weight:800;color:#1a1a2e;margin-bottom:10px;}
+.rs-sub{font-size:14px;color:#6B7280;line-height:1.7;margin-bottom:28px;}
+.rs-card{width:100%;background:#F9FAFB;border-radius:16px;padding:16px;text-align:left;margin-bottom:24px;}
+.rs-card-row{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;}
+.rs-label{color:#9CA3AF;}
+.rs-val{font-weight:600;color:#1a1a2e;}
+.rs-actions{width:100%;}
+
+/* ── SCREEN: add_handles ── */
+#s-add_handles{display:flex;flex-direction:column;height:100%;background:#F9FAFB;}
+.ah-header{background:#fff;padding:16px 20px 12px;border-bottom:1px solid #F3F4F6;}
+.ah-title{font-size:20px;font-weight:800;color:#1a1a2e;margin-bottom:2px;}
+.ah-sub{font-size:13px;color:#9CA3AF;}
+.ah-body{flex:1;padding:16px;overflow-y:auto;}
+.ah-card{background:#fff;border-radius:20px;padding:20px;margin-bottom:12px;}
+.ah-app-row{display:flex;align-items:center;gap:12px;margin-bottom:14px;}
+.ah-app-icon{width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0;}
+.ah-app-name{font-size:15px;font-weight:700;color:#1a1a2e;}
+.ah-app-desc{font-size:11px;color:#9CA3AF;}
+.ah-input{width:100%;padding:12px 14px;border-radius:12px;border:1.5px solid #E5E7EB;font-size:14px;color:#1a1a2e;background:#F9FAFB;outline:none;}
+.ah-input.filled{border-color:#6366F1;background:#EEF2FF;}
+.ah-saved-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#059669;font-weight:600;margin-top:6px;}
+.ah-footer{padding:16px 20px 32px;background:#fff;border-top:1px solid #F3F4F6;}
+
+/* ── SCREEN: opt_out ── */
+#s-opt_out{display:flex;flex-direction:column;height:100%;background:#F9FAFB;}
+.oo-header{background:#fff;padding:16px 20px 12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #F3F4F6;}
+.oo-back{width:34px;height:34px;border-radius:10px;background:#F9FAFB;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;}
+.oo-title{font-size:17px;font-weight:700;color:#1a1a2e;}
+.oo-body{flex:1;padding:20px;overflow-y:auto;}
+.oo-section{background:#fff;border-radius:20px;padding:20px;margin-bottom:12px;}
+.oo-section-title{font-size:13px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.7px;margin-bottom:12px;}
+.oo-option{display:flex;align-items:flex-start;gap:12px;padding:12px 0;border-bottom:1px solid #F9FAFB;cursor:pointer;}
+.oo-option:last-child{border-bottom:none;}
+.oo-option-icon{font-size:20px;margin-top:1px;}
+.oo-option-label{font-size:14px;font-weight:600;color:#1a1a2e;margin-bottom:2px;}
+.oo-option-desc{font-size:12px;color:#9CA3AF;line-height:1.5;}
+.oo-option-arrow{margin-left:auto;color:#9CA3AF;font-size:14px;margin-top:2px;}
+.oo-danger{background:#fff;border-radius:20px;padding:20px;margin-bottom:12px;border:1.5px solid #FEE2E2;}
+.oo-danger-title{font-size:13px;font-weight:700;color:#DC2626;text-transform:uppercase;letter-spacing:.7px;margin-bottom:12px;}
+.oo-delete-btn{width:100%;padding:14px;border-radius:14px;background:#FEE2E2;color:#DC2626;font-size:14px;font-weight:700;border:none;cursor:pointer;}
+
+/* ── SCREEN: stop_sent ── */
+#s-stop_sent{display:flex;flex-direction:column;height:100%;background:#fff;align-items:center;justify-content:center;padding:32px 24px;text-align:center;}
+
+/* ── SCREEN: event_detail_waiting ── */
+#s-event_detail_waiting{display:flex;flex-direction:column;height:100%;background:#F9FAFB;}
+.ew-header{background:#fff;padding:16px 20px 12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #F3F4F6;}
+.ew-back{width:34px;height:34px;border-radius:10px;background:#F9FAFB;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;}
+.ew-header-info{flex:1;}
+.ew-event-name{font-size:16px;font-weight:700;color:#1a1a2e;}
+.ew-host{font-size:12px;color:#9CA3AF;}
+.ew-body{flex:1;overflow-y:auto;padding:16px;}
+.ew-status-card{background:#fff;border-radius:20px;padding:20px;margin-bottom:14px;text-align:center;}
+.ew-status-icon{font-size:36px;margin-bottom:10px;}
+.ew-status-title{font-size:16px;font-weight:700;color:#1a1a2e;margin-bottom:6px;}
+.ew-status-desc{font-size:13px;color:#6B7280;line-height:1.6;}
+.ew-progress-row{display:flex;align-items:center;justify-content:space-between;margin:16px 0 6px;}
+.ew-progress-label{font-size:12px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.7px;}
+.ew-progress-count{font-size:12px;font-weight:700;color:#059669;}
+.ew-progress-bar{height:6px;background:#F3F4F6;border-radius:4px;overflow:hidden;margin-bottom:14px;}
+.ew-progress-fill{height:100%;width:62%;background:linear-gradient(90deg,#059669,#34D399);border-radius:4px;}
+.ew-section{background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;}
+.ew-section-title{font-size:12px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px;}
+.ew-member-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #F9FAFB;}
+.ew-member-row:last-child{border-bottom:none;}
+.ew-member-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;flex-shrink:0;}
+.ew-member-name{flex:1;font-size:13px;font-weight:500;color:#1a1a2e;}
+.ew-member-status{font-size:11px;font-weight:700;}
+.ew-member-status.joined{color:#059669;}
+.ew-member-status.invited{color:#D97706;}
+.ew-footer{padding:14px 20px 28px;background:#fff;border-top:1px solid #F3F4F6;}
+.ew-note{font-size:12px;color:#9CA3AF;text-align:center;line-height:1.6;padding:8px 0;}
+
+/* ── SCREEN: lock_notif ── */
+#s-lock_notif{display:flex;flex-direction:column;height:100%;background:#F9FAFB;}
+.ln-banner{background:#FFFBEB;border-bottom:1.5px solid #FDE68A;padding:12px 20px;display:flex;align-items:center;gap:10px;}
+.ln-banner-icon{font-size:20px;}
+.ln-banner-text{font-size:13px;color:#92400E;font-weight:600;line-height:1.4;}
+.ln-header{background:#fff;padding:16px 20px 12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #F3F4F6;}
+.ln-back{width:34px;height:34px;border-radius:10px;background:#F9FAFB;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px;}
+.ln-header-info{flex:1;}
+.ln-event-name{font-size:16px;font-weight:700;color:#1a1a2e;}
+.ln-host{font-size:12px;color:#9CA3AF;}
+.ln-body{flex:1;overflow-y:auto;padding:16px;}
+.ln-calc-card{background:#fff;border-radius:20px;padding:24px;margin-bottom:16px;text-align:center;}
+.ln-calc-icon{font-size:40px;margin-bottom:10px;}
+.ln-calc-title{font-size:15px;font-weight:700;color:#1a1a2e;margin-bottom:6px;}
+.ln-calc-desc{font-size:13px;color:#6B7280;line-height:1.6;}
+.ln-calc-dots{display:flex;justify-content:center;gap:6px;margin-top:14px;}
+.ln-calc-dot{width:8px;height:8px;border-radius:50%;background:#E5E7EB;}
+.ln-calc-dot.active{background:#D97706;animation:pulse-dot 1.4s ease-in-out infinite;}
+.ln-calc-dot:nth-child(2){animation-delay:.25s;}
+.ln-calc-dot:nth-child(3){animation-delay:.5s;}
+@keyframes pulse-dot{0%,100%{opacity:.3;transform:scale(.8);}50%{opacity:1;transform:scale(1);}}
+.ln-lock-card{background:#FFFBEB;border-radius:16px;padding:16px;margin-bottom:12px;display:flex;align-items:flex-start;gap:12px;}
+.ln-lock-icon{font-size:24px;}
+.ln-lock-title{font-size:14px;font-weight:700;color:#92400E;margin-bottom:3px;}
+.ln-lock-desc{font-size:12px;color:#78350F;line-height:1.5;}
+.ln-footer{padding:16px 20px 28px;background:#fff;border-top:1px solid #F3F4F6;}
+
+/* ── SCREEN: revised_msg ── */
+#s-revised_msg{display:flex;flex-direction:column;height:100%;background:#F9FAFB;}
+.rm-banner{background:#FFFBEB;padding:12px 20px;display:flex;align-items:center;gap:10px;border-bottom:1.5px solid #FDE68A;}
+.rm-banner-icon{font-size:18px;}
+.rm-banner-text{font-size:13px;color:#92400E;font-weight:600;}
+.rm-header{background:#fff;padding:16px 20px 12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #F3F4F6;}
+.rm-back{width:34px;height:34px;border-radius:10px;background:#F9FAFB;display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;}
+.rm-title{font-size:17px;font-weight:700;color:#1a1a2e;}
+.rm-body{flex:1;padding:20px;overflow-y:auto;}
+.rm-change-card{background:#fff;border-radius:20px;padding:24px;margin-bottom:16px;text-align:center;}
+.rm-change-label{font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.8px;margin-bottom:14px;}
+.rm-old{font-size:28px;font-weight:800;color:#D1D5DB;text-decoration:line-through;margin-bottom:2px;}
+.rm-arrow{font-size:20px;color:#D97706;margin:4px 0;}
+.rm-new{font-size:44px;font-weight:800;color:#1a1a2e;letter-spacing:-1px;margin-bottom:10px;}
+.rm-reason{font-size:12px;color:#6B7280;background:#F9FAFB;border-radius:10px;padding:8px 14px;display:inline-block;}
+.rm-detail-card{background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;}
+.rm-detail-title{font-size:12px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;}
+.rm-detail-row{display:flex;justify-content:space-between;font-size:13px;padding:6px 0;border-bottom:1px solid #F9FAFB;}
+.rm-detail-row:last-child{border-bottom:none;}
+.rm-detail-label{color:#6B7280;}
+.rm-detail-val{font-weight:600;color:#1a1a2e;}
+.rm-footer{padding:16px 20px 32px;background:#fff;border-top:1px solid #F3F4F6;}
+
+/* ── SCREEN: dashboard ── */
+#s-dashboard{display:flex;flex-direction:column;height:100%;background:#F9FAFB;}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 18 18" fill="none"><path d="M4 9h10M9 4l5 5-5 5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <span class="logo-text">LetsSplyt</span>
+  </div>
+  <div style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px;">Registered Participant</div>
+
+  <div class="sidebar-section">Joining (R01)</div>
+  <div class="screen-btn active" id="btn-join_deeplink" onclick="nav('join_deeplink')"><div class="dot"></div><span>App deep link join</span><span class="screen-tag tag-cp">CP</span></div>
+  <div class="screen-btn" id="btn-join_expired" onclick="nav('join_expired')"><div class="dot"></div><span>Session expired re-auth</span><span class="screen-tag tag-cp">CP</span></div>
+  <div class="screen-btn" id="btn-joined" onclick="nav('joined')"><div class="dot"></div><span>Joined confirmation</span><span class="screen-tag tag-cp">CP</span></div>
+  <div class="screen-btn" id="btn-event_detail_waiting" onclick="nav('event_detail_waiting')"><div class="dot"></div><span>Event — waiting to lock</span><span class="screen-tag tag-cp">CP</span></div>
+
+  <div class="sidebar-section">Receiving & Paying (R04–R06)</div>
+  <div class="screen-btn" id="btn-event_detail" onclick="nav('event_detail')"><div class="dot"></div><span>Event detail</span><span class="screen-tag tag-mvp">MVP</span></div>
+  <div class="screen-btn" id="btn-lock_notif" onclick="nav('lock_notif')"><div class="dot"></div><span>Group locked state</span><span class="screen-tag tag-mvp">MVP</span></div>
+  <div class="screen-btn" id="btn-revised_msg" onclick="nav('revised_msg')"><div class="dot"></div><span>Revised split (R04a)</span><span class="screen-tag tag-mvp">MVP</span></div>
+  <div class="screen-btn" id="btn-payment_links" onclick="nav('payment_links')"><div class="dot"></div><span>Tap to pay</span><span class="screen-tag tag-cp">CP</span></div>
+  <div class="screen-btn" id="btn-ive_paid" onclick="nav('ive_paid')"><div class="dot"></div><span>Self-report payment</span><span class="screen-tag tag-mvp">MVP</span></div>
+  <div class="screen-btn" id="btn-report_sent" onclick="nav('report_sent')"><div class="dot"></div><span>Settled!</span><span class="screen-tag tag-mvp">MVP</span></div>
+
+  <div class="sidebar-section">Dashboard (R07)</div>
+  <div class="screen-btn" id="btn-dashboard" onclick="nav('dashboard')"><div class="dot"></div><span>My balance overview</span><span class="screen-tag tag-mvp">MVP</span></div>
+
+  <div class="sidebar-section">Account (R09–R10)</div>
+  <div class="screen-btn" id="btn-add_handles" onclick="nav('add_handles')"><div class="dot"></div><span>Add payment handles</span><span class="screen-tag tag-mvp">MVP</span></div>
+  <div class="screen-btn" id="btn-opt_out" onclick="nav('opt_out')"><div class="dot"></div><span>Opt out / delete</span><span class="screen-tag tag-mvp">MVP</span></div>
+  <div class="screen-btn" id="btn-stop_sent" onclick="nav('stop_sent')"><div class="dot"></div><span>STOP confirmed</span><span class="screen-tag tag-mvp">MVP</span></div>
+</div>
+
+<!-- CENTER: Phone -->
+<div id="center">
+  <div class="phone">
+    <!-- Status bar -->
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M1.5 8.5C5.5 4.5 10.5 2.5 12 2.5s6.5 2 10.5 6l-1.5 1.5C18 7.3 15 5.5 12 5.5S6 7.3 3 10l-1.5-1.5z"/><path d="M5 12c1.9-1.9 4.3-3 7-3s5.1 1.1 7 3l-1.4 1.4C16 11.9 14.1 11 12 11s-4 .9-5.6 2.4L5 12z"/><path d="M8.5 15.5c.9-.9 2.1-1.5 3.5-1.5s2.6.6 3.5 1.5L14 17c-.5-.5-1.3-.8-2-.8s-1.5.3-2 .8l-1.5-1.5z"/><circle cx="12" cy="20" r="1.5"/></svg>
+        <svg viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="7" width="15" height="10" rx="2"/><path d="M19 10.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <!-- Screens -->
+    <div class="screen-content">
+
+      <!-- join_deeplink -->
+      <div id="s-join_deeplink" style="display:flex;">
+        <div class="jd-hero">
+          <div class="jd-event-pill">📨 You're invited</div>
+          <div class="jd-event-name">Dinner at Nobu</div>
+          <div class="jd-host">Hosted by Rohan P.</div>
+          <div class="jd-avatars">
+            <div class="jd-avatar" style="background:#6366F1;">R</div>
+            <div class="jd-avatar" style="background:#059669;">A</div>
+            <div class="jd-avatar" style="background:#D97706;">M</div>
+            <div class="jd-avatar" style="background:#DC2626;">S</div>
+            <div class="jd-avatar" style="background:#7C3AED;">+3</div>
+          </div>
+          <div class="jd-members-label">7 members in this group</div>
+        </div>
+        <div class="jd-card">
+          <div class="jd-card-row"><span class="label">Date</span><span class="value">Sat, May 23</span></div>
+          <div class="jd-card-row"><span class="label">Restaurant</span><span class="value">Nobu, Malibu</span></div>
+          <div class="jd-card-row"><span class="label">Group status</span><span class="value"><span class="chip green">Open · Joinable</span></span></div>
+          <div class="jd-card-row"><span class="label">Your account</span><span class="value" style="color:#6366F1;">✓ Logged in</span></div>
+        </div>
+        <div class="jd-actions">
+          <button class="gradient-btn" onclick="nav('joined')">Join now →</button>
+          <button class="ghost-btn">View members first</button>
+        </div>
+      </div>
+
+      <!-- join_expired -->
+      <div id="s-join_expired" style="display:none;">
+        <div class="je-top">
+          <div class="je-back" onclick="nav('join_deeplink')">←</div>
+        </div>
+        <div class="je-body">
+          <div class="je-icon">🔒</div>
+          <div class="je-title">Session expired</div>
+          <div class="je-sub">For your security, we need to verify it's you.<br>We sent a code to <strong>+1 (415) 555-0192</strong></div>
+          <div class="otp-row">
+            <div class="otp-box filled">3</div>
+            <div class="otp-box filled">8</div>
+            <div class="otp-box filled">4</div>
+            <div class="otp-box cursor"></div>
+            <div class="otp-box"></div>
+            <div class="otp-box"></div>
+          </div>
+          <div style="font-size:12px;color:#9CA3AF;">Didn't get it? <span style="color:#6366F1;font-weight:600;">Resend</span></div>
+        </div>
+        <div class="je-actions">
+          <button class="gradient-btn" onclick="nav('join_deeplink')">Verify & Join →</button>
+        </div>
+      </div>
+
+      <!-- joined -->
+      <div id="s-joined" style="display:none;">
+        <div class="joined-body">
+          <div class="joined-check">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+          </div>
+          <div class="joined-title">You're in! 🎉</div>
+          <div class="joined-sub">You've joined <strong>Dinner at Nobu</strong>. Rohan will scan the receipt and you'll get a payment request when it's ready.</div>
+          <div class="joined-info-card">
+            <div class="joined-info-row"><span class="joined-info-label">Event</span><span class="joined-info-val">Dinner at Nobu</span></div>
+            <div class="joined-info-row"><span class="joined-info-label">Host</span><span class="joined-info-val">Rohan P.</span></div>
+            <div class="joined-info-row"><span class="joined-info-label">Members</span><span class="joined-info-val">8 (including you)</span></div>
+            <div class="joined-info-row"><span class="joined-info-label">Status</span><span class="joined-info-val"><span class="chip amber">Waiting for bill</span></span></div>
+          </div>
+        </div>
+        <div class="joined-actions">
+          <button class="gradient-btn" onclick="nav('event_detail_waiting')">View event →</button>
+        </div>
+      </div>
+
+      <!-- event_detail_waiting -->
+      <div id="s-event_detail_waiting" style="display:none;">
+        <div class="ew-header">
+          <div class="ew-back" onclick="nav('joined')">←</div>
+          <div class="ew-header-info">
+            <div class="ew-event-name">Dinner at Nobu</div>
+            <div class="ew-host">Hosted by Rohan P. · May 23</div>
+          </div>
+          <span class="chip green">Open</span>
+        </div>
+        <div class="ew-body">
+          <div class="ew-status-card">
+            <div class="ew-status-icon">⏳</div>
+            <div class="ew-status-title">Waiting for everyone to join</div>
+            <div class="ew-status-desc">Rohan will lock the group once everyone is in, then scan the receipt and calculate each person's share.</div>
+          </div>
+          <div class="ew-progress-row">
+            <span class="ew-progress-label">Members joined</span>
+            <span class="ew-progress-count">5 of 8</span>
+          </div>
+          <div class="ew-progress-bar"><div class="ew-progress-fill"></div></div>
+          <div class="ew-section">
+            <div class="ew-section-title">Who's in</div>
+            <div class="ew-member-row">
+              <div class="ew-member-avatar" style="background:#6366F1;">R</div>
+              <div class="ew-member-name">Rohan P. <span style="font-size:11px;color:#9CA3AF;">(host)</span></div>
+              <span class="ew-member-status joined">✓ Joined</span>
+            </div>
+            <div class="ew-member-row" style="background:#EEF2FF;border-radius:10px;padding:8px 10px;">
+              <div class="ew-member-avatar" style="background:#7C3AED;">A</div>
+              <div class="ew-member-name">You</div>
+              <span class="ew-member-status joined">✓ Joined</span>
+            </div>
+            <div class="ew-member-row">
+              <div class="ew-member-avatar" style="background:#D97706;">M</div>
+              <div class="ew-member-name">Maya S.</div>
+              <span class="ew-member-status joined">✓ Joined</span>
+            </div>
+            <div class="ew-member-row">
+              <div class="ew-member-avatar" style="background:#059669;">S</div>
+              <div class="ew-member-name">Sam T.</div>
+              <span class="ew-member-status joined">✓ Joined</span>
+            </div>
+            <div class="ew-member-row">
+              <div class="ew-member-avatar" style="background:#EC4899;">J</div>
+              <div class="ew-member-name">Jamie K.</div>
+              <span class="ew-member-status joined">✓ Joined</span>
+            </div>
+            <div class="ew-member-row">
+              <div class="ew-member-avatar" style="background:#E5E7EB;color:#9CA3AF;">?</div>
+              <div class="ew-member-name" style="color:#9CA3AF;">3 more invited…</div>
+              <span class="ew-member-status invited">⌛ Pending</span>
+            </div>
+          </div>
+        </div>
+        <div class="ew-footer">
+          <div class="ew-note">Your share will appear here once Rohan locks the group and the bill is calculated.</div>
+        </div>
+      </div>
+
+      <!-- event_detail -->
+      <div id="s-event_detail" style="display:none;">
+        <div class="ed-header">
+          <div class="ed-back" onclick="nav('event_detail')">←</div>
+          <div class="ed-header-info">
+            <div class="ed-event-name">Dinner at Nobu</div>
+            <div class="ed-host">Hosted by Rohan P. · May 23</div>
+          </div>
+          <span class="chip amber">Pending</span>
+        </div>
+        <div class="ed-body">
+          <div class="ed-your-share">
+            <div class="ed-share-label">Your share</div>
+            <div class="ed-share-amount">$48.50</div>
+            <div class="ed-share-status">Payment pending · Sent via SMS</div>
+          </div>
+          <div class="ed-section">
+            <div class="ed-section-title">Your items</div>
+            <div class="ed-item-row">
+              <div><div class="ed-item-name">Wagyu gyoza × 2</div></div>
+              <div class="ed-item-price">$36.00</div>
+            </div>
+            <div class="ed-item-row">
+              <div><div class="ed-item-name">Yellowtail jalapeño</div><div class="ed-item-shared">Shared with Rohan</div></div>
+              <div class="ed-item-price">$9.50</div>
+            </div>
+            <div class="ed-item-row">
+              <div><div class="ed-item-name">Tax & tip (prop.)</div></div>
+              <div class="ed-item-price" style="color:#9CA3AF;">$3.00</div>
+            </div>
+          </div>
+          <div class="ed-section">
+            <div class="ed-section-title">All members</div>
+            <div class="ed-member-row">
+              <div class="ed-member-avatar" style="background:#6366F1;">R</div>
+              <div class="ed-member-name">Rohan P. <span style="font-size:11px;color:#9CA3AF;">(host)</span></div>
+              <div class="ed-member-amount" style="color:#059669;">$72.00 ✓</div>
+            </div>
+            <div class="ed-member-row" style="background:#EEF2FF;border-radius:10px;padding:8px 10px;">
+              <div class="ed-member-avatar" style="background:#7C3AED;">A</div>
+              <div class="ed-member-name">You</div>
+              <div class="ed-member-amount" style="color:#EF4444;">$48.50 ⏳</div>
+            </div>
+            <div class="ed-member-row">
+              <div class="ed-member-avatar" style="background:#D97706;">M</div>
+              <div class="ed-member-name">Maya S.</div>
+              <div class="ed-member-amount" style="color:#D97706;">$55.00 ⌛</div>
+            </div>
+            <div class="ed-member-row">
+              <div class="ed-member-avatar" style="background:#059669;">S</div>
+              <div class="ed-member-name">Sam T.</div>
+              <div class="ed-member-amount" style="color:#059669;">$38.50 ✓</div>
+            </div>
+          </div>
+        </div>
+        <div class="ed-footer">
+          <button class="gradient-btn" onclick="nav('payment_links')">Pay $48.50 now →</button>
+          <button class="ghost-btn" onclick="nav('ive_paid')" style="margin-top:8px;">✓ I've paid — mark as settled</button>
+        </div>
+      </div>
+
+      <!-- payment_links -->
+      <div id="s-payment_links" style="display:none;">
+        <div class="pl-header">
+          <div class="pl-title">Pay Rohan P.</div>
+          <div class="pl-sub">Choose your preferred app</div>
+        </div>
+        <div class="pl-amount-card">
+          <div class="pl-amount-label">Amount due</div>
+          <div class="pl-amount">$48.50</div>
+          <div class="pl-payee">Dinner at Nobu · May 23</div>
+        </div>
+        <div class="pl-options">
+          <div class="pl-option selected">
+            <div class="pl-option-icon" style="background:#3D95CE20;">💙</div>
+            <div><div class="pl-option-name">Venmo</div><div class="pl-option-desc">@rohan-patel · $48.50 pre-filled</div></div>
+            <div class="pl-option-arrow">›</div>
+          </div>
+          <div class="pl-option">
+            <div class="pl-option-icon" style="background:#00457C20;">💳</div>
+            <div><div class="pl-option-name">PayPal</div><div class="pl-option-desc">paypal.me/rohanpatel · $48.50</div></div>
+            <div class="pl-option-arrow">›</div>
+          </div>
+          <div class="pl-option">
+            <div class="pl-option-icon" style="background:#00D63220;">💚</div>
+            <div><div class="pl-option-name">Cash App</div><div class="pl-option-desc">$rohanp · $48.50 pre-filled</div></div>
+            <div class="pl-option-arrow">›</div>
+          </div>
+          <div class="pl-option">
+            <div class="pl-option-icon" style="background:#F9FAFB;">💵</div>
+            <div><div class="pl-option-name">Zelle</div><div class="pl-option-desc">rohan@email.com</div></div>
+            <div class="pl-option-arrow">›</div>
+          </div>
+        </div>
+        <div class="pl-footer">
+          <button class="gradient-btn" onclick="nav('event_detail')">Open Venmo →</button>
+          <button class="ghost-btn" onclick="nav('event_detail')">Pay later</button>
+        </div>
+      </div>
+
+      <!-- ive_paid -->
+      <div id="s-ive_paid" style="display:none;">
+        <div class="ip-header">
+          <div class="ip-back" onclick="nav('event_detail')">←</div>
+          <div class="ip-title">Report your payment</div>
+        </div>
+        <div class="ip-body">
+          <div class="ip-info">
+            <div class="ip-info-title">Amount to confirm</div>
+            <div class="ip-info-amount">$48.50</div>
+            <div class="ip-info-event">Dinner at Nobu · Hosted by Rohan P.</div>
+          </div>
+          <div class="ip-method-section">
+            <div class="ip-method-title">How did you pay?</div>
+            <div class="ip-method-option selected">
+              <div class="ip-method-icon">💙</div>
+              <div class="ip-method-label">Venmo</div>
+              <div class="ip-radio"></div>
+            </div>
+            <div class="ip-method-option">
+              <div class="ip-method-icon">💳</div>
+              <div class="ip-method-label">PayPal</div>
+              <div class="ip-radio"></div>
+            </div>
+            <div class="ip-method-option">
+              <div class="ip-method-icon">🏦</div>
+              <div class="ip-method-label">Bank transfer</div>
+              <div class="ip-radio"></div>
+            </div>
+            <div class="ip-method-option">
+              <div class="ip-method-icon">💵</div>
+              <div class="ip-method-label">Cash</div>
+              <div class="ip-radio"></div>
+            </div>
+          </div>
+          <div class="ip-note">📲 Rohan will get a notification: <em>"Alex says they paid $48.50 via Venmo."</em> Your balance settles immediately on your end.</div>
+        </div>
+        <div class="ip-footer">
+          <button class="gradient-btn" onclick="nav('report_sent')">Settle up →</button>
+        </div>
+      </div>
+
+      <!-- report_sent -->
+      <div id="s-report_sent" style="display:none;">
+        <div class="rs-icon" style="background:linear-gradient(135deg,#6366F1,#7C3AED);border-radius:50%;width:80px;height:80px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>
+        </div>
+        <div class="rs-title">You're all settled! 🎉</div>
+        <div class="rs-sub">Your $48.50 for <strong>Dinner at Nobu</strong> is marked settled. Rohan has been notified.</div>
+        <div class="rs-card">
+          <div class="rs-card-row"><span class="rs-label">Event</span><span class="rs-val">Dinner at Nobu</span></div>
+          <div class="rs-card-row"><span class="rs-label">Amount</span><span class="rs-val">$48.50</span></div>
+          <div class="rs-card-row"><span class="rs-label">Method</span><span class="rs-val">Venmo</span></div>
+          <div class="rs-card-row"><span class="rs-label">Status</span><span class="rs-val"><span class="chip green">Settled</span></span></div>
+          <div class="rs-card-row"><span class="rs-label">Notification</span><span class="rs-val" style="color:#6366F1;">📲 Sent to Rohan</span></div>
+        </div>
+        <div class="rs-actions">
+          <button class="gradient-btn" onclick="nav('event_detail')">Back to event →</button>
+        </div>
+      </div>
+
+      <!-- add_handles -->
+      <div id="s-add_handles" style="display:none;">
+        <div class="ah-header">
+          <div class="ah-title">Payment handles</div>
+          <div class="ah-sub">Set once — used whenever you host a split</div>
+        </div>
+        <div class="ah-body">
+          <div class="ah-card">
+            <div class="ah-app-row">
+              <div class="ah-app-icon" style="background:#3D95CE20;">💙</div>
+              <div><div class="ah-app-name">Venmo</div><div class="ah-app-desc">Most used in the US</div></div>
+            </div>
+            <input class="ah-input filled" value="@alex-chen-92" placeholder="@username">
+            <div class="ah-saved-badge">✓ Saved</div>
+          </div>
+          <div class="ah-card">
+            <div class="ah-app-row">
+              <div class="ah-app-icon" style="background:#00457C20;">💳</div>
+              <div><div class="ah-app-name">PayPal</div><div class="ah-app-desc">Works internationally</div></div>
+            </div>
+            <input class="ah-input" value="" placeholder="paypal.me/username">
+          </div>
+          <div class="ah-card">
+            <div class="ah-app-row">
+              <div class="ah-app-icon" style="background:#00D63220;">💚</div>
+              <div><div class="ah-app-name">Cash App</div><div class="ah-app-desc">Popular in US</div></div>
+            </div>
+            <input class="ah-input" value="" placeholder="$cashtag">
+          </div>
+        </div>
+        <div class="ah-footer">
+          <button class="gradient-btn">Save handles</button>
+        </div>
+      </div>
+
+      <!-- opt_out -->
+      <div id="s-opt_out" style="display:none;">
+        <div class="oo-header">
+          <div class="oo-back" onclick="nav('event_detail')">←</div>
+          <div class="oo-title">Account settings</div>
+        </div>
+        <div class="oo-body">
+          <div class="oo-section">
+            <div class="oo-section-title">Messaging preferences</div>
+            <div class="oo-option">
+              <div class="oo-option-icon">🔕</div>
+              <div>
+                <div class="oo-option-label">Pause messages (30 days)</div>
+                <div class="oo-option-desc">Temporarily stop receiving payment requests and reminders</div>
+              </div>
+              <div class="oo-option-arrow">›</div>
+            </div>
+            <div class="oo-option">
+              <div class="oo-option-icon">📵</div>
+              <div>
+                <div class="oo-option-label">Stop all messages (STOP)</div>
+                <div class="oo-option-desc">Permanently opt out — no more messages to this number, ever</div>
+              </div>
+              <div class="oo-option-arrow">›</div>
+            </div>
+          </div>
+          <div class="oo-danger">
+            <div class="oo-danger-title">Danger zone</div>
+            <div style="font-size:13px;color:#6B7280;line-height:1.6;margin-bottom:14px;">Deleting your account removes all your data, anonymises your payment history, and permanently removes your payment handles. This cannot be undone.</div>
+            <button class="oo-delete-btn" onclick="nav('stop_sent')">Delete account & data</button>
+          </div>
+          <div style="font-size:11px;color:#9CA3AF;text-align:center;padding-bottom:8px;">Legally required by GDPR & CCPA · Effective immediately</div>
+        </div>
+      </div>
+
+      <!-- stop_sent -->
+      <div id="s-stop_sent" style="display:none;align-items:center;justify-content:center;padding:32px 24px;text-align:center;flex-direction:column;">
+        <div style="width:80px;height:80px;border-radius:50%;background:#F3F4F6;display:flex;align-items:center;justify-content:center;font-size:36px;margin:0 auto 20px;">👋</div>
+        <div style="font-size:22px;font-weight:800;color:#1a1a2e;margin-bottom:10px;">You're opted out</div>
+        <div style="font-size:14px;color:#6B7280;line-height:1.7;margin-bottom:28px;">No further messages will be sent to your number. Any active event memberships have been anonymised. Reply <strong>START</strong> to any previous message to opt back in.</div>
+        <div style="width:100%;background:#F9FAFB;border-radius:16px;padding:16px;text-align:left;margin-bottom:24px;">
+          <div style="display:flex;justify-content:space-between;font-size:13px;padding:5px 0;"><span style="color:#9CA3AF;">Status</span><span style="font-weight:600;color:#1a1a2e;">Opted out</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;padding:5px 0;"><span style="color:#9CA3AF;">Effective</span><span style="font-weight:600;color:#1a1a2e;">Immediately</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:13px;padding:5px 0;"><span style="color:#9CA3AF;">Data</span><span style="font-weight:600;color:#1a1a2e;">Anonymised</span></div>
+        </div>
+        <div style="width:100%;font-size:11px;color:#9CA3AF;text-align:center;">To re-activate, reply START to any past LetsSplyt message</div>
+      </div>
+
+      <!-- lock_notif -->
+      <div id="s-lock_notif" style="display:none;">
+        <div class="ln-banner">
+          <div class="ln-banner-icon">🔒</div>
+          <div class="ln-banner-text">Rohan has locked the group — scanning receipt &amp; calculating splits</div>
+        </div>
+        <div class="ln-header">
+          <div class="ln-back" onclick="nav('event_detail_waiting')">←</div>
+          <div class="ln-header-info">
+            <div class="ln-event-name">Dinner at Nobu</div>
+            <div class="ln-host">Hosted by Rohan P. · May 23</div>
+          </div>
+          <span class="chip amber">🔒 Locked</span>
+        </div>
+        <div class="ln-body">
+          <div class="ln-calc-card">
+            <div class="ln-calc-icon">🧾</div>
+            <div class="ln-calc-title">Calculating your share…</div>
+            <div class="ln-calc-desc">Rohan is scanning the receipt and assigning items. Your exact amount will appear here once the split is ready — you'll get a notification.</div>
+            <div class="ln-calc-dots">
+              <div class="ln-calc-dot active"></div>
+              <div class="ln-calc-dot active"></div>
+              <div class="ln-calc-dot active"></div>
+            </div>
+          </div>
+          <div class="ln-lock-card">
+            <div class="ln-lock-icon">🔒</div>
+            <div>
+              <div class="ln-lock-title">Group is locked — 8 members confirmed</div>
+              <div class="ln-lock-desc">No new members can join. The receipt is being reviewed. Amounts are not yet confirmed.</div>
+            </div>
+          </div>
+          <div class="ew-section" style="background:#fff;border-radius:16px;padding:16px;margin-bottom:12px;">
+            <div class="ed-section-title">Members (8 locked in)</div>
+            <div class="ed-member-row">
+              <div class="ed-member-avatar" style="background:#6366F1;">R</div>
+              <div class="ed-member-name">Rohan P. <span style="font-size:11px;color:#9CA3AF;">(host)</span></div>
+              <div class="ed-member-amount" style="color:#9CA3AF;font-size:12px;">—</div>
+            </div>
+            <div class="ed-member-row" style="background:#FFFBEB;border-radius:10px;padding:8px 10px;">
+              <div class="ed-member-avatar" style="background:#7C3AED;">A</div>
+              <div class="ed-member-name">You</div>
+              <div class="ed-member-amount" style="color:#9CA3AF;font-size:12px;">calculating…</div>
+            </div>
+            <div class="ed-member-row">
+              <div class="ed-member-avatar" style="background:#D97706;">M</div>
+              <div class="ed-member-name">Maya S.</div>
+              <div class="ed-member-amount" style="color:#9CA3AF;font-size:12px;">—</div>
+            </div>
+            <div class="ed-member-row">
+              <div class="ed-member-avatar" style="background:#059669;">S</div>
+              <div class="ed-member-name">Sam T.</div>
+              <div class="ed-member-amount" style="color:#9CA3AF;font-size:12px;">—</div>
+            </div>
+          </div>
+        </div>
+        <div class="ln-footer">
+          <div style="text-align:center;font-size:13px;color:#9CA3AF;padding:8px 0;">You'll be notified when your share is ready</div>
+        </div>
+      </div>
+
+      <!-- revised_msg -->
+      <div id="s-revised_msg" style="display:none;">
+        <div class="rm-banner">
+          <div class="rm-banner-icon">🔄</div>
+          <div class="rm-banner-text">Rohan revised your split</div>
+        </div>
+        <div class="rm-header">
+          <div class="rm-back" onclick="nav('event_detail')">←</div>
+          <div class="rm-title">Updated split</div>
+        </div>
+        <div class="rm-body">
+          <div class="rm-change-card">
+            <div class="rm-change-label">Your share · Dinner at Nobu</div>
+            <div class="rm-old">$48.50</div>
+            <div class="rm-arrow">↓</div>
+            <div class="rm-new">$52.00</div>
+            <div class="rm-reason">📝 "Added your cocktails from the bar tab"</div>
+          </div>
+          <div class="rm-detail-card">
+            <div class="rm-detail-title">What changed</div>
+            <div class="rm-detail-row"><span class="rm-detail-label">Original split</span><span class="rm-detail-val">$48.50</span></div>
+            <div class="rm-detail-row"><span class="rm-detail-label">Bar tab addition</span><span class="rm-detail-val">+ $3.50</span></div>
+            <div class="rm-detail-row"><span class="rm-detail-label">New total</span><span class="rm-detail-val" style="color:#EF4444;">$52.00</span></div>
+          </div>
+          <div class="rm-detail-card">
+            <div class="rm-detail-title">Payment options</div>
+            <div class="rm-detail-row"><span class="rm-detail-label">Venmo</span><span class="rm-detail-val" style="color:#6366F1;">@rohan-patel</span></div>
+            <div class="rm-detail-row"><span class="rm-detail-label">Cash App</span><span class="rm-detail-val" style="color:#6366F1;">$rohanp</span></div>
+          </div>
+        </div>
+        <div class="rm-footer">
+          <button class="gradient-btn" onclick="nav('payment_links')">Pay $52.00 now →</button>
+          <button class="ghost-btn" onclick="nav('ive_paid')" style="margin-top:8px;">✓ I've already paid</button>
+        </div>
+      </div>
+
+      <!-- dashboard -->
+      <div id="s-dashboard" style="display:none;">
+        <div class="mb-header">
+          <div class="mb-greeting">Good evening, Alex 👋</div>
+          <div class="mb-title">My balance</div>
+        </div>
+        <div style="overflow-y:auto;flex:1;">
+          <div class="mb-hero">
+            <div class="mb-hero-label">Total you owe</div>
+            <div class="mb-hero-amount">$52.00</div>
+            <div class="mb-hero-sub">Across 1 active event</div>
+          </div>
+          <div class="mb-section-title">You owe</div>
+          <div class="mb-event-card">
+            <div class="mb-event-name">Dinner at Nobu</div>
+            <div class="mb-event-meta">Hosted by Rohan P. · May 23</div>
+            <div class="mb-event-row">
+              <div class="mb-event-amount">$52.00</div>
+              <div class="mb-event-actions">
+                <button class="mb-pay-btn" onclick="nav('payment_links')">Pay now</button>
+                <button class="mb-detail-btn" onclick="nav('event_detail')">Details</button>
+              </div>
+            </div>
+          </div>
+          <div class="mb-section-title">You're owed</div>
+          <div style="margin:0 16px 16px;background:#fff;border-radius:16px;padding:20px;text-align:center;">
+            <div style="font-size:28px;margin-bottom:8px;">🎉</div>
+            <div style="font-size:14px;font-weight:600;color:#059669;">All clear!</div>
+            <div style="font-size:12px;color:#9CA3AF;margin-top:4px;">No one owes you right now</div>
+          </div>
+          <div class="mb-section-title">Recent · Settled</div>
+          <div class="mb-settled-card">
+            <div class="mb-event-name">Lunch at Shake Shack</div>
+            <div class="mb-event-meta">Hosted by Maya S. · Apr 18 · <span style="color:#059669;font-weight:600;">Settled ✓</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /screen-content -->
+    <!-- Persistent Tab Bar -->
+    <div style="display:flex;align-items:stretch;background:rgba(255,255,255,.96);border-top:1px solid #F0EEF8;backdrop-filter:blur(12px);height:64px;flex-shrink:0;">
+      <div onclick="nav('dashboard')" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;"><div style="font-size:22px;">⬡</div><div style="font-size:9px;font-weight:600;color:#9CA3AF;letter-spacing:.02em;">Dashboard</div></div>
+      <div onclick="navTab('events')" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;position:relative;"><div style="font-size:22px;transform:scale(1.08);">◫</div><div style="font-size:9px;font-weight:600;color:#6366F1;letter-spacing:.02em;">Events</div><div style="position:absolute;top:8px;right:calc(50% - 16px);width:6px;height:6px;border-radius:3px;background:#EF4444;"></div></div>
+      <div onclick="navTab('members')" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;"><div style="font-size:22px;">◎</div><div style="font-size:9px;font-weight:600;color:#9CA3AF;letter-spacing:.02em;">Members</div></div>
+      <div onclick="navTab('settings')" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;"><div style="font-size:22px;">◈</div><div style="font-size:9px;font-weight:600;color:#9CA3AF;letter-spacing:.02em;">Settings</div></div>
+    </div>
+  </div><!-- /phone -->
+</div>
+
+<!-- INFO PANEL -->
+<div id="info">
+  <div class="info-label" id="info-id">R01 · Joining</div>
+  <div class="info-title" id="info-title">App deep link join</div>
+  <div class="info-desc" id="info-desc">Existing LetsSplyt member opens the invite. Since they're already logged in, the OS intercepts the deep link and lands directly on the event join screen — one tap to join.</div>
+  <div id="info-tags">
+    <span class="info-tag flow">⟶ Critical Path</span>
+    <span class="info-tag ux">✦ Zero friction</span>
+  </div>
+  <div class="info-ref" id="info-ref">Spec ref: R01 · App installed, session active</div>
+</div>
+
+<script>
+const SCREENS = {
+  join_deeplink:{
+    el:document.getElementById('s-join_deeplink'),
+    id:'R01 · Joining',title:'App deep link join',
+    desc:'Existing LetsSplyt member opens the invite. Since they\'re already logged in, the OS intercepts the deep link and lands directly on the event join screen — one tap to join.',
+    tags:'<span class="info-tag flow">⟶ Critical Path</span><span class="info-tag ux">✦ Zero friction</span>',
+    ref:'Spec ref: R01 · App installed, session active'
+  },
+  join_expired:{
+    el:document.getElementById('s-join_expired'),
+    id:'R01a · Joining',title:'Session expired — re-auth',
+    desc:'If the session has lapsed, the user re-verifies via OTP (pre-filled on iOS). Lightweight — just the code, no re-registration.',
+    tags:'<span class="info-tag flow">⟶ Critical Path</span><span class="info-tag ai">🔒 OTP verify</span>',
+    ref:'Spec ref: R01a · Session expired path'
+  },
+  joined:{
+    el:document.getElementById('s-joined'),
+    id:'R01 · Joining',title:'Joined confirmation',
+    desc:'Satisfying confirmation screen. Participant sees event name, host, member count, and a "waiting for bill" status — sets clear expectations for what comes next.',
+    tags:'<span class="info-tag ux">✦ Expectation setting</span>',
+    ref:'Spec ref: R01 → post-join state'
+  },
+  event_detail_waiting:{
+    el:document.getElementById('s-event_detail_waiting'),
+    id:'R01 · Joining',title:'Event — waiting to lock',
+    desc:'After joining, the member lands here. Shows who has joined so far and a progress bar toward the total expected count. No amounts shown — the bill hasn\'t been scanned yet. Clear message: "Your share will appear once Rohan locks the group and calculates the bill."',
+    tags:'<span class="info-tag flow">⟶ Holding state</span><span class="info-tag ux">✦ Expectation setting</span>',
+    ref:'Spec ref: R01 → post-join waiting state'
+  },
+  lock_notif:{
+    el:document.getElementById('s-lock_notif'),
+    id:'R04 · Locked state',title:'Group locked — calculating',
+    desc:'Group is locked but the bill hasn\'t been calculated yet. No amounts shown — "calculating…" placeholder only. Animated dots signal background activity. Member sees all 8 people confirmed, amber Locked chip, and a message that they\'ll be notified when their share is ready.',
+    tags:'<span class="info-tag gate">🔒 Gate</span><span class="info-tag ux">✦ No premature amounts</span>',
+    ref:'Spec ref: R04 · Lock gate → calculating state (pre-receipt)'
+  },
+  revised_msg:{
+    el:document.getElementById('s-revised_msg'),
+    id:'R04a · Revised split',title:'Revised split message',
+    desc:'Creator revised the split after locking. Participant sees old amount struck through, new amount prominent, and a plain-language reason note. Updated payment links shown below.',
+    tags:'<span class="info-tag flow">⟶ Revision path</span><span class="info-tag ux">✦ Transparency</span>',
+    ref:'Spec ref: R04a · Revised split notification'
+  },
+  dashboard:{
+    el:document.getElementById('s-dashboard'),
+    id:'R07 · Dashboard',title:'My balance overview',
+    desc:'Participant home screen: a dark hero card shows net amount owed across all active events. "You owe" cards have inline Pay and Details actions. "You\'re owed" section shows a clear all-settled state. Settled events listed below.',
+    tags:'<span class="info-tag ux">✦ Financial clarity</span><span class="info-tag flow">⟶ Entry point</span>',
+    ref:'Spec ref: R07 · Participant balance dashboard'
+  },
+  event_detail:{
+    el:document.getElementById('s-event_detail'),
+    id:'R08 · Event detail',title:'Full split breakdown',
+    desc:'"Why do I owe $48.50?" — this screen answers it. Shows the participant\'s specific items, shared items with proportional note, and all members\' statuses.',
+    tags:'<span class="info-tag ux">✦ Transparency</span><span class="info-tag ux">✦ Trust building</span>',
+    ref:'Spec ref: R08 · Event detail view'
+  },
+  payment_links:{
+    el:document.getElementById('s-payment_links'),
+    id:'R05 · Payment',title:'Tap to pay',
+    desc:'Payment app options shown with handle + amount pre-filled. Participant picks their preferred app — Venmo, PayPal, Cash App, or Zelle. One tap opens that app with everything ready.',
+    tags:'<span class="info-tag flow">⟶ Critical Path</span><span class="info-tag ai">🤖 A3 pre-fills handles</span>',
+    ref:'Spec ref: R05 · Tap payment deep link'
+  },
+  ive_paid:{
+    el:document.getElementById('s-ive_paid'),
+    id:'R06 · Settlement',title:'Select method & settle',
+    desc:'Member selects how they paid externally — Venmo, PayPal, bank, or cash — then taps "Settle up". Fires a notification to the creator and clears their balance immediately.',
+    tags:'<span class="info-tag ux">✦ Agency</span><span class="info-tag flow">⟶ Notification to creator</span>',
+    ref:'Spec ref: R06 · Self-report in app'
+  },
+  report_sent:{
+    el:document.getElementById('s-report_sent'),
+    id:'R06 · Settlement',title:'Settled!',
+    desc:'Balance marked as settled. Notification fired to the creator immediately. Member sees a clean confirmed state — no waiting required on their end.',
+    tags:'<span class="info-tag ux">✦ Satisfying close</span><span class="info-tag flow">⟶ Notification sent</span>',
+    ref:'Spec ref: R06 → settled state'
+  },
+  add_handles:{
+    el:document.getElementById('s-add_handles'),
+    id:'R09 · Account',title:'Add payment handles',
+    desc:'Participant sets up their own payment handles for when they host a future event. Set once, used forever. Venmo pre-filled as the most common US option.',
+    tags:'<span class="info-tag ux">✦ MVP</span><span class="info-tag flow">⟶ Future-ready</span>',
+    ref:'Spec ref: R09 · Add own payment handles'
+  },
+  opt_out:{
+    el:document.getElementById('s-opt_out'),
+    id:'R10 · Account',title:'Opt out / delete account',
+    desc:'Legally required GDPR/CCPA right to erasure. Two options: pause messages (temporary) or full account deletion. Danger zone clearly separated with red border.',
+    tags:'<span class="info-tag flow">⟶ Legally Required</span>',
+    ref:'Spec ref: R10 · Opt out / delete account'
+  },
+  stop_sent:{
+    el:document.getElementById('s-stop_sent'),
+    id:'R10 · Account',title:'Opt-out confirmed',
+    desc:'Clean exit screen confirming the opt-out. No more messages will be sent. Data anonymised immediately. Re-opt-in instructions provided clearly.',
+    tags:'<span class="info-tag flow">⟶ Legally Required</span><span class="info-tag ux">✦ Respectful exit</span>',
+    ref:'Spec ref: R10 → post-deletion state'
+  }
+};
+
+function navTab(tab){var dest={home:{f:'home.html',t:'home'},events:{f:'home.html',t:'events'},members:{f:'home.html',t:'members'},settings:{f:'home.html',t:'settings'}}[tab];if(!dest)return;if(window.parent!==window){window.parent.postMessage({loadFile:dest.f,tab:dest.t},'*');}else{location.href=dest.f;}}
+function nav(id){
+  if(!SCREENS[id])return;
+  Object.values(SCREENS).forEach(s=>s.el.style.display='none');
+  SCREENS[id].el.style.display='flex';
+  document.querySelectorAll('.screen-btn').forEach(b=>b.classList.remove('active'));
+  const btn=document.getElementById('btn-'+id);
+  if(btn)btn.classList.add('active');
+  document.getElementById('info-id').textContent=SCREENS[id].id;
+  document.getElementById('info-title').textContent=SCREENS[id].title;
+  document.getElementById('info-desc').textContent=SCREENS[id].desc;
+  document.getElementById('info-tags').innerHTML=SCREENS[id].tags;
+  document.getElementById('info-ref').textContent=SCREENS[id].ref;
+}
+
+// Sim mode + postMessage
+(function(){
+  if(new URLSearchParams(location.search).get('sim')){
+    ['sidebar','info'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
+    var c=document.getElementById('center');if(c){c.style.justifyContent='center';c.style.gap='0';}
+  }
+  window.addEventListener('message',function(e){
+    if(e.data&&e.data.nav&&SCREENS[e.data.nav])nav(e.data.nav);
+  });
+})();
+</script>
+</body>
+</html>

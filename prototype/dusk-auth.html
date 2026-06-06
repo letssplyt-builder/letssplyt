@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LetsSplyt — Auth & Profile</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif;
+  background:#F0EFFF;display:flex;height:100vh;overflow:hidden;color:#1E1B3A;}
+
+/* ── SIDEBAR ── */
+#sidebar{width:248px;background:#fff;border-right:1px solid #E8E6F0;
+  display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;}
+#sb-logo{padding:20px 18px 14px;border-bottom:1px solid #F0EEF8;}
+#sb-logo .mark{display:flex;align-items:center;gap:10px;margin-bottom:3px;}
+#sb-logo .gem{width:32px;height:32px;border-radius:10px;
+  background:linear-gradient(135deg,#6366F1,#7C3AED);
+  display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;}
+#sb-logo .name{font-size:16px;font-weight:800;color:#1E1B3A;letter-spacing:-.3px;}
+#sb-logo .sub{font-size:10px;color:#9CA3AF;letter-spacing:.05em;text-transform:uppercase;}
+#sb-screens{flex:1;overflow-y:auto;padding:6px 0 16px;}
+#sb-screens::-webkit-scrollbar{width:0;}
+.sg{margin-bottom:2px;}
+.sg-hdr{padding:10px 16px 3px;font-size:9px;font-weight:700;color:#C4C0D8;
+  text-transform:uppercase;letter-spacing:.1em;}
+.sc{display:flex;align-items:center;gap:9px;padding:7px 16px;cursor:pointer;
+  border-left:2px solid transparent;transition:all .12s;border-radius:0 8px 8px 0;margin-right:8px;}
+.sc:hover{background:#F5F3FF;}
+.sc.active{background:#EEF2FF;border-left-color:#6366F1;}
+.sc-badge{font-size:9px;font-weight:700;color:#6366F1;min-width:24px;opacity:.8;flex-shrink:0;}
+.sc-name{font-size:11px;color:#6B7280;line-height:1.3;}
+.sc.active .sc-name{color:#4338CA;font-weight:600;}
+.sc-tag{font-size:8px;font-weight:700;padding:1px 5px;border-radius:4px;flex-shrink:0;margin-left:auto;}
+.tag-browser{background:#FEF3C7;color:#D97706;}
+.tag-app{background:#D1FAE5;color:#059669;}
+.tag-creator{background:#EDE9FE;color:#7C3AED;}
+
+/* ── CENTER ── */
+#center{flex:1;display:flex;align-items:center;justify-content:center;
+  gap:24px;padding:24px;overflow:hidden;}
+
+/* ── PHONE ── */
+#phone-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;}
+#phone{width:375px;background:#E8E6F5;border-radius:54px;padding:12px;flex-shrink:0;
+  box-shadow:0 0 0 1px rgba(99,102,241,0.12),0 28px 70px rgba(99,102,241,0.14),0 6px 20px rgba(0,0,0,.05);}
+#di{width:120px;height:34px;background:#D1CFF0;border-radius:20px;margin:0 auto 8px;}
+#screen-wrap{width:351px;height:724px;border-radius:42px;overflow:hidden;position:relative;display:flex;flex-direction:column;}
+#sb-time-bar{position:absolute;top:0;left:0;right:0;height:48px;display:flex;
+  align-items:flex-end;justify-content:space-between;padding:0 24px 8px;z-index:100;pointer-events:none;}
+.time{font-size:15px;font-weight:700;color:#1E1B3A;}
+.icons{display:flex;gap:5px;align-items:center;color:#1E1B3A;}
+#screen{flex:1;overflow-y:auto;overflow-x:hidden;}
+#screen::-webkit-scrollbar{width:0;}
+#hi{height:32px;display:flex;align-items:center;justify-content:center;
+  position:absolute;bottom:0;left:0;right:0;pointer-events:none;z-index:100;}
+#hi div{width:130px;height:5px;border-radius:3px;background:#1E1B3A;opacity:.2;}
+#ctrl{display:flex;align-items:center;gap:10px;}
+#back-btn{padding:8px 16px;background:#fff;border:1px solid #E5E7EB;
+  color:#6B7280;border-radius:10px;font-size:12px;cursor:pointer;font-family:inherit;transition:all .15s;}
+#back-btn:hover{background:#F5F3FF;color:#4338CA;border-color:#C7D2FE;}
+#crumb{font-size:10px;color:#9CA3AF;font-family:monospace;}
+
+/* ── INFO ── */
+#info{width:214px;flex-shrink:0;display:flex;flex-direction:column;gap:10px;}
+.ic{background:#fff;border:1px solid #E8E6F0;border-radius:16px;padding:14px;
+  box-shadow:0 1px 6px rgba(99,102,241,.05);}
+.ic-label{font-size:9px;font-weight:700;color:#C4C0D8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;}
+.ic-badge{display:inline-block;background:#EEF2FF;color:#6366F1;
+  font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;margin-bottom:6px;font-family:monospace;}
+.ic-name{font-size:13px;font-weight:600;color:#1E1B3A;margin-bottom:5px;line-height:1.3;}
+.ic-desc{font-size:11px;color:#9CA3AF;line-height:1.5;}
+#hist{display:flex;flex-direction:column;gap:3px;max-height:150px;overflow-y:auto;}
+#hist::-webkit-scrollbar{width:0;}
+.hi-row{display:flex;align-items:center;gap:7px;cursor:pointer;padding:3px 5px;border-radius:6px;}
+.hi-row:hover{background:#F5F3FF;}
+.hi-dot{width:5px;height:5px;border-radius:3px;background:#E5E7EB;flex-shrink:0;}
+.hi-row.cur .hi-dot{background:#6366F1;}
+.hi-lbl{font-size:10px;color:#9CA3AF;}
+.hi-row.cur .hi-lbl{color:#6366F1;font-weight:600;}
+#tip{background:#EEF2FF;border:1px solid #C7D2FE;border-radius:12px;padding:12px 14px;}
+#tip p{font-size:11px;color:#4338CA;line-height:1.5;}
+
+/* ═══ DESIGN SYSTEM ═══ */
+.page-bg{background:linear-gradient(160deg,#F8F7FF 0%,#EEF2FF 50%,#F5F3FF 100%);min-height:100%;}
+.card{background:#fff;border-radius:20px;border:1px solid #F0EEF8;box-shadow:0 2px 16px rgba(99,102,241,0.08);}
+.card-sm{background:#F8F7FF;border-radius:14px;border:1px solid #EDE9FE;}
+
+.btn-primary{display:flex;align-items:center;justify-content:center;width:100%;height:56px;
+  border-radius:18px;border:none;background:linear-gradient(135deg,#6366F1,#7C3AED);
+  color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;
+  box-shadow:0 4px 20px rgba(99,102,241,0.3);transition:all .15s;}
+.btn-primary:active{opacity:.9;transform:scale(.99);}
+.btn-outline{display:flex;align-items:center;justify-content:center;width:100%;height:52px;
+  border-radius:16px;background:#fff;border:1.5px solid #D1C4FE;
+  color:#6366F1;font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .15s;}
+.btn-ghost{display:flex;align-items:center;justify-content:center;width:100%;height:46px;
+  border-radius:14px;border:none;background:transparent;
+  color:#9CA3AF;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit;}
+
+.sp-input{width:100%;height:56px;padding:0 18px;background:#F8F7FF;
+  border:1.5px solid #E0DDFF;border-radius:16px;font-size:17px;font-weight:500;
+  color:#1E1B3A;font-family:inherit;outline:none;transition:all .2s;caret-color:#6366F1;}
+.sp-input:focus{background:#fff;border-color:#6366F1;box-shadow:0 0 0 3px rgba(99,102,241,0.10);}
+.sp-input::placeholder{color:#C4C0D8;font-weight:400;font-size:15px;}
+.sp-input-sm{height:48px;font-size:15px;border-radius:14px;}
+
+.prefix{display:flex;align-items:center;gap:6px;padding:0 14px;height:56px;
+  background:#F8F7FF;border:1.5px solid #E0DDFF;border-right:none;
+  border-radius:16px 0 0 16px;font-size:14px;color:#4B5563;font-weight:600;white-space:nowrap;flex-shrink:0;}
+.input-row{display:flex;}
+.input-row .sp-input{border-radius:0 16px 16px 0;border-left:none;}
+
+.orb{width:48px;height:48px;border-radius:24px;display:flex;align-items:center;justify-content:center;
+  font-size:20px;font-weight:800;background:#F8F7FF;border:1.5px solid #E0DDFF;color:#1E1B3A;transition:all .2s;}
+.orb.on{background:#EEF2FF;border-color:#6366F1;color:#4338CA;box-shadow:0 0 0 3px rgba(99,102,241,0.12);}
+.orb.cur{border-color:#A5B4FC;box-shadow:0 0 0 2px rgba(99,102,241,0.08);}
+
+.sp-nav{display:flex;align-items:center;justify-content:space-between;padding:54px 22px 8px;position:relative;}
+.sp-back{display:flex;align-items:center;gap:3px;color:#6366F1;font-size:15px;font-weight:600;
+  cursor:pointer;border:none;background:none;font-family:inherit;}
+
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;
+  padding:4px 10px;border-radius:100px;}
+.pill-indigo{background:#EEF2FF;color:#6366F1;}
+.pill-green{background:#D1FAE5;color:#059669;}
+.pill-amber{background:#FEF3C7;color:#D97706;}
+.pill-purple{background:#EDE9FE;color:#7C3AED;}
+
+.divider{display:flex;align-items:center;gap:10px;margin:14px 0;}
+.divider span{font-size:11px;color:#C4C0D8;white-space:nowrap;}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:#F0EEF8;}
+
+.handle-card{display:flex;align-items:center;gap:14px;padding:14px 16px;margin-bottom:9px;
+  background:#fff;border:1.5px solid #F0EEF8;border-radius:18px;cursor:pointer;transition:all .15s;
+  box-shadow:0 1px 5px rgba(99,102,241,.05);}
+.handle-card:hover{border-color:#C7D2FE;}
+.handle-card.active{background:#EEF2FF;border-color:#A5B4FC;}
+
+.member-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #F0EEF8;}
+.avatar{width:38px;height:38px;border-radius:19px;display:flex;align-items:center;justify-content:center;
+  font-size:15px;font-weight:700;color:#fff;flex-shrink:0;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+@keyframes popIn{0%{transform:scale(0.3);opacity:0;}60%{transform:scale(1.08);}100%{transform:scale(1);opacity:1;}}
+@keyframes pulse-ring{0%{transform:scale(1);opacity:.4;}100%{transform:scale(1.6);opacity:0;}}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.4;}}
+
+.fade-up{animation:fadeUp .3s ease forwards;}
+.pop-in{animation:popIn .4s cubic-bezier(.34,1.56,.64,1) forwards;}
+.blink{animation:blink 1.4s ease infinite;}
+</style>
+</head>
+<body>
+
+<aside id="sidebar">
+  <div id="sb-logo">
+    <div class="mark"><div class="gem">✦</div><div class="name">LetsSplyt</div></div>
+    <div class="sub">Auth &amp; Profile · All flows</div>
+  </div>
+  <div id="sb-screens">
+
+    <div class="sg">
+      <div class="sg-hdr">Path A — Non-member (Browser)</div>
+      <div class="sc active" data-id="web_invite" onclick="nav('web_invite')">
+        <span class="sc-badge">—</span><span class="sc-name">Invite landing</span><span class="sc-tag tag-browser">web</span></div>
+      <div class="sc" data-id="web_register" onclick="nav('web_register')">
+        <span class="sc-badge">G01</span><span class="sc-name">Name &amp; phone</span><span class="sc-tag tag-browser">web</span></div>
+      <div class="sc" data-id="web_otp" onclick="nav('web_otp')">
+        <span class="sc-badge">G01</span><span class="sc-name">OTP verify</span><span class="sc-tag tag-browser">web</span></div>
+      <div class="sc" data-id="web_joined" onclick="nav('web_joined')">
+        <span class="sc-badge">G01</span><span class="sc-name">Joined! (no app)</span><span class="sc-tag tag-browser">web</span></div>
+    </div>
+
+    <div class="sg">
+      <div class="sg-hdr">Path B — LetsSplyt Member (App)</div>
+      <div class="sc" data-id="app_join_loggedin" onclick="nav('app_join_loggedin')">
+        <span class="sc-badge">R01</span><span class="sc-name">Deep link · logged in</span><span class="sc-tag tag-app">app</span></div>
+      <div class="sc" data-id="app_join_auth" onclick="nav('app_join_auth')">
+        <span class="sc-badge">R01</span><span class="sc-name">Deep link · needs auth</span><span class="sc-tag tag-app">app</span></div>
+      <div class="sc" data-id="app_otp" onclick="nav('app_otp')">
+        <span class="sc-badge">P01</span><span class="sc-name">OTP verify</span><span class="sc-tag tag-app">app</span></div>
+      <div class="sc" data-id="app_joined" onclick="nav('app_joined')">
+        <span class="sc-badge">R01</span><span class="sc-name">Joined!</span><span class="sc-tag tag-app">app</span></div>
+    </div>
+
+    <div class="sg">
+      <div class="sg-hdr">Event Creator View</div>
+      <div class="sc" data-id="creator_locked" onclick="nav('creator_locked')">
+        <span class="sc-badge">P14</span><span class="sc-name">Group locked</span><span class="sc-tag tag-creator">creator</span></div>
+    </div>
+
+    <div class="sg">
+      <div class="sg-hdr">Auth (New member via App)</div>
+      <div class="sc" data-id="phone_entry" onclick="nav('phone_entry')">
+        <span class="sc-badge">P01</span><span class="sc-name">Phone entry</span></div>
+      <div class="sc" data-id="otp_reg" onclick="nav('otp_reg')">
+        <span class="sc-badge">P01</span><span class="sc-name">OTP verify</span></div>
+      <div class="sc" data-id="success" onclick="nav('success')">
+        <span class="sc-badge">P01</span><span class="sc-name">Account created</span></div>
+      <div class="sc" data-id="login" onclick="nav('login')">
+        <span class="sc-badge">P02</span><span class="sc-name">Login</span></div>
+      <div class="sc" data-id="biometric" onclick="nav('biometric')">
+        <span class="sc-badge">P03</span><span class="sc-name">Biometric</span></div>
+    </div>
+
+    <div class="sg">
+      <div class="sg-hdr">Profile</div>
+      <div class="sc" data-id="profile" onclick="nav('profile')">
+        <span class="sc-badge">P04</span><span class="sc-name">Profile &amp; handles</span></div>
+      <div class="sc" data-id="edit_profile" onclick="nav('edit_profile')">
+        <span class="sc-badge">P06</span><span class="sc-name">Edit display name / avatar</span></div>
+      <div class="sc" data-id="add_handle" onclick="nav('add_handle')">
+        <span class="sc-badge">P04</span><span class="sc-name">Add handle</span></div>
+      <div class="sc" data-id="handle_saved" onclick="nav('handle_saved')">
+        <span class="sc-badge">P05</span><span class="sc-name">Handle saved</span></div>
+    </div>
+
+  </div>
+</aside>
+
+<div id="center">
+  <div id="phone-wrap">
+    <div id="phone">
+      <div id="di"></div>
+      <div id="screen-wrap">
+        <div id="sb-time-bar">
+          <span class="time" id="time-el">9:41</span>
+          <div class="icons">
+            <svg width="16" height="12" viewBox="0 0 16 12"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor"/><rect x="13.5" y="1" width="2.5" height="10" rx="1" fill="currentColor" opacity=".3"/></svg>
+            <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x=".5" y="1" width="21" height="10" rx="2.5" stroke="currentColor" stroke-width="1.2"/><rect x="22" y="3.5" width="2.5" height="5" rx="1.2" fill="currentColor"/><rect x="2" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/></svg>
+          </div>
+        </div>
+        <div id="screen"></div>
+        <div id="tab-bar" style="display:none;align-items:stretch;background:rgba(255,255,255,.96);border-top:1px solid #F0EEF8;backdrop-filter:blur(12px);flex-shrink:0;height:64px;">
+          <div onclick="navTab('home')" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;"><div style="font-size:22px;">⬡</div><div style="font-size:9px;font-weight:600;color:#9CA3AF;letter-spacing:.02em;">Dashboard</div></div>
+          <div onclick="navTab('events')" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;position:relative;"><div style="font-size:22px;transform:scale(1.08);">◫</div><div style="font-size:9px;font-weight:600;color:#6366F1;letter-spacing:.02em;">Events</div><div style="position:absolute;top:8px;right:calc(50% - 16px);width:6px;height:6px;border-radius:3px;background:#EF4444;"></div></div>
+          <div onclick="navTab('members')" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;"><div style="font-size:22px;">◎</div><div style="font-size:9px;font-weight:600;color:#9CA3AF;letter-spacing:.02em;">Members</div></div>
+          <div onclick="navTab('settings')" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;"><div style="font-size:22px;">◈</div><div style="font-size:9px;font-weight:600;color:#9CA3AF;letter-spacing:.02em;">Settings</div></div>
+        </div>
+        <div id="hi"><div></div></div>
+      </div>
+    </div>
+    <div id="ctrl">
+      <button id="back-btn" onclick="goBack()">← Back</button>
+      <span id="crumb"></span>
+    </div>
+  </div>
+
+  <div id="info">
+    <div class="ic">
+      <div class="ic-label">Current Screen</div>
+      <div id="ic-badge" class="ic-badge" style="display:none;"></div>
+      <div id="ic-name" class="ic-name">LetsSplyt</div>
+      <div id="ic-desc" class="ic-desc">Select a screen from the sidebar to explore the flow.</div>
+    </div>
+    <div class="ic">
+      <div class="ic-label">Navigation history</div>
+      <div id="hist"></div>
+    </div>
+    <div id="tip"><p>🟡 <strong>Browser</strong> = no app needed &nbsp;·&nbsp; 🟢 <strong>App</strong> = existing member &nbsp;·&nbsp; 🟣 <strong>Creator</strong> = event owner</p></div>
+  </div>
+</div>
+
+<script>
+const SCREENS={};
+function def(id,meta,fn){SCREENS[id]={...meta,id,render:fn};}
+const META={
+  web_invite:{badge:'—',name:'Invite landing (browser)',desc:'Non-member clicks the link. Browser opens — no app needed. Shows who invited them and the event. Single CTA to join.'},
+  web_register:{badge:'G01',name:'Name & phone (browser)',desc:'Guest enters First Name, Last Name, and Phone Number. No account creation — just enough to identify them in the group.'},
+  web_otp:{badge:'G01',name:'OTP verify (browser)',desc:'Code sent via SMS. 6-digit entry. Same Twilio verify flow as app users.'},
+  web_joined:{badge:'G01',name:'Joined! (no app)',desc:'Guest has joined the group without installing the app. They\'ll receive payment requests via SMS when the bill is split.'},
+  app_join_loggedin:{badge:'R01',name:'Deep link — logged in',desc:'Existing member scans QR. App opens directly to the event join screen. One tap to join since they\'re already authenticated.'},
+  app_join_auth:{badge:'R01',name:'Deep link — needs auth',desc:'Existing member\'s app session has expired. App opens to a quick OTP screen before letting them join.'},
+  app_otp:{badge:'P01',name:'OTP verify (app)',desc:'Quick 6-digit OTP entry inside the app. After verification they land on the join screen.'},
+  app_joined:{badge:'R01',name:'Joined! (app)',desc:'Member joined the event. They can see who else is in the group and wait for the bill to be split.'},
+  creator_locked:{badge:'P14',name:'Group locked',desc:'Payer tapped Lock Group. Join token expired. No one can join or leave. Scan & Split button is now enabled. This is the hard gate before any financial calculation begins.'},
+  phone_entry:{badge:'P01',name:'Phone entry',desc:'Standard new-member registration. Phone number is the only identity primitive.'},
+  otp_reg:{badge:'P01',name:'OTP verify (registration)',desc:'Verify phone for new account creation.'},
+  success:{badge:'P01',name:'Account created',desc:'New account confirmed. Prompt to set up payment handles so they\'re ready when the first bill comes.'},
+  login:{badge:'P02',name:'Login — returning user',desc:'Face ID first, phone+OTP fallback.'},
+  biometric:{badge:'P03',name:'Biometric unlock',desc:'Face ID / fingerprint unlock screen.'},
+  profile:{badge:'P04',name:'Profile & handles',desc:'Payment handles — Venmo, PayPal, Cash App, Zelle. AES-256 encrypted.'},
+  edit_profile:{badge:'P06',name:'Edit display name / avatar',desc:'Change display name and avatar colour. Tapping the ✏️ on the profile screen opens this. Changes reflected immediately.'},
+  add_handle:{badge:'P04',name:'Add payment handle',desc:'Provider grid + @ input + live message preview.'},
+  handle_saved:{badge:'P05',name:'Handle saved',desc:'Confirmation with list of all saved handles.'},
+};
+let history=['web_invite'];
+
+function navTab(tab){var dest={home:{f:'home.html',t:'home'},events:{f:'home.html',t:'events'},members:{f:'home.html',t:'members'},settings:{f:'home.html',t:'settings'}}[tab];if(!dest)return;if(window.parent!==window){window.parent.postMessage({loadFile:dest.f,tab:dest.t},'*');}else{location.href=dest.f;}}
+var TAB_SCREENS_AUTH=['app_join_loggedin','app_joined','app_join_auth'];
+function updateTabBar(id){var el=document.getElementById('tab-bar');if(el)el.style.display=TAB_SCREENS_AUTH.includes(id)?'flex':'none';}
+function nav(id){
+  if(!SCREENS[id]){console.warn('Missing:',id);return;}
+  history.push(id);render(id);updateSidebar(id);updateInfo(id);updateHist();updateTabBar(id);
+}
+function goBack(){
+  if(history.length<=1)return;
+  history.pop();
+  const prev=history[history.length-1];
+  render(prev);updateSidebar(prev);updateInfo(prev);updateHist();
+}
+function render(id){
+  const s=SCREENS[id];if(!s)return;
+  const el=document.getElementById('screen');
+  el.style.opacity='0';
+  setTimeout(()=>{el.innerHTML=s.render();el.style.opacity='1';el.style.transition='opacity .18s';el.scrollTop=0;},80);
+  document.getElementById('crumb').textContent=id;
+}
+function updateSidebar(id){
+  document.querySelectorAll('.sc').forEach(el=>el.classList.toggle('active',el.dataset.id===id));
+}
+function updateInfo(id){
+  const m=META[id]||{};
+  const b=document.getElementById('ic-badge');
+  if(m.badge&&m.badge!=='—'){b.style.display='inline-block';b.textContent=m.badge;}else{b.style.display='none';}
+  document.getElementById('ic-name').textContent=m.name||id;
+  document.getElementById('ic-desc').textContent=m.desc||'';
+}
+function updateHist(){
+  document.getElementById('hist').innerHTML=history.slice(-7).reverse().map((id,i)=>`
+    <div class="hi-row ${i===0?'cur':''}" onclick="nav('${id}')">
+      <div class="hi-dot"></div>
+      <span class="hi-lbl">${META[id]?.name||id}</span>
+    </div>`).join('');
+}
+
+/* ─────────────────────────────────────────────
+   PATH A: NON-MEMBER (BROWSER)
+───────────────────────────────────────────── */
+
+def('web_invite',{},()=>`
+<div class="page-bg" style="min-height:100%;display:flex;flex-direction:column;padding:52px 22px 32px;">
+
+  <!-- Brand bar -->
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:28px;">
+    <div style="width:30px;height:30px;border-radius:9px;
+      background:linear-gradient(135deg,#6366F1,#7C3AED);
+      display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;">✦</div>
+    <div style="font-size:15px;font-weight:800;color:#1E1B3A;">LetsSplyt</div>
+    <div class="pill pill-amber" style="margin-left:auto;">Browser</div>
+  </div>
+
+  <!-- Inviter -->
+  <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+    <div class="avatar" style="background:linear-gradient(135deg,#A78BFA,#7C3AED);font-size:18px;">S</div>
+    <div>
+      <div style="font-size:12px;color:#9CA3AF;">Invited by</div>
+      <div style="font-size:16px;font-weight:700;color:#1E1B3A;">Sara Malik</div>
+    </div>
+  </div>
+
+  <!-- Event card -->
+  <div class="card" style="padding:20px;margin-bottom:18px;">
+    <div class="pill pill-indigo" style="margin-bottom:12px;">✦ You're invited</div>
+    <div style="font-size:22px;font-weight:800;color:#1E1B3A;line-height:1.2;margin-bottom:4px;">Dinner at Nobu 🍣</div>
+    <div style="font-size:13px;color:#9CA3AF;margin-bottom:16px;">Thu, June 12 · 8:00 PM</div>
+    <div style="height:1px;background:#F0EEF8;margin-bottom:14px;"></div>
+    <div style="display:flex;">
+      <div style="flex:1;text-align:center;">
+        <div style="font-size:18px;font-weight:800;color:#6366F1;">5</div>
+        <div style="font-size:10px;color:#9CA3AF;margin-top:1px;">Members</div>
+      </div>
+      <div style="width:1px;background:#F0EEF8;"></div>
+      <div style="flex:1;text-align:center;">
+        <div style="font-size:18px;font-weight:800;color:#6366F1;">AI ✦</div>
+        <div style="font-size:10px;color:#9CA3AF;margin-top:1px;">Smart split</div>
+      </div>
+      <div style="width:1px;background:#F0EEF8;"></div>
+      <div style="flex:1;text-align:center;">
+        <div style="font-size:18px;">📱</div>
+        <div style="font-size:10px;color:#9CA3AF;margin-top:1px;">SMS pay</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- No app needed note -->
+  <div class="card-sm" style="padding:10px 14px;margin-bottom:20px;display:flex;align-items:center;gap:10px;">
+    <span style="font-size:16px;">✅</span>
+    <div style="font-size:12px;color:#6B7280;">No app download needed. Join right here.</div>
+  </div>
+
+  <button class="btn-primary" onclick="nav('web_register')">Join the group →</button>
+  <button class="btn-ghost" onclick="nav('app_join_loggedin')" style="font-size:12px;margin-top:6px;">Already have LetsSplyt? Open app</button>
+</div>`);
+
+def('web_register',{},()=>`
+<div class="page-bg" style="min-height:100%;display:flex;flex-direction:column;">
+  <div class="sp-nav">
+    <button class="sp-back" onclick="nav('web_invite')">‹ Back</button>
+    <div class="pill pill-amber" style="position:absolute;right:20px;top:58px;">Browser</div>
+  </div>
+  <div style="padding:4px 22px 32px;">
+    <div style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;
+      letter-spacing:.06em;margin-bottom:6px;">Joining</div>
+    <div style="font-size:22px;font-weight:800;color:#1E1B3A;margin-bottom:20px;">Your details</div>
+
+    <!-- Name row -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div>
+        <div style="font-size:11px;font-weight:600;color:#9CA3AF;margin-bottom:5px;">First name</div>
+        <input class="sp-input sp-input-sm" placeholder="Alex" value="Alex">
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:600;color:#9CA3AF;margin-bottom:5px;">Last name</div>
+        <input class="sp-input sp-input-sm" placeholder="Chen" value="Chen">
+      </div>
+    </div>
+
+    <!-- Phone -->
+    <div style="margin-bottom:20px;">
+      <div style="font-size:11px;font-weight:600;color:#9CA3AF;margin-bottom:5px;">Phone number</div>
+      <div class="input-row">
+        <div class="prefix" style="height:48px;border-radius:14px 0 0 14px;font-size:13px;">🇺🇸 +1</div>
+        <input class="sp-input sp-input-sm" type="tel" placeholder="(555) 000-0000" value="(555) 123-4567"
+          style="border-radius:0 14px 14px 0;border-left:none;">
+      </div>
+      <div style="font-size:11px;color:#C4C0D8;margin-top:6px;">We'll text you a verification code.</div>
+    </div>
+
+    <!-- Event reminder -->
+    <div class="card-sm" style="padding:10px 14px;margin-bottom:20px;display:flex;align-items:center;gap:10px;">
+      <span style="font-size:16px;">🍣</span>
+      <div>
+        <div style="font-size:12px;font-weight:600;color:#1E1B3A;">Dinner at Nobu</div>
+        <div style="font-size:11px;color:#9CA3AF;">Joining Sara's group</div>
+      </div>
+    </div>
+
+    <button class="btn-primary" onclick="nav('web_otp')">Send verification code →</button>
+    <div style="text-align:center;font-size:11px;color:#C4C0D8;margin-top:10px;">
+      By joining you agree to our <span style="color:#6366F1;">Terms</span> &amp; <span style="color:#6366F1;">Privacy</span>
+    </div>
+  </div>
+</div>`);
+
+def('web_otp',{},()=>`
+<div class="page-bg" style="min-height:100%;display:flex;flex-direction:column;">
+  <div class="sp-nav">
+    <button class="sp-back" onclick="nav('web_register')">‹ Back</button>
+    <div class="pill pill-amber" style="position:absolute;right:20px;top:58px;">Browser</div>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;padding:0 22px 48px;text-align:center;">
+
+    <div style="width:60px;height:60px;border-radius:18px;background:#EEF2FF;
+      display:flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:18px;">📱</div>
+    <div style="font-size:22px;font-weight:800;color:#1E1B3A;margin-bottom:6px;">Check your texts</div>
+    <div style="font-size:13px;color:#9CA3AF;margin-bottom:26px;">
+      Sent to <strong style="color:#1E1B3A;">(555) 123-4567</strong>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:28px;">
+      <div class="orb on">3</div><div class="orb on">7</div><div class="orb on">2</div>
+      <div class="orb cur"></div><div class="orb"></div><div class="orb"></div>
+    </div>
+    <button class="btn-primary" style="width:100%;" onclick="nav('web_joined')">Verify &amp; join →</button>
+    <div style="margin-top:14px;font-size:12px;color:#9CA3AF;">
+      Didn't get it? <span style="color:#6366F1;font-weight:600;cursor:pointer;">Resend</span>
+    </div>
+  </div>
+</div>`);
+
+def('web_joined',{},()=>`
+<div class="page-bg" style="min-height:100%;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding:48px 22px;text-align:center;">
+
+  <div style="width:80px;height:80px;border-radius:40px;margin-bottom:20px;
+    background:linear-gradient(135deg,#10B981,#059669);
+    display:flex;align-items:center;justify-content:center;font-size:36px;
+    box-shadow:0 8px 28px rgba(16,185,129,0.3);" class="pop-in">✓</div>
+
+  <div style="font-size:28px;font-weight:800;color:#1E1B3A;margin-bottom:6px;">You're in, Alex!</div>
+  <div class="pill pill-green" style="margin-bottom:24px;">Joined Dinner at Nobu</div>
+
+  <!-- What happens next -->
+  <div class="card" style="width:100%;padding:18px;text-align:left;margin-bottom:18px;">
+    <div style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;
+      letter-spacing:.06em;margin-bottom:14px;">What happens next</div>
+    ${[
+      ['🧾','Sara scans the receipt','After dinner, the bill gets scanned'],
+      ['🤖','AI splits it fairly','Each person\'s share is calculated'],
+      ['📱','You get a text','Payment link sent to (555) 123-4567'],
+    ].map(([icon,title,desc])=>`
+    <div style="display:flex;gap:12px;margin-bottom:12px;">
+      <div style="font-size:18px;flex-shrink:0;width:24px;">${icon}</div>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#1E1B3A;">${title}</div>
+        <div style="font-size:11px;color:#9CA3AF;margin-top:1px;">${desc}</div>
+      </div>
+    </div>`).join('')}
+  </div>
+
+  <div class="card-sm" style="width:100%;padding:12px 14px;display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+    <span style="font-size:14px;">📲</span>
+    <div style="font-size:11px;color:#6B7280;">Want the app for future splits?
+      <span style="color:#6366F1;font-weight:600;cursor:pointer;"> Download LetsSplyt</span>
+    </div>
+  </div>
+
+  <button class="btn-ghost">Close</button>
+</div>`);
+
+/* ─────────────────────────────────────────────
+   PATH B: EXISTING MEMBER (APP)
+───────────────────────────────────────────── */
+
+def('app_join_loggedin',{},()=>`
+<div class="page-bg" style="min-height:100%;display:flex;flex-direction:column;">
+  <!-- App chrome — already logged in -->
+  <div style="padding:52px 22px 16px;display:flex;align-items:center;justify-content:space-between;">
+    <div style="font-size:14px;font-weight:700;color:#1E1B3A;">LetsSplyt</div>
+    <div class="pill pill-green">App · Logged in</div>
+  </div>
+
+  <div style="padding:0 22px;flex:1;">
+    <!-- Event invite card -->
+    <div class="card" style="padding:20px;margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;
+        letter-spacing:.06em;margin-bottom:12px;">Group invite</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+        <div style="width:48px;height:48px;border-radius:14px;background:#EEF2FF;
+          display:flex;align-items:center;justify-content:center;font-size:24px;">🍣</div>
+        <div>
+          <div style="font-size:18px;font-weight:800;color:#1E1B3A;">Dinner at Nobu</div>
+          <div style="font-size:12px;color:#9CA3AF;">Thu, June 12 · Invited by Sara Malik</div>
+        </div>
+      </div>
+      <!-- Members already in -->
+      <div style="font-size:11px;font-weight:600;color:#9CA3AF;margin-bottom:10px;">Already joined (4)</div>
+      <div style="display:flex;gap:-6px;margin-bottom:16px;">
+        ${['S','M','J','K'].map((l,i)=>`
+        <div style="width:32px;height:32px;border-radius:16px;display:flex;align-items:center;
+          justify-content:center;font-size:13px;font-weight:700;color:#fff;
+          border:2px solid #fff;margin-left:${i===0?'0':'-8px'};
+          background:${['#6366F1','#A78BFA','#10B981','#F59E0B'][i]};">${l}</div>`).join('')}
+        <div style="width:32px;height:32px;border-radius:16px;display:flex;align-items:center;
+          justify-content:center;font-size:10px;font-weight:700;color:#6366F1;
+          border:2px solid #fff;margin-left:-8px;background:#EEF2FF;">+1</div>
+      </div>
+      <div style="height:1px;background:#F0EEF8;margin-bottom:14px;"></div>
+      <div style="font-size:13px;color:#6B7280;margin-bottom:14px;">
+        Joining as <strong style="color:#1E1B3A;">Alex Chen</strong> · (555) 123-4567
+      </div>
+      <button class="btn-primary" onclick="nav('app_joined')">Join now →</button>
+    </div>
+    <button class="btn-ghost" style="color:#9CA3AF;font-size:13px;">Decline invite</button>
+  </div>
+</div>`);
+
+def('app_join_auth',{},()=>`
+<div class="page-bg" style="min-height:100%;display:flex;flex-direction:column;">
+  <div style="padding:52px 22px 16px;display:flex;align-items:center;justify-content:space-between;">
+    <div style="font-size:14px;font-weight:700;color:#1E1B3A;">LetsSplyt</div>
+    <div class="pill pill-amber">Session expired</div>
+  </div>
+  <div style="padding:0 22px;flex:1;display:flex;flex-direction:column;">
+
+    <!-- Event context at top -->
+    <div class="card-sm" style="padding:12px 14px;margin-bottom:24px;display:flex;align-items:center;gap:10px;">
+      <span style="font-size:18px;">🍣</span>
+      <div>
+        <div style="font-size:13px;font-weight:600;color:#1E1B3A;">Dinner at Nobu</div>
+        <div style="font-size:11px;color:#9CA3AF;">Quick verify to join Sara's group</div>
+      </div>
+    </div>
+
+    <div style="font-size:22px;font-weight:800;color:#1E1B3A;margin-bottom:6px;">Verify it's you</div>
+    <div style="font-size:13px;color:#9CA3AF;margin-bottom:24px;">
+      We'll send a code to your registered number.
+    </div>
+
+    <div class="input-row" style="margin-bottom:14px;">
+      <div class="prefix">🇺🇸 +1</div>
+      <input class="sp-input" type="tel" value="(555) 123-4567">
+    </div>
+    <button class="btn-primary" onclick="nav('app_otp')">Send code →</button>
+    <div class="divider"><span>or</span></div>
+    <button class="btn-outline" onclick="nav('app_joined')" style="gap:8px;">🔐 Use Face ID</button>
+  </div>
+</div>`);
+
+def('app_otp',{},()=>`
+<div class="page-bg" style="min-height:100%;display:flex;flex-direction:column;">
+  <div class="sp-nav">
+    <button class="sp-back" onclick="nav('app_join_auth')">‹ Back</button>
+    <div class="pill pill-green" style="position:absolute;right:20px;top:58px;">App</div>
+  </div>
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;padding:0 22px 48px;text-align:center;">
+    <div style="width:60px;height:60px;border-radius:18px;background:#EEF2FF;
+      display:flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:18px;">📱</div>
+    <div style="font-size:22px;font-weight:800;color:#1E1B3A;margin-bottom:6px;">Check your texts</div>
+    <div style="font-size:13px;color:#9CA3AF;margin-bottom:26px;">
+      Sent to <strong style="color:#1E1B3A;">(555) 123-4567</strong>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:28px;">
+      <div class="orb on">3</div><div class="orb on">7</div><div class="orb on">2</div>
+      <div class="orb cur"></div><div class="orb"></div><div class="orb"></div>
+    </div>
+    <button class="btn-primary" style="width:100%;" onclick="nav('app_joined')">Verify →</button>
+    <div style="margin-top:14px;font-size:12px;color:#9CA3AF;">
+      Didn't get it? <span style="color:#6366F1;font-weight:600;cursor:pointer;">Resend</span>
+    </div>
+  </div>
+</div>`);
+
+def('app_joined',{},()=>`
+<div class="page-bg" style="min-height:100%;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding:48px 22px;text-align:center;">
+
+  <div style="width:80px;height:80px;border-radius:40px;margin-bottom:20px;
+    background:linear-gradient(135deg,#6366F1,#7C3AED);
+    display:flex;align-items:center;justify-content:center;font-size:36px;
+    box-shadow:0 8px 28px rgba(99,102,241,0.3);" class="pop-in">✓</div>
+
+  <div style="font-size:28px;font-weight:800;color:#1E1B3A;margin-bottom:6px;">You're in, Alex!</div>
+  <div class="pill pill-indigo" style="margin-bottom:24px;">Joined Dinner at Nobu</div>
+
+  <!-- Group preview -->
+  <div class="card" style="width:100%;padding:18px;text-align:left;margin-bottom:16px;">
+    <div style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;
+      letter-spacing:.06em;margin-bottom:12px;">Group · 5 members</div>
+    ${[
+      ['S','Sara Malik','Organiser','#6366F1'],
+      ['M','Mike Torres','Joined','#10B981'],
+      ['J','Jamie Lee','Joined','#10B981'],
+      ['K','Kim Park','Joined','#10B981'],
+      ['A','Alex Chen','You · Just joined','#7C3AED'],
+    ].map(([l,name,role,bg])=>`
+    <div class="member-row">
+      <div class="avatar" style="background:${bg};">${l}</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:600;color:#1E1B3A;">${name}</div>
+        <div style="font-size:11px;color:#9CA3AF;">${role}</div>
+      </div>
+      ${role.includes('Joined')||role.includes('You')?`<div style="width:7px;height:7px;border-radius:4px;background:#10B981;"></div>`:''}
+    </div>`).join('')}
+  </div>
+
+  <div class="card-sm" style="width:100%;padding:12px 14px;display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+    <span class="blink" style="font-size:14px;">⏳</span>
+    <div style="font-size:12px;color:#6B7280;">Waiting for Sara to scan the receipt…</div>
+  </div>
+
+  <button class="btn-ghost">Go to home</button>
+</div>`);
+
+def('creator_locked',{},()=>`
+<div class="page-bg" style="min-height:100%;display:flex;flex-direction:column;">
+  <div style="padding:52px 22px 14px;display:flex;align-items:center;justify-content:space-between;">
+    <div>
+      <div style="font-size:11px;color:#9CA3AF;font-weight:600;margin-bottom:2px;">YOUR EVENT</div>
+      <div style="font-size:20px;font-weight:800;color:#1E1B3A;">Dinner at Nobu 🍣</div>
+    </div>
+    <div class="pill pill-purple">Creator</div>
+  </div>
+
+  <div style="padding:0 22px;flex:1;overflow-y:auto;">
+
+    <!-- Lock confirmation banner -->
+    <div style="background:linear-gradient(135deg,#EEF2FF,#EDE9FE);border:1.5px solid #C7D2FE;
+      border-radius:18px;padding:16px 18px;margin-bottom:16px;
+      display:flex;align-items:center;gap:12px;">
+      <div style="width:40px;height:40px;border-radius:12px;background:#6366F1;
+        display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;">🔒</div>
+      <div style="flex:1;">
+        <div style="font-size:14px;font-weight:700;color:#1E1B3A;">Group is locked</div>
+        <div style="font-size:11px;color:#6B7280;margin-top:2px;">No one can join or leave. Ready to split.</div>
+      </div>
+    </div>
+
+    <!-- Final member list -->
+    <div class="card" style="padding:18px;margin-bottom:14px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div style="font-size:13px;font-weight:700;color:#1E1B3A;">Final group · 5 members</div>
+        <div class="pill pill-green" style="font-size:10px;">All in ✓</div>
+      </div>
+      ${[
+        ['S','Sara Malik','You · Organiser','#6366F1','app'],
+        ['M','Mike Torres','App member','#10B981','app'],
+        ['J','Jamie Lee','Browser join','#10B981','web'],
+        ['K','Kim Park','Browser join','#F59E0B','web'],
+        ['R','Raj Patel','App member','#6366F1','app'],
+      ].map(([l,name,sub,bg,via])=>`
+      <div class="member-row">
+        <div class="avatar" style="background:${bg};">${l}</div>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:600;color:#1E1B3A;">${name}</div>
+          <div style="font-size:11px;color:#9CA3AF;">${sub}</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:5px;">
+          ${via==='web'?`<span style="font-size:9px;background:#FEF3C7;color:#D97706;padding:1px 5px;border-radius:4px;font-weight:700;">web</span>`:`<span style="font-size:9px;background:#D1FAE5;color:#059669;padding:1px 5px;border-radius:4px;font-weight:700;">app</span>`}
+          <div style="width:7px;height:7px;border-radius:4px;background:#10B981;"></div>
+        </div>
+      </div>`).join('')}
+    </div>
+
+    <!-- Reopen option -->
+    <div class="card-sm" style="padding:12px 14px;margin-bottom:18px;
+      display:flex;align-items:center;gap:10px;">
+      <span style="font-size:14px;">↩️</span>
+      <div style="flex:1;font-size:11px;color:#6B7280;">Someone missing?
+        <span style="color:#6366F1;font-weight:600;cursor:pointer;"> Reopen join for 1 hour</span>
+      </div>
+    </div>
+
+    <!-- Primary CTA — now enabled -->
+    <button class="btn-primary" style="margin-bottom:10px;">
+      📷 Scan receipt &amp; split →
+    </button>
+    <button class="btn-outline" style="margin-bottom:0;">
+      Enter total manually
+    </button>
+  </div>
+</div>`);
+
+/* ─────────────────────────────────────────────
+   AUTH — NEW MEMBER VIA APP
+───────────────────────────────────────────── */
+
+def('phone_entry',{},()=>`
+<div class="page-bg" style="min-height:100%;display:flex;flex-direction:column;">
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:80px 22px 24px;">
+    <div class="pill pill-indigo" style="margin-bottom:14px;align-self:flex-start;">New account</div>
+    <div style="font-size:30px;font-weight:800;color:#1E1B3A;line-height:1.15;
+      letter-spacing:-.5px;margin-bottom:6px;">Your phone<br>number</div>
+    <div style="font-size:13px;color:#9CA3AF;margin-bottom:28px;">We'll verify with a one-time code.</div>
+    <div class="input-row" style="margin-bottom:12px;">
+      <div class="prefix">🇺🇸 +1</div>
+      <input class="sp-input" type="tel" placeholder="(555) 000-0000" value="(555) 123-4567">
+    </div>
+    <button class="btn-primary" onclick="nav('otp_reg')">Send code →</button>
+    <div style="text-align:center;font-size:11px;color:#C4C0D8;margin-top:10px;">
+      By continuing you agree to our <span style="color:#6366F1;cursor:pointer;">Terms</span> &amp; <span style="color:#6366F1;cursor:pointer;">Privacy</span>
+    </div>
+  </div>
+  <div style="padding:0 22px 28px;">
+    <button class="btn-ghost" onclick="nav('login')">Already have an account</button>
+  </div>
+</div>`);
+
+def('otp_reg',{},()=>`
+<div class="page-bg" style="min-height:100%;display:flex;flex-direction:column;">
+  <div class="sp-nav"><button class="sp-back" onclick="nav('phone_entry')">‹ Back</button></div>
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;padding:0 22px 48px;text-align:center;">
+    <div style="width:60px;height:60px;border-radius:18px;background:#EEF2FF;
+      display:flex;align-items:center;justify-content:center;font-size:28px;margin-bottom:18px;">📱</div>
+    <div style="font-size:22px;font-weight:800;color:#1E1B3A;margin-bottom:6px;">Check your texts</div>
+    <div style="font-size:13px;color:#9CA3AF;margin-bottom:26px;">
+      Sent to <strong style="color:#1E1B3A;">(555) 123-4567</strong>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:28px;">
+      <div class="orb on">3</div><div class="orb on">7</div><div class="orb on">2</div>
+      <div class="orb cur"></div><div class="orb"></div><div class="orb"></div>
+    </div>
+    <button class="btn-primary" style="width:100%;" onclick="nav('success')">Verify →</button>
+    <div style="margin-top:14px;font-size:12px;color:#9CA3AF;">
+      Didn't get it? <span style="color:#6366F1;font-weight:600;cursor:pointer;">Resend in 28s</span>
+    </div>
+    <div class="card-sm" style="margin-top:20px;padding:10px 14px;text-align:left;width:100%;">
+      <div style="font-size:11px;color:#9CA3AF;line-height:1.5;">
+        📡 WhatsApp attempted first · SMS fallback · A2P 10DLC compliant
+      </div>
+    </div>
+  </div>
+</div>`);
+
+def('success',{},()=>`
+<div class="page-bg" style="min-height:100%;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding:48px 22px;text-align:center;">
+  <div style="width:80px;height:80px;border-radius:40px;margin-bottom:20px;
+    background:linear-gradient(135deg,#6366F1,#7C3AED);
+    display:flex;align-items:center;justify-content:center;font-size:36px;
+    box-shadow:0 8px 28px rgba(99,102,241,0.35);" class="pop-in">✓</div>
+  <div style="font-size:30px;font-weight:800;color:#1E1B3A;margin-bottom:6px;">You're in!</div>
+  <div class="pill pill-green" style="margin-bottom:32px;">✓ (555) 123-4567 verified</div>
+
+  <div class="card" style="width:100%;padding:16px;text-align:left;margin-bottom:20px;">
+    <div style="font-size:12px;font-weight:700;color:#9CA3AF;margin-bottom:6px;">One more thing</div>
+    <div style="font-size:14px;color:#1E1B3A;line-height:1.5;">
+      Add your payment handles so LetsSplyt can include your Venmo/PayPal links in split messages.
+    </div>
+  </div>
+
+  <div style="width:100%;display:flex;flex-direction:column;gap:10px;">
+    <button class="btn-primary" onclick="nav('profile')">Set up payment handles</button>
+    <button class="btn-ghost" onclick="nav('profile')">Skip for now</button>
+  </div>
+</div>`);
+
+def('login',{},()=>`
+<div class="page-bg" style="min-height:100%;display:flex;flex-direction:column;">
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:80px 22px 24px;">
+    <div style="font-size:12px;color:#9CA3AF;font-weight:600;letter-spacing:.06em;
+      text-transform:uppercase;margin-bottom:6px;">Welcome back</div>
+    <div style="font-size:30px;font-weight:800;color:#1E1B3A;margin-bottom:28px;">Sign in</div>
+    <div class="card" style="display:flex;align-items:center;gap:14px;padding:14px 16px;
+      margin-bottom:14px;cursor:pointer;" onclick="nav('biometric')">
+      <div style="width:42px;height:42px;border-radius:13px;background:#EEF2FF;
+        display:flex;align-items:center;justify-content:center;font-size:20px;">🔐</div>
+      <div style="flex:1;">
+        <div style="font-size:14px;font-weight:600;color:#1E1B3A;">Use Face ID</div>
+        <div style="font-size:11px;color:#9CA3AF;margin-top:1px;">Instant sign-in</div>
+      </div>
+      <div style="color:#6366F1;font-size:18px;">›</div>
+    </div>
+    <div class="divider"><span>or sign in with your number</span></div>
+    <div class="input-row" style="margin-bottom:14px;">
+      <div class="prefix">🇺🇸 +1</div>
+      <input class="sp-input" type="tel" value="(555) 123-4567">
+    </div>
+    <button class="btn-primary" onclick="nav('otp_reg')">Send code →</button>
+  </div>
+  <div style="padding:0 22px 28px;">
+    <button class="btn-ghost" onclick="nav('phone_entry')">Create new account</button>
+  </div>
+</div>`);
+
+def('biometric',{},()=>`
+<div style="background:linear-gradient(160deg,#EEF2FF 0%,#F5F3FF 60%,#EDE9FE 100%);
+  min-height:100%;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:56px 22px;text-align:center;position:relative;">
+  <div style="position:absolute;top:56px;text-align:center;width:100%;">
+    <div style="font-size:11px;font-weight:700;color:#A5B4FC;letter-spacing:.14em;text-transform:uppercase;">SPLITEASY</div>
+  </div>
+  <div style="font-size:24px;font-weight:800;color:#1E1B3A;margin-bottom:4px;">Good evening, Alex</div>
+  <div style="font-size:13px;color:#9CA3AF;margin-bottom:48px;">Touch to unlock</div>
+  <div style="position:relative;display:flex;align-items:center;justify-content:center;
+    width:140px;height:140px;margin-bottom:48px;">
+    <div style="position:absolute;width:140px;height:140px;border-radius:70px;
+      border:1.5px solid rgba(99,102,241,0.2);animation:pulse-ring 2s ease-out infinite;"></div>
+    <div style="position:absolute;width:112px;height:112px;border-radius:56px;
+      border:1.5px solid rgba(99,102,241,0.3);animation:pulse-ring 2s ease-out infinite .4s;"></div>
+    <div style="width:88px;height:88px;border-radius:44px;background:#fff;
+      border:2px solid #E0DDFF;display:flex;align-items:center;justify-content:center;font-size:40px;
+      cursor:pointer;box-shadow:0 6px 24px rgba(99,102,241,0.18);" onclick="nav('profile')">👤</div>
+  </div>
+  <button class="btn-primary" style="width:100%;margin-bottom:10px;" onclick="nav('profile')">✓ Authenticated</button>
+  <button class="btn-ghost" onclick="nav('otp_reg')">Use code instead</button>
+</div>`);
+
+/* ─────────────────────────────────────────────
+   PROFILE
+───────────────────────────────────────────── */
+
+def('profile',{},()=>`
+<div class="page-bg" style="min-height:100%;display:flex;flex-direction:column;">
+  <div style="padding:54px 22px 22px;text-align:center;">
+    <div style="position:relative;display:inline-block;margin-bottom:12px;">
+      <div style="width:76px;height:76px;border-radius:38px;margin:0 auto;
+        background:linear-gradient(135deg,#6366F1,#7C3AED);
+        display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:800;color:#fff;
+        box-shadow:0 6px 20px rgba(99,102,241,0.3);">A</div>
+      <div onclick="nav('edit_profile')" style="position:absolute;bottom:0;right:0;width:22px;height:22px;
+        background:#6366F1;border-radius:11px;display:flex;align-items:center;
+        justify-content:center;font-size:10px;cursor:pointer;border:2px solid #F0EFFF;">✏️</div>
+    </div>
+    <div style="font-size:20px;font-weight:800;color:#1E1B3A;margin-bottom:3px;">Alex Chen</div>
+    <div style="font-size:12px;color:#9CA3AF;margin-bottom:8px;">(555) 123-4567</div>
+    <div class="pill pill-green">✓ Verified</div>
+  </div>
+
+  <div style="padding:0 20px 24px;flex:1;">
+    <div style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;
+      letter-spacing:.08em;margin-bottom:12px;">Payment handles</div>
+
+    <div class="handle-card active" onclick="nav('add_handle')">
+      <div style="width:38px;height:38px;border-radius:11px;background:#3D95CE;
+        display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff;font-weight:800;">V</div>
+      <div style="flex:1;"><div style="font-size:14px;font-weight:600;color:#1E1B3A;">Venmo</div>
+        <div style="font-size:12px;color:#9CA3AF;margin-top:1px;">@alex-chen-splits</div></div>
+      <div style="width:7px;height:7px;border-radius:4px;background:#10B981;"></div>
+    </div>
+
+    <div class="handle-card active" onclick="nav('add_handle')">
+      <div style="width:38px;height:38px;border-radius:11px;background:#003087;
+        display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;font-weight:800;">PP</div>
+      <div style="flex:1;"><div style="font-size:14px;font-weight:600;color:#1E1B3A;">PayPal.me</div>
+        <div style="font-size:12px;color:#9CA3AF;margin-top:1px;">paypal.me/alexchen</div></div>
+      <div style="width:7px;height:7px;border-radius:4px;background:#10B981;"></div>
+    </div>
+
+    <div class="handle-card" onclick="nav('add_handle')">
+      <div style="width:38px;height:38px;border-radius:11px;background:#F3F4F6;border:1px solid #E5E7EB;
+        display:flex;align-items:center;justify-content:center;font-size:18px;">💸</div>
+      <div style="flex:1;"><div style="font-size:14px;font-weight:500;color:#9CA3AF;">Cash App</div>
+        <div style="font-size:11px;color:#C4C0D8;margin-top:1px;">Not added</div></div>
+      <div style="color:#C4C0D8;font-size:20px;font-weight:300;">+</div>
+    </div>
+
+    <div class="handle-card" onclick="nav('add_handle')">
+      <div style="width:38px;height:38px;border-radius:11px;background:#F3F4F6;border:1px solid #E5E7EB;
+        display:flex;align-items:center;justify-content:center;font-size:18px;">⚡</div>
+      <div style="flex:1;"><div style="font-size:14px;font-weight:500;color:#9CA3AF;">Zelle</div>
+        <div style="font-size:11px;color:#C4C0D8;margin-top:1px;">Not added</div></div>
+      <div style="color:#C4C0D8;font-size:20px;font-weight:300;">+</div>
+    </div>
+
+    <div class="card-sm" style="padding:10px 14px;margin-top:4px;display:flex;align-items:center;gap:10px;">
+      <span style="font-size:14px;">🔒</span>
+      <div style="font-size:11px;color:#9CA3AF;line-height:1.5;">AES-256 encrypted · Never shared without your action</div>
+    </div>
+
+    <button class="btn-primary" style="margin-top:16px;">Save changes</button>
+  </div>
+</div>`);
+
+def('edit_profile',{},()=>`
+<div class="page-bg" style="min-height:100%;display:flex;flex-direction:column;">
+  <div class="sp-nav">
+    <button class="sp-back" onclick="nav('profile')">‹ Profile</button>
+    <div style="font-size:16px;font-weight:700;color:#1E1B3A;position:absolute;left:50%;transform:translateX(-50%);">Edit Profile</div>
+    <div style="width:44px;"></div>
+  </div>
+  <div style="padding:24px 20px 28px;flex:1;">
+
+    <!-- Avatar editor -->
+    <div style="text-align:center;margin-bottom:28px;">
+      <div style="position:relative;display:inline-block;margin-bottom:12px;">
+        <div id="ep-avatar" style="width:84px;height:84px;border-radius:42px;margin:0 auto;
+          background:linear-gradient(135deg,#6366F1,#7C3AED);
+          display:flex;align-items:center;justify-content:center;font-size:34px;font-weight:800;color:#fff;
+          box-shadow:0 6px 20px rgba(99,102,241,0.3);">A</div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;">
+        ${['#6366F1','#10B981','#F59E0B','#EF4444','#8B5CF6','#3B82F6'].map(c=>`
+        <div onclick="document.getElementById('ep-avatar').style.background='${c}';document.getElementById('ep-avatar').style.backgroundImage='none';"
+          style="width:28px;height:28px;border-radius:14px;background:${c};cursor:pointer;
+          border:2px solid transparent;transition:transform .15s;"
+          onmouseover="this.style.transform='scale(1.15)'" onmouseout="this.style.transform='scale(1)'"></div>`).join('')}
+      </div>
+      <div style="font-size:11px;color:#9CA3AF;margin-top:8px;">Tap a colour to update your avatar</div>
+    </div>
+
+    <!-- Display name -->
+    <div style="margin-bottom:16px;">
+      <div style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;
+        letter-spacing:.08em;margin-bottom:8px;">Display name</div>
+      <input id="ep-name" type="text" value="Alex Chen"
+        style="width:100%;height:48px;border-radius:14px;border:1.5px solid #EDE9FE;
+          background:#F8F7FF;font-size:15px;font-weight:600;color:#1E1B3A;padding:0 14px;
+          box-sizing:border-box;font-family:inherit;outline:none;"
+        oninput="document.getElementById('ep-preview-name').textContent=this.value||'Your Name'"
+        onfocus="this.style.borderColor='#6366F1'" onblur="this.style.borderColor='#EDE9FE'">
+      <div style="font-size:11px;color:#9CA3AF;margin-top:6px;">This is how other members will see you.</div>
+    </div>
+
+    <!-- Preview -->
+    <div style="background:#F8F7FF;border-radius:14px;padding:14px 16px;margin-bottom:24px;
+      display:flex;align-items:center;gap:12px;">
+      <div id="ep-avatar-preview-wrap">
+        <div style="width:38px;height:38px;border-radius:19px;background:linear-gradient(135deg,#6366F1,#7C3AED);
+          display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff;">A</div>
+      </div>
+      <div>
+        <div id="ep-preview-name" style="font-size:14px;font-weight:700;color:#1E1B3A;">Alex Chen</div>
+        <div style="font-size:11px;color:#9CA3AF;">(555) 123-4567 · Verified ✓</div>
+      </div>
+    </div>
+
+    <button onclick="nav('profile')" style="display:flex;align-items:center;justify-content:center;gap:8px;
+      width:100%;height:52px;border-radius:16px;border:none;
+      background:linear-gradient(135deg,#6366F1,#7C3AED);color:#fff;font-size:16px;font-weight:700;
+      cursor:pointer;font-family:inherit;box-shadow:0 4px 18px rgba(99,102,241,.25);margin-bottom:10px;">
+      ✓ Save changes
+    </button>
+    <button onclick="nav('profile')" class="btn-ghost" style="font-size:13px;">Cancel</button>
+  </div>
+</div>`);
+
+def('add_handle',{},()=>`
+<div class="page-bg" style="min-height:100%;display:flex;flex-direction:column;">
+  <div class="sp-nav">
+    <button class="sp-back" onclick="nav('profile')">‹ Profile</button>
+    <div style="font-size:16px;font-weight:700;color:#1E1B3A;position:absolute;left:50%;transform:translateX(-50%);">Add handle</div>
+    <div style="width:44px;"></div>
+  </div>
+  <div style="padding:8px 20px 28px;flex:1;">
+    <div style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;
+      letter-spacing:.08em;margin-bottom:10px;">Choose provider</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px;">
+      ${[
+        {bg:'#3D95CE',icon:'V',name:'Venmo',sel:true},
+        {bg:'#003087',icon:'PP',name:'PayPal.me'},
+        {bg:'#00D632',icon:'$',name:'Cash App'},
+        {bg:'#6D1ED4',icon:'⚡',name:'Zelle'},
+      ].map(p=>`
+      <div style="padding:12px;border-radius:14px;display:flex;align-items:center;gap:10px;cursor:pointer;
+        background:${p.sel?'#EEF2FF':'#fff'};
+        border:1.5px solid ${p.sel?'#A5B4FC':'#F0EEF8'};
+        box-shadow:0 1px 5px rgba(99,102,241,${p.sel?'0.10':'0.03'});">
+        <div style="width:32px;height:32px;background:${p.bg};border-radius:9px;
+          display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;font-weight:800;flex-shrink:0;">${p.icon}</div>
+        <div style="font-size:12px;font-weight:${p.sel?'700':'500'};color:${p.sel?'#4338CA':'#6B7280'};">${p.name}</div>
+      </div>`).join('')}
+    </div>
+
+    <div style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;
+      letter-spacing:.08em;margin-bottom:6px;">Username</div>
+    <div style="position:relative;margin-bottom:20px;">
+      <div style="position:absolute;left:16px;top:50%;transform:translateY(-50%);
+        font-size:18px;font-weight:800;color:#A5B4FC;">@</div>
+      <input class="sp-input" style="padding-left:34px;" value="alex-chen-splits">
+    </div>
+
+    <div class="card" style="padding:14px 16px;margin-bottom:20px;">
+      <div style="font-size:10px;font-weight:700;color:#6366F1;text-transform:uppercase;
+        letter-spacing:.06em;margin-bottom:8px;">Message preview</div>
+      <div style="font-size:11px;color:#9CA3AF;margin-bottom:7px;">Sara will see:</div>
+      <div class="card-sm" style="padding:9px 12px;font-size:12px;color:#4338CA;font-weight:600;">
+        💸 Pay via Venmo → @alex-chen-splits ($32.00)
+      </div>
+    </div>
+
+    <button class="btn-primary" onclick="nav('handle_saved')">Save handle</button>
+    <button class="btn-ghost" onclick="nav('profile')">Cancel</button>
+  </div>
+</div>`);
+
+def('handle_saved',{},()=>`
+<div class="page-bg" style="min-height:100%;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding:48px 22px;text-align:center;">
+  <div style="width:76px;height:76px;border-radius:38px;margin-bottom:18px;
+    background:linear-gradient(135deg,#6366F1,#7C3AED);
+    display:flex;align-items:center;justify-content:center;font-size:34px;
+    box-shadow:0 8px 28px rgba(99,102,241,0.3);" class="pop-in">✓</div>
+  <div style="font-size:26px;font-weight:800;color:#1E1B3A;margin-bottom:5px;">Handle saved</div>
+  <div style="font-size:13px;color:#9CA3AF;margin-bottom:28px;">Encrypted &amp; ready to use</div>
+
+  <div class="card" style="width:100%;padding:16px;text-align:left;margin-bottom:14px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+      <div style="width:36px;height:36px;background:#3D95CE;border-radius:10px;
+        display:flex;align-items:center;justify-content:center;font-size:13px;color:#fff;font-weight:800;">V</div>
+      <div>
+        <div style="font-size:14px;font-weight:600;color:#1E1B3A;">Venmo</div>
+        <div style="font-size:12px;color:#6366F1;">@alex-chen-splits</div>
+      </div>
+      <div style="width:7px;height:7px;border-radius:4px;background:#10B981;margin-left:auto;"></div>
+    </div>
+    <div style="font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;
+      letter-spacing:.06em;margin-bottom:8px;">All saved handles</div>
+    ${['Venmo · @alex-chen-splits','PayPal.me · paypal.me/alexchen'].map(h=>`
+      <div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #F0EEF8;">
+        <div style="width:6px;height:6px;border-radius:3px;background:#10B981;"></div>
+        <div style="font-size:12px;color:#6B7280;">${h}</div>
+      </div>`).join('')}
+  </div>
+
+  <div style="width:100%;display:flex;flex-direction:column;gap:9px;">
+    <button class="btn-primary" onclick="nav('profile')">Add another handle</button>
+    <button class="btn-ghost">Done</button>
+  </div>
+</div>`);
+
+// ── INIT ──
+render('web_invite');updateSidebar('web_invite');updateInfo('web_invite');updateHist();
+
+// ── SIM MODE ──
+(function(){
+  if(new URLSearchParams(location.search).get("sim")){
+    ["sidebar","info"].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display="none";});
+    var c=document.getElementById("center");if(c){c.style.justifyContent="center";c.style.gap="0";}
+  }
+  window.addEventListener("message",function(e){
+    if(e.data&&e.data.nav&&SCREENS[e.data.nav])nav(e.data.nav);
+  });
+})();
+</script>
+</body>
+</html>

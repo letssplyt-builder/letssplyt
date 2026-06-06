@@ -1,0 +1,40 @@
+# ─── Dependencies ─────────────────────────────────────────────
+node_modules/
+
+# ─── TypeScript build outputs ─────────────────────────────────
+dist/
+*.js.map
+*.d.ts.map
+*.tsbuildinfo
+
+# ─── Expo / React Native generated ───────────────────────────
+.expo/
+mobile/ios/
+mobile/android/
+
+# ─── Test coverage reports ────────────────────────────────────
+coverage/
+
+# ─── Environment files (secrets live in Doppler, not here) ───
+.env
+.env.*
+!.env.example
+
+# ─── Supabase local dev state ─────────────────────────────────
+supabase/.branches/
+supabase/.temp/
+.supabase/
+
+# ─── Logs ─────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+
+# ─── EAS / app store build artifacts ─────────────────────────
+*.ipa
+*.apk
+*.aab
+
+# ─── OS / editor ──────────────────────────────────────────────
+.DS_Store
+Thumbs.db

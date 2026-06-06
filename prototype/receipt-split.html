@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LetsSplyt — Receipt & Split</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif;
+  background:#F0EFFF;display:flex;height:100vh;overflow:hidden;color:#1E1B3A;}
+
+#sidebar{width:240px;background:#fff;border-right:1px solid #E8E6F0;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;}
+#sb-logo{padding:20px 18px 14px;border-bottom:1px solid #F0EEF8;}
+#sb-logo .mark{display:flex;align-items:center;gap:10px;margin-bottom:3px;}
+#sb-logo .gem{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,#6366F1,#7C3AED);display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;}
+#sb-logo .name{font-size:16px;font-weight:800;color:#1E1B3A;letter-spacing:-.3px;}
+#sb-logo .sub{font-size:10px;color:#9CA3AF;letter-spacing:.05em;text-transform:uppercase;}
+#sb-screens{flex:1;overflow-y:auto;padding:6px 0 16px;}
+#sb-screens::-webkit-scrollbar{width:0;}
+.sg-hdr{padding:10px 16px 3px;font-size:9px;font-weight:700;color:#C4C0D8;text-transform:uppercase;letter-spacing:.1em;}
+.sc{display:flex;align-items:center;gap:9px;padding:7px 16px;cursor:pointer;border-left:2px solid transparent;transition:all .12s;border-radius:0 8px 8px 0;margin-right:8px;}
+.sc:hover{background:#F5F3FF;}
+.sc.active{background:#EEF2FF;border-left-color:#6366F1;}
+.sc-badge{font-size:9px;font-weight:700;color:#6366F1;min-width:28px;opacity:.8;flex-shrink:0;}
+.sc-name{font-size:11px;color:#6B7280;line-height:1.3;}
+.sc.active .sc-name{color:#4338CA;font-weight:600;}
+
+#center{flex:1;display:flex;align-items:center;justify-content:center;gap:24px;padding:24px;overflow:hidden;}
+#phone-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;}
+#phone{width:375px;background:#E8E6F5;border-radius:54px;padding:12px;flex-shrink:0;
+  box-shadow:0 0 0 1px rgba(99,102,241,.12),0 28px 70px rgba(99,102,241,.14),0 6px 20px rgba(0,0,0,.05);}
+#di{width:120px;height:34px;background:#D1CFF0;border-radius:20px;margin:0 auto 8px;}
+#screen-wrap{width:351px;height:724px;border-radius:42px;overflow:hidden;position:relative;display:flex;flex-direction:column;}
+#sb-time-bar{position:absolute;top:0;left:0;right:0;height:48px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 24px 8px;z-index:100;pointer-events:none;}
+.time{font-size:15px;font-weight:700;}
+.icons{display:flex;gap:5px;align-items:center;}
+#screen{flex:1;overflow-y:auto;overflow-x:hidden;}
+#screen::-webkit-scrollbar{width:0;}
+#hi{height:32px;display:flex;align-items:center;justify-content:center;position:absolute;bottom:0;left:0;right:0;pointer-events:none;z-index:100;}
+#hi div{width:130px;height:5px;border-radius:3px;opacity:.25;}
+#ctrl{display:flex;align-items:center;gap:10px;}
+#back-btn{padding:8px 16px;background:#fff;border:1px solid #E5E7EB;color:#6B7280;border-radius:10px;font-size:12px;cursor:pointer;font-family:inherit;transition:all .15s;}
+#back-btn:hover{background:#F5F3FF;color:#4338CA;border-color:#C7D2FE;}
+#crumb{font-size:10px;color:#9CA3AF;font-family:monospace;}
+
+#info{width:210px;flex-shrink:0;display:flex;flex-direction:column;gap:10px;}
+.ic{background:#fff;border:1px solid #E8E6F0;border-radius:16px;padding:14px;box-shadow:0 1px 6px rgba(99,102,241,.05);}
+.ic-label{font-size:9px;font-weight:700;color:#C4C0D8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;}
+.ic-badge{display:inline-block;background:#EEF2FF;color:#6366F1;font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;margin-bottom:6px;font-family:monospace;}
+.ic-name{font-size:13px;font-weight:600;color:#1E1B3A;margin-bottom:5px;line-height:1.3;}
+.ic-desc{font-size:11px;color:#9CA3AF;line-height:1.5;}
+#hist{display:flex;flex-direction:column;gap:3px;max-height:140px;overflow-y:auto;}
+#hist::-webkit-scrollbar{width:0;}
+.hi-row{display:flex;align-items:center;gap:7px;cursor:pointer;padding:3px 5px;border-radius:6px;}
+.hi-row:hover{background:#F5F3FF;}
+.hi-dot{width:5px;height:5px;border-radius:3px;background:#E5E7EB;flex-shrink:0;}
+.hi-row.cur .hi-dot{background:#6366F1;}
+.hi-lbl{font-size:10px;color:#9CA3AF;}
+.hi-row.cur .hi-lbl{color:#6366F1;font-weight:600;}
+#tip{background:#EEF2FF;border:1px solid #C7D2FE;border-radius:12px;padding:12px 14px;}
+#tip p{font-size:11px;color:#4338CA;line-height:1.5;}
+
+/* ═══ DESIGN TOKENS ═══ */
+:root{
+  --bg:#F8F7FF;
+  --white:#fff;
+  --indigo:#6366F1;
+  --indigo-lt:#EEF2FF;
+  --purple:#7C3AED;
+  --green:#10B981;
+  --green-lt:#D1FAE5;
+  --amber:#F59E0B;
+  --amber-lt:#FEF3C7;
+  --red:#EF4444;
+  --t1:#1E1B3A;
+  --t2:#6B7280;
+  --t3:#9CA3AF;
+  --border:#F0EEF8;
+  --border2:#E0DDFF;
+}
+.page{background:var(--bg);min-height:100%;}
+.page-white{background:#fff;min-height:100%;}
+
+/* Camera screen */
+.camera-screen{background:#0A0A0A;min-height:100%;position:relative;overflow:hidden;}
+
+/* Buttons */
+.btn{display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;font-family:inherit;transition:all .15s;}
+.btn-fill{width:100%;height:56px;border-radius:18px;background:linear-gradient(135deg,var(--indigo),var(--purple));color:#fff;font-size:16px;font-weight:700;box-shadow:0 4px 20px rgba(99,102,241,.3);}
+.btn-outline{width:100%;height:52px;border-radius:16px;background:var(--white);border:1.5px solid var(--border2);color:var(--indigo);font-size:15px;font-weight:600;}
+.btn-ghost{width:100%;height:44px;border-radius:14px;background:transparent;color:var(--t3);font-size:14px;font-weight:500;}
+
+/* Cards */
+.card{background:var(--white);border-radius:20px;border:1px solid var(--border);box-shadow:0 2px 16px rgba(99,102,241,.07);}
+.card-flat{background:var(--bg);border-radius:16px;border:1px solid var(--border2);}
+
+/* Nav */
+.nav-bar{display:flex;align-items:center;justify-content:space-between;padding:54px 22px 10px;}
+.back{background:none;border:none;color:var(--indigo);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;}
+.nav-title{font-size:16px;font-weight:700;color:var(--t1);position:absolute;left:50%;transform:translateX(-50%);}
+
+/* Avatar chip */
+.av{width:36px;height:36px;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0;}
+.av-lg{width:48px;height:48px;border-radius:24px;font-size:18px;}
+.av-xl{width:56px;height:56px;border-radius:28px;font-size:22px;}
+
+/* Item row */
+.item-row{display:flex;align-items:center;gap:12px;padding:11px 0;border-bottom:1px solid #F5F3FF;}
+.item-row:last-child{border-bottom:none;}
+
+/* Pill */
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:100px;}
+.pill-g{background:var(--green-lt);color:#059669;}
+.pill-i{background:var(--indigo-lt);color:var(--indigo);}
+.pill-a{background:var(--amber-lt);color:#B45309;}
+.pill-r{background:#FEE2E2;color:var(--red);}
+
+/* Animations */
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+@keyframes popIn{0%{transform:scale(.3);opacity:0;}65%{transform:scale(1.08);}100%{transform:scale(1);opacity:1;}}
+@keyframes scan{0%{top:12%;}50%{top:80%;}100%{top:12%;}}
+@keyframes tickIn{from{opacity:0;transform:translateX(-8px);}to{opacity:1;transform:translateX(0);}}
+@keyframes shimmer{0%{opacity:.4;}50%{opacity:1;}100%{opacity:.4;}}
+@keyframes pulse{0%,100%{transform:scale(1);}50%{transform:scale(1.06);}}
+
+.fade-up{animation:fadeUp .3s ease forwards;}
+.pop-in{animation:popIn .38s cubic-bezier(.34,1.56,.64,1) forwards;}
+.tick-in{animation:tickIn .25s ease forwards;}
+.shimmer{animation:shimmer 1.6s ease infinite;}
+</style>
+</head>
+<body>
+
+<aside id="sidebar">
+  <div id="sb-logo">
+    <div class="mark"><div class="gem">✦</div><div class="name">LetsSplyt</div></div>
+    <div class="sub">Receipt &amp; Split · P15–P20a</div>
+  </div>
+  <div id="sb-screens">
+    <div class="sg-hdr">Receipt</div>
+    <div class="sc active" data-id="scan_receipt" onclick="nav('scan_receipt')"><span class="sc-badge">P15</span><span class="sc-name">Scan receipt</span></div>
+    <div class="sc" data-id="ai_reading" onclick="nav('ai_reading')"><span class="sc-badge">S01</span><span class="sc-name">AI reading…</span></div>
+    <div class="sc" data-id="manual_total" onclick="nav('manual_total')"><span class="sc-badge">P17</span><span class="sc-name">Enter total manually</span></div>
+
+    <div class="sg-hdr" style="margin-top:4px;">Split Mode</div>
+    <div class="sc" data-id="split_mode" onclick="nav('split_mode')"><span class="sc-badge">P15a</span><span class="sc-name">Choose split mode</span></div>
+    <div class="sc" data-id="custom_amounts" onclick="nav('custom_amounts')"><span class="sc-badge">P16b</span><span class="sc-name">Custom amounts entry</span></div>
+
+    <div class="sg-hdr" style="margin-top:4px;">Itemised</div>
+    <div class="sc" data-id="item_review" onclick="nav('item_review')"><span class="sc-badge">P16</span><span class="sc-name">Review items</span></div>
+    <div class="sc" data-id="assign_tap" onclick="nav('assign_tap')"><span class="sc-badge">P18</span><span class="sc-name">Assign — tap to assign</span></div>
+    <div class="sc" data-id="assign_nlp" onclick="nav('assign_nlp')"><span class="sc-badge">P19</span><span class="sc-name">Assign — natural language</span></div>
+
+    <div class="sg-hdr" style="margin-top:4px;">Review & Edit</div>
+    <div class="sc" data-id="split_breakdown" onclick="nav('split_breakdown')"><span class="sc-badge">P20</span><span class="sc-name">Split breakdown</span></div>
+    <div class="sc" data-id="edit_postsend" onclick="nav('edit_postsend')"><span class="sc-badge">P20a</span><span class="sc-name">Edit after sending</span></div>
+  </div>
+</aside>
+
+<div id="center">
+  <div id="phone-wrap">
+    <div id="phone">
+      <div id="di"></div>
+      <div id="screen-wrap">
+        <div id="sb-time-bar">
+          <span class="time" id="time-el">9:41</span>
+          <div class="icons">
+            <svg width="16" height="12" viewBox="0 0 16 12"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor"/><rect x="13.5" y="1" width="2.5" height="10" rx="1" fill="currentColor" opacity=".3"/></svg>
+            <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x=".5" y="1" width="21" height="10" rx="2.5" stroke="currentColor" stroke-width="1.2"/><rect x="22" y="3.5" width="2.5" height="5" rx="1.2" fill="currentColor"/><rect x="2" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/></svg>
+          </div>
+        </div>
+        <div id="screen"></div>
+        <div id="tab-bar" style="display:flex;align-items:stretch;background:rgba(255,255,255,.96);border-top:1px solid #F0EEF8;backdrop-filter:blur(12px);flex-shrink:0;height:64px;">
+          <div onclick="navTab('home')" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;"><div style="font-size:22px;">⬡</div><div style="font-size:9px;font-weight:600;color:#9CA3AF;letter-spacing:.02em;">Dashboard</div></div>
+          <div onclick="navTab('events')" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;position:relative;"><div style="font-size:22px;transform:scale(1.08);">◫</div><div style="font-size:9px;font-weight:600;color:#6366F1;letter-spacing:.02em;">Events</div><div style="position:absolute;top:8px;right:calc(50% - 16px);width:6px;height:6px;border-radius:3px;background:#EF4444;"></div></div>
+          <div onclick="navTab('members')" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;"><div style="font-size:22px;">◎</div><div style="font-size:9px;font-weight:600;color:#9CA3AF;letter-spacing:.02em;">Members</div></div>
+          <div onclick="navTab('settings')" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;"><div style="font-size:22px;">◈</div><div style="font-size:9px;font-weight:600;color:#9CA3AF;letter-spacing:.02em;">Settings</div></div>
+        </div>
+        <div id="hi"><div></div></div>
+      </div>
+    </div>
+    <div id="ctrl">
+      <button id="back-btn" onclick="goBack()">← Back</button>
+      <span id="crumb"></span>
+    </div>
+  </div>
+
+  <div id="info">
+    <div class="ic">
+      <div class="ic-label">Current Screen</div>
+      <div id="ic-badge" class="ic-badge" style="display:none;"></div>
+      <div id="ic-name" class="ic-name">LetsSplyt</div>
+      <div id="ic-desc" class="ic-desc">Navigate screens from the sidebar.</div>
+    </div>
+    <div class="ic"><div class="ic-label">History</div><div id="hist"></div></div>
+    <div id="tip"><p>✦ Design goal — every screen communicates in visuals first. Text is a last resort.</p></div>
+  </div>
+</div>
+
+<script>
+const SCREENS={};
+function def(id,m,fn){SCREENS[id]={...m,id,render:fn};}
+const META={
+  scan_receipt:{badge:'P15',name:'Scan receipt',desc:'Full-screen camera. Animated scan line. One shutter button. "Skip" is the only other tap target — no menu, no settings.'},
+  ai_reading:{badge:'S01',name:'AI reading receipt',desc:'Items tick into view one by one as Claude reads them. Feels like watching magic. Progress is implicit — no spinner, no percentage.'},
+  manual_total:{badge:'P17',name:'Enter total manually',desc:'Single large number input. Clean and minimal. For when there\'s no receipt or the scan fails.'},
+  split_mode:{badge:'P15a',name:'Choose split mode',desc:'Two tiles: Itemised (receipt path) and Custom. Even split is now a tab inside Custom — fewer screens, fewer taps.'},
+  item_review:{badge:'P16',name:'Review items',desc:'Editable item list. Tap any row to correct a misread. Visual diff shows what AI read vs what you changed.'},
+  assign_tap:{badge:'P18',name:'Assign — tap to assign',desc:'Avatars pinned at the top. Items below as clean rows. Tap an item to select → tap an avatar to assign. Selected state uses indigo highlight. Assigned items show avatar badge.'},
+  assign_nlp:{badge:'P19',name:'Assign — natural language',desc:'A single text field. User types or speaks. Assignments resolve visually below the input in real time.'},
+  split_breakdown:{badge:'P20',name:'Split breakdown',desc:'One card per person. Large amount. Horizontal bar shows their share of the total. Very visual.'},
+  edit_postsend:{badge:'P20a',name:'Edit after sending',desc:'Amber warning banner. Only the changed item is highlighted. Affected participant shown clearly.'},
+};
+let history=['scan_receipt'];
+let HAS_RECEIPT=true; // false when user entered total manually (no receipt scanned)
+
+function navTab(tab){var dest={home:{f:'home.html',t:'home'},events:{f:'home.html',t:'events'},members:{f:'home.html',t:'members'},settings:{f:'home.html',t:'settings'}}[tab];if(!dest)return;if(window.parent!==window){window.parent.postMessage({loadFile:dest.f,tab:dest.t},'*');}else{location.href=dest.f;}}
+function nav(id){if(!SCREENS[id])return;history.push(id);render(id);updateSB(id);updateInfo(id);updateHist();updateTabBar(id);}
+function updateTabBar(id){var el=document.getElementById('tab-bar');if(el)el.style.display=['scan_receipt','ai_reading'].includes(id)?'none':'flex';}
+function goBack(){if(history.length<=1)return;history.pop();const p=history[history.length-1];render(p);updateSB(p);updateInfo(p);updateHist();}
+function render(id){
+  const s=SCREENS[id];if(!s)return;
+  const el=document.getElementById('screen');
+  const isLight=!['scan_receipt','ai_reading'].includes(id);
+  el.style.opacity='0';
+  setTimeout(()=>{
+    el.innerHTML=s.render();
+    el.style.opacity='1';el.style.transition='opacity .18s';el.scrollTop=0;
+    const tb=document.getElementById('time-el');
+    const hi=document.getElementById('hi').querySelector('div');
+    const icons=document.querySelectorAll('.icons svg');
+    if(isLight){tb.style.color='#1E1B3A';hi.style.background='#1E1B3A';icons.forEach(s=>s.style.color='#1E1B3A');}
+    else{tb.style.color='#fff';hi.style.background='#fff';icons.forEach(s=>s.style.color='rgba(255,255,255,.7)');}
+  },80);
+  document.getElementById('crumb').textContent=id;
+}
+function updateSB(id){document.querySelectorAll('.sc').forEach(e=>e.classList.toggle('active',e.dataset.id===id));}
+function updateInfo(id){
+  const m=META[id]||{};
+  const b=document.getElementById('ic-badge');
+  if(m.badge){b.style.display='inline-block';b.textContent=m.badge;}else{b.style.display='none';}
+  document.getElementById('ic-name').textContent=m.name||id;
+  document.getElementById('ic-desc').textContent=m.desc||'';
+}
+function updateHist(){
+  document.getElementById('hist').innerHTML=history.slice(-6).reverse().map((id,i)=>`
+    <div class="hi-row ${i===0?'cur':''}" onclick="nav('${id}')"><div class="hi-dot"></div>
+    <span class="hi-lbl">${META[id]?.name||id}</span></div>`).join('');
+}
+
+const MEMBERS=[
+  {l:'S',name:'Sara',bg:'#6366F1'},
+  {l:'M',name:'Mike',bg:'#10B981'},
+  {l:'J',name:'Jamie',bg:'#A78BFA'},
+  {l:'K',name:'Kim',bg:'#F59E0B'},
+  {l:'R',name:'Raj',bg:'#EF4444'},
+];
+const ITEMS=[
+  {name:'Tuna tartare',price:22,who:null},
+  {name:'Wagyu gyoza',price:18,who:0},
+  {name:'Black cod miso',price:38,who:2},
+  {name:'Yellowtail jalapeño',price:26,who:null},
+  {name:'Edamame',price:9,who:'shared'},
+  {name:'Sake (bottle)',price:65,who:'shared'},
+  {name:'Chocolate fondant',price:14,who:1},
+  {name:'Green tea ice cream',price:11,who:3},
+];
+
+/* ── SCREENS ── */
+
+def('scan_receipt',{},()=>`
+<div class="camera-screen">
+  <!-- Status bar override -->
+  <div style="position:absolute;top:0;left:0;right:0;z-index:10;
+    padding:16px 24px 0;display:flex;justify-content:flex-end;">
+    <span style="font-size:14px;font-weight:600;color:rgba(255,255,255,.5);cursor:pointer;"
+      onclick="nav('manual_total')">Skip</span>
+  </div>
+
+  <!-- Simulated camera view -->
+  <div style="position:absolute;inset:0;background:#111;overflow:hidden;">
+    <!-- Fake bokeh texture -->
+    <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 30% 40%,#1a1a1a,#000);opacity:.8;"></div>
+    <!-- Receipt outline guide -->
+    <div style="position:absolute;top:15%;left:10%;right:10%;bottom:22%;
+      border:2px solid rgba(99,102,241,.6);border-radius:12px;
+      box-shadow:0 0 0 2000px rgba(0,0,0,.45);">
+      <!-- Corner accents -->
+      <div style="position:absolute;top:-2px;left:-2px;width:24px;height:24px;
+        border-top:3px solid #6366F1;border-left:3px solid #6366F1;border-radius:4px 0 0 0;"></div>
+      <div style="position:absolute;top:-2px;right:-2px;width:24px;height:24px;
+        border-top:3px solid #6366F1;border-right:3px solid #6366F1;border-radius:0 4px 0 0;"></div>
+      <div style="position:absolute;bottom:-2px;left:-2px;width:24px;height:24px;
+        border-bottom:3px solid #6366F1;border-left:3px solid #6366F1;border-radius:0 0 0 4px;"></div>
+      <div style="position:absolute;bottom:-2px;right:-2px;width:24px;height:24px;
+        border-bottom:3px solid #6366F1;border-right:3px solid #6366F1;border-radius:0 0 4px 0;"></div>
+      <!-- Scan line -->
+      <div style="position:absolute;left:0;right:0;height:2px;
+        background:linear-gradient(90deg,transparent,#6366F1,#A78BFA,#6366F1,transparent);
+        animation:scan 2.4s ease-in-out infinite;box-shadow:0 0 8px rgba(99,102,241,.6);"></div>
+    </div>
+
+    <!-- Hint text -->
+    <div style="position:absolute;top:14%;left:50%;transform:translateX(-50%);
+      font-size:12px;color:rgba(255,255,255,.5);white-space:nowrap;">Align receipt in frame</div>
+  </div>
+
+  <!-- Shutter -->
+  <div style="position:absolute;bottom:48px;left:50%;transform:translateX(-50%);
+    display:flex;flex-direction:column;align-items:center;gap:14px;">
+    <div onclick="nav('ai_reading')"
+      style="width:72px;height:72px;border-radius:36px;background:#fff;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+      box-shadow:0 0 0 6px rgba(255,255,255,.2);animation:pulse 2s ease infinite;">
+      <div style="width:56px;height:56px;border-radius:28px;background:#fff;
+        border:3px solid #1E1B3A;"></div>
+    </div>
+  </div>
+</div>`);
+
+def('ai_reading',{},()=>`
+<div style="background:#1E1B3A;min-height:100%;display:flex;flex-direction:column;
+  padding:64px 24px 32px;position:relative;overflow:hidden;">
+
+  <!-- Soft glow -->
+  <div style="position:absolute;width:300px;height:300px;border-radius:50%;
+    background:radial-gradient(circle,rgba(99,102,241,.15),transparent 65%);
+    top:-80px;right:-60px;pointer-events:none;"></div>
+
+  <!-- Header -->
+  <div style="margin-bottom:32px;">
+    <div style="font-size:13px;font-weight:700;color:rgba(99,102,241,.8);
+      letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px;">AI · Reading receipt</div>
+    <div style="font-size:28px;font-weight:800;color:#fff;line-height:1.1;">Dinner at Nobu 🍣</div>
+  </div>
+
+  <!-- Items appearing -->
+  <div style="flex:1;display:flex;flex-direction:column;gap:0;">
+    ${[
+      {name:'Tuna tartare',qty:1,price:'$22.00',done:true,delay:0},
+      {name:'Wagyu gyoza',qty:2,price:'$36.00',done:true,delay:.08},
+      {name:'Black cod miso',qty:1,price:'$38.00',done:true,delay:.16},
+      {name:'Yellowtail jalapeño',qty:1,price:'$26.00',done:true,delay:.24},
+      {name:'Edamame',qty:1,price:'$9.00',done:true,delay:.32},
+      {name:'Sake (bottle)',qty:1,price:'$65.00',done:true,delay:.40},
+      {name:'Chocolate fondant',qty:1,price:'$14.00',done:true,delay:.48},
+      {name:'Green tea ice cream',qty:2,price:'$22.00',done:false,delay:.56},
+    ].map(item=>`
+    <div style="display:flex;align-items:center;gap:14px;padding:11px 0;
+      border-bottom:1px solid rgba(255,255,255,.06);
+      animation:tickIn .3s ease ${item.delay}s both;">
+      <div style="width:20px;height:20px;border-radius:10px;flex-shrink:0;
+        background:${item.done?'#10B981':'rgba(255,255,255,.1)'};
+        display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;">
+        ${item.done?'✓':''}
+      </div>
+      <div style="flex:1;">
+        <div style="font-size:14px;font-weight:${item.done?600:400};
+          color:${item.done?'#fff':'rgba(255,255,255,.3)'};">${item.name}</div>
+        ${item.qty>1?`<div style="font-size:11px;color:rgba(99,102,241,.7);margin-top:1px;">× ${item.qty}</div>`:''}
+      </div>
+      <div style="font-size:14px;font-weight:700;
+        color:${item.done?'rgba(255,255,255,.7)':'rgba(255,255,255,.2)'};">${item.price}</div>
+    </div>`).join('')}
+
+    <!-- Totals -->
+    <div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,.1);">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+        <span style="font-size:13px;color:rgba(255,255,255,.4);">Tax</span>
+        <span style="font-size:13px;color:rgba(255,255,255,.5);">$20.30</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;margin-bottom:14px;">
+        <span style="font-size:13px;color:rgba(255,255,255,.4);">Tip (18%)</span>
+        <span style="font-size:13px;color:rgba(255,255,255,.5);">$36.54</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;">
+        <span style="font-size:16px;font-weight:700;color:#fff;">Total</span>
+        <span style="font-size:22px;font-weight:800;color:#A78BFA;">$278.84</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div style="margin-top:24px;">
+    <button onclick="HAS_RECEIPT=true;nav('split_mode')"
+      style="width:100%;height:56px;border-radius:18px;border:none;cursor:pointer;font-family:inherit;
+      background:linear-gradient(135deg,#6366F1,#7C3AED);color:#fff;font-size:16px;font-weight:700;
+      box-shadow:0 4px 20px rgba(99,102,241,.4);">
+      Looks good →
+    </button>
+    <button onclick="nav('item_review')"
+      style="width:100%;height:44px;border-radius:14px;border:none;background:transparent;
+      color:rgba(255,255,255,.35);font-size:13px;cursor:pointer;font-family:inherit;margin-top:4px;">
+      Edit items
+    </button>
+  </div>
+</div>`);
+
+def('manual_total',{},()=>`
+<div class="page" style="min-height:100%;display:flex;flex-direction:column;">
+  <div class="nav-bar" style="position:relative;">
+    <button class="back" onclick="nav('scan_receipt')">‹ Back</button>
+  </div>
+
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 32px 80px;">
+    <div style="font-size:14px;font-weight:600;color:var(--t3);margin-bottom:40px;text-align:center;">
+      Total bill amount
+    </div>
+
+    <!-- Giant number input -->
+    <div style="display:flex;align-items:flex-start;justify-content:center;margin-bottom:48px;">
+      <span style="font-size:36px;font-weight:700;color:var(--t3);margin-top:8px;margin-right:4px;">$</span>
+      <span style="font-size:72px;font-weight:800;color:var(--t1);letter-spacing:-3px;
+        border-bottom:3px solid var(--indigo);padding-bottom:4px;cursor:text;">278</span>
+      <span style="font-size:36px;font-weight:700;color:var(--t3);margin-top:10px;margin-left:4px;">.84</span>
+    </div>
+
+    <!-- Numpad -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;width:100%;max-width:280px;margin-bottom:36px;">
+      ${[1,2,3,4,5,6,7,8,9,'.',0,'⌫'].map(k=>`
+      <div style="height:56px;border-radius:16px;background:var(--white);
+        border:1px solid var(--border);display:flex;align-items:center;justify-content:center;
+        font-size:${k==='⌫'?20:22}px;font-weight:600;color:var(--t1);cursor:pointer;
+        box-shadow:0 1px 4px rgba(99,102,241,.06);
+        ${k===0?'grid-column:auto;':''}">${k}</div>`).join('')}
+    </div>
+
+    <button class="btn fill" onclick="HAS_RECEIPT=false;nav('custom_amounts')"
+      style="width:100%;height:56px;border-radius:18px;border:none;cursor:pointer;font-family:inherit;
+      background:linear-gradient(135deg,#6366F1,#7C3AED);color:#fff;font-size:16px;font-weight:700;
+      box-shadow:0 4px 20px rgba(99,102,241,.3);">
+      Continue →
+    </button>
+  </div>
+</div>`);
+
+def('split_mode',{},()=>{
+  const itemisedTile = HAS_RECEIPT ? `
+    <!-- Itemised (receipt path only) -->
+    <div onclick="nav('item_review')"
+      style="flex:1;border-radius:24px;background:var(--white);border:1.5px solid var(--border);
+      padding:22px;cursor:pointer;display:flex;gap:18px;align-items:center;
+      box-shadow:0 2px 12px rgba(99,102,241,.05);position:relative;overflow:hidden;">
+      <div style="position:absolute;right:-20px;bottom:-20px;width:100px;height:100px;
+        border-radius:50%;background:#F0FDF4;opacity:.6;"></div>
+      <div style="width:64px;height:64px;flex-shrink:0;display:grid;grid-template-columns:1fr 1fr;gap:4px;">
+        ${[['#6366F1','S'],['#10B981','M'],['#A78BFA','J'],['#F59E0B','K']].map(([bg,l])=>`
+        <div style="border-radius:8px;background:${bg}20;border:1.5px solid ${bg}50;
+          display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:${bg};">${l}</div>`).join('')}
+      </div>
+      <div>
+        <div style="font-size:18px;font-weight:800;color:var(--t1);margin-bottom:3px;">Itemised</div>
+        <div style="font-size:13px;color:var(--t3);">Assign each dish</div>
+      </div>
+      <div style="margin-left:auto;font-size:20px;color:var(--t3);">›</div>
+    </div>` : '';
+
+  return `
+<div class="page" style="min-height:100%;display:flex;flex-direction:column;padding:52px 20px 32px;">
+
+  <div style="margin-bottom:32px;">
+    <div style="font-size:24px;font-weight:800;color:var(--t1);margin-bottom:4px;">How to split?</div>
+    <div style="font-size:14px;color:var(--t3);">$278.84 · 5 people</div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:12px;flex:1;">
+
+    ${itemisedTile}
+
+    <!-- Custom -->
+    <div onclick="nav('custom_amounts')"
+      style="flex:1;border-radius:24px;background:var(--white);border:1.5px solid var(--border);
+      padding:22px;cursor:pointer;display:flex;gap:18px;align-items:center;
+      box-shadow:0 2px 12px rgba(99,102,241,.05);
+      position:relative;overflow:hidden;">
+      <div style="position:absolute;right:-20px;bottom:-20px;width:100px;height:100px;
+        border-radius:50%;background:#FFF7ED;opacity:.6;"></div>
+      <div style="width:64px;height:64px;flex-shrink:0;display:flex;flex-direction:column;
+        justify-content:center;align-items:flex-start;gap:6px;">
+        ${[['$42','#6366F1'],['$85','#F59E0B'],['$61','#10B981']].map(([amt,c])=>`
+        <div style="font-size:11px;font-weight:800;color:${c};background:${c}15;
+          padding:2px 8px;border-radius:6px;">${amt}</div>`).join('')}
+      </div>
+      <div>
+        <div style="font-size:18px;font-weight:800;color:var(--t1);margin-bottom:3px;">Custom</div>
+        <div style="font-size:13px;color:var(--t3);">Type each amount</div>
+      </div>
+      <div style="margin-left:auto;font-size:20px;color:var(--t3);">›</div>
+    </div>
+
+  </div>
+</div>`;
+});
+
+def('custom_amounts',{},()=>{
+  const BILL=278.84;
+  const N=5;
+  const EVEN_AMT=parseFloat((BILL/N).toFixed(2));
+  const MEMBERS=[
+    {l:'S',name:'Sara (you)',bg:'#6366F1',val:0},
+    {l:'M',name:'Mike T.',bg:'#10B981',val:0},
+    {l:'J',name:'Jamie L.',bg:'#A78BFA',val:0},
+    {l:'K',name:'Kim P.',bg:'#F59E0B',val:0},
+    {l:'R',name:'Raj P.',bg:'#EF4444',val:0},
+  ];
+  let mode='even'; // 'even' | 'amount' | 'percent' | 'portion'
+
+  function dollarAmt(i){
+    const v=MEMBERS[i].val||0;
+    if(mode==='even') return EVEN_AMT;
+    if(mode==='amount') return v;
+    if(mode==='percent') return BILL*(v/100);
+    const totalPortions=MEMBERS.reduce((s,m)=>s+(m.val||0),0);
+    return totalPortions>0?BILL*(v/totalPortions):0;
+  }
+  function recalc(){
+    const totalDollars=MEMBERS.reduce((s,_,i)=>s+dollarAmt(i),0);
+    const rem=BILL-totalDollars;
+    const ok=mode==='even'||Math.abs(rem)<0.01;
+    const pct=Math.min(100,(totalDollars/BILL)*100);
+
+    document.getElementById('ca-allocated').textContent='$'+totalDollars.toFixed(2);
+    const remEl=document.getElementById('ca-remaining');
+    remEl.textContent=(rem>=0?'$'+rem.toFixed(2):'−$'+Math.abs(rem).toFixed(2));
+    remEl.style.color=ok?'#10B981':rem<0?'#EF4444':'#B45309';
+    document.getElementById('ca-bar').style.width=pct+'%';
+    document.getElementById('ca-bar').style.background=ok?'#10B981':rem<0?'#EF4444':'#6366F1';
+    document.getElementById('ca-cta').style.opacity=ok?'1':'0.45';
+    document.getElementById('ca-cta').style.cursor=ok?'pointer':'not-allowed';
+    document.getElementById('ca-cta').onclick=ok?()=>nav('split_breakdown'):null;
+
+    MEMBERS.forEach((_,i)=>{
+      const lbl=document.getElementById('ca-lbl-'+i);
+      if(lbl){
+        if(mode==='even') lbl.textContent='$'+EVEN_AMT.toFixed(2)+' each';
+        else lbl.textContent=mode==='amount'?'':'= $'+dollarAmt(i).toFixed(2);
+      }
+    });
+  }
+  function switchMode(m){
+    mode=m;
+    MEMBERS.forEach(mb=>mb.val=0);
+    ['even','amount','percent','portion'].forEach(id=>{
+      const btn=document.getElementById('ca-tab-'+id);
+      if(btn){
+        btn.style.background=id===m?'var(--indigo)':'transparent';
+        btn.style.color=id===m?'#fff':'var(--t2)';
+      }
+    });
+    const isEven=m==='even';
+    MEMBERS.forEach((_,i)=>{
+      const inp=document.getElementById('ca-inp-'+i);
+      const pre=document.getElementById('ca-pre-'+i);
+      const suf=document.getElementById('ca-suf-'+i);
+      const row=document.getElementById('ca-row-'+i);
+      if(!inp) return;
+      inp.value='';
+      inp.disabled=isEven;
+      inp.style.opacity=isEven?'0':'1';
+      if(row) row.style.opacity=isEven?'0.5':'1';
+      if(m==='even'||m==='amount'){inp.placeholder='0.00';inp.step='0.01';if(pre)pre.textContent='$';if(suf)suf.textContent='';}
+      if(m==='percent'){inp.placeholder='0';inp.step='1';if(pre)pre.textContent='';if(suf)suf.textContent='%';}
+      if(m==='portion'){inp.placeholder='1';inp.step='1';if(pre)pre.textContent='';if(suf)suf.textContent='×';}
+    });
+    const hint=document.getElementById('ca-hint');
+    if(hint){
+      if(m==='even')    hint.textContent='Split evenly — $'+EVEN_AMT.toFixed(2)+' per person';
+      if(m==='amount')  hint.textContent='Amounts must add up to exactly $'+BILL.toFixed(2);
+      if(m==='percent') hint.textContent='Percentages must add up to exactly 100%';
+      if(m==='portion') hint.textContent='Enter relative portions — e.g. 2 means double share';
+    }
+    recalc();
+  }
+  window._caSetMode=m=>switchMode(m);
+  window._caBack=()=>nav(HAS_RECEIPT?'split_mode':'manual_total');
+
+  setTimeout(()=>{
+    MEMBERS.forEach((mb,i)=>{
+      const el=document.getElementById('ca-inp-'+i);
+      if(el) el.addEventListener('input',()=>{mb.val=parseFloat(el.value)||0;recalc();});
+    });
+    switchMode('even'); // start on Even tab
+  },60);
+  return `
+<div class="page" style="min-height:100%;display:flex;flex-direction:column;">
+  <div class="nav-bar" style="position:relative;">
+    <button class="back" onclick="_caBack()">‹ Back</button>
+    <span class="nav-title">Split</span>
+  </div>
+
+  <!-- Mode toggle -->
+  <div style="padding:12px 20px 0;background:var(--white);border-bottom:1px solid var(--border);">
+    <div style="display:flex;background:var(--bg);border-radius:12px;padding:3px;gap:2px;margin-bottom:12px;">
+      <button id="ca-tab-even" onclick="_caSetMode('even')"
+        style="flex:1;height:32px;border-radius:9px;border:none;font-size:12px;font-weight:700;
+          font-family:inherit;cursor:pointer;transition:all .15s;background:transparent;color:var(--t2);">= Even</button>
+      <button id="ca-tab-amount" onclick="_caSetMode('amount')"
+        style="flex:1;height:32px;border-radius:9px;border:none;font-size:12px;font-weight:700;
+          font-family:inherit;cursor:pointer;transition:all .15s;background:transparent;color:var(--t2);">$ Amount</button>
+      <button id="ca-tab-percent" onclick="_caSetMode('percent')"
+        style="flex:1;height:32px;border-radius:9px;border:none;font-size:12px;font-weight:700;
+          font-family:inherit;cursor:pointer;transition:all .15s;background:transparent;color:var(--t2);">% Percent</button>
+      <button id="ca-tab-portion" onclick="_caSetMode('portion')"
+        style="flex:1;height:32px;border-radius:9px;border:none;font-size:12px;font-weight:700;
+          font-family:inherit;cursor:pointer;transition:all .15s;background:transparent;color:var(--t2);">⅟ Portion</button>
+    </div>
+
+    <!-- Progress bar -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+      <div style="font-size:11px;color:var(--t3);">Allocated <strong id="ca-allocated" style="color:var(--t1);">$0.00</strong></div>
+      <div style="font-size:11px;font-weight:700;color:var(--indigo);">Total $${BILL.toFixed(2)}</div>
+      <div style="font-size:11px;color:var(--t3);">Left <strong id="ca-remaining" style="color:#B45309;">$${BILL.toFixed(2)}</strong></div>
+    </div>
+    <div style="height:5px;border-radius:3px;background:var(--border2);overflow:hidden;margin-bottom:6px;">
+      <div id="ca-bar" style="height:100%;width:0%;border-radius:3px;background:#6366F1;transition:all .2s;"></div>
+    </div>
+    <div id="ca-hint" style="font-size:10px;color:var(--t3);text-align:center;padding-bottom:10px;">
+      Split evenly — $${EVEN_AMT.toFixed(2)} per person
+    </div>
+  </div>
+
+  <!-- Member rows -->
+  <div style="flex:1;overflow-y:auto;padding:14px 20px 20px;">
+    ${MEMBERS.map((m,i)=>`
+    <div id="ca-row-${i}" style="background:var(--white);border-radius:16px;border:1.5px solid var(--border);
+      padding:12px 14px;margin-bottom:9px;display:flex;align-items:center;gap:10px;transition:opacity .2s;">
+      <div style="width:36px;height:36px;border-radius:18px;background:${m.bg};display:flex;align-items:center;
+        justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0;">${m.l}</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:700;color:var(--t1);">${m.name}</div>
+        <div id="ca-lbl-${i}" style="font-size:11px;color:var(--t3);min-height:14px;margin-top:1px;"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:3px;background:var(--bg);border-radius:10px;
+        border:1.5px solid var(--border2);padding:0 10px;height:36px;min-width:80px;">
+        <span id="ca-pre-${i}" style="font-size:13px;color:var(--t3);font-weight:600;">$</span>
+        <input id="ca-inp-${i}" type="number" min="0" step="0.01" placeholder="0.00"
+          style="width:52px;border:none;background:transparent;font-size:15px;font-weight:700;
+            color:var(--t1);font-family:inherit;outline:none;text-align:right;">
+        <span id="ca-suf-${i}" style="font-size:13px;color:var(--t3);font-weight:600;min-width:8px;"></span>
+      </div>
+    </div>`).join('')}
+  </div>
+
+  <div style="padding:14px 20px 28px;background:var(--white);border-top:1px solid var(--border);">
+    <button id="ca-cta"
+      style="width:100%;height:52px;border-radius:16px;border:none;
+        background:linear-gradient(135deg,var(--indigo),var(--purple));color:#fff;
+        font-size:16px;font-weight:700;font-family:inherit;
+        box-shadow:0 4px 18px rgba(99,102,241,.28);opacity:.45;cursor:not-allowed;">
+      Review split →
+    </button>
+  </div>
+</div>`;
+});
+
+def('item_review',{},()=>`
+<div class="page" style="min-height:100%;display:flex;flex-direction:column;">
+  <div class="nav-bar" style="position:relative;">
+    <button class="back" onclick="nav('split_mode')">‹ Back</button>
+    <span class="nav-title">Review items</span>
+    <button class="back" onclick="nav('assign_tap')" style="color:var(--indigo);font-weight:700;">Done</button>
+  </div>
+
+  <div style="padding:0 20px 24px;flex:1;overflow-y:auto;">
+
+    <!-- Total pill -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div style="font-size:13px;color:var(--t3);">8 items · tap to edit</div>
+      <div class="pill pill-i">Total $203.00</div>
+    </div>
+
+    <div class="card" style="padding:4px 18px;">
+      ${ITEMS.map((item,i)=>`
+      <div class="item-row" style="cursor:pointer;"
+        ${i===2?`onclick="nav('item_review')" style="background:#FFFBEB;margin:0 -18px;padding:11px 18px;border-radius:12px;"`:''}>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:600;color:var(--t1);">${item.name}
+            ${i===2?`<span style="font-size:10px;background:#FEF3C7;color:#D97706;padding:2px 6px;border-radius:5px;margin-left:6px;font-weight:700;">edited</span>`:''}
+          </div>
+          ${i===2?`<div style="font-size:11px;color:var(--t3);margin-top:2px;">Was: Black cod — corrected</div>`:''}
+        </div>
+        <div style="font-size:15px;font-weight:700;color:${i===2?'var(--amber)':'var(--t1)'};">
+          $${item.price.toFixed(2)}</div>
+      </div>`).join('')}
+
+      <!-- Tax & tip -->
+      <div style="padding:12px 0;border-top:1px solid var(--border);margin-top:4px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+          <span style="font-size:13px;color:var(--t3);">Tax</span>
+          <span style="font-size:13px;color:var(--t2);">$20.30</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+          <span style="font-size:13px;color:var(--t3);">Tip (18%)</span>
+          <span style="font-size:13px;color:var(--t2);">$36.54</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <span style="font-size:15px;font-weight:700;color:var(--t1);">Total</span>
+          <span style="font-size:18px;font-weight:800;color:var(--indigo);">$278.84</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding:0 20px 28px;">
+    <button class="btn btn-fill" onclick="nav('assign_tap')">Assign items →</button>
+  </div>
+</div>`);
+
+def('assign_tap',{},()=>`
+<div class="page" style="min-height:100%;display:flex;flex-direction:column;">
+  <!-- Sticky top: avatars -->
+  <div style="background:var(--bg);padding:54px 0 0;position:sticky;top:0;z-index:10;">
+    <div style="padding:0 20px;display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+      <div style="font-size:18px;font-weight:800;color:var(--t1);">Assign dishes</div>
+      <button onclick="nav('assign_nlp')"
+        style="font-size:12px;font-weight:700;color:var(--indigo);background:var(--indigo-lt);
+        border:none;padding:6px 12px;border-radius:10px;cursor:pointer;font-family:inherit;">
+        🗣 Use voice
+      </button>
+    </div>
+
+    <!-- Avatar row — Kim selected -->
+    <div style="display:flex;justify-content:space-around;padding:0 16px 16px;">
+      ${MEMBERS.map((m,i)=>`
+      <div style="display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;">
+        <div style="width:${i===3?52:44}px;height:${i===3?52:44}px;border-radius:50%;
+          background:${m.bg};display:flex;align-items:center;justify-content:center;
+          font-size:${i===3?20:16}px;font-weight:700;color:#fff;
+          ${i===3?`box-shadow:0 0 0 3px #fff,0 0 0 5px ${m.bg};`:''}">${m.l}</div>
+        <div style="font-size:10px;font-weight:${i===3?700:400};
+          color:${i===3?m.bg:'var(--t3)'};">${m.name}</div>
+      </div>`).join('')}
+    </div>
+    <div style="height:1px;background:var(--border);"></div>
+  </div>
+
+  <!-- Items -->
+  <div style="padding:0 20px;flex:1;overflow-y:auto;">
+    <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;
+      letter-spacing:.07em;margin:14px 0 10px;">Tap an item to assign to Kim</div>
+
+    ${ITEMS.map((item,i)=>{
+      const assigned = item.who !== null;
+      const m = item.who==='shared' ? null : (item.who !== null ? MEMBERS[item.who] : null);
+      return `
+      <div onclick="${!assigned?`nav('assign_tap')`:'nav(\'assign_tap\')'}"
+        style="display:flex;align-items:center;gap:12px;padding:13px 14px;margin-bottom:8px;
+        border-radius:16px;cursor:pointer;transition:all .15s;
+        background:${assigned?'var(--white)':'var(--white)'};
+        border:1.5px solid ${assigned?'var(--border)':'var(--border2)'};">
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:600;color:var(--t1);">${item.name}</div>
+          <div style="font-size:12px;color:var(--t3);margin-top:1px;">$${item.price.toFixed(2)}</div>
+        </div>
+        ${assigned && m ? `
+        <div style="width:28px;height:28px;border-radius:14px;background:${m.bg};
+          display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;">
+          ${m.l}</div>` : ''}
+        ${item.who==='shared' ? `
+        <div style="font-size:10px;font-weight:700;color:var(--indigo);background:var(--indigo-lt);
+          padding:3px 8px;border-radius:6px;">Shared</div>` : ''}
+        ${!assigned ? `
+        <div style="width:28px;height:28px;border-radius:14px;background:var(--bg);
+          border:1.5px dashed var(--border2);display:flex;align-items:center;
+          justify-content:center;font-size:14px;color:var(--t3);">+</div>` : ''}
+      </div>`;
+    }).join('')}
+
+    <div style="height:80px;"></div>
+  </div>
+
+  <div style="padding:0 20px 28px;background:var(--bg);position:sticky;bottom:0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="font-size:12px;color:var(--t3);">6 of 8 assigned</div>
+      <div class="pill pill-a">2 unassigned</div>
+    </div>
+    <button class="btn btn-fill" onclick="nav('split_breakdown')">Review split →</button>
+  </div>
+</div>`);
+
+def('assign_nlp',{},()=>`
+<div class="page" style="min-height:100%;display:flex;flex-direction:column;">
+  <div class="nav-bar" style="position:relative;">
+    <button class="back" onclick="nav('assign_tap')">‹ Back</button>
+    <span class="nav-title">Tell me who had what</span>
+    <div style="width:44px;"></div>
+  </div>
+
+  <div style="padding:0 22px;flex:1;display:flex;flex-direction:column;">
+
+    <!-- NLP input -->
+    <div style="position:relative;margin-bottom:20px;">
+      <textarea style="width:100%;min-height:90px;padding:16px 50px 16px 18px;
+        background:var(--white);border:2px solid var(--indigo);border-radius:18px;
+        font-size:15px;font-weight:500;color:var(--t1);font-family:inherit;
+        outline:none;resize:none;line-height:1.5;caret-color:var(--indigo);">Raj had the tuna tartare and sake, Jamie had the black cod</textarea>
+      <div style="position:absolute;right:14px;bottom:14px;width:34px;height:34px;
+        border-radius:12px;background:var(--indigo);display:flex;align-items:center;
+        justify-content:center;cursor:pointer;font-size:16px;">🎤</div>
+    </div>
+
+    <!-- Resolved assignments -->
+    <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;
+      letter-spacing:.07em;margin-bottom:10px;">Resolved</div>
+
+    <div class="card" style="padding:6px 16px;margin-bottom:16px;">
+      ${[
+        {item:'Tuna tartare',who:'Raj',bg:'#EF4444',conf:98},
+        {item:'Sake (bottle)',who:'Raj',bg:'#EF4444',conf:95},
+        {item:'Black cod miso',who:'Jamie',bg:'#A78BFA',conf:92},
+      ].map(r=>`
+      <div class="item-row">
+        <div class="av" style="background:${r.bg};">${r.who[0]}</div>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:600;color:var(--t1);">${r.item}</div>
+          <div style="font-size:11px;color:var(--t3);">${r.who}</div>
+        </div>
+        <div style="font-size:10px;font-weight:700;color:var(--green);">${r.conf}%</div>
+      </div>`).join('')}
+    </div>
+
+    <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;
+      letter-spacing:.07em;margin-bottom:10px;">Still unassigned</div>
+
+    <div class="card-flat" style="padding:6px 16px;">
+      ${[{item:'Yellowtail jalapeño'},{item:'Wagyu gyoza'}].map(r=>`
+      <div class="item-row">
+        <div style="width:36px;height:36px;border-radius:18px;border:1.5px dashed var(--border2);
+          display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--t3);flex-shrink:0;">?</div>
+        <div style="flex:1;font-size:13px;font-weight:600;color:var(--t2);">${r.item}</div>
+        <div style="font-size:12px;color:var(--indigo);font-weight:600;cursor:pointer;">Assign</div>
+      </div>`).join('')}
+    </div>
+
+    <div style="flex:1;"></div>
+    <button class="btn btn-fill" onclick="nav('split_breakdown')" style="margin-bottom:12px;">Review split →</button>
+    <button class="btn btn-ghost" onclick="nav('assign_tap')">Switch to tap mode</button>
+    <div style="height:16px;"></div>
+  </div>
+</div>`);
+
+def('split_breakdown',{},()=>`
+<div class="page" style="min-height:100%;display:flex;flex-direction:column;">
+  <div style="padding:52px 22px 16px;display:flex;align-items:center;justify-content:space-between;">
+    <div style="font-size:22px;font-weight:800;color:var(--t1);">Split</div>
+    <div class="pill pill-i">$278.84 total</div>
+  </div>
+
+  <div style="padding:0 20px;flex:1;overflow-y:auto;">
+    ${[
+      {m:MEMBERS[0],amt:62.40,items:['Wagyu gyoza','Edamame ½','Sake ⅕'],pct:22},
+      {m:MEMBERS[1],amt:44.10,items:['Chocolate fondant','Edamame ½'],pct:16},
+      {m:MEMBERS[2],amt:71.80,items:['Black cod miso','Sake ⅕'],pct:26},
+      {m:MEMBERS[3],amt:33.90,items:['Green tea ice cream','Sake ⅕'],pct:12},
+      {m:MEMBERS[4],amt:66.64,items:['Tuna tartare','Yellowtail','Sake ⅕'],pct:24},
+    ].map((p,i)=>`
+    <div class="card" style="margin-bottom:12px;padding:16px 18px;cursor:pointer;"
+      onclick="nav('split_breakdown')">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+        <div class="av av-lg" style="background:${p.m.bg};">${p.m.l}</div>
+        <div style="flex:1;">
+          <div style="font-size:15px;font-weight:700;color:var(--t1);">${p.m.name}</div>
+          <div style="font-size:11px;color:var(--t3);">${p.items.join(' · ')}</div>
+        </div>
+        <div style="font-size:22px;font-weight:800;color:var(--t1);">$${p.amt.toFixed(2)}</div>
+      </div>
+      <!-- Share bar -->
+      <div style="height:5px;border-radius:3px;background:var(--border);">
+        <div style="height:5px;border-radius:3px;width:${p.pct}%;
+          background:${p.m.bg};transition:width .5s ease;"></div>
+      </div>
+      <div style="font-size:10px;color:var(--t3);margin-top:4px;">${p.pct}% of total</div>
+    </div>`).join('')}
+
+    <div style="height:80px;"></div>
+  </div>
+
+  <div style="padding:0 20px 28px;background:var(--bg);position:sticky;bottom:0;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="font-size:12px;color:var(--t3);">All amounts confirmed</div>
+      <div class="pill pill-g">✓ Balanced</div>
+    </div>
+    <button class="btn btn-fill" style="font-size:16px;">
+      Send messages →
+    </button>
+  </div>
+</div>`);
+
+def('edit_postsend',{},()=>`
+<div class="page" style="min-height:100%;display:flex;flex-direction:column;">
+  <div class="nav-bar" style="position:relative;">
+    <button class="back" onclick="nav('split_breakdown')">‹ Back</button>
+    <span class="nav-title">Edit split</span>
+    <div style="width:44px;"></div>
+  </div>
+
+  <div style="padding:0 22px;flex:1;overflow-y:auto;">
+
+    <!-- Warning banner -->
+    <div style="background:#FEF3C7;border:1.5px solid #FDE68A;border-radius:16px;
+      padding:14px 16px;margin-bottom:20px;display:flex;gap:12px;align-items:flex-start;">
+      <span style="font-size:18px;flex-shrink:0;">⚠️</span>
+      <div>
+        <div style="font-size:13px;font-weight:700;color:#92400E;margin-bottom:2px;">
+          Messages already sent
+        </div>
+        <div style="font-size:12px;color:#B45309;line-height:1.4;">
+          Only affected participants will receive a revised message.
+        </div>
+      </div>
+    </div>
+
+    <!-- The item being edited -->
+    <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;
+      letter-spacing:.07em;margin-bottom:10px;">Changed item</div>
+
+    <div class="card" style="padding:16px 18px;margin-bottom:20px;">
+      <div style="font-size:13px;font-weight:700;color:var(--t1);margin-bottom:12px;">Yellowtail jalapeño</div>
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:11px;color:var(--t3);margin-bottom:4px;">Was</div>
+          <div style="font-size:24px;font-weight:800;color:var(--t3);text-decoration:line-through;">$26.00</div>
+        </div>
+        <div style="font-size:22px;color:var(--t3);">→</div>
+        <div style="flex:1;text-align:center;">
+          <div style="font-size:11px;color:var(--indigo);font-weight:600;margin-bottom:4px;">Now</div>
+          <div style="font-size:24px;font-weight:800;color:var(--indigo);">$24.00</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Who's affected -->
+    <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;
+      letter-spacing:.07em;margin-bottom:10px;">Revised message sent to</div>
+
+    <div class="card" style="padding:14px 18px;margin-bottom:20px;">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+        <div class="av av-lg" style="background:#EF4444;">R</div>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:700;color:var(--t1);">Raj Patel</div>
+          <div style="font-size:12px;color:var(--t3);">Share changes $66.64 → $64.64</div>
+        </div>
+        <div class="pill pill-a">Revised</div>
+      </div>
+      <!-- Preview of revised message -->
+      <div style="background:#F8F7FF;border-radius:12px;padding:10px 14px;
+        font-size:12px;color:var(--indigo);font-weight:600;line-height:1.5;">
+        ✏️ Updated: Your share is now $64.64 (was $66.64) · Dinner at Nobu
+      </div>
+    </div>
+
+    <!-- Who's NOT affected -->
+    <div style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;
+      letter-spacing:.07em;margin-bottom:8px;">Not affected · no message sent</div>
+    <div class="card-flat" style="padding:10px 16px;margin-bottom:24px;
+      display:flex;gap:-6px;align-items:center;">
+      <div style="display:flex;gap:-6px;margin-right:12px;">
+        ${MEMBERS.filter((_,i)=>i!==4).map(m=>`
+        <div style="width:30px;height:30px;border-radius:15px;background:${m.bg};
+          display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;
+          border:2px solid #F8F7FF;margin-left:-6px;">${m.l}</div>`).join('')}
+      </div>
+      <div style="font-size:12px;color:var(--t3);">Sara, Mike, Jamie, Kim</div>
+    </div>
+
+    <button class="btn btn-fill" onclick="nav('split_breakdown')">Save &amp; send revision →</button>
+    <button class="btn btn-ghost" onclick="nav('split_breakdown')">Cancel</button>
+    <div style="height:20px;"></div>
+  </div>
+</div>`);
+
+// ── INIT ──
+render('scan_receipt');updateSB('scan_receipt');updateInfo('scan_receipt');updateHist();updateTabBar('scan_receipt');
+
+// ── SIM MODE ──
+(function(){
+  if(new URLSearchParams(location.search).get("sim")){
+    ["sidebar","info"].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display="none";});
+    var c=document.getElementById("center");if(c){c.style.justifyContent="center";c.style.gap="0";}
+  }
+  window.addEventListener("message",function(e){
+    if(e.data&&e.data.nav&&SCREENS[e.data.nav])nav(e.data.nav);
+  });
+})();
+</script>
+</body>
+</html>

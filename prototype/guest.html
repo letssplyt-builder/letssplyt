@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LetsSplyt — Guest Experience</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#F0EFFF;display:flex;min-height:100vh;}
+
+/* Layout */
+#sidebar{width:260px;background:#fff;border-right:1px solid #E8E6FF;padding:24px 16px;flex-shrink:0;}
+#center{display:flex;flex:1;align-items:center;justify-content:center;gap:32px;padding:32px;}
+#info{width:260px;flex-shrink:0;padding:24px;}
+
+/* Sidebar */
+.sidebar-logo{display:flex;align-items:center;gap:8px;margin-bottom:28px;}
+.logo-icon{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#6366F1,#7C3AED);display:flex;align-items:center;justify-content:center;}
+.logo-icon svg{width:18px;height:18px;}
+.logo-text{font-size:16px;font-weight:700;color:#1a1a2e;}
+.sidebar-section{font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.8px;margin:20px 0 8px;}
+.screen-btn{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:10px;cursor:pointer;margin-bottom:2px;transition:background .15s;}
+.screen-btn:hover{background:#F0EFFF;}
+.screen-btn.active{background:#EEF2FF;}
+.screen-btn .dot{width:6px;height:6px;border-radius:50%;background:#D1D5DB;flex-shrink:0;}
+.screen-btn.active .dot{background:#6366F1;}
+.screen-btn span{font-size:12px;color:#6B7280;}
+.screen-btn.active span{color:#4338CA;font-weight:600;}
+.screen-tag{margin-left:auto;font-size:9px;padding:2px 6px;border-radius:6px;font-weight:700;}
+.tag-cp{background:#EEF2FF;color:#6366F1;}
+.tag-mvp{background:#F0FDF4;color:#16A34A;}
+.tag-legal{background:#FEF2F2;color:#DC2626;}
+
+/* Phone */
+.phone{width:375px;height:720px;background:#fff;border-radius:44px;overflow:hidden;box-shadow:0 20px 60px rgba(99,102,241,.15),0 0 0 10px #1a1a2e;position:relative;flex-shrink:0;}
+.status-bar{height:44px;background:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 24px;flex-shrink:0;}
+.status-time{font-size:15px;font-weight:700;color:#1a1a2e;}
+.status-icons{display:flex;align-items:center;gap:6px;}
+.status-icons svg{width:16px;height:16px;color:#1a1a2e;}
+.screen-content{height:calc(720px - 44px);overflow:hidden;position:relative;display:flex;flex-direction:column;}
+
+/* Info panel */
+.info-label{font-size:10px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;}
+.info-title{font-size:18px;font-weight:700;color:#1a1a2e;margin-bottom:10px;line-height:1.3;}
+.info-desc{font-size:13px;color:#6B7280;line-height:1.7;margin-bottom:16px;}
+.info-tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:4px 10px;border-radius:10px;font-weight:600;margin-right:6px;margin-bottom:6px;}
+.info-tag.ai{background:#EEF2FF;color:#6366F1;}
+.info-tag.ux{background:#F0FDF4;color:#16A34A;}
+.info-tag.flow{background:#FFFBEB;color:#D97706;}
+.info-tag.legal{background:#FEF2F2;color:#DC2626;}
+.info-ref{font-size:11px;color:#9CA3AF;margin-top:12px;padding-top:12px;border-top:1px solid #F3F4F6;}
+
+/* Shared */
+.gradient-btn{width:100%;padding:16px;border-radius:16px;background:linear-gradient(135deg,#6366F1,#7C3AED);color:#fff;font-size:16px;font-weight:700;border:none;cursor:pointer;text-align:center;}
+.ghost-btn{width:100%;padding:14px;border-radius:16px;background:transparent;border:1.5px solid #E5E7EB;color:#6B7280;font-size:15px;font-weight:600;cursor:pointer;text-align:center;}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:5px 10px;border-radius:14px;font-size:11px;font-weight:600;}
+.chip.green{background:#ECFDF5;color:#059669;}
+.chip.amber{background:#FFFBEB;color:#D97706;}
+.chip.indigo{background:#EEF2FF;color:#6366F1;}
+
+/* ── SCREEN: browser_invite ── */
+/* Simulates mobile Safari browser chrome */
+#s-browser_invite{display:flex;flex-direction:column;height:100%;background:#F2F2F7;}
+.browser-chrome{background:#F2F2F7;padding:8px 12px;flex-shrink:0;}
+.browser-url-bar{background:#fff;border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;}
+.browser-url-bar .lock{font-size:12px;color:#34C759;}
+.browser-url-text{font-size:12px;color:#6B7280;flex:1;}
+.browser-body{flex:1;background:#fff;overflow-y:auto;}
+.bi-header{background:linear-gradient(145deg,#1E1B3A,#4C1D95);padding:28px 24px 24px;color:#fff;text-align:center;}
+.bi-logo-row{display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:16px;}
+.bi-logo-icon{width:28px;height:28px;border-radius:8px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-size:14px;}
+.bi-logo-text{font-size:14px;font-weight:700;opacity:.9;}
+.bi-invite-badge{font-size:11px;background:rgba(255,255,255,.15);padding:4px 12px;border-radius:14px;margin-bottom:12px;display:inline-block;}
+.bi-event-name{font-size:24px;font-weight:800;margin-bottom:6px;}
+.bi-host{font-size:13px;opacity:.7;}
+.bi-card{margin:16px;background:#fff;border-radius:18px;padding:20px;box-shadow:0 2px 12px rgba(0,0,0,.08);}
+.bi-card-row{display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #F9FAFB;font-size:13px;}
+.bi-card-row:last-child{border-bottom:none;}
+.bi-card-label{color:#9CA3AF;}
+.bi-card-value{font-weight:600;color:#1a1a2e;}
+.bi-cta{padding:0 16px 16px;}
+.bi-no-app{text-align:center;font-size:11px;color:#9CA3AF;padding:0 16px 16px;}
+
+/* ── SCREEN: name_phone ── */
+#s-name_phone{display:flex;flex-direction:column;height:100%;background:#F2F2F7;}
+.np-browser-chrome{background:#F2F2F7;padding:8px 12px;flex-shrink:0;}
+.np-browser-body{flex:1;background:#fff;overflow-y:auto;padding:24px;}
+.np-title{font-size:22px;font-weight:800;color:#1a1a2e;margin-bottom:6px;}
+.np-sub{font-size:13px;color:#6B7280;line-height:1.6;margin-bottom:24px;}
+.np-field{margin-bottom:16px;}
+.np-label{font-size:12px;font-weight:600;color:#6B7280;margin-bottom:6px;}
+.np-input{width:100%;padding:14px;border-radius:12px;border:1.5px solid #E5E7EB;font-size:15px;color:#1a1a2e;background:#F9FAFB;}
+.np-input.filled{border-color:#6366F1;background:#EEF2FF;}
+.np-phone-row{display:flex;gap:8px;}
+.np-country{padding:14px 12px;border-radius:12px;border:1.5px solid #E5E7EB;font-size:14px;background:#F9FAFB;color:#1a1a2e;white-space:nowrap;}
+.np-privacy{font-size:11px;color:#9CA3AF;text-align:center;margin-top:12px;line-height:1.5;}
+
+/* ── SCREEN: otp_browser ── */
+#s-otp_browser{display:flex;flex-direction:column;height:100%;background:#F2F2F7;}
+.otp-browser-body{flex:1;background:#fff;padding:24px;display:flex;flex-direction:column;align-items:center;text-align:center;}
+.otp-icon{font-size:48px;margin-bottom:16px;}
+.otp-title{font-size:22px;font-weight:800;color:#1a1a2e;margin-bottom:8px;}
+.otp-sub{font-size:13px;color:#6B7280;line-height:1.6;margin-bottom:28px;}
+.otp-row{display:flex;gap:10px;justify-content:center;margin-bottom:20px;}
+.otp-box{width:44px;height:52px;border-radius:12px;border:1.5px solid #E5E7EB;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#1a1a2e;}
+.otp-box.filled{border-color:#6366F1;background:#EEF2FF;}
+.otp-box.cursor{border-color:#6366F1;animation:blink 1s step-end infinite;}
+@keyframes blink{0%,100%{background:#EEF2FF;}50%{background:#fff;}}
+.otp-resend{font-size:12px;color:#9CA3AF;margin-bottom:auto;}
+.otp-cta{width:100%;margin-top:20px;}
+
+/* ── SCREEN: joined_browser ── */
+#s-joined_browser{display:flex;flex-direction:column;height:100%;background:#F2F2F7;}
+.jb-body{flex:1;background:#fff;padding:28px 24px;display:flex;flex-direction:column;align-items:center;text-align:center;}
+.jb-check{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#6366F1,#7C3AED);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:32px;}
+.jb-title{font-size:22px;font-weight:800;color:#1a1a2e;margin-bottom:8px;}
+.jb-sub{font-size:13px;color:#6B7280;line-height:1.6;margin-bottom:20px;}
+.jb-info-card{width:100%;background:#F9FAFB;border-radius:16px;padding:16px;text-align:left;margin-bottom:16px;}
+.jb-info-row{display:flex;justify-content:space-between;font-size:13px;padding:5px 0;}
+.jb-info-label{color:#9CA3AF;}
+.jb-info-val{font-weight:600;color:#1a1a2e;}
+.jb-timeline{width:100%;text-align:left;margin-bottom:20px;}
+.jb-timeline-title{font-size:12px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px;}
+.jb-step{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;}
+.jb-step-dot{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0;margin-top:1px;}
+.jb-step-text{font-size:12px;color:#6B7280;line-height:1.5;}
+.jb-step-text strong{color:#1a1a2e;}
+.jb-app-nudge{width:100%;background:#F0EFFF;border-radius:16px;padding:14px 16px;display:flex;align-items:center;gap:12px;margin-top:auto;}
+.jb-app-icon{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,#6366F1,#7C3AED);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;}
+.jb-app-text{flex:1;}
+.jb-app-name{font-size:13px;font-weight:700;color:#1a1a2e;}
+.jb-app-desc{font-size:11px;color:#9CA3AF;}
+.jb-app-cta{font-size:12px;font-weight:700;color:#6366F1;}
+
+/* ── SCREEN: waiting_bill ── */
+#s-waiting_bill{display:flex;flex-direction:column;height:100%;background:#F2F2F7;}
+.wb-body{flex:1;background:#fff;padding:28px 24px;display:flex;flex-direction:column;align-items:center;text-align:center;}
+.wb-pulse{width:80px;height:80px;border-radius:50%;background:#EEF2FF;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;position:relative;font-size:32px;}
+.wb-pulse::before{content:'';position:absolute;inset:-8px;border-radius:50%;border:2px solid rgba(99,102,241,.2);animation:pulse 2s ease-in-out infinite;}
+.wb-pulse::after{content:'';position:absolute;inset:-16px;border-radius:50%;border:2px solid rgba(99,102,241,.1);animation:pulse 2s ease-in-out infinite .3s;}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1);}50%{opacity:.5;transform:scale(1.05);}}
+.wb-title{font-size:20px;font-weight:800;color:#1a1a2e;margin-bottom:8px;}
+.wb-sub{font-size:13px;color:#6B7280;line-height:1.6;margin-bottom:24px;}
+.wb-status-card{width:100%;background:#F9FAFB;border-radius:16px;padding:16px;margin-bottom:16px;text-align:left;}
+.wb-status-row{display:flex;align-items:center;gap:10px;padding:6px 0;}
+.wb-status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.wb-status-text{font-size:13px;color:#1a1a2e;}
+.wb-status-sub{font-size:11px;color:#9CA3AF;margin-left:auto;}
+.wb-notification-hint{background:#FFFBEB;border-radius:14px;padding:12px 14px;font-size:12px;color:#92400E;line-height:1.5;width:100%;}
+
+/* ── SCREEN: sms_received ── */
+#s-sms_received{display:flex;flex-direction:column;height:100%;background:#F2F2F7;}
+.sms-chrome{background:#F2F2F7;padding:12px 16px 8px;text-align:center;flex-shrink:0;}
+.sms-header-name{font-size:17px;font-weight:600;color:#1a1a2e;}
+.sms-header-sub{font-size:12px;color:#9CA3AF;}
+.sms-body{flex:1;padding:12px 16px;overflow-y:auto;}
+.sms-bubble-wrap{display:flex;justify-content:flex-start;margin-bottom:12px;}
+.sms-bubble{background:#E9E9EB;border-radius:18px 18px 18px 4px;padding:12px 14px;max-width:85%;}
+.sms-bubble-text{font-size:14px;color:#1a1a2e;line-height:1.5;}
+.sms-bubble-time{font-size:10px;color:#9CA3AF;margin-top:4px;}
+.sms-split-card{background:#fff;border-radius:12px;padding:14px;margin-top:8px;border:1px solid #E5E7EB;}
+.sms-split-title{font-size:12px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;}
+.sms-split-row{display:flex;justify-content:space-between;font-size:13px;padding:4px 0;border-bottom:1px solid #F9FAFB;}
+.sms-split-row:last-child{border-bottom:none;}
+.sms-split-row.highlight{background:#EEF2FF;border-radius:6px;padding:6px 8px;margin:2px -4px;}
+.sms-split-name{color:#1a1a2e;}
+.sms-split-amount{font-weight:700;color:#1a1a2e;}
+.sms-split-you{font-weight:700;color:#6366F1;}
+.sms-pay-section{margin-top:10px;}
+.sms-pay-label{font-size:11px;color:#9CA3AF;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+.sms-pay-link{display:block;padding:8px 12px;border-radius:10px;font-size:13px;font-weight:700;text-align:center;margin-bottom:6px;text-decoration:none;}
+.sms-pay-venmo{background:#3D95CE15;color:#3D95CE;}
+.sms-pay-paypal{background:#00457C15;color:#00457C;}
+.sms-opt-out{font-size:11px;color:#9CA3AF;margin-top:12px;text-align:center;}
+.sms-input-bar{background:#F2F2F7;padding:8px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0;}
+.sms-input{flex:1;background:#fff;border-radius:18px;padding:8px 14px;font-size:14px;border:none;color:#9CA3AF;}
+
+/* ── SCREEN: pay_external ── */
+#s-pay_external{display:flex;flex-direction:column;height:100%;background:#F2F2F7;}
+.pe-app-chrome{background:#3D95CE;padding:12px 16px 10px;color:#fff;text-align:center;flex-shrink:0;}
+.pe-app-name{font-size:16px;font-weight:700;}
+.pe-body{flex:1;background:#fff;padding:24px;}
+.pe-section{margin-bottom:20px;}
+.pe-label{font-size:12px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px;}
+.pe-recipient{display:flex;align-items:center;gap:12px;background:#F9FAFB;border-radius:14px;padding:14px;}
+.pe-avatar{width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#6366F1,#7C3AED);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;}
+.pe-name{font-size:15px;font-weight:700;color:#1a1a2e;}
+.pe-handle{font-size:12px;color:#9CA3AF;}
+.pe-amount-display{text-align:center;padding:20px 0;background:#F9FAFB;border-radius:16px;margin-bottom:16px;}
+.pe-currency{font-size:28px;font-weight:300;color:#9CA3AF;display:inline;}
+.pe-amount-val{font-size:48px;font-weight:800;color:#1a1a2e;letter-spacing:-1px;}
+.pe-amount-label{font-size:12px;color:#9CA3AF;margin-top:4px;}
+.pe-note{background:#F9FAFB;border-radius:12px;padding:12px 14px;font-size:14px;color:#6B7280;}
+.pe-pay-btn{width:100%;padding:16px;border-radius:16px;background:#3D95CE;color:#fff;font-size:16px;font-weight:700;border:none;cursor:pointer;}
+
+/* ── SCREEN: opted_out ── */
+#s-opted_out{display:flex;flex-direction:column;height:100%;background:#F2F2F7;}
+.oo-body{flex:1;background:#fff;padding:32px 24px;display:flex;flex-direction:column;align-items:center;text-align:center;}
+
+/* ── SCREEN: enter_phone ── */
+#s-enter_phone{display:flex;flex-direction:column;height:100%;background:#F2F2F7;}
+
+/* ── SCREEN: greet_existing ── */
+#s-greet_existing{display:flex;flex-direction:column;height:100%;background:#F2F2F7;}
+.ge-body{flex:1;background:#fff;padding:28px 24px;display:flex;flex-direction:column;}
+.ge-avatar-row{display:flex;align-items:center;gap:14px;margin-bottom:20px;}
+.ge-avatar{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#6366F1,#7C3AED);display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;color:#fff;flex-shrink:0;}
+.ge-greeting{font-size:22px;font-weight:800;color:#1a1a2e;line-height:1.3;}
+.ge-sub{font-size:13px;color:#6B7280;line-height:1.6;margin-bottom:20px;}
+.ge-phone-card{background:#F9FAFB;border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:12px;margin-bottom:24px;}
+.ge-phone-icon{font-size:20px;}
+.ge-phone-detail{flex:1;}
+.ge-phone-label{font-size:11px;color:#9CA3AF;font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+.ge-phone-num{font-size:15px;font-weight:700;color:#1a1a2e;}
+.ge-sent-badge{font-size:11px;background:#ECFDF5;color:#059669;padding:4px 10px;border-radius:10px;font-weight:600;}
+
+/* ── SCREEN: revised_sms ── */
+#s-revised_sms{display:flex;flex-direction:column;height:100%;background:#F2F2F7;}
+.rs-old{text-decoration:line-through;color:#9CA3AF;}
+.rs-new{font-weight:700;color:#6366F1;}
+.rs-reason{font-size:11px;background:#EEF2FF;color:#6366F1;padding:3px 8px;border-radius:8px;display:inline-block;margin:4px 0 8px;}
+
+/* ── SCREEN: manual_sms ── */
+#s-manual_sms{display:flex;flex-direction:column;height:100%;background:#F2F2F7;}
+</style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <div class="sidebar-logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 18 18" fill="none"><path d="M4 9h10M9 4l5 5-5 5" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <span class="logo-text">LetsSplyt</span>
+  </div>
+  <div style="font-size:11px;font-weight:700;color:#9CA3AF;text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px;">Guest Experience 🌐</div>
+
+  <div class="sidebar-section">Sub-type A: QR Browser Guest</div>
+  <div class="screen-btn active" id="btn-browser_invite" onclick="nav('browser_invite')"><div class="dot"></div><span>Browser invite landing</span><span class="screen-tag tag-cp">CP</span></div>
+  <div class="screen-btn" id="btn-enter_phone" onclick="nav('enter_phone')"><div class="dot"></div><span>Enter phone number</span><span class="screen-tag tag-cp">CP</span></div>
+  <div class="screen-btn" id="btn-greet_existing" onclick="nav('greet_existing')"><div class="dot"></div><span>Returning user greeting</span><span class="screen-tag tag-cp">CP</span></div>
+  <div class="screen-btn" id="btn-name_phone" onclick="nav('name_phone')"><div class="dot"></div><span>Enter name (new guest)</span><span class="screen-tag tag-cp">CP</span></div>
+  <div class="screen-btn" id="btn-joined_browser" onclick="nav('joined_browser')"><div class="dot"></div><span>Joined confirmation</span><span class="screen-tag tag-mvp">MVP</span></div>
+  <div class="screen-btn" id="btn-sms_received" onclick="nav('sms_received')"><div class="dot"></div><span>SMS payment request</span><span class="screen-tag tag-cp">CP</span></div>
+  <div class="screen-btn" id="btn-revised_sms" onclick="nav('revised_sms')"><div class="dot"></div><span>Revised share SMS</span><span class="screen-tag tag-cp">CP</span></div>
+
+  <div class="sidebar-section">Sub-type B: Manually Added Guest</div>
+  <div class="screen-btn" id="btn-manual_sms" onclick="nav('manual_sms')"><div class="dot"></div><span>WhatsApp / SMS received</span><span class="screen-tag tag-mvp">MVP</span></div>
+</div>
+
+<!-- CENTER: Phone -->
+<div id="center">
+  <div class="phone">
+    <div class="status-bar">
+      <span class="status-time">9:41</span>
+      <div class="status-icons">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M1.5 8.5C5.5 4.5 10.5 2.5 12 2.5s6.5 2 10.5 6l-1.5 1.5C18 7.3 15 5.5 12 5.5S6 7.3 3 10l-1.5-1.5z"/><path d="M5 12c1.9-1.9 4.3-3 7-3s5.1 1.1 7 3l-1.4 1.4C16 11.9 14.1 11 12 11s-4 .9-5.6 2.4L5 12z"/><path d="M8.5 15.5c.9-.9 2.1-1.5 3.5-1.5s2.6.6 3.5 1.5L14 17c-.5-.5-1.3-.8-2-.8s-1.5.3-2 .8l-1.5-1.5z"/><circle cx="12" cy="20" r="1.5"/></svg>
+        <svg viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="7" width="15" height="10" rx="2"/><path d="M19 10.5v3a1.5 1.5 0 000-3z"/></svg>
+      </div>
+    </div>
+    <div class="screen-content">
+
+      <!-- browser_invite -->
+      <div id="s-browser_invite" style="display:flex;">
+        <div class="browser-chrome">
+          <div class="browser-url-bar">
+            <span class="lock">🔒</span>
+            <span class="browser-url-text">letssplyt.app/join/dN9kQ</span>
+          </div>
+        </div>
+        <div class="browser-body">
+          <div class="bi-header">
+            <div class="bi-logo-row">
+              <div class="bi-logo-icon">⚡</div>
+              <span class="bi-logo-text">LetsSplyt</span>
+            </div>
+            <div class="bi-invite-badge">📨 You've been invited</div>
+            <div class="bi-event-name">Dinner at Nobu</div>
+            <div class="bi-host">Hosted by Rohan P.</div>
+          </div>
+          <div class="bi-card">
+            <div class="bi-card-row"><span class="bi-card-label">Date</span><span class="bi-card-value">Sat, May 23</span></div>
+            <div class="bi-card-row"><span class="bi-card-label">Members</span><span class="bi-card-value">7 joined so far</span></div>
+            <div class="bi-card-row"><span class="bi-card-label">Group</span><span class="bi-card-value"><span class="chip green">Open · Joinable</span></span></div>
+          </div>
+          <div class="bi-cta">
+            <button class="gradient-btn" onclick="nav('enter_phone')">Join the group →</button>
+          </div>
+          <div class="bi-no-app">No app needed · Takes 30 seconds</div>
+        </div>
+      </div>
+
+      <!-- enter_phone -->
+      <div id="s-enter_phone" style="display:none;">
+        <div class="np-browser-chrome">
+          <div class="browser-url-bar" style="background:#fff;border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
+            <span style="font-size:12px;color:#34C759;">🔒</span>
+            <span style="font-size:12px;color:#6B7280;">letssplyt.app/join/dN9kQ/phone</span>
+          </div>
+        </div>
+        <div class="np-browser-body">
+          <div class="np-title">What's your number?</div>
+          <div class="np-sub">Enter your phone to join <strong>Dinner at Nobu</strong>. We'll check if you already have an account.</div>
+          <div class="np-field" style="margin-bottom:20px;">
+            <div class="np-label">Phone number</div>
+            <div class="np-phone-row">
+              <div class="np-country">🇺🇸 +1</div>
+              <input class="np-input filled" value="415 555 0147" placeholder="Phone number" style="flex:1;">
+            </div>
+          </div>
+          <button class="gradient-btn" onclick="nav('greet_existing')" style="margin-bottom:12px;">Continue →</button>
+          <div style="text-align:center;font-size:13px;color:#9CA3AF;">First time here? <span style="color:#6366F1;font-weight:600;cursor:pointer;" onclick="nav('name_phone')">Enter your name →</span></div>
+          <div class="np-privacy" style="margin-top:16px;">🔒 Your number is only used to send your bill. We never share it. Reply STOP anytime to opt out.</div>
+        </div>
+      </div>
+
+      <!-- greet_existing -->
+      <div id="s-greet_existing" style="display:none;">
+        <div class="np-browser-chrome">
+          <div class="browser-url-bar" style="background:#fff;border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
+            <span style="font-size:12px;color:#34C759;">🔒</span>
+            <span style="font-size:12px;color:#6B7280;">letssplyt.app/join/dN9kQ/verify</span>
+          </div>
+        </div>
+        <div class="ge-body">
+          <div class="ge-avatar-row">
+            <div class="ge-avatar">J</div>
+            <div class="ge-greeting">Hi Jordan! 👋</div>
+          </div>
+          <div class="ge-sub">We found your account. Enter the code we sent to <strong>+1 (415) 555-0147</strong> to join <strong>Dinner at Nobu</strong>.</div>
+          <div class="otp-row" style="justify-content:flex-start;margin-bottom:8px;">
+            <div class="otp-box filled">4</div>
+            <div class="otp-box filled">7</div>
+            <div class="otp-box filled">2</div>
+            <div class="otp-box cursor"></div>
+            <div class="otp-box"></div>
+            <div class="otp-box"></div>
+          </div>
+          <div style="font-size:12px;color:#9CA3AF;margin-bottom:20px;">Didn't receive it? <span style="color:#6366F1;font-weight:600;">Resend in 0:45</span></div>
+          <button class="gradient-btn" onclick="nav('joined_browser')" style="margin-bottom:12px;">Verify & join →</button>
+          <div style="text-align:center;font-size:12px;color:#9CA3AF;">Not you? <span style="color:#6366F1;font-weight:600;cursor:pointer;" onclick="nav('enter_phone')">Use a different number</span></div>
+        </div>
+      </div>
+
+      <!-- name_phone (new guest — name + OTP on one page) -->
+      <div id="s-name_phone" style="display:none;">
+        <div class="np-browser-chrome">
+          <div class="browser-url-bar" style="background:#fff;border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
+            <span style="font-size:12px;color:#34C759;">🔒</span>
+            <span style="font-size:12px;color:#6B7280;">letssplyt.app/join/dN9kQ/register</span>
+          </div>
+        </div>
+        <div class="np-browser-body">
+          <div class="np-title">What's your name?</div>
+          <div class="np-sub">So Rohan can identify you in the split.</div>
+          <div class="np-field">
+            <div class="np-label">First name</div>
+            <input class="np-input filled" value="Jordan" placeholder="First name">
+          </div>
+          <div class="np-field" style="margin-bottom:20px;">
+            <div class="np-label">Last name</div>
+            <input class="np-input filled" value="Lee" placeholder="Last name">
+          </div>
+          <div style="height:1px;background:#F3F4F6;margin-bottom:18px;"></div>
+          <div class="np-label" style="margin-bottom:6px;">Verification code sent to +1 (415) 555-0147</div>
+          <div class="otp-row" style="justify-content:flex-start;margin-bottom:8px;">
+            <div class="otp-box filled">4</div>
+            <div class="otp-box filled">7</div>
+            <div class="otp-box filled">2</div>
+            <div class="otp-box cursor"></div>
+            <div class="otp-box"></div>
+            <div class="otp-box"></div>
+          </div>
+          <div style="font-size:12px;color:#9CA3AF;margin-bottom:20px;">Didn't receive it? <span style="color:#6366F1;font-weight:600;">Resend in 0:45</span></div>
+          <button class="gradient-btn" onclick="nav('joined_browser')">Verify & join →</button>
+          <div class="np-privacy" style="margin-top:12px;">🔒 Your number is only used to send your bill. We never share it.</div>
+        </div>
+      </div>
+
+      <!-- otp_browser -->
+      <div id="s-otp_browser" style="display:none;">
+        <div class="np-browser-chrome">
+          <div class="browser-url-bar" style="background:#fff;border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
+            <span style="font-size:12px;color:#34C759;">🔒</span>
+            <span style="font-size:12px;color:#6B7280;">letssplyt.app/join/dN9kQ/verify</span>
+          </div>
+        </div>
+        <div class="otp-browser-body">
+          <div class="otp-icon">📱</div>
+          <div class="otp-title">Check your texts</div>
+          <div class="otp-sub">We sent a 6-digit code to<br><strong>+1 (415) 555-0147</strong></div>
+          <div class="otp-row">
+            <div class="otp-box filled">4</div>
+            <div class="otp-box filled">7</div>
+            <div class="otp-box filled">2</div>
+            <div class="otp-box cursor"></div>
+            <div class="otp-box"></div>
+            <div class="otp-box"></div>
+          </div>
+          <div class="otp-resend">Didn't receive it? <span style="color:#6366F1;font-weight:600;">Resend in 0:45</span></div>
+          <div class="otp-cta">
+            <button class="gradient-btn" onclick="nav('joined_browser')">Verify & join →</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- joined_browser -->
+      <div id="s-joined_browser" style="display:none;">
+        <div class="np-browser-chrome">
+          <div class="browser-url-bar" style="background:#fff;border-radius:10px;padding:8px 12px;display:flex;align-items:center;gap:8px;">
+            <span style="font-size:12px;color:#34C759;">🔒</span>
+            <span style="font-size:12px;color:#6B7280;">letssplyt.app/join/dN9kQ/confirmed</span>
+          </div>
+        </div>
+        <div class="jb-body">
+          <div class="jb-check">✓</div>
+          <div class="jb-title">You're in, Jordan! 🎉</div>
+          <div class="jb-sub">You've joined <strong>Dinner at Nobu</strong>. Here's what happens next:</div>
+          <div class="jb-timeline">
+            <div class="jb-timeline-title">What happens next</div>
+            <div class="jb-step">
+              <div class="jb-step-dot" style="background:#6366F1;">1</div>
+              <div class="jb-step-text"><strong>Rohan scans the receipt</strong> — AI reads and splits the bill</div>
+            </div>
+            <div class="jb-step">
+              <div class="jb-step-dot" style="background:#7C3AED;">2</div>
+              <div class="jb-step-text"><strong>You get a text</strong> with your exact share and payment links</div>
+            </div>
+            <div class="jb-step">
+              <div class="jb-step-dot" style="background:#059669;">3</div>
+              <div class="jb-step-text"><strong>Pay via Venmo / PayPal</strong> — pre-filled, one tap</div>
+            </div>
+          </div>
+          <div class="jb-info-card">
+            <div class="jb-info-row"><span class="jb-info-label">Your name</span><span class="jb-info-val">Jordan Lee</span></div>
+            <div class="jb-info-row"><span class="jb-info-label">Event</span><span class="jb-info-val">Dinner at Nobu</span></div>
+            <div class="jb-info-row"><span class="jb-info-label">Notification</span><span class="jb-info-val">SMS to +1 (415) 555-0147</span></div>
+          </div>
+          <div class="jb-app-nudge">
+            <div class="jb-app-icon">⚡</div>
+            <div class="jb-app-text">
+              <div class="jb-app-name">Get LetsSplyt</div>
+              <div class="jb-app-desc">Track all your bills in one place</div>
+            </div>
+            <div class="jb-app-cta">↗</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- sms_received -->
+      <div id="s-sms_received" style="display:none;">
+        <div class="sms-chrome">
+          <div style="font-size:12px;color:#9CA3AF;margin-bottom:2px;">← Messages</div>
+          <div class="sms-header-name">LetsSplyt</div>
+          <div class="sms-header-sub">+1 (888) 555-0100</div>
+        </div>
+        <div class="sms-body">
+          <div style="text-align:center;font-size:11px;color:#9CA3AF;padding:8px 0 12px;">Today 9:38 PM</div>
+          <div class="sms-bubble-wrap">
+            <div class="sms-bubble">
+              <div class="sms-bubble-text">Hey Jordan 👋 Rohan P. split the bill for <strong>Dinner at Nobu</strong>. Here's your share:</div>
+              <div class="sms-split-card">
+                <div class="sms-split-title">Bill breakdown</div>
+                <div class="sms-split-row"><span class="sms-split-name" style="color:#9CA3AF;">Rohan P.</span><span class="sms-split-amount" style="color:#9CA3AF;">$72.00</span></div>
+                <div class="sms-split-row highlight"><span class="sms-split-name" style="color:#6366F1;font-weight:700;">→ Jordan (you)</span><span class="sms-split-you">$31.20</span></div>
+                <div class="sms-split-row"><span class="sms-split-name" style="color:#9CA3AF;">Maya S.</span><span class="sms-split-amount" style="color:#9CA3AF;">$55.00</span></div>
+                <div class="sms-split-row"><span class="sms-split-name" style="color:#9CA3AF;">+ 4 others</span><span class="sms-split-amount" style="color:#9CA3AF;">$189.80</span></div>
+              </div>
+              <div class="sms-pay-section">
+                <div class="sms-pay-label">Pay $31.20 to Rohan:</div>
+                <a class="sms-pay-link sms-pay-venmo" onclick="nav('pay_external')">💙 Venmo @rohan-patel · $31.20</a>
+                <a class="sms-pay-link sms-pay-paypal" onclick="nav('pay_external')">💳 PayPal · paypal.me/rohanpatel</a>
+              </div>
+              <div class="sms-opt-out">Reply STOP to opt out of future messages</div>
+              <div class="sms-bubble-time">9:38 PM · Delivered</div>
+            </div>
+          </div>
+        </div>
+        <div class="sms-input-bar">
+          <div class="sms-input">Text Message</div>
+          <span style="font-size:22px;color:#9CA3AF;">🎤</span>
+        </div>
+      </div>
+
+      <!-- revised_sms — G05a: Revised share notification -->
+      <div id="s-revised_sms" style="display:none;">
+        <div class="sms-chrome">
+          <div style="font-size:12px;color:#9CA3AF;margin-bottom:2px;">← Messages</div>
+          <div class="sms-header-name">LetsSplyt</div>
+          <div class="sms-header-sub">+1 (888) 555-0100</div>
+        </div>
+        <div class="sms-body">
+          <div style="text-align:center;font-size:11px;color:#9CA3AF;padding:8px 0 12px;">Today 10:14 PM</div>
+          <!-- Original message (condensed) -->
+          <div class="sms-bubble-wrap" style="margin-bottom:6px;">
+            <div class="sms-bubble" style="background:#D1D5DB;">
+              <div class="sms-bubble-text" style="color:#6B7280;font-size:12px;">Your share was $31.20 · <span style="text-decoration:line-through;">Pay Rohan</span></div>
+              <div class="sms-bubble-time">9:38 PM</div>
+            </div>
+          </div>
+          <!-- Revised message -->
+          <div class="sms-bubble-wrap">
+            <div class="sms-bubble">
+              <div class="sms-bubble-text">⚠️ Hey Jordan, Rohan updated your share for <strong>Dinner at Nobu</strong>.</div>
+              <div class="sms-split-card" style="margin-top:8px;">
+                <div class="sms-split-title">Updated share</div>
+                <div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:13px;">
+                  <span class="rs-old">$31.20</span>
+                  <span style="color:#9CA3AF;">→</span>
+                  <span class="rs-new" style="font-size:16px;">$35.50</span>
+                </div>
+                <div class="rs-reason">📝 "Added your cocktails from the bar tab"</div>
+                <div style="font-size:12px;color:#9CA3AF;border-top:1px solid #F3F4F6;padding-top:8px;margin-top:4px;">Difference: <strong style="color:#1a1a2e;">+$4.30</strong></div>
+              </div>
+              <div class="sms-pay-section">
+                <div class="sms-pay-label">Pay updated amount $35.50:</div>
+                <a class="sms-pay-link sms-pay-venmo" onclick="nav('pay_external')">💙 Venmo @rohan-patel · $35.50</a>
+                <a class="sms-pay-link sms-pay-paypal" onclick="nav('pay_external')">💳 PayPal · paypal.me/rohanpatel</a>
+              </div>
+              <div class="sms-opt-out">Reply STOP to opt out of future messages</div>
+              <div class="sms-bubble-time">10:14 PM · Delivered</div>
+            </div>
+          </div>
+        </div>
+        <div class="sms-input-bar">
+          <div class="sms-input">Text Message</div>
+          <span style="font-size:22px;color:#9CA3AF;">🎤</span>
+        </div>
+      </div>
+
+      <!-- manual_sms — Sub-type B: Manually added guest -->
+      <div id="s-manual_sms" style="display:none;">
+        <!-- WhatsApp chrome -->
+        <div style="background:#075E54;padding:12px 16px;display:flex;align-items:center;gap:10px;flex-shrink:0;">
+          <span style="font-size:11px;color:rgba(255,255,255,.7);">←</span>
+          <div style="width:36px;height:36px;border-radius:50%;background:#25D366;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;">S</div>
+          <div>
+            <div style="font-size:15px;font-weight:600;color:#fff;">LetsSplyt</div>
+            <div style="font-size:11px;color:rgba(255,255,255,.6);">online</div>
+          </div>
+        </div>
+        <div style="flex:1;background:#ECE5DD;padding:12px;overflow-y:auto;background-image:url('data:image/svg+xml,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'300\' height=\'300\'><rect fill=\'%23ECE5DD\' width=\'300\' height=\'300\'/></svg>');">
+          <div style="text-align:center;font-size:11px;color:#667781;background:#fff;border-radius:8px;padding:4px 10px;display:inline-block;margin:0 auto 12px;display:block;">Today</div>
+          <div style="background:#fff;border-radius:0 12px 12px 12px;padding:12px 14px;max-width:88%;box-shadow:0 1px 2px rgba(0,0,0,.1);margin-bottom:4px;">
+            <div style="font-size:14px;color:#111;line-height:1.5;margin-bottom:8px;">Hey Sam 👋 Rohan P. added you to <strong>Dinner at Nobu</strong> and split the bill.<br><br>Your share: <strong style="color:#075E54;">$28.75</strong></div>
+            <div style="background:#F0F0F0;border-radius:8px;padding:10px;margin-bottom:8px;">
+              <div style="font-size:11px;font-weight:700;color:#667781;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">Pay Rohan:</div>
+              <div style="font-size:13px;font-weight:700;color:#25D366;margin-bottom:4px;">💚 Cash App · $rohanp · $28.75</div>
+              <div style="font-size:13px;font-weight:700;color:#3D95CE;">💙 Venmo · @rohan-patel · $28.75</div>
+            </div>
+            <div style="font-size:11px;color:#667781;">Reply STOP to opt out of future messages</div>
+            <div style="font-size:10px;color:#999;text-align:right;margin-top:4px;">9:41 PM ✓✓</div>
+          </div>
+        </div>
+        <div style="background:#F0F0F0;padding:8px 12px;display:flex;align-items:center;gap:8px;flex-shrink:0;">
+          <div style="flex:1;background:#fff;border-radius:20px;padding:8px 14px;font-size:14px;color:#999;">Message</div>
+          <span style="font-size:24px;color:#25D366;">➤</span>
+        </div>
+      </div>
+
+    </div><!-- /screen-content -->
+  </div><!-- /phone -->
+</div>
+
+<!-- INFO PANEL -->
+<div id="info">
+  <div class="info-label" id="info-id">G01 · QR Browser Guest</div>
+  <div class="info-title" id="info-title">Browser invite landing</div>
+  <div class="info-desc" id="info-desc">Guest scans QR or taps a link — mobile browser opens. No app install prompt at this stage. Joining in browser is the primary path, not a fallback. Single CTA keeps the decision easy.</div>
+  <div id="info-tags">
+    <span class="info-tag flow">⟶ Critical Path</span>
+    <span class="info-tag ux">✦ No install required</span>
+  </div>
+  <div class="info-ref" id="info-ref">Spec ref: G01 · Open invite in browser</div>
+</div>
+
+<script>
+const SCREENS = {
+  browser_invite:{
+    el:document.getElementById('s-browser_invite'),
+    id:'G01 · QR Browser Guest',title:'Browser invite landing',
+    desc:'Guest scans QR or taps a link — mobile browser opens. No app install prompt at this stage. Joining in browser is the primary path, not a fallback. Single CTA keeps the decision easy.',
+    tags:'<span class="info-tag flow">⟶ Critical Path</span><span class="info-tag ux">✦ No install required</span>',
+    ref:'Spec ref: G01 · Open invite in browser'
+  },
+  enter_phone:{
+    el:document.getElementById('s-enter_phone'),
+    id:'G01b · QR Browser Guest',title:'Enter phone number',
+    desc:'Phone-first pattern: collect the identifier before asking for anything else. The system checks if this number exists — returning users get a personalised greeting, new users are asked for their name next.',
+    tags:'<span class="info-tag flow">⟶ Critical Path</span><span class="info-tag ux">✦ Phone-first auth</span>',
+    ref:'Spec ref: G01b · Enter phone in browser'
+  },
+  greet_existing:{
+    el:document.getElementById('s-greet_existing'),
+    id:'G01c · QR Browser Guest (Returning)',title:'Returning user — verify & join',
+    desc:'Phone matched an existing account — user is greeted by name and the OTP entry is shown on the same screen. One tap to verify and join. No separate OTP page needed.',
+    tags:'<span class="info-tag flow">⟶ Critical Path</span><span class="info-tag ux">✦ Personalised · 1-screen verify</span>',
+    ref:'Spec ref: G01c · Returning user — greet + verify'
+  },
+  name_phone:{
+    el:document.getElementById('s-name_phone'),
+    id:'G02 · QR Browser Guest (New)',title:'Enter name + verify',
+    desc:'New guest: enter name and the OTP code on the same screen. Phone captured on the previous screen; the code is sent automatically. Single "Verify & join" button completes both steps.',
+    tags:'<span class="info-tag flow">⟶ Critical Path</span><span class="info-tag ux">✦ Minimal friction · 1-screen verify</span>',
+    ref:'Spec ref: G02 · Enter name + verify (new guest)'
+  },
+  joined_browser:{
+    el:document.getElementById('s-joined_browser'),
+    id:'G04 · QR Browser Guest',title:'Joined confirmation',
+    desc:'Sets expectations: Rohan scans → AI splits → you get a text. Step-by-step visual so guest isn\'t confused when the SMS arrives later. App download nudge is subtle, below everything.',
+    tags:'<span class="info-tag ux">✦ Expectation setting</span><span class="info-tag mvp">MVP</span>',
+    ref:'Spec ref: G04 · Joined confirmation in browser'
+  },
+  sms_received:{
+    el:document.getElementById('s-sms_received'),
+    id:'G05 · QR Browser Guest',title:'SMS payment request',
+    desc:'Guest\'s payment request lands via SMS. Their row is highlighted in the split table. Payment links are pre-filled with handle + amount. Opt-out line always included at the bottom.',
+    tags:'<span class="info-tag flow">⟶ Critical Path</span><span class="info-tag ai">🤖 A3 composed</span>',
+    ref:'Spec ref: G05 · Receive payment request via SMS'
+  },
+  revised_sms:{
+    el:document.getElementById('s-revised_sms'),
+    id:'G05a · QR Browser Guest',title:'Revised share SMS',
+    desc:'Payer revised the split after the initial SMS was sent (e.g. added missed items). Guest sees old amount struck through, new amount, and the payer\'s reason. Pre-filled payment links update to the new amount automatically.',
+    tags:'<span class="info-tag flow">⟶ Critical Path</span><span class="info-tag ai">🤖 A3 + revision delta</span>',
+    ref:'Spec ref: G05a · Revised payment request via SMS'
+  },
+  manual_sms:{
+    el:document.getElementById('s-manual_sms'),
+    id:'G08 · Manually Added Guest',title:'WhatsApp payment request',
+    desc:'Sub-type B: guest added directly by payer (from contacts). Receives message via WhatsApp (Twilio auto-route for known contacts). Same content as G05 — split breakdown + pre-filled payment links.',
+    tags:'<span class="info-tag flow">⟶ MVP</span><span class="info-tag ai">🤖 A3 + S04 routing</span>',
+    ref:'Spec ref: G08 · Receive via SMS/WhatsApp'
+  }
+};
+
+function nav(id){
+  if(!SCREENS[id])return;
+  Object.values(SCREENS).forEach(s=>s.el.style.display='none');
+  SCREENS[id].el.style.display='flex';
+  document.querySelectorAll('.screen-btn').forEach(b=>b.classList.remove('active'));
+  const btn=document.getElementById('btn-'+id);
+  if(btn)btn.classList.add('active');
+  document.getElementById('info-id').textContent=SCREENS[id].id;
+  document.getElementById('info-title').textContent=SCREENS[id].title;
+  document.getElementById('info-desc').textContent=SCREENS[id].desc;
+  document.getElementById('info-tags').innerHTML=SCREENS[id].tags;
+  document.getElementById('info-ref').textContent=SCREENS[id].ref;
+}
+
+// Sim mode + postMessage
+(function(){
+  if(new URLSearchParams(location.search).get('sim')){
+    ['sidebar','info'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
+    var c=document.getElementById('center');if(c){c.style.justifyContent='center';c.style.gap='0';}
+  }
+  window.addEventListener('message',function(e){
+    if(e.data&&e.data.nav&&SCREENS[e.data.nav])nav(e.data.nav);
+  });
+})();
+</script>
+</body>
+</html>

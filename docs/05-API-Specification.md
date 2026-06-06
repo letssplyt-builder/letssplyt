@@ -1,0 +1,1214 @@
+# LetsSplyt — API Specification
+**Version:** 1.0 | **Date:** May 2026
+
+---
+
+## OpenAPI Contract
+
+This document is the human-readable API specification. A machine-readable OpenAPI 3.1 spec is generated from the TypeScript types in `/shared/api-spec/letssplyt.openapi.yaml`.
+
+**Critical rule:** When you add or modify an endpoint, update BOTH this document AND the OpenAPI spec. The OpenAPI spec is used to:
+- Validate backend responses against the contract in CI
+- Generate typed API clients for the mobile app
+- Detect drift between mobile and backend at compile time
+
+If the TypeScript shared types and this document contradict each other, the TypeScript types win.
+
+---
+
+## How to Read This Document
+
+Every endpoint the LetsSplyt backend exposes is listed here. Implement each one exactly as specified — same path, same method, same response shape. The mobile app's typed API layer (`/shared/types/api.types.ts`) is generated from these shapes.
+
+### Notation
+
+- `[AUTH]` — requires valid JWT access token in `Authorization: Bearer <token>` header
+- `[PAYER]` — additionally requires the authenticated user to be the payer of the referenced event
+- `[PARTICIPANT]` — additionally requires the authenticated user to be a participant in the referenced event
+- `[NO AUTH]` — public endpoint, no token required
+- `[TWILIO SIG]` — no JWT, but must validate Twilio request signature (`X-Twilio-Signature` header)
+- `→ ASK USER` — pause and ask the user for this value before implementing
+
+### Standard Error Response (all endpoints)
+
+```typescript
+// All errors return this shape
+interface ErrorResponse {
+  error: {
+    code: string;      // machine-readable, e.g. "OTP_RATE_LIMITED"
+    message: string;   // human-readable
+    details?: unknown; // optional extra context
+  };
+}
+```
+
+Never expose stack traces, SQL errors, or internal paths in error responses.
+
+### Standard Success Envelope
+
+Endpoints returning a single resource use the resource directly. Endpoints returning lists use:
+
+```typescript
+interface ListResponse<T> {
+  data: T[];
+  count: number;
+}
+```
+
+---
+
+## Base URL
+
+```
+Development:  http://localhost:3000/api/v1
+Staging:      https://[staging-railway-url]/api/v1
+Production:   https://[→ ASK USER: your Railway production URL]/api/v1
+```
+
+All routes below are relative to `/api/v1`.
+
+---
+
+## Authentication Endpoints
+
+### POST `/auth/otp/request`
+**Auth:** `[NO AUTH]` | **Rate limit:** 5 per phone/hour, 20 per IP/hour
+
+Request a 6-digit OTP via Twilio Verify (WhatsApp-first for international, SMS for US).
+
+**Request body:**
+```typescript
+{
+  phone_e164: string;   // E.164 format, validated with libphonenumber
+  channel?: "sms" | "whatsapp";  // default: auto (Twilio decides)
+}
+```
+
+**Response `200`:**
+```typescript
+{
+  sent: true;
+  channel: "sms" | "whatsapp";
+  expires_in_seconds: 600;  // OTP valid for 10 minutes
+}
+```
+
+**Error codes:**
+- `INVALID_PHONE` 400 — phone failed E.164 validation
+- `OTP_RATE_LIMITED` 429 — too many requests for this phone
+- `IP_RATE_LIMITED` 429 — too many requests from this IP
+- `OTP_UNAVAILABLE` 403 — unable to send OTP (reason withheld from caller) // Generic code — never reveal opt-out status to callers. Log the real reason server-side only.
+
+---
+
+### POST `/auth/otp/verify`
+**Auth:** `[NO AUTH]` | **Rate limit:** 3 attempts per phone per 10 minutes
+
+Verify OTP. On success, creates or retrieves user, issues JWT pair.
+
+**Request body:**
+```typescript
+{
+  phone_e164: string;
+  code: string;              // 6-digit OTP
+  display_name?: string;     // required only if new user (first registration)
+  context?: "login" | "join_event";  // default: "login"
+  join_token?: string;       // required if context = "join_event"
+}
+```
+
+**Response `200`:**
+```json
+{
+  "verified": true,
+  "access_token": "eyJ...",
+  "refresh_token": "dGt...",
+  "user": {
+    "id": "uuid",
+    "display_name": "string | null"
+  }
+}
+```
+// phone_e164 is intentionally NOT returned — it is never stored in plaintext. Client already knows the phone they entered.
+
+**Error codes:**
+- `INVALID_CODE` 400 — wrong OTP
+- `CODE_EXPIRED` 400 — OTP expired
+- `OTP_MAX_ATTEMPTS` 429 — too many failed attempts, phone locked for 10 min
+- `NAME_REQUIRED` 400 — new user but display_name not provided
+
+---
+
+### POST `/auth/token/refresh`
+**Auth:** `[NO AUTH]` | **Rate limit:** 10 per device per hour
+
+Exchange a refresh token for a new access + refresh token pair. Old refresh token is immediately invalidated (rotation).
+
+**Request body:**
+```typescript
+{
+  refresh_token: string;
+}
+```
+
+**Response `200`:**
+```typescript
+{
+  access_token: string;
+  refresh_token: string;   // new token — client must replace stored token
+}
+```
+
+**Error codes:**
+- `INVALID_REFRESH_TOKEN` 401 — token not found or already used
+- `REFRESH_TOKEN_EXPIRED` 401 — 30-day TTL exceeded
+
+**Session handling note:** On 401 `INVALID_REFRESH_TOKEN`, the client must force logout (clear SecureStore, navigate to PhoneEntryScreen). On network error, retry up to 3 times before forcing logout. Never silently swallow a 401 — the user must re-authenticate.
+
+---
+
+### DELETE `/auth/session`
+**Auth:** `[AUTH]`
+
+Logout — invalidates current refresh token on server.
+
+**Request body:** none
+
+**Response `204`:** no body
+
+---
+
+## User & Profile Endpoints
+
+### GET `/users/me`
+**Auth:** `[AUTH]`
+
+**Response `200`:**
+```typescript
+{
+  id: string;
+  phone_e164: string;
+  display_name: string;
+  avatar_colour: string;
+  avatar_url: string | null;
+  total_events_created: number;
+  total_events_joined: number;
+  created_at: string;
+}
+```
+
+---
+
+### PATCH `/users/me`
+**Auth:** `[AUTH]`
+
+Update display name, avatar colour, or Expo push token.
+
+**Request body (all fields optional):**
+```typescript
+{
+  display_name?: string;       // max 50 chars
+  avatar_colour?: string;      // hex colour e.g. "#6366F1"
+  expo_push_token?: string;    // register/update Expo push token for this device
+}
+```
+
+**Response `200`:** updated user object (same shape as GET /users/me)
+
+**Note:** `expo_push_token` is stored in `device_sessions.expo_push_token`, not the `users` table.
+
+---
+
+### GET `/users/me/data`
+**Auth:** `[AUTH]` | **Rate limit:** 1 request per user per 24 hours
+
+GDPR right of access — returns all data held about the user.
+
+**Rate limit headers returned:**
+```
+X-RateLimit-Limit: 1
+X-RateLimit-Remaining: 0
+X-RateLimit-Reset: [unix timestamp]
+```
+
+**On limit exceeded — `429 Too Many Requests`:**
+```typescript
+{ "error": "EXPORT_RATE_LIMITED", "reset_at": "ISO timestamp" }
+```
+
+**Response `200`:**
+```typescript
+{
+  user: User;
+  payment_handles: PaymentHandle[];   // handles decrypted for export
+  events_created: Event[];
+  events_participated: Event[];
+  settlement_log: SettlementLogEntry[];
+  analytics_events_count: number;     // count only, not raw events
+  exported_at: string;
+}
+```
+
+---
+
+### DELETE `/users/me`
+**Auth:** `[AUTH]`
+
+GDPR right to erasure. Soft-deletes user, hard-deletes payment handles, anonymises participant names to "Deleted User", removes analytics events older than 30 days.
+
+**Request body:**
+```typescript
+{
+  confirm: true;   // explicit confirmation required
+}
+```
+
+**Response `200`:**
+```typescript
+{
+  deleted: true;
+  anonymised_participant_records: number;
+}
+```
+
+---
+
+## Payment Handle Endpoints
+
+### GET `/users/me/handles`
+**Auth:** `[AUTH]`
+
+**Response `200`:**
+```typescript
+{
+  data: Array<{
+    id: string;
+    provider: "venmo" | "paypal" | "cashapp" | "zelle" | "wise" | "upi" | "other";
+    handle_display: string;   // DECRYPTED — only returned to owner, never logged
+    display_order: number;
+    is_active: boolean;
+    created_at: string;
+  }>;
+}
+```
+
+---
+
+### POST `/users/me/handles`
+**Auth:** `[AUTH]`
+
+Add a payment handle. Encrypt before storing.
+
+**Request body:**
+```typescript
+{
+  provider: "venmo" | "paypal" | "cashapp" | "zelle" | "wise" | "upi" | "other";
+  handle: string;         // plaintext — service encrypts before DB insert
+  display_order?: number; // default 0
+}
+```
+
+**Response `201`:**
+```typescript
+{
+  id: string;
+  provider: string;
+  handle_display: string;
+  display_order: number;
+}
+```
+
+**Error codes:**
+- `DUPLICATE_PROVIDER` 409 — user already has an active handle for this provider
+- `INVALID_HANDLE` 400 — handle fails format validation for the provider
+
+---
+
+### PATCH `/users/me/handles/:handleId`
+**Auth:** `[AUTH]` | Owner only (service must verify handle belongs to auth user)
+
+**Request body (all optional):**
+```typescript
+{
+  handle?: string;
+  display_order?: number;
+  is_active?: boolean;
+}
+```
+
+**Response `200`:** updated handle object
+
+---
+
+### DELETE `/users/me/handles/:handleId`
+**Auth:** `[AUTH]` | Owner only
+
+Sets `is_active = false` (soft delete). Does not hard-delete — needed for historical message audit.
+
+**Response `204`:** no body
+
+---
+
+## Event Endpoints
+
+### GET `/events`
+**Auth:** `[AUTH]`
+
+Returns all events the user is payer of or participant in, sorted by created_at desc.
+
+// Cursor-based pagination preferred over offset — consistent results under concurrent inserts.
+
+**Query params:**
+- `status`: filter by event status (optional)
+- `role`: `"creator"` | `"participant"` | `"all"` (default: `"all"`)
+- `cursor`: string (optional) — opaque cursor from previous response (base64 encoded last event ID + created_at)
+- `limit`: number (optional) — default 20, max 50
+
+**Response `200`:**
+```typescript
+{
+  events: Array<{
+    id: string;
+    title: string;
+    event_date: string | null;
+    status: EventStatus;
+    total_amount: number | null;
+    currency: string;
+    participant_count: number;
+    settled_count: number;
+    role: "creator" | "participant";
+    created_at: string;
+  }>;
+  next_cursor: string | null;  // null means no more pages; opaque base64 token
+  has_more: boolean;
+}
+```
+
+---
+
+### POST `/events`
+**Auth:** `[AUTH]` | **Rate limit:** 20 per user per hour
+
+Create a new event. Automatically generates a join token (24-hour TTL).
+
+**Request body:**
+```typescript
+{
+  title: string;          // max 100 chars
+  event_date?: string;    // ISO 8601 date e.g. "2026-06-15"
+}
+```
+
+**Response `201`:**
+```typescript
+{
+  event: Event;
+  join_token: string;
+  join_url: string;       // e.g. https://[APP_DOMAIN]/join/[token]
+  qr_data: string;        // same as join_url — encode this into QR
+}
+```
+
+---
+
+### GET `/events/:eventId`
+**Auth:** `[AUTH]` | Must be payer or participant
+
+Full event detail with participants and settlement status.
+
+**Response `200`:**
+```typescript
+{
+  event: {
+    id: string;
+    title: string;
+    event_date: string | null;
+    status: EventStatus;
+    total_amount: number | null;
+    currency: string;
+    split_mode: string | null;
+    payer: { id: string; display_name: string; avatar_colour: string; };
+    locked_at: string | null;
+    messages_sent_at: string | null;
+    fully_settled_at: string | null;
+    created_at: string;
+  };
+  // participants array contains only non-creator participants.
+  // The payer/creator identity is in the top-level payer_id and payer_display_name fields.
+  // The creator is never a participant in their own event.
+  participants: Array<{
+    id: string;
+    display_name: string;
+    join_method: JoinMethod;
+    amount_owed: number | null;
+    payment_status: PaymentStatus;
+    message_delivered_at: string | null;
+    self_reported_at: string | null;
+    last_nudged_at: string | null;
+    nudge_count: number;
+    opted_out_at: string | null;
+  }>;
+  join_token: {             // only included if event status = "open"
+    token: string;
+    join_url: string;
+    expires_at: string;
+    is_active: boolean;
+  } | null;
+  summary: {
+    total: number;
+    collected: number;
+    outstanding: number;
+    confirmed_count: number;
+    pending_count: number;
+  };
+}
+```
+
+---
+
+### PATCH `/events/:eventId`
+**Auth:** `[AUTH]` | `[PAYER]` | Only while status = "open" or "locked"
+
+**Request body (all optional):**
+```typescript
+{
+  title?: string;
+  event_date?: string;
+}
+```
+
+**Response `200`:** updated event object
+
+---
+
+### POST `/events/:eventId/lock`
+**Auth:** `[AUTH]` | `[PAYER]` | Event must be in "open" status
+
+Lock the group. Expires the active join token. No new participants can join after this.
+
+**Request body:** none
+
+**Response `200`:**
+```typescript
+{
+  event_id: string;
+  status: "locked";
+  locked_at: string;
+  participant_count: number;
+}
+```
+
+**Error codes:**
+- `ALREADY_LOCKED` 409 — event already locked
+- `MIN_PARTICIPANTS` 400 — cannot lock with fewer than 2 participants
+
+---
+
+### POST `/events/:eventId/reopen`
+**Auth:** `[AUTH]` | `[PAYER]` | Event must be in "locked" status
+
+Reopen the join window for 1 hour. Generates a new join token.
+
+**Request body:** none
+
+**Response `200`:**
+```typescript
+{
+  join_token: string;
+  join_url: string;
+  expires_at: string;    // 1 hour from now
+}
+```
+
+---
+
+## Participant Endpoints
+
+### Canonical Participant Response Shape
+
+All participant list responses across every endpoint use this schema. Never deviate from this shape.
+
+```typescript
+// Canonical participant shape in ALL API responses:
+interface ParticipantResponse {
+  id: string;                // participants.id (not user_id)
+  user_id: string | null;    // null for guests
+  display_name: string;      // from users.display_name or guest_pii (decrypted guest name)
+  join_method: 'qr_app' | 'qr_web' | 'manual_phone' | 'manual_name_only';
+  payment_status: 'pending' | 'self_reported' | 'confirmed' | 'disputed' | 'opted_out';
+  amount_owed: number;       // in major currency units (e.g. 12.50 not 1250)
+  // NEVER include: phone_hash, phone_encrypted, guest_pii_token
+}
+```
+
+### GET `/events/:eventId/participants`
+**Auth:** `[AUTH]` | Must be payer or participant
+
+**Response `200`:** list of participant objects (canonical shape above)
+
+**NEVER included in response (stripped by PII middleware before response leaves backend):**
+- `phone_e164` — internal only
+- `phone_hash` — internal only
+- `name_encrypted` — internal only
+- `guest_pii_token` — internal only
+
+---
+
+### POST `/events/:eventId/participants`
+**Auth:** `[AUTH]` | `[PAYER]` | Event must be in "open" status
+
+Manually add a participant. Payer vouches — no OTP required for join.
+
+**Request body:**
+```typescript
+{
+  display_name: string;
+  phone_e164?: string;        // omit for name-only (cash) participant
+  join_method: "manual_phone" | "manual_name_only";
+  send_invite_sms?: boolean;  // default true if phone provided; checks opt-out before sending
+}
+```
+
+**Response `201`:**
+```typescript
+{
+  participant: Participant;
+  invite_sent: boolean;
+}
+```
+
+**Error codes:**
+- `DUPLICATE_PHONE` 409 — phone already in this event
+- `OTP_UNAVAILABLE` 403 — unable to send invite (reason withheld from caller) // Generic code — never reveal opt-out status to callers. Log the real reason server-side only.
+- `GROUP_LOCKED` 409 — event is locked
+
+---
+
+### DELETE `/events/:eventId/participants/:participantId`
+**Auth:** `[AUTH]` | `[PAYER]` | Event must be in "open" status (before lock)
+
+**Response `204`:** no body
+
+**Error codes:**
+- `GROUP_LOCKED` 409 — cannot remove after lock
+- `NOT_FOUND` 404
+
+---
+
+## Browser Join Endpoints
+
+These endpoints serve the browser join flow. The GET renders HTML; the POST endpoints return JSON.
+
+### GET `/join/:token`
+**Auth:** `[NO AUTH]`
+
+Renders the browser join page HTML. Check token validity — if expired or revoked, render an "expired" page with event title and payer name.
+
+**→ Note:** This endpoint returns HTML, not JSON. Use Express `res.render()` or inline HTML template. The page must include the TCPA consent text from `09-Security-And-Privacy.md` Section 6 (DPDP Consent) near the phone number field. The page must work without JavaScript disabled (progressive enhancement).
+
+---
+
+### POST `/join/:token/check`
+**Auth:** `[NO AUTH]` | **Rate limit:** 10 per IP per minute
+
+Validate the join token and accept the phone number to be verified. Does NOT reveal whether the phone is registered.
+
+// Never reveal phone registration status before OTP verification. Return generic 200 regardless of match. The 'mode' field is set AFTER OTP verification, not before.
+
+**Request body:**
+```typescript
+{ phone_e164: string; }
+```
+
+**Response (always 200, regardless of phone match):**
+```typescript
+{
+  proceed: true;
+  event_title: string;     // always return — used in page copy
+  payer_name: string;      // payer's first name
+}
+```
+
+**Note:** The `mode` field (`"new_user"` | `"returning_user"`) and any personalised greeting are only revealed AFTER OTP verification succeeds (see `POST /join/:token/otp/verify`). This endpoint must never expose whether the phone number is registered in LetsSplyt.
+
+---
+
+### POST `/join/:token/otp/request`
+**Auth:** `[NO AUTH]` | **Rate limit:** same as `/auth/otp/request`
+
+Send OTP to the number provided in the browser join form. Checks opt-out before sending.
+
+**Request body:**
+```typescript
+{ phone_e164: string; }
+```
+
+**Response `200`:** same shape as `POST /auth/otp/request`
+
+---
+
+### POST `/join/:token/otp/verify`
+**Auth:** `[NO AUTH]` | **Rate limit:** 3 per phone per 10 minutes
+
+Verify OTP and add person to event as participant. Creates a guest participant record (no user account).
+
+**Request body:**
+```typescript
+{
+  phone_e164: string;
+  code: string;
+  first_name?: string;    // required if new guest
+  last_name?: string;     // required if new guest
+}
+```
+
+**Response `200`:**
+```typescript
+{
+  participant_id: string;
+  is_existing_user: boolean;
+  event: {
+    title: string;
+    payer_name: string;
+    member_count: number;
+  };
+  members: Array<{ display_name: string; }>;   // show in joined confirmation page
+}
+```
+
+**Error codes:**
+- `TOKEN_EXPIRED` 410 — join window closed
+- `TOKEN_REVOKED` 410 — group locked
+- `DUPLICATE_PHONE` 409 — already in this event
+- `NAME_REQUIRED` 400 — new guest but name fields missing
+
+---
+
+## Receipt Endpoints
+
+### POST `/events/:eventId/receipt/scan`
+**Auth:** `[AUTH]` | `[PAYER]` | Event must be "locked" | **Rate limit:** 5 per event per hour
+
+Upload receipt image. Triggers A1 (receipt parser harness). Returns parsed items for payer review. Does NOT run A2 yet.
+
+**Request:** `multipart/form-data`
+```
+image: File    (JPEG, PNG, WebP; max 10MB after client-side compression)
+```
+
+**Response `200`:**
+```typescript
+{
+  parse_id: string;     // UUID — used to confirm this specific parse
+  items: Array<{
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+    confidence: number;
+    low_confidence: boolean;   // true if confidence < 0.75
+  }>;
+  subtotal: number;
+  tax: number;
+  tip: number;
+  total: number;
+  currency: string;
+  parse_confidence: number;
+  requires_review: boolean;   // true if any item is low_confidence or overall < 0.80
+  attempts: number;
+}
+```
+
+**Error codes:**
+- `RECEIPT_UNREADABLE` 422 — A1 returned unreadable after 3 retries
+- `PARSE_FAILED` 500 — all retries exhausted
+- `IMAGE_TOO_LARGE` 413 — image exceeds 10MB
+- `WRONG_EVENT_STATUS` 409 — event not in "locked" status
+
+---
+
+### POST `/events/:eventId/receipt/confirm`
+**Auth:** `[AUTH]` | `[PAYER]`
+
+Payer confirms (and optionally edits) the parsed items. This is the human checkpoint — A2 cannot run until this is called.
+
+**Request body:**
+```typescript
+{
+  parse_id: string;    // must match the ID from the scan response
+  items: Array<{
+    id: string;        // existing ID from parse, or new UUID for manually added items
+    name: string;
+    price: number;
+    quantity: number;
+    is_tax?: boolean;
+    is_tip?: boolean;
+  }>;
+  tax: number;
+  tip: number;
+  total: number;
+  currency: string;
+  entry_method: "receipt_scan" | "manual";
+}
+```
+
+**Response `200`:**
+```typescript
+{
+  confirmed: true;
+  receipt_item_ids: string[];   // IDs of stored receipt_items rows
+  total: number;
+}
+```
+
+---
+
+## Split Endpoints
+
+### POST `/events/:eventId/split/calculate`
+**Auth:** `[AUTH]` | `[PAYER]` | Receipt must be confirmed
+
+Run A2. Provide item assignments (drag-and-drop, NLP, or even/custom mode).
+
+**Request body:**
+```typescript
+{
+  split_mode: "even" | "itemised" | "amount" | "percent" | "portion";
+
+  // For split_mode = "itemised":
+  assignments?: Array<{
+    item_id: string;
+    participant_ids: string[];   // item split equally among these
+  }>;
+  nlp_instruction?: string;      // natural language e.g. "Rohan had the pasta"
+
+  // For split_mode = "even":
+  // No extra fields needed
+
+  // For split_mode = "amount" | "percent" | "portion":
+  manual_splits: Array<{
+    participant_id: string;
+    value: number;   // dollars for "amount", 0-100 for "percent", weight for "portion"
+  }>;
+
+  // For all modes where receipt wasn't scanned:
+  manual_total?: number;    // required if entry_method was "manual"
+}
+```
+
+**Response `200`:**
+```typescript
+{
+  splits: Array<{
+    participant_id: string;
+    display_name: string;
+    amount_owed: number;
+    item_names: string[];     // items assigned to this person (for A3 context)
+  }>;
+  total_check: number;        // sum of all amount_owed — must equal event total
+  unassigned_item_ids: string[];  // items A2 couldn't assign (payer must manually assign)
+  confidence: number;
+  requires_review: boolean;
+}
+```
+
+**Error codes:**
+- `RECEIPT_NOT_CONFIRMED` 409 — human checkpoint not passed
+- `SUM_INVARIANT_VIOLATED` 500 — internal arithmetic error (should never happen; log + alert)
+- `UNRESOLVED_ASSIGNMENTS` 400 — unassigned_item_ids is non-empty; payer must assign before confirming
+
+---
+
+### POST `/events/:eventId/split/confirm`
+**Auth:** `[AUTH]` | `[PAYER]`
+
+Payer reviews and confirms the calculated split. Writes `amount_owed` to all participant rows. Advances event status to `"calculated"`.
+
+**Request body:**
+```typescript
+{
+  splits: Array<{
+    participant_id: string;
+    amount_owed: number;   // payer may have edited individual amounts
+  }>;
+}
+```
+
+**Response `200`:**
+```typescript
+{
+  confirmed: true;
+  event_status: "calculated";
+  splits: Array<{ participant_id: string; amount_owed: number; }>;
+}
+```
+
+---
+
+### PATCH `/events/:eventId/split`
+**Auth:** `[AUTH]` | `[PAYER]` | Event must be in "sent" status (edit after send)
+
+Recalculate split after messages sent. Only affected participants get a revised message.
+
+**Request body:** same shape as `POST /split/calculate`
+
+**Response `200`:**
+```typescript
+{
+  updated_splits: Array<{
+    participant_id: string;
+    old_amount: number;
+    new_amount: number;
+    changed: boolean;
+  }>;
+  revision_messages_queued: number;   // count of participants who will receive revised SMS
+}
+```
+
+---
+
+## Message Endpoints
+
+### GET `/events/:eventId/messages/preview`
+**Auth:** `[AUTH]` | `[PAYER]` | Split must be confirmed
+
+Generate per-participant message previews (without sending). Runs A3 composition but does not trigger Twilio.
+
+**Response `200`:**
+```typescript
+{
+  previews: Array<{
+    participant_id: string;
+    display_name: string;
+    amount_owed: number;
+    message_text: string;    // full composed message
+    channel: "whatsapp" | "sms";
+    payment_links: Array<{
+      provider: string;
+      url: string;
+      label: string;
+    }>;
+  }>;
+}
+```
+
+---
+
+### POST `/events/:eventId/messages/send`
+**Auth:** `[AUTH]` | `[PAYER]` | **Rate limit:** 3 per event per 24 hours
+
+Send all participant messages via Twilio. Checks opt-out for every number before sending.
+
+**Request body:** none (uses confirmed split data)
+
+**Response `200`:**
+```typescript
+{
+  sent_count: number;
+  skipped_count: number;       // opted-out or name-only participants
+  failed_count: number;
+  results: Array<{
+    participant_id: string;
+    status: "sent" | "skipped_opt_out" | "skipped_no_phone" | "failed";
+    twilio_sid?: string;
+  }>;
+  event_status: "sent";
+}
+```
+
+---
+
+### POST `/events/:eventId/messages/nudge/:participantId`
+**Auth:** `[AUTH]` | `[PAYER]` | **Rate limit:** 1 per participant per 24 hours
+
+Send a reminder message to a specific participant. Checks opt-out before sending.
+
+**Request body:** none
+
+**Response `200`:**
+```typescript
+{
+  sent: boolean;
+  channel: "whatsapp" | "sms";
+  twilio_sid?: string;
+  next_nudge_available_at: string;   // ISO 8601 — when cooldown expires
+}
+```
+
+**Error codes:**
+- `NUDGE_COOLDOWN` 429 — still within 24-hour cooldown; includes `next_available_at` in body
+- `PARTICIPANT_OPTED_OUT` 403 — cannot nudge opted-out number
+- `PARTICIPANT_SETTLED` 409 — participant already confirmed paid
+
+---
+
+## Settlement Endpoints
+
+// participant_id in path enforces authorization at route level — backend verifies caller owns or created the event containing this participant.
+// Settlement endpoint URL pattern: POST /settlement/:participantId/self-report | POST /settlement/:participantId/confirm | POST /settlement/:participantId/dispute
+
+### POST `/events/:eventId/settlement/:participantId/self-report`
+**Auth:** `[AUTH]` | `[PARTICIPANT]`
+
+Participant marks themselves as paid. Sends push notification to payer.
+
+**Request body:**
+```typescript
+{
+  payment_method: "venmo" | "paypal" | "cashapp" | "zelle" | "wise" | "cash" | "bank_transfer" | "other";
+  note?: string;   // max 200 chars, optional free text
+}
+```
+
+**Response `200`:**
+```typescript
+{
+  participant_id: string;
+  payment_status: "self_reported";
+  self_reported_at: string;
+}
+```
+
+---
+
+### POST `/events/:eventId/settlement/:participantId/confirm`
+**Auth:** `[AUTH]` | `[PAYER]`
+
+Payer confirms a self-reported payment. Sends push notification to participant.
+
+**Request body:** none
+
+**Response `200`:**
+```typescript
+{
+  participant_id: string;
+  payment_status: "confirmed";
+  confirmed_at: string;
+  event_fully_settled: boolean;   // true if this was the last pending participant
+}
+```
+
+---
+
+### POST `/events/:eventId/settlement/:participantId/dispute`
+**Auth:** `[AUTH]` | `[PAYER]`
+
+Payer disputes a self-reported payment. Resets status to pending. Notifies participant.
+
+**Request body:**
+```typescript
+{
+  note?: string;   // reason for dispute (shown to participant in push notification)
+}
+```
+
+**Response `200`:**
+```typescript
+{
+  participant_id: string;
+  payment_status: "pending";
+  disputed_count: number;
+}
+```
+
+---
+
+### POST `/events/:eventId/settlement/cash/:participantId`
+**Auth:** `[AUTH]` | `[PAYER]`
+
+Payer marks a participant as paid (cash, Zelle, or any external method). Immediately settles.
+
+**Request body:**
+```typescript
+{
+  payment_method: "cash" | "zelle" | "bank_transfer" | "other";
+  note?: string;
+}
+```
+
+**Response `200`:**
+```typescript
+{
+  participant_id: string;
+  payment_status: "payer_marked";
+  event_fully_settled: boolean;
+}
+```
+
+---
+
+## Background Job Consumer Endpoints
+
+These endpoints are called by Upstash QStash, not by the mobile app. All require QStash signature verification via the `X-Qstash-Signature` header (verified using `QSTASH_CURRENT_SIGNING_KEY`). They are not JWT-authenticated.
+
+### POST `/api/v1/jobs/nudge-check`
+**Auth:** QStash signature (`X-Qstash-Signature` header)
+
+**Request body:**
+```typescript
+{
+  eventId: string;
+  participantIds?: string[];
+}
+```
+
+**Response `200`:**
+```typescript
+{ nudged: number; skipped: number; }
+```
+
+**Validation:** Verify QStash signature using `QSTASH_CURRENT_SIGNING_KEY`.
+
+---
+
+### POST `/api/v1/jobs/purge-guest-pii`
+**Auth:** QStash signature
+
+**Request body:**
+```typescript
+{ batchSize?: number; }
+```
+
+**Response `200`:**
+```typescript
+{ purged: number; }
+```
+
+---
+
+### POST `/api/v1/jobs/create-analytics-partition`
+**Auth:** QStash signature
+
+**Request body:**
+```typescript
+{ year: number; month: number; }
+```
+
+**Response `200`:**
+```typescript
+{ partition: string; created: boolean; }
+```
+
+---
+
+## Analytics Endpoint
+
+### POST `/analytics/events`
+**Auth:** `[AUTH]` or anonymous (user_id optional) | **Rate limit:** 200 per session per minute
+
+Log a single analytics event. Mobile app calls this for every tracked action. See `10-Engineering-Operations.md` Section 5 for full event name list.
+
+**Request body:**
+```typescript
+{
+  event_name: AnalyticsEventName;  // from analytics.types.ts union
+  session_id: string;
+  anonymous_id?: string;
+  properties: Record<string, unknown>;
+  platform: "ios" | "android" | "web";
+  app_version: string;
+  timestamp: string;   // ISO 8601 — client timestamp; server stores server time too
+}
+```
+
+**Response `202`:** accepted (fire-and-forget; don't block UI on this)
+
+---
+
+## Webhook Endpoints
+
+These are called by Twilio, not by the app. Validate `X-Twilio-Signature` header on every request using the Twilio SDK's `validateRequest` helper. Reject with 403 if signature invalid.
+
+### POST `/webhooks/twilio/opt-out`
+**Auth:** `[TWILIO SIG]`
+
+Fired when anyone replies STOP (or STOP, STOPALL, UNSUBSCRIBE, CANCEL, END, QUIT) to any of your messages.
+
+**Twilio sends:** `application/x-www-form-urlencoded` with fields including `From` (the phone number that replied STOP).
+
+**What the handler must do (in this order):**
+1. Validate Twilio signature
+2. Normalise `From` to E.164
+3. `INSERT INTO sms_opt_outs` (on conflict do nothing)
+4. `UPDATE users SET is_opted_out = TRUE` where phone matches (if registered user)
+5. `UPDATE participants SET opted_out_at = NOW()` for all active participant records
+6. Return `200` with empty TwiML response: `<Response></Response>`
+
+**Response `200`:** TwiML `<Response></Response>` — tells Twilio not to send an auto-reply
+
+---
+
+### POST `/webhooks/twilio/delivery`
+**Auth:** `[TWILIO SIG]`
+
+Delivery status callback for each message sent. Twilio calls this for `delivered`, `failed`, `undelivered`.
+
+**What the handler must do:**
+1. Validate Twilio signature
+2. Extract `MessageSid`, `MessageStatus`, `To`
+3. Update `notification_log.status` and `delivered_at` for the matching `twilio_sid`
+4. If status = `failed` or `undelivered`: update `participants.message_failed = TRUE`, fire analytics event `message_delivery_failed`
+5. Return `200` with empty body
+
+**→ Note:** Twilio must be configured to POST to `[YOUR_BACKEND_URL]/api/v1/webhooks/twilio/delivery` for every message. Set this in Twilio Console → Phone Numbers → your number → Messaging → Status Callback URL. Ask the user for the production backend URL when configuring this.
+
+---
+
+## Static Pages (Express routes, return HTML)
+
+| Route | Purpose | Auth |
+|-------|---------|------|
+| `GET /privacy` | Privacy policy page | `[NO AUTH]` |
+| `GET /terms` | Terms of service page | `[NO AUTH]` |
+| `GET /join/:token` | Browser join invitation page | `[NO AUTH]` |
+
+---
+
+## Summary Table
+
+| Method | Path | Auth | Rate Limit |
+|--------|------|------|------------|
+| POST | /auth/otp/request | NO AUTH | 5/phone/hr |
+| POST | /auth/otp/verify | NO AUTH | 3/phone/10min |
+| POST | /auth/token/refresh | NO AUTH | 10/device/hr |
+| DELETE | /auth/session | AUTH | — |
+| GET | /users/me | AUTH | — |
+| PATCH | /users/me | AUTH | — |
+| GET | /users/me/data | AUTH | 1/user/24hr |
+| DELETE | /users/me | AUTH | — |
+| GET | /users/me/handles | AUTH | — |
+| POST | /users/me/handles | AUTH | — |
+| PATCH | /users/me/handles/:id | AUTH | — |
+| DELETE | /users/me/handles/:id | AUTH | — |
+| GET | /events | AUTH | — |
+| POST | /events | AUTH | 20/user/hr |
+| GET | /events/:id | AUTH | — |
+| PATCH | /events/:id | AUTH | — |
+| POST | /events/:id/lock | AUTH PAYER | — |
+| POST | /events/:id/reopen | AUTH PAYER | — |
+| GET | /events/:id/participants | AUTH | — |
+| POST | /events/:id/participants | AUTH PAYER | — |
+| DELETE | /events/:id/participants/:pid | AUTH PAYER | — |
+| GET | /join/:token | NO AUTH | — |
+| POST | /join/:token/check | NO AUTH | 10/IP/min |
+| POST | /join/:token/otp/request | NO AUTH | 5/phone/hr |
+| POST | /join/:token/otp/verify | NO AUTH | 3/phone/10min |
+| POST | /events/:id/receipt/scan | AUTH PAYER | 5/event/hr |
+| POST | /events/:id/receipt/confirm | AUTH PAYER | — |
+| POST | /events/:id/split/calculate | AUTH PAYER | — |
+| POST | /events/:id/split/confirm | AUTH PAYER | — |
+| PATCH | /events/:id/split | AUTH PAYER | — |
+| GET | /events/:id/messages/preview | AUTH PAYER | — |
+| POST | /events/:id/messages/send | AUTH PAYER | 3/event/24hr |
+| POST | /events/:id/messages/nudge/:pid | AUTH PAYER | 1/participant/24hr |
+| POST | /events/:id/settlement/:pid/self-report | AUTH PARTICIPANT | — |
+| POST | /events/:id/settlement/:pid/confirm | AUTH PAYER | — |
+| POST | /events/:id/settlement/:pid/dispute | AUTH PAYER | — |
+| POST | /events/:id/settlement/cash/:pid | AUTH PAYER | — |
+| POST | /analytics/events | AUTH or ANON | 200/session/min |
+| POST | /webhooks/twilio/opt-out | TWILIO SIG | — |
+| POST | /webhooks/twilio/delivery | TWILIO SIG | — |
+
+---
+
+*All request/response types must be reflected in `/shared/types/api.types.ts`. If a field is added here, add the corresponding TypeScript type. If the type changes, the API spec is the source of truth.*

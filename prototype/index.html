@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LetsSplyt — Modern Prototype</title>
+<style>
+/* ── RESET ─────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#F7F8FA; --card:#fff;
+  --p:#0A8577; --p-lt:#E6FAF7; --acc:#00C9A7;
+  --t1:#09090B; --t2:#71717A; --t3:#A1A1AA;
+  --ok:#22C55E; --warn:#EAB308; --err:#EF4444;
+  --sh:0 2px 8px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --sh-el:0 8px 32px rgba(0,0,0,.12);
+  --r:20px; --rb:16px; --ri:14px;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',sans-serif;
+  background:#0D1117;display:flex;height:100vh;overflow:hidden;color:var(--t1);}
+
+/* ── SIDEBAR ───────────────────────────────────────── */
+#sidebar{width:260px;background:#161B22;display:flex;flex-direction:column;
+  overflow:hidden;flex-shrink:0;border-right:1px solid rgba(255,255,255,0.06);}
+#sb-header{padding:16px 14px 12px;border-bottom:1px solid rgba(255,255,255,0.07);flex-shrink:0;}
+#sb-logo{display:flex;align-items:center;gap:9px;margin-bottom:3px;}
+#sb-logo .lm{width:28px;height:28px;background:linear-gradient(135deg,#0A8577,#00C9A7);
+  border-radius:8px;display:flex;align-items:center;justify-content:center;
+  font-size:15px;color:#fff;font-weight:800;}
+#sb-logo .lt{font-size:15px;font-weight:700;color:#fff;}
+#sb-sub{font-size:10px;color:#4B5563;letter-spacing:.04em;}
+#actor-tabs{display:flex;padding:8px 10px;gap:4px;flex-shrink:0;border-bottom:1px solid rgba(255,255,255,0.05);}
+.atab{flex:1;padding:5px 2px;border-radius:7px;border:none;font-size:10px;font-weight:600;
+  cursor:pointer;background:rgba(255,255,255,0.05);color:#6B7280;transition:all .15s;font-family:inherit;}
+.atab:hover{background:rgba(255,255,255,0.09);color:#9CA3AF;}
+.atab.active{background:var(--p);color:#fff;}
+#sb-flow-list{flex:1;overflow-y:auto;padding:4px 0 12px;}
+#sb-flow-list::-webkit-scrollbar{width:2px;}
+#sb-flow-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.08);border-radius:2px;}
+.fg-header{padding:10px 14px 4px;font-size:9px;font-weight:700;color:#374151;
+  text-transform:uppercase;letter-spacing:.08em;}
+.si{display:flex;align-items:center;gap:8px;padding:6px 14px;cursor:pointer;
+  transition:background .1s;border-left:2px solid transparent;}
+.si:hover{background:rgba(255,255,255,0.03);}
+.si.active{background:rgba(10,133,119,0.12);border-left-color:var(--p);}
+.si-badge{font-size:9px;font-weight:700;color:var(--p);min-width:24px;font-family:monospace;}
+.si-name{font-size:11px;color:#6B7280;line-height:1.3;}
+.si.active .si-name{color:#5EEAD4;} .si.active .si-badge{color:#14B8A6;}
+
+/* ── MAIN CENTER ───────────────────────────────────── */
+#main-center{flex:1;display:flex;align-items:center;justify-content:center;
+  padding:20px 24px;gap:24px;overflow:hidden;}
+
+/* ── PHONE FRAME ───────────────────────────────────── */
+#phone-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;}
+#phone-device{width:375px;background:#0D0D0D;border-radius:52px;padding:12px;
+  box-shadow:0 0 0 1px rgba(255,255,255,0.07),0 32px 80px rgba(0,0,0,.7),
+  inset 0 0 0 1px rgba(255,255,255,0.03);position:relative;flex-shrink:0;}
+#dynamic-island{width:120px;height:34px;background:#000;border-radius:20px;
+  margin:0 auto 8px;position:relative;z-index:10;}
+#phone-screen-wrap{width:351px;height:724px;background:var(--bg);border-radius:42px;
+  overflow:hidden;position:relative;display:flex;flex-direction:column;}
+#status-bar{height:48px;background:transparent;display:flex;align-items:flex-end;
+  justify-content:space-between;padding:0 24px 8px;flex-shrink:0;position:absolute;
+  top:0;left:0;right:0;z-index:50;pointer-events:none;}
+.sb-time{font-size:15px;font-weight:700;color:#09090B;}
+.sb-time.white{color:#fff;} .sb-icons{display:flex;align-items:center;gap:5px;}
+#screen-body{flex:1;overflow-y:auto;overflow-x:hidden;position:relative;margin-top:0;}
+#screen-body::-webkit-scrollbar{width:0;}
+#home-indicator{height:32px;background:transparent;display:flex;align-items:center;
+  justify-content:center;flex-shrink:0;position:absolute;bottom:0;left:0;right:0;pointer-events:none;}
+#home-indicator div{width:130px;height:5px;background:#000;border-radius:3px;opacity:.12;}
+#phone-controls{display:flex;align-items:center;gap:10px;}
+#back-btn{padding:7px 14px;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.1);
+  color:#6B7280;border-radius:10px;font-size:12px;cursor:pointer;transition:all .15s;font-family:inherit;}
+#back-btn:hover{background:rgba(255,255,255,0.12);color:#fff;}
+#screen-crumb{font-size:10px;color:#374151;font-family:monospace;}
+
+/* ── INFO PANEL ────────────────────────────────────── */
+#info-panel{width:232px;flex-shrink:0;display:flex;flex-direction:column;gap:10px;}
+.ic{background:#161B22;border-radius:14px;padding:14px;border:1px solid rgba(255,255,255,0.05);}
+.ic-title{font-size:9px;font-weight:700;color:#374151;text-transform:uppercase;
+  letter-spacing:.08em;margin-bottom:9px;}
+.action-id-pill{display:inline-block;background:rgba(10,133,119,0.18);color:#14B8A6;
+  font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;margin-bottom:7px;font-family:monospace;}
+.action-name{font-size:13px;font-weight:600;color:#E2E8F0;margin-bottom:5px;line-height:1.4;}
+.action-desc{font-size:11px;color:#4B5563;line-height:1.6;}
+#history-list{display:flex;flex-direction:column;gap:3px;max-height:150px;overflow-y:auto;}
+#history-list::-webkit-scrollbar{width:0;}
+.hi{display:flex;align-items:center;gap:6px;cursor:pointer;padding:3px 5px;
+  border-radius:6px;transition:background .1s;}
+.hi:hover{background:rgba(255,255,255,0.04);}
+.hi-dot{width:5px;height:5px;border-radius:3px;background:#1F2937;flex-shrink:0;}
+.hi.cur .hi-dot{background:var(--p);}
+.hi-label{font-size:10px;color:#4B5563;}
+.hi.cur .hi-label{color:#5EEAD4;font-weight:500;}
+#hint-card{background:rgba(10,133,119,0.07);border:1px solid rgba(10,133,119,0.18);
+  border-radius:12px;padding:11px 13px;}
+#hint-card p{font-size:11px;color:#5EEAD4;line-height:1.5;}
+
+/* ── PHONE SCREEN COMPONENTS ───────────────────────── */
+/* Every screen renders inside #screen-body which has padding-top:0 */
+.scr{min-height:100%;display:flex;flex-direction:column;background:var(--bg);}
+.scr-white{background:#fff;}
+
+/* Nav bar */
+.nav{display:flex;align-items:center;justify-content:space-between;
+  padding:56px 20px 10px;background:var(--bg);flex-shrink:0;}
+.nav-white{background:#fff;}
+.nav-back{display:flex;align-items:center;gap:2px;color:var(--p);font-size:15px;
+  font-weight:500;cursor:pointer;border:none;background:none;font-family:inherit;}
+.nav-title{font-size:17px;font-weight:600;color:var(--t1);position:absolute;left:50%;transform:translateX(-50%);}
+.nav-action{font-size:15px;color:var(--p);font-weight:600;cursor:pointer;border:none;background:none;font-family:inherit;}
+
+/* Hero header */
+.hero{background:linear-gradient(155deg,#064E3B 0%,#0A8577 45%,#00C9A7 100%);
+  padding:56px 22px 28px;color:#fff;flex-shrink:0;position:relative;}
+.hero-sm{background:linear-gradient(155deg,#064E3B,#0A8577);padding:56px 20px 20px;color:#fff;flex-shrink:0;}
+.hero-eyebrow{font-size:11px;font-weight:600;opacity:.65;letter-spacing:.06em;text-transform:uppercase;margin-bottom:5px;}
+.hero-title{font-size:28px;font-weight:800;line-height:1.15;letter-spacing:-.3px;}
+.hero-sub{font-size:14px;opacity:.75;margin-top:6px;}
+.hero-amount{font-size:56px;font-weight:800;line-height:1;letter-spacing:-2px;margin:8px 0 4px;}
+
+/* Content */
+.pad{padding:20px;}
+.pad-t{padding:20px;padding-top:8px;}
+
+/* Buttons */
+.btn{display:flex;align-items:center;justify-content:center;width:100%;height:56px;
+  border-radius:var(--rb);border:none;font-size:16px;font-weight:600;cursor:pointer;
+  font-family:inherit;transition:opacity .15s,transform .1s;letter-spacing:-.1px;}
+.btn:active{opacity:.88;transform:scale(.99);}
+.bp{background:var(--p);color:#fff;}
+.bg{background:transparent;color:var(--t2);font-size:15px;height:46px;}
+.bd{background:#FEF2F2;color:var(--err);}
+.bl{background:var(--p-lt);color:var(--p);}
+.btn-row{display:flex;gap:10px;}
+.btn-row .btn{height:44px;font-size:14px;}
+.bsm{display:inline-flex;align-items:center;justify-content:center;height:38px;
+  padding:0 16px;border-radius:12px;border:none;font-size:13px;font-weight:600;
+  cursor:pointer;font-family:inherit;transition:opacity .15s;}
+.bsmp{background:var(--p);color:#fff;} .bsmo{background:var(--p-lt);color:var(--p);}
+.bsmg{background:#F4F4F5;color:var(--t2);} .bsmr{background:#FEF2F2;color:var(--err);}
+.bsmgr{background:#F0FDF4;color:#16A34A;}
+
+/* Cards */
+.card{background:var(--card);border-radius:var(--r);padding:16px 18px;
+  box-shadow:var(--sh);margin-bottom:12px;}
+.card-g{background:linear-gradient(135deg,#E6FAF7,#CCFBF1);border-radius:var(--r);
+  padding:16px 18px;margin-bottom:12px;}
+.card-w{background:#FFFBEB;border-radius:var(--r);padding:14px 16px;margin-bottom:12px;}
+.card-r{background:#FEF2F2;border-radius:var(--r);padding:14px 16px;margin-bottom:12px;}
+
+/* Option card (big tappable) */
+.opt{background:var(--card);border-radius:var(--r);padding:18px 20px;
+  box-shadow:var(--sh);margin-bottom:10px;cursor:pointer;
+  display:flex;align-items:center;gap:16px;transition:box-shadow .15s;}
+.opt:active{box-shadow:var(--sh-el);}
+.opt-icon{font-size:30px;flex-shrink:0;line-height:1;}
+.opt-title{font-size:16px;font-weight:700;color:var(--t1);}
+.opt-sub{font-size:12px;color:var(--t3);margin-top:2px;}
+.opt-arr{margin-left:auto;font-size:20px;color:var(--t3);}
+
+/* Input */
+.field{width:100%;height:52px;padding:0 16px;background:var(--card);border:none;
+  border-radius:var(--ri);font-size:15px;color:var(--t1);font-family:inherit;
+  box-shadow:var(--sh);outline:none;}
+.field:focus{box-shadow:0 0 0 2px var(--p),var(--sh);}
+.field-label{font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;
+  letter-spacing:.04em;margin-bottom:6px;display:block;}
+.fgrp{margin-bottom:14px;}
+.field-prefix{display:flex;align-items:center;gap:8px;}
+.field-prefix .pre{padding:0 12px;height:52px;background:#F4F4F5;border-radius:var(--ri) 0 0 var(--ri);
+  display:flex;align-items:center;font-size:15px;color:var(--t2);white-space:nowrap;flex-shrink:0;}
+.field-prefix .field{border-radius:0 var(--ri) var(--ri) 0;}
+
+/* Avatars */
+.av{width:44px;height:44px;border-radius:22px;display:flex;align-items:center;justify-content:center;
+  font-size:16px;font-weight:700;flex-shrink:0;}
+.av-sm{width:34px;height:34px;border-radius:17px;font-size:13px;}
+.av-lg{width:60px;height:60px;border-radius:30px;font-size:22px;}
+.av-xl{width:78px;height:78px;border-radius:39px;font-size:28px;}
+.at{background:#CCFBF1;color:#0A8577;} .ab{background:#DBEAFE;color:#2563EB;}
+.ap{background:#EDE9FE;color:#7C3AED;} .ao{background:#FEF3C7;color:#D97706;}
+.ak{background:#FCE7F3;color:#DB2777;} .ag{background:#D1FAE5;color:#059669;}
+.az{background:#F4F4F5;color:#71717A;}
+
+/* Status dots */
+.dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;display:inline-block;}
+.dok{background:var(--ok);} .dw{background:var(--warn);} .dr{background:var(--err);} .dg{background:#D4D4D8;}
+
+/* Pills */
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;
+  padding:4px 10px;border-radius:100px;}
+.pok{background:#DCFCE7;color:#16A34A;} .pw{background:#FEF9C3;color:#CA8A04;}
+.pr{background:#FEE2E2;color:var(--err);} .pg{background:#F4F4F5;color:var(--t2);}
+.pt{background:var(--p-lt);color:var(--p);} .pb{background:#DBEAFE;color:#2563EB;}
+
+/* Section header */
+.sh{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin:20px 0 10px;}
+
+/* Row */
+.row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;font-size:14px;}
+.row-label{color:var(--t2);}
+.row-val{font-weight:600;color:var(--t1);}
+.row-total{font-size:17px;font-weight:800;color:var(--t1);padding-top:10px;
+  border-top:1px solid #F4F4F5;margin-top:4px;}
+
+/* Tab bar */
+.tab-bar{display:flex;background:#fff;box-shadow:0 -1px 0 rgba(0,0,0,.06);
+  padding:6px 0 4px;flex-shrink:0;}
+.ti{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;
+  cursor:pointer;padding:4px 0;font-size:9px;font-weight:600;color:var(--t3);}
+.ti.active{color:var(--p);}
+.ti-icon{font-size:22px;line-height:1;}
+
+/* OTP */
+.otp-row{display:flex;gap:8px;justify-content:center;margin:28px 0;}
+.otp-box{width:46px;height:56px;background:var(--card);border-radius:14px;
+  box-shadow:var(--sh);display:flex;align-items:center;justify-content:center;
+  font-size:26px;font-weight:800;color:var(--t1);}
+.otp-box.on{background:var(--p-lt);color:var(--p);box-shadow:0 0 0 2px var(--p);}
+.otp-box.cur{box-shadow:0 0 0 2px var(--p);}
+
+/* Toggle */
+.toggle{width:44px;height:26px;border-radius:13px;background:#E4E4E7;position:relative;
+  cursor:pointer;flex-shrink:0;transition:background .2s;}
+.toggle.on{background:var(--p);}
+.toggle::after{content:'';width:20px;height:20px;border-radius:10px;background:#fff;
+  box-shadow:0 1px 3px rgba(0,0,0,.2);position:absolute;top:3px;left:3px;transition:left .2s;}
+.toggle.on::after{left:21px;}
+
+/* Inner tabs */
+.tabs{display:flex;background:#F4F4F5;border-radius:12px;padding:3px;gap:2px;margin-bottom:16px;}
+.tab{flex:1;padding:8px;border-radius:10px;border:none;font-size:12px;font-weight:600;
+  cursor:pointer;font-family:inherit;transition:all .15s;color:var(--t3);background:none;}
+.tab.active{background:#fff;color:var(--p);box-shadow:var(--sh);}
+
+/* Split row */
+.srow{display:flex;align-items:center;padding:12px 14px;border-radius:14px;
+  margin-bottom:8px;gap:12px;background:var(--card);box-shadow:var(--sh);}
+.srow-mine{background:var(--p-lt);box-shadow:0 0 0 1.5px var(--p),var(--sh);}
+
+/* Chat bubble */
+.bbl{background:#DCF8C6;border-radius:16px 16px 4px 16px;padding:12px 14px;
+  max-width:87%;font-size:13px;line-height:1.5;color:var(--t1);box-shadow:0 1px 2px rgba(0,0,0,.07);}
+.bbl-in{background:#fff;border-radius:16px 16px 16px 4px;box-shadow:var(--sh);}
+
+/* Misc */
+.divider{height:1px;background:#F4F4F5;margin:14px 0;}
+.fab{width:56px;height:56px;background:var(--p);border-radius:28px;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 16px rgba(10,133,119,.4);cursor:pointer;border:none;font-family:inherit;
+  color:#fff;font-size:28px;position:absolute;bottom:20px;right:18px;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+.fade{animation:fadeUp .18s ease;}
+
+/* Compat aliases for old CSS class names used in screens */
+.screen{min-height:100%;display:flex;flex-direction:column;background:var(--bg);}
+.screen-bg-gray{background:var(--bg);}
+.teal-hero{background:linear-gradient(155deg,#064E3B,#0A8577 45%,#00C9A7 100%);padding:56px 22px 28px;color:#fff;flex-shrink:0;}
+.teal-hero-sm{background:linear-gradient(155deg,#064E3B,#0A8577);padding:56px 20px 20px;color:#fff;flex-shrink:0;}
+.hero-eyebrow{font-size:11px;font-weight:600;opacity:.65;letter-spacing:.06em;text-transform:uppercase;margin-bottom:5px;}
+.hero-title{font-size:28px;font-weight:800;line-height:1.15;letter-spacing:-.3px;}
+.hero-title-sm{font-size:20px;font-weight:700;}
+.hero-sub{font-size:14px;opacity:.75;margin-top:6px;}
+.phone-nav{display:flex;align-items:center;justify-content:space-between;
+  padding:56px 20px 10px;background:var(--bg);flex-shrink:0;position:relative;}
+.phone-nav-back{display:flex;align-items:center;gap:2px;color:var(--p);font-size:15px;
+  font-weight:500;cursor:pointer;border:none;background:none;font-family:inherit;}
+.phone-nav-title{font-size:17px;font-weight:600;color:var(--t1);}
+.avatar{width:44px;height:44px;border-radius:22px;display:flex;align-items:center;justify-content:center;
+  font-size:16px;font-weight:700;flex-shrink:0;}
+.av-teal{background:#CCFBF1;color:#0A8577;} .av-blue{background:#DBEAFE;color:#2563EB;}
+.av-purple{background:#EDE9FE;color:#7C3AED;} .av-orange{background:#FEF3C7;color:#D97706;}
+.av-pink{background:#FCE7F3;color:#DB2777;} .av-green{background:#D1FAE5;color:#059669;}
+.av-gray{background:#F4F4F5;color:#71717A;}
+.av-sm{width:34px!important;height:34px!important;border-radius:17px!important;font-size:13px!important;}
+.av-lg{width:60px!important;height:60px!important;border-radius:30px!important;font-size:22px!important;}
+.btn-primary{background:var(--p);color:#fff;} .btn-ghost{background:transparent;color:var(--t2);font-size:15px;height:46px;}
+.btn-danger{background:#FEF2F2;color:var(--err);}
+.btn-secondary{background:var(--p-lt);color:var(--p);}
+.btn-sm{display:inline-flex;align-items:center;justify-content:center;height:38px;padding:0 16px;
+  border-radius:12px;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}
+.btn-sm-primary{background:var(--p);color:#fff;} .btn-sm-outline{background:var(--p-lt);color:var(--p);}
+.btn-sm-ghost{background:#F4F4F5;color:var(--t2);} .btn-sm-red{background:#FEF2F2;color:var(--err);}
+.btn-sm-green{background:#F0FDF4;color:#16A34A;}
+.otp-box.filled{background:var(--p-lt);color:var(--p);box-shadow:0 0 0 2px var(--p);}
+.tab-bar{display:flex;background:#fff;box-shadow:0 -1px 0 rgba(0,0,0,.06);padding:6px 0 4px;flex-shrink:0;}
+.tab-item{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;
+  padding:4px 0;font-size:9px;font-weight:600;color:var(--t3);}
+.tab-item.active{color:var(--p);}
+.pill-green{background:#DCFCE7;color:#16A34A;} .pill-yellow{background:#FEF9C3;color:#CA8A04;}
+.pill-red{background:#FEE2E2;color:var(--err);} .pill-gray{background:#F4F4F5;color:var(--t2);}
+.pill-teal{background:var(--p-lt);color:var(--p);}
+.inner-tabs{display:flex;background:#F4F4F5;border-radius:12px;padding:3px;gap:2px;margin-bottom:16px;}
+.inner-tab{flex:1;padding:8px;border-radius:10px;border:none;font-size:12px;font-weight:600;
+  cursor:pointer;font-family:inherit;transition:all .15s;color:var(--t3);background:none;}
+.inner-tab.active{background:#fff;color:var(--p);box-shadow:var(--sh);}
+.card-teal{background:linear-gradient(135deg,#E6FAF7,#CCFBF1);border-radius:var(--r);padding:16px 18px;margin-bottom:12px;}
+.card-red{background:#FEF2F2;border-radius:var(--r);padding:16px 18px;margin-bottom:12px;}
+.amount-xl{font-size:56px;font-weight:800;color:var(--t1);text-align:center;letter-spacing:-2px;}
+.amount-lg{font-size:32px;font-weight:800;color:var(--p);}
+.section-title{font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;margin:18px 0 10px;}
+.split-row{display:flex;align-items:center;padding:12px 14px;border-radius:14px;margin-bottom:8px;gap:12px;background:var(--card);box-shadow:var(--sh);}
+.split-row-mine{background:var(--p-lt);box-shadow:0 0 0 1.5px var(--p),var(--sh);}
+.split-name{flex:1;font-size:14px;font-weight:500;} .split-amount{font-size:15px;font-weight:700;color:var(--p);}
+.split-amount-gray{font-size:14px;font-weight:600;color:var(--t2);}
+.wa-bubble{background:#DCF8C6;border-radius:16px 16px 4px 16px;padding:12px 14px;max-width:87%;font-size:13px;line-height:1.5;color:var(--t1);}
+</style>
+</head>
+<body>
+
+<aside id="sidebar">
+  <div id="sb-header">
+    <div id="sb-logo">
+      <div class="lm">✦</div>
+      <div class="lt">LetsSplyt</div>
+    </div>
+    <div id="sb-sub">Interactive Prototype · 61 Actions</div>
+  </div>
+  <div id="actor-tabs">
+    <button class="atab active" onclick="setActor('payer')">Payer</button>
+    <button class="atab" onclick="setActor('participant')">Partic.</button>
+    <button class="atab" onclick="setActor('guest')">Guest</button>
+    <button class="atab" onclick="setActor('system')">System</button>
+  </div>
+  <div id="sb-flow-list"></div>
+</aside>
+
+<div id="main-center">
+  <div id="phone-wrap">
+    <div id="phone-device">
+      <div id="dynamic-island"></div>
+      <div id="phone-screen-wrap">
+        <div id="status-bar">
+          <span class="sb-time" id="sb-time">9:41</span>
+          <div class="sb-icons">
+            <svg width="16" height="12" viewBox="0 0 16 12" fill="#09090B"><rect x="0" y="3" width="3" height="9" rx="1"/><rect x="4.5" y="2" width="3" height="10" rx="1"/><rect x="9" y="0" width="3" height="12" rx="1"/><rect x="13.5" y="1" width="2.5" height="10" rx="1" opacity=".3"/></svg>
+            <svg width="15" height="12" viewBox="0 0 15 12" fill="#09090B"><path d="M7.5 1C11.5 1 14.5 3.5 14.5 7C14.5 10.5 11.5 12 7.5 12C3.5 12 .5 10.5 .5 7C.5 3.5 3.5 1 7.5 1Z" opacity=".15"/><path d="M7.5 3.5C10.5 3.5 12.5 5 12.5 7C12.5 9 10.5 10.5 7.5 10.5C4.5 10.5 2.5 9 2.5 7C2.5 5 4.5 3.5 7.5 3.5Z" opacity=".5"/><circle cx="7.5" cy="7" r="2"/></svg>
+            <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x=".5" y="1" width="21" height="10" rx="2.5" stroke="#09090B" stroke-width="1.2"/><rect x="22" y="3.5" width="2.5" height="5" rx="1.2" fill="#09090B"/><rect x="2" y="2.5" width="17" height="7" rx="1.5" fill="#09090B"/></svg>
+          </div>
+        </div>
+        <div id="screen-body"></div>
+        <div id="home-indicator"><div></div></div>
+      </div>
+    </div>
+    <div id="phone-controls">
+      <button id="back-btn" onclick="goBack()">← Back</button>
+      <span id="screen-crumb"></span>
+    </div>
+  </div>
+
+  <div id="info-panel">
+    <div class="ic">
+      <div class="ic-title">Current Action</div>
+      <div id="action-badge" class="action-id-pill" style="display:none"></div>
+      <div id="action-name" class="action-name">Welcome</div>
+      <div id="action-desc" class="action-desc">Select a screen or tap elements inside the phone to navigate.</div>
+    </div>
+    <div class="ic">
+      <div class="ic-title">Navigation History</div>
+      <div id="history-list"></div>
+    </div>
+    <div id="hint-card">
+      <p>💡 Tap <strong>teal buttons</strong> inside the phone to navigate. Use <strong>← Back</strong> below or the sidebar to jump anywhere.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const SCREENS = {};
+function def(id,meta,fn){ SCREENS[id]={id,...meta,render:fn}; }
+
+const FLOWS = {
+  payer:[
+    {group:'Auth & Profile',screens:[
+      {id:'splash',badge:'',name:'Welcome'},
+      {id:'phone_entry',badge:'P01',name:'Register — Phone'},
+      {id:'otp_verify',badge:'P01',name:'Register — OTP'},
+      {id:'account_created',badge:'P01',name:'Account Created'},
+      {id:'login',badge:'P02',name:'Login'},
+      {id:'biometric',badge:'P03',name:'Biometric Login'},
+      {id:'profile',badge:'P04',name:'Profile & Handles'},
+      {id:'add_handle',badge:'P04',name:'Add Handle'},
+      {id:'handle_added',badge:'P05',name:'Handle Saved'},
+    ]},
+    {group:'Create Event',screens:[
+      {id:'home',badge:'',name:'Home Dashboard'},
+      {id:'create_event',badge:'P07',name:'Create Event'},
+      {id:'qr_display',badge:'P08',name:'QR Fullscreen'},
+      {id:'waiting_room',badge:'P08',name:'Waiting Room'},
+    ]},
+    {group:'Add Participants',screens:[
+      {id:'add_options',badge:'P09',name:'Add Participant'},
+      {id:'add_contact',badge:'P09',name:'From Contacts'},
+      {id:'add_manual',badge:'P10',name:'Type Number'},
+      {id:'add_intl',badge:'P11',name:'International'},
+      {id:'add_cash',badge:'P12',name:'Cash Only'},
+      {id:'group_members',badge:'P13',name:'Group Members'},
+      {id:'reopen_join',badge:'P13a',name:'Reopen Window'},
+      {id:'group_locked',badge:'P14',name:'Group Locked'},
+    ]},
+    {group:'Receipt & Split',screens:[
+      {id:'camera',badge:'P15',name:'Scan Receipt'},
+      {id:'ai_parsing',badge:'S01',name:'AI Parsing…'},
+      {id:'review_items',badge:'P16',name:'Review Items'},
+      {id:'split_mode',badge:'P15a',name:'Split Mode'},
+      {id:'manual_entry',badge:'P17',name:'Manual Total'},
+      {id:'assign_items',badge:'P18',name:'Assign Items'},
+      {id:'nlp_assign',badge:'P19',name:'NLP Assign'},
+      {id:'split_review',badge:'P20',name:'Split Breakdown'},
+      {id:'edit_after_send',badge:'P20a',name:'Edit After Send'},
+    ]},
+    {group:'Send Messages',screens:[
+      {id:'generating',badge:'P21',name:'Generating…'},
+      {id:'preview_sara',badge:'P21a',name:'Preview — Sara'},
+      {id:'preview_rohan',badge:'P21a',name:'Preview — Rohan'},
+      {id:'preview_mark',badge:'P21a',name:'Preview — Mark 🇩🇪'},
+      {id:'share_sheet',badge:'P22',name:'Share Sheet'},
+      {id:'all_sent',badge:'P22',name:'All Sent'},
+      {id:'nudge',badge:'P23',name:'Send Nudge'},
+    ]},
+    {group:'Settlement',screens:[
+      {id:'settlement',badge:'P24',name:'Settlement Dashboard'},
+      {id:'confirm_pay',badge:'P25',name:'Confirm Payment'},
+      {id:'dispute_pay',badge:'P26',name:'Dispute Payment'},
+      {id:'mark_cash',badge:'P27',name:'Mark Cash Paid'},
+      {id:'event_history',badge:'P28',name:'Event History'},
+    ]},
+    {group:'Dashboards',screens:[
+      {id:'owed_to_me',badge:'P29',name:'Owed to Me'},
+      {id:'i_owe',badge:'P30',name:'I Owe'},
+      {id:'delete_account',badge:'P31',name:'Delete Account'},
+    ]},
+  ],
+  participant:[
+    {group:'Join via QR',screens:[
+      {id:'qr_web_join',badge:'R01',name:'QR Join Page'},
+      {id:'reg_form',badge:'R01',name:'Register Form'},
+      {id:'reg_otp',badge:'R02',name:'Verify OTP'},
+      {id:'rejoin',badge:'R03',name:'Welcome Back'},
+      {id:'join_success',badge:'R03',name:'Joined!'},
+    ]},
+    {group:'Receive & Pay',screens:[
+      {id:'rcv_message',badge:'R04',name:'Receive Message'},
+      {id:'rcv_revised',badge:'R05',name:'Revised Message'},
+      {id:'tap_venmo',badge:'R06',name:'Pay via Venmo'},
+      {id:'p_home',badge:'R07',name:'I Owe Dashboard'},
+      {id:'p_event_detail',badge:'R08',name:'Event Detail'},
+      {id:'self_report',badge:'R06',name:'Self-Report'},
+    ]},
+    {group:'Account',screens:[
+      {id:'p_add_handles',badge:'R09',name:'My Handles'},
+      {id:'p_opt_out',badge:'R10',name:'Notifications'},
+    ]},
+  ],
+  guest:[
+    {group:'Receive & Pay',screens:[
+      {id:'g_message',badge:'G01',name:'Guest SMS'},
+      {id:'g_revised',badge:'G02',name:'Revised SMS'},
+      {id:'g_paypal',badge:'G02',name:'PayPal Link'},
+      {id:'g_stop',badge:'G03',name:'STOP Opt-Out'},
+    ]},
+  ],
+  system:[
+    {group:'AI Agents & System',screens:[
+      {id:'s_otp_dispatch',badge:'S01',name:'OTP Dispatch'},
+      {id:'s_qr_token',badge:'S02',name:'QR Token'},
+      {id:'s_a1_receipt',badge:'S03',name:'A1 — Receipt Vision'},
+      {id:'s_a2_split',badge:'S04',name:'A2 — Split Calc'},
+      {id:'s_a3_message',badge:'S05',name:'A3 — Msg Composer'},
+      {id:'s_delivery',badge:'S06',name:'Message Delivery'},
+      {id:'s_state_machine',badge:'S07',name:'Payment State Machine'},
+      {id:'s_nudge',badge:'S08',name:'Nudge Scheduler'},
+      {id:'s_dispute',badge:'S09',name:'Dispute Flagging'},
+      {id:'s_auto_close',badge:'S10',name:'Event Auto-Close'},
+      {id:'s_gdpr_erase',badge:'S11',name:'GDPR Erasure'},
+    ]},
+  ],
+};
+
+const ACTION_META={
+  '':{name:'LetsSplyt',desc:'App launch screen.'},
+  'P01':{name:'Register with phone number',desc:'Enter phone → OTP via SMS/WhatsApp → account created.'},
+  'P02':{name:'Log in (returning user)',desc:'Enter phone → OTP → JWT → biometric registered.'},
+  'P03':{name:'Log in via biometric',desc:'Face ID / fingerprint. No OTP re-entry needed.'},
+  'P04':{name:'Add payment handles',desc:'Venmo, PayPal, Cash App, Zelle. AES-256 encrypted at rest.'},
+  'P05':{name:'Edit / remove a handle',desc:'Update or delete an existing payment handle.'},
+  'P07':{name:'Create a new event',desc:'Name + date → QR join link with 24h TTL generated.'},
+  'P08':{name:'Display QR code',desc:'Fullscreen QR. Waiting room updates live via WebSocket.'},
+  'P09':{name:'Add from contacts',desc:'Native contact picker. No OTP needed — payer vouches.'},
+  'P10':{name:'Add by typing number',desc:'Country code + number. Validated via libphonenumber.'},
+  'P11':{name:'Add international participant',desc:'+49 etc. Auto-filters payment to PayPal+Wise only.'},
+  'P12':{name:'Add cash-only participant',desc:'Name only. No message sent. Manual settlement by payer.'},
+  'P13':{name:'Remove from waiting room',desc:'Before lock — remove wrong person or duplicate.'},
+  'P13a':{name:'Reopen join window',desc:'After locking — 1hr fresh token for a latecomer.'},
+  'P14':{name:'Lock group & start split',desc:'Expires QR token. Proceeds to receipt/split screen.'},
+  'P15':{name:'Photograph receipt',desc:'Camera → A1 parses items, prices, tax, tip.'},
+  'P15a':{name:'Choose split mode',desc:'Even / Itemised / Custom amounts.'},
+  'P16':{name:'Review parsed items',desc:'Edit misread items before splitting.'},
+  'P17':{name:'Enter total manually',desc:'Skip camera — type event total directly.'},
+  'P18':{name:'Assign items (drag)',desc:'Drag line items to participant avatars.'},
+  'P19':{name:'Assign via NLP',desc:'"Rohan had the pasta" → A2 maps to items.'},
+  'P20':{name:'Review split breakdown',desc:'Per-person totals with proportional tax & tip.'},
+  'P20a':{name:'Edit after sending',desc:'Correct error post-send. Only affected participants re-notified.'},
+  'P21':{name:'Generate messages',desc:'A3 creates split image + country-filtered payment links.'},
+  'P21a':{name:'Preview message',desc:'See exactly what each participant will receive.'},
+  'P22':{name:'Send via share sheet',desc:'Native iOS/Android share sheet. One tap per person.'},
+  'P23':{name:'Send nudge',desc:'Re-opens share sheet with same message. Nudge logged.'},
+  'P24':{name:'Settlement dashboard',desc:'Live status: pending / self-reported / confirmed / settled.'},
+  'P25':{name:'Confirm payment',desc:'Two-party model: participant says paid → payer confirms.'},
+  'P26':{name:'Dispute payment',desc:'Resets to pending. Participant notified.'},
+  'P27':{name:'Mark cash paid',desc:'Manual confirmation for cash or external transfers.'},
+  'P28':{name:'Event history',desc:'Past events with totals and settlement logs.'},
+  'P29':{name:'Owed to me',desc:'Outstanding across all events where payer is creator.'},
+  'P30':{name:'I owe',desc:'Events where payer is a participant owing others.'},
+  'P31':{name:'Delete account',desc:'GDPR right to erasure. Removes user, anonymises history.'},
+  'R01':{name:'Scan QR code',desc:'Camera → QR → browser opens join page.'},
+  'R02':{name:'Self-register via QR',desc:'Name + phone + OTP → account created + added to group.'},
+  'R03':{name:'Rejoin via QR',desc:'Phone lookup → existing account → OTP → linked.'},
+  'R04':{name:'Receive split message',desc:'Split image + payment deep links + soft app nudge.'},
+  'R05':{name:'Receive revised message',desc:'"Your revised share is $X (was $Y)" — only if amount changed.'},
+  'R06':{name:'Tap payment deep link',desc:'Venmo/PayPal opens with handle + amount pre-filled.'},
+  'R07':{name:'I owe dashboard',desc:'All events with outstanding amounts.'},
+  'R08':{name:'Event detail',desc:'Full split breakdown — their items, group status.'},
+  'R09':{name:'Add payment handles',desc:'Set up handles for when they become a payer.'},
+  'R10':{name:'Opt out / delete',desc:'Reply STOP or delete in app. Legally required.'},
+  'G01':{name:'Receive split message (guest)',desc:'SMS — split image + payment links + opt-out line.'},
+  'G02':{name:'Tap payment link (guest)',desc:'PayPal / Wise. Country-filtered.'},
+  'G03':{name:'Opt out (STOP)',desc:'Reply STOP → opted-out in DB → no further messages.'},
+  'S01':{name:'A1 — Parse receipt',desc:'Claude Haiku 4.5 vision. ~$0.002/receipt. 97% accuracy.'},
+  'S02':{name:'A2 — Calculate split',desc:'Assigns items, prorates tax & tip, enforces sum invariant.'},
+  'S03':{name:'A3 — Compose messages',desc:'Split image + country-filtered deep links + conditional nudge.'},
+  'S04':{name:'Auto-route delivery',desc:'US → SMS first. Non-US → WhatsApp first, SMS fallback.'},
+  'S05':{name:'Filter payment options',desc:'US → all. Non-US → PayPal + Wise + Cash only.'},
+  'S06':{name:'Expire QR token',desc:'On lock OR 24h TTL. Payer can reopen 1h manually.'},
+  'S07':{name:'Push — self-report',desc:'"[Name] says they paid $X. Confirm?" push to payer.'},
+  'S08':{name:'Push — nudge reminder',desc:'T+48h: "N people haven\'t paid. Send a reminder?"'},
+  'S09':{name:'Detect existing user',desc:'Phone lookup → skip registration, link account, OTP.'},
+  'S10':{name:'Compute split diff',desc:'Which participants changed on edit. Only they get revised msg.'},
+  'S11':{name:'Push — revision',desc:'Push to registered participants whose amount changed.'},
+};
+
+let currentActor='payer';
+let navHistory=['splash'];
+
+function nav(id){
+  if(!SCREENS[id]){console.warn('Missing screen:',id);return;}
+  navHistory.push(id);
+  renderScreen(id);updateSidebar(id);updateInfo(id);updateHistory();
+}
+function goBack(){
+  if(navHistory.length<=1)return;
+  navHistory.pop();
+  const prev=navHistory[navHistory.length-1];
+  renderScreen(prev);updateSidebar(prev);updateInfo(prev);updateHistory();
+}
+function setActor(a){
+  currentActor=a;
+  document.querySelectorAll('.atab').forEach((t,i)=>{
+    t.classList.toggle('active',['payer','participant','guest','system'][i]===a);
+  });
+  renderSidebar();
+  const f=FLOWS[a][0];if(f&&f.screens[0])nav(f.screens[0].id);
+}
+function renderScreen(id){
+  const s=SCREENS[id];if(!s)return;
+  const body=document.getElementById('screen-body');
+  body.style.opacity='0';
+  setTimeout(()=>{
+    body.innerHTML=s.render();
+    body.style.opacity='1';body.style.transition='opacity .15s ease';body.scrollTop=0;
+    // status bar color based on content
+    const isDark=body.querySelector('.hero,.teal-hero,.teal-hero-sm');
+    const t=document.getElementById('sb-time');
+    t.style.color=isDark?'#fff':'#09090B';
+  },80);
+  document.getElementById('screen-crumb').textContent=id;
+}
+function updateInfo(id){
+  const s=SCREENS[id];if(!s)return;
+  const badge=s.actionId||'';
+  const meta=ACTION_META[badge]||ACTION_META[''];
+  const el=document.getElementById('action-badge');
+  if(badge){el.style.display='inline-block';el.textContent=badge;}
+  else{el.style.display='none';}
+  document.getElementById('action-name').textContent=s.actionName||meta.name||s.name;
+  document.getElementById('action-desc').textContent=s.actionDesc||meta.desc||'';
+}
+function updateHistory(){
+  const cur=navHistory[navHistory.length-1];
+  const items=navHistory.slice(-6).reverse();
+  document.getElementById('history-list').innerHTML=items.map((id,i)=>{
+    const s=SCREENS[id];
+    return`<div class="hi ${i===0?'cur':''}" onclick="nav('${id}')">
+      <div class="hi-dot"></div><span class="hi-label">${s?s.name:id}</span></div>`;
+  }).join('');
+}
+function updateSidebar(aid){
+  document.querySelectorAll('.si').forEach(el=>el.classList.toggle('active',el.dataset.id===aid));
+}
+function renderSidebar(){
+  const flows=FLOWS[currentActor]||[];
+  document.getElementById('sb-flow-list').innerHTML=flows.map(f=>`
+    <div><div class="fg-header">${f.group}</div>
+    ${f.screens.map(s=>`<div class="si" data-id="${s.id}" onclick="nav('${s.id}')">
+      <span class="si-badge">${s.badge}</span><span class="si-name">${s.name}</span></div>`).join('')}
+    </div>`).join('');
+}
+function init(){renderSidebar();renderScreen('splash');updateInfo('splash');updateHistory();}
+</script>
+
+<!-- SCREENS LOADED BELOW — ONE WORKFLOW AT A TIME -->
+<script>
+// Placeholder splash — will be replaced in R1
+def('splash',{name:'Splash',actionId:'',actionName:'LetsSplyt'},()=>`
+<div style="background:linear-gradient(155deg,#064E3B,#0A8577 45%,#00C9A7 100%);
+  min-height:100%;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:48px 28px;text-align:center;">
+  <div style="font-size:64px;margin-bottom:20px;">✦</div>
+  <div style="font-size:36px;font-weight:800;color:#fff;letter-spacing:-.5px;margin-bottom:8px;">LetsSplyt</div>
+  <div style="font-size:16px;color:rgba(255,255,255,.7);margin-bottom:64px;">Split bills. Not friendships.</div>
+  <div style="width:100%;display:flex;flex-direction:column;gap:12px;">
+    <button class="btn bp" onclick="nav('phone_entry')">Get started</button>
+    <button class="btn bg" style="color:rgba(255,255,255,.7);" onclick="nav('login')">I have an account</button>
+  </div>
+</div>`);
+init();
+</script>
+</body>
+</html>
+
+<script>
+// ── R1: AUTH SCREENS ────────────────────────────────────────────────────────
+
+// Redefine splash with full modern design
+def('splash',{name:'Splash',actionId:'',actionName:'LetsSplyt'},()=>`
+<div style="background:linear-gradient(155deg,#064E3B 0%,#0A8577 45%,#00C9A7 100%);
+  min-height:100%;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:0 28px 40px;text-align:center;">
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+    <div style="width:88px;height:88px;background:rgba(255,255,255,.15);border-radius:28px;
+      display:flex;align-items:center;justify-content:center;font-size:44px;
+      backdrop-filter:blur(8px);margin-bottom:24px;box-shadow:0 8px 32px rgba(0,0,0,.2);">✦</div>
+    <div style="font-size:40px;font-weight:800;color:#fff;letter-spacing:-.5px;line-height:1;">LetsSplyt</div>
+    <div style="font-size:16px;color:rgba(255,255,255,.65);margin-top:10px;font-weight:400;">Split bills. Not friendships.</div>
+  </div>
+  <div style="width:100%;display:flex;flex-direction:column;gap:12px;padding-bottom:8px;">
+    <button class="btn" style="background:#fff;color:#0A8577;font-weight:700;"
+      onclick="nav('phone_entry')">Get started</button>
+    <button class="btn bg" style="color:rgba(255,255,255,.65);"
+      onclick="nav('login')">I already have an account</button>
+  </div>
+</div>`);
+
+def('phone_entry',{name:'Register — Phone',actionId:'P01',actionName:'Register with phone number'},()=>`
+<div class="scr">
+  <div class="teal-hero">
+    <div class="hero-eyebrow">New here?</div>
+    <div class="hero-title">Your phone number</div>
+  </div>
+  <div class="pad" style="flex:1;display:flex;flex-direction:column;padding-top:24px;">
+    <div class="fgrp">
+      <div class="field-prefix">
+        <div class="pre">🇺🇸 +1</div>
+        <input class="field" type="tel" placeholder="(555) 000-0000" value="(555) 123-4567">
+      </div>
+    </div>
+    <div style="flex:1;"></div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button class="btn bp" onclick="nav('otp_verify')">Continue →</button>
+      <button class="btn bg" onclick="nav('login')">Sign in instead</button>
+    </div>
+    <div style="text-align:center;margin-top:14px;font-size:11px;color:var(--t3);line-height:1.6;">
+      By continuing you agree to our <span style="color:var(--p);">Terms</span> &amp; <span style="color:var(--p);">Privacy Policy</span>
+    </div>
+  </div>
+</div>`);
+
+def('otp_verify',{name:'Register — OTP',actionId:'P01',actionName:'Enter OTP verification code'},()=>`
+<div class="scr">
+  <div class="phone-nav">
+    <button class="phone-nav-back" onclick="nav('phone_entry')">‹ Back</button>
+    <div style="width:44px;"></div>
+  </div>
+  <div class="pad" style="flex:1;display:flex;flex-direction:column;padding-top:16px;text-align:center;">
+    <div style="font-size:48px;margin-bottom:16px;">📱</div>
+    <div style="font-size:22px;font-weight:800;color:var(--t1);margin-bottom:6px;">Check your messages</div>
+    <div style="font-size:14px;color:var(--t2);margin-bottom:4px;">Code sent to</div>
+    <div style="font-size:16px;font-weight:700;color:var(--t1);margin-bottom:4px;">(555) 123-4567</div>
+    <div class="otp-row">
+      <div class="otp-box on">3</div>
+      <div class="otp-box on">7</div>
+      <div class="otp-box on">2</div>
+      <div class="otp-box cur"></div>
+      <div class="otp-box"></div>
+      <div class="otp-box"></div>
+    </div>
+    <button class="btn bp" onclick="nav('account_created')">Verify</button>
+    <div style="margin-top:20px;font-size:13px;color:var(--t3);">
+      Didn't get it? <span style="color:var(--p);font-weight:600;cursor:pointer;">Resend</span>
+    </div>
+  </div>
+</div>`);
+
+def('account_created',{name:'Account Created',actionId:'P01',actionName:'Registration complete'},()=>`
+<div class="scr" style="align-items:center;justify-content:center;text-align:center;padding:0 28px;">
+  <div style="width:80px;height:80px;background:linear-gradient(135deg,#0A8577,#00C9A7);
+    border-radius:40px;display:flex;align-items:center;justify-content:center;
+    font-size:38px;margin-bottom:20px;box-shadow:0 8px 28px rgba(10,133,119,.3);">✓</div>
+  <div style="font-size:28px;font-weight:800;color:var(--t1);margin-bottom:6px;">You're in!</div>
+  <div style="font-size:15px;color:var(--t2);margin-bottom:36px;">Alex Chen · (555) 123-4567</div>
+  <div style="width:100%;display:flex;flex-direction:column;gap:10px;">
+    <button class="btn bp" onclick="nav('profile')">Set up payment handles</button>
+    <button class="btn bg" onclick="nav('home')">Skip for now</button>
+  </div>
+</div>`);
+
+def('login',{name:'Login',actionId:'P02',actionName:'Log in (returning user)'},()=>`
+<div class="scr">
+  <div class="teal-hero">
+    <div class="hero-eyebrow">Welcome back</div>
+    <div class="hero-title">Sign in</div>
+  </div>
+  <div class="pad" style="flex:1;display:flex;flex-direction:column;padding-top:24px;">
+    <div class="fgrp">
+      <div class="field-prefix">
+        <div class="pre">🇺🇸 +1</div>
+        <input class="field" type="tel" placeholder="(555) 000-0000" value="(555) 123-4567">
+      </div>
+    </div>
+    <div class="card" style="display:flex;align-items:center;gap:14px;cursor:pointer;margin-top:4px;"
+      onclick="nav('biometric')">
+      <div style="font-size:28px;">🔐</div>
+      <div style="flex:1;">
+        <div style="font-size:15px;font-weight:600;color:var(--t1);">Use Face ID</div>
+        <div style="font-size:12px;color:var(--t3);">Faster sign-in</div>
+      </div>
+      <div style="font-size:20px;color:var(--t3);">›</div>
+    </div>
+    <div style="flex:1;"></div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <button class="btn bp" onclick="nav('otp_verify')">Continue →</button>
+      <button class="btn bg" onclick="nav('phone_entry')">Create account</button>
+    </div>
+  </div>
+</div>`);
+
+def('biometric',{name:'Biometric Login',actionId:'P03',actionName:'Log in via biometric'},()=>`
+<div style="background:linear-gradient(155deg,#064E3B,#0A8577);min-height:100%;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:40px 28px;text-align:center;">
+  <div style="font-size:15px;font-weight:600;color:rgba(255,255,255,.6);margin-bottom:8px;letter-spacing:.04em;">SPLITEASY</div>
+  <div style="font-size:26px;font-weight:800;color:#fff;margin-bottom:4px;">Good evening, Alex 👋</div>
+  <div style="font-size:14px;color:rgba(255,255,255,.6);margin-bottom:52px;">Tap to unlock</div>
+  <div style="width:120px;height:120px;background:rgba(255,255,255,.1);border-radius:60px;
+    display:flex;align-items:center;justify-content:center;font-size:56px;
+    box-shadow:0 0 0 2px rgba(255,255,255,.2);cursor:pointer;margin-bottom:56px;"
+    onclick="nav('home')">👤</div>
+  <button class="btn" style="background:#fff;color:#0A8577;font-weight:700;width:100%;"
+    onclick="nav('home')">✓ Authenticated</button>
+  <button class="btn bg" style="color:rgba(255,255,255,.5);" onclick="nav('otp_verify')">Use code instead</button>
+</div>`);
+</script>

@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LetsSplyt — Prototype Simulator</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#0D0C18;color:#fff;height:100vh;overflow:hidden;display:flex;flex-direction:column;}
+
+  /* ── LANDING ── */
+  #landing{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;gap:44px;padding:40px;}
+  .land-logo{display:flex;align-items:center;gap:12px;}
+  .land-logo svg{width:48px;height:48px;}
+  .land-logo-text{font-size:30px;font-weight:800;background:linear-gradient(135deg,#A5B4FC,#C4B5FD);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+  .land-sub{font-size:12px;color:rgba(255,255,255,.35);letter-spacing:1.5px;text-transform:uppercase;text-align:center;margin-top:6px;}
+  .persona-row{display:flex;gap:18px;flex-wrap:wrap;justify-content:center;}
+  .persona-card{width:210px;background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.08);border-radius:22px;padding:28px 20px 24px;cursor:pointer;transition:all .2s;text-align:center;position:relative;overflow:hidden;}
+  .persona-card::before{content:'';position:absolute;inset:0;border-radius:22px;opacity:0;transition:opacity .2s;}
+  .persona-card:hover{transform:translateY(-4px);}
+  .persona-card:hover::before{opacity:1;}
+  .persona-card.creator::before{background:radial-gradient(circle at 50% 0%,rgba(99,102,241,.2),transparent 70%);}
+  .persona-card.member::before{background:radial-gradient(circle at 50% 0%,rgba(16,185,129,.15),transparent 70%);}
+  .persona-card.guest::before{background:radial-gradient(circle at 50% 0%,rgba(245,158,11,.12),transparent 70%);}
+  .persona-card.creator{border-color:rgba(99,102,241,.35);}
+  .persona-card.member{border-color:rgba(16,185,129,.25);}
+  .persona-card.guest{border-color:rgba(245,158,11,.22);}
+  .persona-card.coming-soon{opacity:.45;cursor:default;}
+  .persona-card.coming-soon:hover{transform:none;}
+  .p-steps{position:absolute;top:12px;right:14px;font-size:10px;color:rgba(255,255,255,.28);font-weight:700;letter-spacing:.5px;}
+  .p-emoji{font-size:42px;margin-bottom:14px;display:block;}
+  .p-name{font-size:17px;font-weight:800;margin-bottom:6px;}
+  .p-desc{font-size:12px;color:rgba(255,255,255,.4);line-height:1.6;}
+  .p-badge{display:inline-block;margin-top:12px;font-size:10px;font-weight:700;padding:3px 10px;border-radius:8px;letter-spacing:.5px;}
+  .p-badge.creator{background:rgba(99,102,241,.2);color:#A5B4FC;}
+  .p-badge.member{background:rgba(16,185,129,.15);color:#6EE7B7;}
+  .p-badge.guest{background:rgba(245,158,11,.15);color:#FCD34D;}
+  .p-badge.soon{background:rgba(255,255,255,.07);color:rgba(255,255,255,.3);}
+
+  /* ── SIMULATOR SHELL ── */
+  #sim{display:none;flex-direction:column;height:100vh;}
+
+  /* Top bar */
+  #topbar{display:flex;align-items:center;gap:14px;padding:10px 18px;background:rgba(255,255,255,.025);border-bottom:1px solid rgba(255,255,255,.06);flex-shrink:0;}
+  #back-btn{background:none;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.5);padding:5px 12px;border-radius:16px;cursor:pointer;font-size:11px;font-weight:600;transition:all .2s;white-space:nowrap;}
+  #back-btn:hover{border-color:rgba(255,255,255,.35);color:#fff;}
+  .tb-persona{display:flex;align-items:center;gap:8px;}
+  .tb-emoji{font-size:18px;}
+  .tb-name{font-size:13px;font-weight:700;}
+  .tb-desc{font-size:10px;color:rgba(255,255,255,.35);}
+  .tb-right{margin-left:auto;display:flex;align-items:center;gap:14px;}
+  #step-counter{font-size:11px;color:rgba(255,255,255,.35);font-variant-numeric:tabular-nums;white-space:nowrap;}
+  #progress-wrap{width:100px;height:3px;background:rgba(255,255,255,.08);border-radius:2px;overflow:hidden;}
+  #progress-fill{height:100%;background:linear-gradient(90deg,#6366F1,#A78BFA);border-radius:2px;transition:width .35s ease;}
+  /* Phase chip */
+  #phase-chip{font-size:10px;font-weight:700;padding:3px 10px;border-radius:10px;background:rgba(99,102,241,.18);color:#A5B4FC;letter-spacing:.5px;white-space:nowrap;}
+
+  /* Main layout */
+  #main{display:flex;flex:1;overflow:hidden;}
+
+  /* Sidebar */
+  #step-panel{width:210px;flex-shrink:0;background:rgba(255,255,255,.015);border-right:1px solid rgba(255,255,255,.05);overflow-y:auto;padding:10px 0 20px;}
+  #step-panel::-webkit-scrollbar{width:3px;}
+  #step-panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:2px;}
+  .sg-label{font-size:9px;font-weight:700;color:rgba(255,255,255,.22);text-transform:uppercase;letter-spacing:1.2px;padding:14px 14px 5px;}
+  .sg-label:first-child{padding-top:8px;}
+  .si{display:flex;align-items:flex-start;gap:9px;padding:7px 14px;cursor:pointer;transition:background .12s;position:relative;}
+  .si:hover{background:rgba(255,255,255,.035);}
+  .si.active{background:rgba(99,102,241,.1);}
+  .si-connector{position:absolute;left:22px;top:26px;width:1px;height:calc(100% - 10px);background:rgba(255,255,255,.06);}
+  .si-dot{width:18px;height:18px;border-radius:50%;border:1.5px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:2px;font-size:8px;color:rgba(255,255,255,.25);transition:all .2s;}
+  .si.done .si-dot{background:var(--p-color,#4F46E5);border-color:var(--p-color,#4F46E5);color:#fff;font-size:9px;}
+  .si.active .si-dot{background:transparent;border-color:var(--p-accent,#818CF8);color:var(--p-accent,#818CF8);}
+  .si-info{flex:1;min-width:0;}
+  .si-label{font-size:11.5px;font-weight:500;color:rgba(255,255,255,.45);line-height:1.35;}
+  .si.active .si-label{color:#fff;font-weight:700;}
+  .si.done .si-label{color:rgba(255,255,255,.3);}
+  .si-badge{font-size:9px;color:rgba(255,255,255,.2);margin-top:2px;font-weight:600;}
+  .si.active .si-badge{color:var(--p-accent,#818CF8);}
+
+  /* Phone frame */
+  #phone-area{flex:1;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;background:radial-gradient(ellipse at center,rgba(99,102,241,.04) 0%,transparent 70%);}
+  #phone-wrap{position:relative;}
+  #phone-frame{width:375px;height:720px;border-radius:46px;border:10px solid #181726;background:#000;overflow:hidden;box-shadow:0 40px 100px rgba(0,0,0,.75),0 0 0 1px rgba(255,255,255,.04),inset 0 0 0 1px rgba(255,255,255,.02);position:relative;}
+  #phone-frame iframe{width:100%;height:100%;border:none;display:block;}
+  .phone-notch{position:absolute;top:0;left:50%;transform:translateX(-50%);width:110px;height:26px;background:#181726;border-radius:0 0 16px 16px;z-index:10;}
+  #loading-overlay{position:absolute;inset:0;background:rgba(13,12,24,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:20;border-radius:36px;opacity:0;pointer-events:none;transition:opacity .25s;}
+  #loading-overlay.show{opacity:1;pointer-events:all;}
+  .loading-spinner{width:28px;height:28px;border:2px solid rgba(99,102,241,.2);border-top-color:#6366F1;border-radius:50%;animation:spin .65s linear infinite;}
+  .loading-text{font-size:11px;color:rgba(255,255,255,.3);}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* Annotation panel */
+  #annotation{width:250px;flex-shrink:0;padding:20px 18px;overflow-y:auto;background:rgba(255,255,255,.015);border-left:1px solid rgba(255,255,255,.05);}
+  #annotation::-webkit-scrollbar{width:3px;}
+  #annotation::-webkit-scrollbar-thumb{background:rgba(255,255,255,.08);border-radius:2px;}
+  .ann-phase{font-size:9px;font-weight:700;color:#6366F1;text-transform:uppercase;letter-spacing:1.2px;margin-bottom:5px;}
+  .ann-step{font-size:10px;color:rgba(255,255,255,.28);margin-bottom:10px;}
+  .ann-title{font-size:15px;font-weight:800;margin-bottom:10px;line-height:1.4;color:#fff;}
+  .ann-body{font-size:12px;color:rgba(255,255,255,.5);line-height:1.75;margin-bottom:14px;}
+  .ann-tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:16px;}
+  .ann-tag{font-size:10px;padding:3px 8px;border-radius:8px;font-weight:700;}
+  .ann-tag.ai{background:rgba(99,102,241,.15);color:#A5B4FC;}
+  .ann-tag.ux{background:rgba(16,185,129,.12);color:#6EE7B7;}
+  .ann-tag.flow{background:rgba(245,158,11,.12);color:#FCD34D;}
+  .ann-tag.gate{background:rgba(239,68,68,.12);color:#FCA5A5;}
+  .ann-tag.new{background:rgba(168,85,247,.15);color:#D8B4FE;}
+  .ann-divider{height:1px;background:rgba(255,255,255,.06);margin:14px 0;}
+  .ann-hint{font-size:11px;color:rgba(255,255,255,.22);font-style:italic;line-height:1.6;}
+  .ann-prd{font-size:10px;font-weight:700;color:rgba(99,102,241,.6);margin-top:14px;letter-spacing:.5px;}
+
+  /* Bottom nav */
+  #bottom-nav{display:flex;align-items:center;justify-content:center;gap:14px;padding:12px 24px;background:rgba(255,255,255,.02);border-top:1px solid rgba(255,255,255,.05);flex-shrink:0;}
+  .nav-btn{padding:9px 24px;border-radius:20px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);color:rgba(255,255,255,.65);font-size:13px;font-weight:600;cursor:pointer;transition:all .18s;}
+  .nav-btn:hover:not(:disabled){background:rgba(255,255,255,.08);color:#fff;border-color:rgba(255,255,255,.25);}
+  .nav-btn:disabled{opacity:.25;cursor:not-allowed;}
+  .nav-btn.primary{background:linear-gradient(135deg,#4F46E5,#7C3AED);border-color:transparent;color:#fff;box-shadow:0 4px 14px rgba(79,70,229,.35);}
+  .nav-btn.primary:hover:not(:disabled){box-shadow:0 6px 20px rgba(79,70,229,.5);}
+  #step-center{font-size:11px;color:rgba(255,255,255,.28);width:200px;text-align:center;line-height:1.5;}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════
+     LANDING
+══════════════════════════════════ -->
+<div id="landing">
+  <div style="text-align:center;">
+    <div class="land-logo" style="justify-content:center;">
+      <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect width="48" height="48" rx="14" fill="url(#lg)"/>
+        <path d="M16 24h16M24 16l8 8-8 8" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+        <defs><linearGradient id="lg" x1="0" y1="0" x2="48" y2="48"><stop stop-color="#6366F1"/><stop offset="1" stop-color="#7C3AED"/></linearGradient></defs>
+      </svg>
+      <span class="land-logo-text">LetsSplyt</span>
+    </div>
+    <div class="land-sub">Interactive Prototype Simulator</div>
+  </div>
+
+  <div>
+    <div style="text-align:center;margin-bottom:28px;">
+      <div style="font-size:18px;font-weight:700;margin-bottom:6px;">Choose a persona journey</div>
+      <div style="font-size:13px;color:rgba(255,255,255,.35);">Each path walks through a different user's end-to-end experience</div>
+    </div>
+    <div class="persona-row">
+
+      <div class="persona-card creator" onclick="startJourney('creator')">
+        <div class="p-steps">30 STEPS</div>
+        <span class="p-emoji">👤</span>
+        <div class="p-name">Creator</div>
+        <div class="p-desc">Registers, creates an event, scans the receipt, splits the bill, sends payment requests, and confirms settlement.</div>
+        <div class="p-badge creator">FULL JOURNEY</div>
+      </div>
+
+      <div class="persona-card member" onclick="startJourney('member')">
+        <div class="p-steps">10 STEPS</div>
+        <span class="p-emoji">📱</span>
+        <div class="p-name">App Member</div>
+        <div class="p-desc">Joins via push notification, views their share, pays or self-reports, and watches their balance clear.</div>
+        <div class="p-badge member">FULL JOURNEY</div>
+      </div>
+
+      <div class="persona-card guest" onclick="startJourney('guest')">
+        <div class="p-steps">8 STEPS</div>
+        <span class="p-emoji">🌐</span>
+        <div class="p-name">Guest</div>
+        <div class="p-desc">Opens a browser link, registers with phone only, verifies OTP inline, and pays via pre-filled Venmo — no app install needed.</div>
+        <div class="p-badge guest">FULL JOURNEY</div>
+      </div>
+
+    </div>
+  </div>
+
+  <div style="font-size:11px;color:rgba(255,255,255,.18);text-align:center;line-height:1.8;">
+    Use ← → arrow keys or Prev / Next buttons to move between steps<br>
+    Click any step in the sidebar to jump directly
+  </div>
+</div>
+
+<!-- ══════════════════════════════════
+     SIMULATOR
+══════════════════════════════════ -->
+<div id="sim">
+  <div id="topbar">
+    <button id="back-btn" onclick="goLanding()">← Personas</button>
+    <div class="tb-persona">
+      <span class="tb-emoji" id="tb-emoji"></span>
+      <div>
+        <div class="tb-name" id="tb-name"></div>
+        <div class="tb-desc" id="tb-desc"></div>
+      </div>
+    </div>
+    <div id="phase-chip"></div>
+    <div class="tb-right">
+      <span id="step-counter"></span>
+      <div id="progress-wrap"><div id="progress-fill"></div></div>
+    </div>
+  </div>
+
+  <div id="main">
+    <div id="step-panel"></div>
+
+    <div id="phone-area">
+      <div id="phone-wrap">
+        <div class="phone-notch"></div>
+        <div id="phone-frame">
+          <div id="loading-overlay" class="show">
+            <div class="loading-spinner"></div>
+            <div class="loading-text">Loading screen…</div>
+          </div>
+          <iframe id="proto-iframe" src="about:blank" allow="*"></iframe>
+        </div>
+      </div>
+    </div>
+
+    <div id="annotation">
+      <div class="ann-phase" id="ann-phase"></div>
+      <div class="ann-step" id="ann-step"></div>
+      <div class="ann-title" id="ann-title"></div>
+      <div class="ann-body" id="ann-body"></div>
+      <div class="ann-tags" id="ann-tags"></div>
+      <div class="ann-divider"></div>
+      <div class="ann-hint" id="ann-hint"></div>
+      <div class="ann-prd" id="ann-prd"></div>
+    </div>
+  </div>
+
+  <div id="bottom-nav">
+    <button class="nav-btn" id="prev-btn" onclick="goStep(cur-1)">← Prev</button>
+    <div id="step-center"></div>
+    <button class="nav-btn primary" id="next-btn" onclick="goStep(cur+1)">Next →</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+//  CREATOR JOURNEY
+// ══════════════════════════════════════════════════════════
+const CREATOR = [
+
+  // ── ONBOARDING ──────────────────────────────────────────
+  { group:'Onboarding', badge:'P01',
+    label:'Enter phone number', file:'dusk-auth.html', nav:'phone_entry',
+    ann:{ phase:'Phase 1 · Auth & Profile',
+      title:'Register with phone number',
+      body:'Phone is the only identity primitive. No email, no username — just a mobile number. The E.164 format ensures global compatibility from day one.',
+      tags:['flow'], prd:'P01', hint:'Country code auto-detected from locale. Creator can tap the flag to override.' }},
+
+  { group:'Onboarding', badge:'P01',
+    label:'Verify OTP', file:'dusk-auth.html', nav:'otp_reg',
+    ann:{ phase:'Phase 1 · Auth & Profile',
+      title:'6-digit OTP verification',
+      body:'Code arrives via SMS within ~3 seconds. Auto-fill works on iOS and Android. Verifies the number is real and accessible to this device.',
+      tags:['flow','ux'], prd:'P01', hint:'Retry link available after 60s. Code expires after 10 minutes.' }},
+
+  { group:'Onboarding', badge:'P01',
+    label:'Account created', file:'dusk-auth.html', nav:'success',
+    ann:{ phase:'Phase 1 · Auth & Profile',
+      title:'Account created successfully',
+      body:'Brief success state before landing on the profile setup. The ✦ logo animates in — a moment of delight before the practical steps.',
+      tags:['ux'], prd:'P01', hint:'First-time only. Returning users land on biometric unlock.' }},
+
+  { group:'Onboarding', badge:'P04',
+    label:'Set up payment handles', file:'dusk-auth.html', nav:'profile',
+    ann:{ phase:'Phase 1 · Auth & Profile',
+      title:'Profile & payment handles',
+      body:'Creator adds their Venmo, PayPal, Cash App, and/or Zelle handles. A3 fetches these automatically at message composition time — no copy-pasting links every time.',
+      tags:['flow'], prd:'P04 / P05', hint:'All handles AES-256 encrypted at rest. Never shared without user action.' }},
+
+  { group:'Onboarding', badge:'P04',
+    label:'Add Venmo handle', file:'dusk-auth.html', nav:'add_handle',
+    ann:{ phase:'Phase 1 · Auth & Profile',
+      title:'Add a payment handle',
+      body:'Pick a provider and enter the @username or link. A live preview shows exactly how it will appear in the payment request message participants receive.',
+      tags:['ux','ai'], prd:'P04', hint:'The preview adapts per recipient country — non-US members only see globally available options.' }},
+
+  { group:'Onboarding', badge:'P05',
+    label:'Handle saved', file:'dusk-auth.html', nav:'handle_saved',
+    ann:{ phase:'Phase 1 · Auth & Profile',
+      title:'Handle saved ✓',
+      body:'Confirmation screen shows all handles on file. Creator can add multiple before proceeding — one setup, used across every event.',
+      tags:['ux'], prd:'P05', hint:'Handles can be edited or removed at any time from the Settings tab.' }},
+
+  { group:'Onboarding', badge:'P06',
+    label:'Edit display name & avatar', file:'dusk-auth.html', nav:'edit_profile',
+    ann:{ phase:'Phase 1 · Auth & Profile',
+      title:'Edit display name & avatar',
+      body:'Creator sets the name other members see and picks an avatar colour. This is how they appear in split images, member lists, and payment messages.',
+      tags:['ux','new'], prd:'P06', hint:'Reachable at any time via the ✏️ button on the Profile screen.' }},
+
+  // ── HOME ────────────────────────────────────────────────
+  { group:'Home', badge:'P29',
+    label:'View home dashboard', file:'home.html', tab:'home',
+    ann:{ phase:'Phase 2 · Home',
+      title:'Net balance dashboard',
+      body:'A single net balance hero number tells the whole story at a glance — +$193 means others owe you more than you owe. "Needs attention" surfaces urgent items below.',
+      tags:['ux'], prd:'P29', hint:'Scroll down to see the full owed-to-you breakdown by person.' }},
+
+  // ── CREATE EVENT ────────────────────────────────────────
+  { group:'Create Event', badge:'P07',
+    label:'Create new event', file:'create-event.html', nav:'create_event',
+    ann:{ phase:'Phase 3 · Create & Share Event',
+      title:'Create a new event',
+      body:'Creator names the event and picks a date. That\'s it — minimal friction. The system generates a unique QR + URL instantly on submission.',
+      tags:['flow','ux'], prd:'P07', hint:'Tap "+" on the Home or Events tab. Event creation discarded if user navigates away mid-flow.' }},
+
+  { group:'Create Event', badge:'P08',
+    label:'QR code & shareable link', file:'create-event.html', nav:'event_qr',
+    ann:{ phase:'Phase 3 · Create & Share Event',
+      title:'QR code + shareable URL',
+      body:'The invite lives here. Same QR code and URL work for both app members (deep link to join screen) and guests (mobile browser join flow). Expires when group is locked or after 24h TTL.',
+      tags:['flow','ux'], prd:'P08', hint:'Creator can regenerate the link from Event Detail if it expires before everyone has joined.' }},
+
+  { group:'Event Detail (Joining)', badge:'P08',
+    label:'Event Detail — joining view', file:'home.html', nav:'event_detail_joining',
+    ann:{ phase:'Phase 3 · Create & Share Event',
+      title:'Creator navigates away — Event Detail',
+      body:'After generating the QR, the creator can navigate away. The event lives in the Events tab. Tapping the event card opens the Event Detail joining view — QR still active, live member list, lock CTA.',
+      tags:['ux','flow'], prd:'P08', hint:'QR shows amber "Expired" state after 24h. One tap regenerates it.' }},
+
+  { group:'Event Detail (Joining)', badge:'P09',
+    label:'Add member manually', file:'home.html', nav:'add_member',
+    ann:{ phase:'Phase 3 · Create & Share Event',
+      title:'Add a member from Event Detail',
+      body:'Creator can add members directly from the joining view — without re-entering the create flow. Two options: with phone (sends SMS invite) or name-only (for cash payers who won\'t use the app).',
+      tags:['ux','flow'], prd:'P09 / P10', hint:'Name-only members show an amber "Manual" badge in the member list.' }},
+
+  { group:'Event Detail (Joining)', badge:'P10',
+    label:'Add name-only member', file:'home.html', nav:'add_member_cash',
+    ann:{ phase:'Phase 3 · Create & Share Event',
+      title:'Add name-only member (no phone)',
+      body:'For cash payers who won\'t join the app. Creator just records a name. They appear in the member list with a "Manual" amber badge and won\'t receive a WhatsApp/SMS message.',
+      tags:['ux'], prd:'P10', hint:'Creator marks these as paid via the Cash button in Event Detail settlement view.' }},
+
+  { group:'Event Detail (Joining)', badge:'P14',
+    label:'Lock the group', file:'create-event.html', nav:'lock_group',
+    ann:{ phase:'Phase 3 · Create & Share Event',
+      title:'Lock Group — the hard gate',
+      body:'Locking expires the join token immediately. No one can join or leave after this point. Scan & Split becomes enabled. This is the architectural gate that separates the join phase from the financial phase.',
+      tags:['flow','gate'], prd:'P14', hint:'Creator can reopen the group for 1 hour if someone was missed (P13a).' }},
+
+  { group:'Event Detail (Joining)', badge:'P14',
+    label:'Group locked ✓', file:'create-event.html', nav:'group_locked',
+    ann:{ phase:'Phase 3 · Create & Share Event',
+      title:'Group is locked',
+      body:'All members confirmed. The QR code is invalidated. "Scan Receipt & Split" is now active. The event transitions from the join phase to the financial phase.',
+      tags:['flow','gate'], prd:'P14', hint:'Members who try to join after locking see an "Event closed" screen.' }},
+
+  // ── RECEIPT & SPLIT ─────────────────────────────────────
+  { group:'Receipt & Split', badge:'P15',
+    label:'Scan the receipt', file:'receipt-split.html', nav:'scan_receipt',
+    ann:{ phase:'Phase 4 · Receipt & Split',
+      title:'Photograph the receipt',
+      body:'Creator points the camera at the receipt. A1 pre-processes the image — correcting skew, contrast, and lighting before passing to the vision model. Works with photos from camera roll too.',
+      tags:['ai'], prd:'P15', hint:'"Enter manually" option always available — never blocked by camera failure.' }},
+
+  { group:'Receipt & Split', badge:'A1',
+    label:'AI reads receipt', file:'receipt-split.html', nav:'ai_reading',
+    ann:{ phase:'Phase 4 · Receipt & Split',
+      title:'A1 agent parses the receipt',
+      body:'Items, quantities, and prices stream in one by one as the vision model recognises them. Multi-quantity items show "×2" in indigo. Tax and tip parsed automatically.',
+      tags:['ai','ux'], prd:'A1', hint:'~97% accuracy on quality receipts. Creator reviews and corrects on the next screen.' }},
+
+  { group:'Receipt & Split', badge:'P16',
+    label:'Review & correct items', file:'receipt-split.html', nav:'item_review',
+    ann:{ phase:'Phase 4 · Receipt & Split',
+      title:'Review parsed items',
+      body:'AI is not perfect. Creator can edit misread item names, prices, and quantities, or add missing items. Corrections made here prevent errors propagating to everyone\'s final amounts.',
+      tags:['ai','ux'], prd:'P16', hint:'Shown in itemised mode. Even-split and custom-split skip this screen.' }},
+
+  { group:'Receipt & Split', badge:'P15a',
+    label:'Choose split mode (receipt path)', file:'receipt-split.html', nav:'split_mode',
+    ann:{ phase:'Phase 4 · Receipt & Split',
+      title:'Choose how to split (receipt path)',
+      body:'Two tiles: Itemised (assign each dish) or Custom (open the entry screen). Even split is now the default tab inside Custom — fewer screens, fewer taps. Manual-entry path skips this screen entirely and lands directly on Custom.',
+      tags:['ux'], prd:'P15a', hint:'Manual total path bypasses this screen — goes straight to Custom split with Even pre-selected.' }},
+
+  { group:'Receipt & Split', badge:'P16b',
+    label:'Split amounts entry', file:'receipt-split.html', nav:'custom_amounts',
+    ann:{ phase:'Phase 4 · Receipt & Split',
+      title:'Split — four input modes',
+      body:'Four tabs: = Even (auto-fills equal split, inputs locked), $ Amount (exact dollars), % Percent (must sum to 100%), ⅟ Portion (relative weights). Even is pre-selected. A live progress bar enforces the sum invariant.',
+      tags:['ux','new'], prd:'P16b', hint:'Even is the default — zero taps to confirm if everyone splits equally. Switch tabs to customise.' }},
+
+  { group:'Receipt & Split', badge:'P20',
+    label:'Review final split', file:'receipt-split.html', nav:'split_breakdown',
+    ann:{ phase:'Phase 4 · Receipt & Split',
+      title:'Final split breakdown',
+      body:'Per-person totals with proportional tax & tip. Each participant\'s share is visible before any message goes out. Creator can edit any amount here.',
+      tags:['ux','flow'], prd:'P20', hint:'This is the last checkpoint before money requests are sent. Errors caught here prevent disputes.' }},
+
+  // ── SEND MESSAGES ───────────────────────────────────────
+  { group:'Send Messages', badge:'P21',
+    label:'A3 generates messages', file:'send-messages.html', nav:'generating',
+    ann:{ phase:'Phase 5 · Send Messages',
+      title:'A3 message composer',
+      body:'One tap triggers A3. It generates a personalised split image per member (their row highlighted), fetches payment handles from profile, and filters payment links by recipient country.',
+      tags:['ai'], prd:'P21', hint:'Generation takes ~2s. A visual progress animation plays while A3 works.' }},
+
+  { group:'Send Messages', badge:'P21a',
+    label:'Preview a message', file:'send-messages.html', nav:'preview',
+    ann:{ phase:'Phase 5 · Send Messages',
+      title:'Optional message preview',
+      body:'Creator can tap any avatar in the horizontal row to read that person\'s exact message before sending. Useful for spot-checking large amounts or international participants.',
+      tags:['ux','ai'], prd:'P21a', hint:'"Send to all" is always one tap away — preview is never forced.' }},
+
+  { group:'Send Messages', badge:'P22',
+    label:'Sending in progress', file:'send-messages.html', nav:'send_progress',
+    ann:{ phase:'Phase 5 · Send Messages',
+      title:'In-app delivery tracking',
+      body:'Green check marks appear per member as Twilio confirms delivery. WhatsApp first, SMS fallback. All N messages dispatched in a single server-side batch — zero per-message taps.',
+      tags:['ai','flow'], prd:'P22', hint:'Failed deliveries are retried once automatically. Creator sees a yellow warning if one fails after retry.' }},
+
+  { group:'Send Messages', badge:'P22',
+    label:'All messages delivered', file:'send-messages.html', nav:'all_sent',
+    ann:{ phase:'Phase 5 · Send Messages',
+      title:'Messages sent to all',
+      body:'All payment requests are out. Creator is taken to a summary screen showing who received what. From here they naturally move to the Events tab to track responses.',
+      tags:['ux'], prd:'P22', hint:'"Track in Events tab" button takes creator directly to the event\'s settlement view.' }},
+
+  // ── TRACK & SETTLE ──────────────────────────────────────
+  { group:'Track & Settle', badge:'P24',
+    label:'Events tab', file:'home.html', tab:'events',
+    ann:{ phase:'Phase 6 · Track & Settle',
+      title:'Back to Events tab',
+      body:'After messages go out, the creator returns here naturally. The event card shows a live progress bar — green grows as payments are confirmed. No separate settlement screen needed.',
+      tags:['ux','flow'], prd:'P24', hint:'Events tab is the single source of truth for all outstanding balances.' }},
+
+  { group:'Track & Settle', badge:'P24',
+    label:'Event Detail — settlement view', file:'home.html', nav:'event_detail',
+    ann:{ phase:'Phase 6 · Track & Settle',
+      title:'Event Detail — settlement view',
+      body:'Tapping any event card opens this. Per-member roster: green = confirmed, amber = self-reported, grey = pending. Bill / Collected / Outstanding summary at the top.',
+      tags:['ux','flow'], prd:'P24', hint:'Same screen that showed QR during the joining phase — now in its settlement mode.' }},
+
+  { group:'Track & Settle', badge:'P25',
+    label:'Confirm a payment', file:'home.html', nav:'confirm_payment',
+    ann:{ phase:'Phase 6 · Track & Settle',
+      title:'Confirm self-reported payment',
+      body:'Jamie tapped "I\'ve paid" via Venmo. Creator sees the amount, method, and time. One tap confirms → row goes green, progress bar updates, outstanding balance drops.',
+      tags:['flow'], prd:'P25', hint:'Creator can also tap Dispute — which resets the member to Pending with a notification.' }},
+
+  // ── DONE ────────────────────────────────────────────────
+  { group:'Done', badge:'P29',
+    label:'Updated home dashboard', file:'home.html', tab:'home',
+    ann:{ phase:'Phase 7 · Done',
+      title:'Balance updated',
+      body:'The net balance hero reflects the confirmed payment. One event closer to fully settled. Settled events archive automatically — the dashboard stays clean.',
+      tags:['ux'], prd:'P29', hint:'Creator can start a new event from here — the cycle begins again.' }},
+];
+
+// ══════════════════════════════════════════════════════════
+//  APP MEMBER JOURNEY
+// ══════════════════════════════════════════════════════════
+const MEMBER = [
+
+  // ── JOIN ────────────────────────────────────────────────
+  { group:'Join', badge:'R01',
+    label:'Tap push notification', file:'participant.html', nav:'join_deeplink',
+    ann:{ phase:'Phase 1 · Join',
+      title:'Push notification → deep link',
+      body:'Rohan added Alex by name and phone. LetsSplyt fires a soft push: "You\'ve been added to Dinner at Nobu." Tapping opens the app directly on the event join screen — one tap to join.',
+      tags:['flow','ux'], prd:'R01', hint:'App Member always has the app installed. No SMS fallback needed for this persona.' }},
+
+  { group:'Join', badge:'R01',
+    label:'Joined — view event', file:'participant.html', nav:'joined',
+    ann:{ phase:'Phase 1 · Join',
+      title:'Joined! View the event',
+      body:'Alex is in. The confirmation screen has one CTA: "View event →" which takes them to the live member list. No amounts shown — the bill hasn\'t been scanned yet.',
+      tags:['ux'], prd:'R01', hint:'No "View my bill" here — the bill doesn\'t exist yet. Setting the right expectation prevents confusion.' }},
+
+  { group:'Join', badge:'R01',
+    label:'Event — waiting to lock', file:'participant.html', nav:'event_detail_waiting',
+    ann:{ phase:'Phase 1 · Join',
+      title:'Waiting for everyone to join',
+      body:'Alex can see who\'s in (5 of 8 so far) and a progress bar. A note at the bottom: "Your share will appear once Rohan locks the group and the bill is calculated." No amounts anywhere.',
+      tags:['ux','flow'], prd:'R01', hint:'This is the member\'s holding state while the social phase is still open. Clean, no financial pressure.' }},
+
+  // ── RECEIVE ─────────────────────────────────────────────
+  { group:'Receive', badge:'R04',
+    label:'Group locked — calculating', file:'participant.html', nav:'lock_notif',
+    ann:{ phase:'Phase 2 · Receive',
+      title:'Group locked — receipt being scanned',
+      body:'Rohan locked the group. Alex sees amber "Locked" banner and animated dots — but NO share amount yet. The receipt scan and item assignment are happening on Rohan\'s side. Alex just waits for the notification.',
+      tags:['flow','gate'], prd:'R04', hint:'This is the gap between locking and calculation completing. Showing a premature amount here would create confusion if it changed.' }},
+
+  { group:'Receive', badge:'R04a',
+    label:'Revised split received', file:'participant.html', nav:'revised_msg',
+    ann:{ phase:'Phase 2 · Receive',
+      title:'Creator revised the split',
+      body:'Rohan found Alex\'s bar tab after the first message. Old amount ($48.50) struck through; new amount ($52.00) shown prominently with a plain-language reason note. Payment links update automatically.',
+      tags:['flow','ux'], prd:'R04a', hint:'Optional step — shown here to demonstrate the revision path. In a clean split the first amount is final.' }},
+
+  { group:'Receive', badge:'R08',
+    label:'Full split breakdown', file:'participant.html', nav:'event_detail',
+    ann:{ phase:'Phase 2 · Receive',
+      title:'Event detail — split received',
+      body:'"Why do I owe $52.00?" is answered right here. Alex sees every item assigned to them, shared items with a proportional note, and the payment status of all group members — building trust before asking for money.',
+      tags:['flow','ux'], prd:'R04 / R08', hint:'Transparent breakdown prevents disputes and reduces "why is it this amount?" messages to the creator.' }},
+
+  // ── PAY ─────────────────────────────────────────────────
+  { group:'Pay', badge:'R05',
+    label:'Tap to pay', file:'participant.html', nav:'payment_links',
+    ann:{ phase:'Phase 3 · Pay',
+      title:'One-tap payment link',
+      body:'Rohan\'s payment handles are listed with amount pre-filled. One tap opens Venmo with @rohan-patel and $52.00 already entered — no typing, no searching for the handle.',
+      tags:['flow','ux'], prd:'R05', hint:'Payment handles are from Rohan\'s profile. Alex gets the benefit of Rohan\'s one-time setup.' }},
+
+  { group:'Pay', badge:'R06',
+    label:'Self-report payment', file:'participant.html', nav:'ive_paid',
+    ann:{ phase:'Phase 3 · Pay',
+      title:'Self-report via "I\'ve paid"',
+      body:'Alex paid via Venmo externally and returns to report it. Selects the method, taps "Settle up." Fires a confirmation to Rohan immediately — no manual chasing loop.',
+      tags:['flow','ux'], prd:'R06', hint:'Both paths (tap-to-pay and self-report) converge here — same settled state regardless of which the member used.' }},
+
+  { group:'Pay', badge:'R06',
+    label:'Payment confirmed ✓', file:'participant.html', nav:'report_sent',
+    ann:{ phase:'Phase 3 · Pay',
+      title:'Settled!',
+      body:'Alex\'s balance clears immediately on their end. Rohan gets a push: "Alex says they paid $52.00 via Venmo." Clean, satisfying close — no waiting loop for Alex.',
+      tags:['ux','flow'], prd:'R06', hint:'Rohan confirms or disputes from his creator dashboard. Alex\'s side is done.' }},
+
+  // ── SETTLE ──────────────────────────────────────────────
+  { group:'Settle', badge:'R07',
+    label:'My balance dashboard', file:'participant.html', nav:'dashboard',
+    ann:{ phase:'Phase 4 · Settle',
+      title:'Balance overview',
+      body:'Dashboard hero shows net amount owed across all events. Since Alex just settled, the balance drops. "You owe" section reflects live state. Past settled events archived below for reference.',
+      tags:['ux'], prd:'R07', hint:'Accessible anytime via the bottom-left tab. Acts as Alex\'s financial home screen within LetsSplyt.' }},
+
+  { group:'Settle', badge:'R08',
+    label:'Event detail — settled view', file:'participant.html', nav:'event_detail',
+    ann:{ phase:'Phase 4 · Settle',
+      title:'Event settled — full record',
+      body:'Alex\'s row shows green ✓ next to $52.00. All member statuses visible. The event lives in the Events tab as a permanent settled record — useful for personal expense tracking or future disputes.',
+      tags:['ux','flow'], prd:'R08', hint:'Full transparency on every dollar — who paid, when, via what method. Creator and members share the same view.' }},
+];
+
+// ══════════════════════════════════════════════════════════
+//  GUEST JOURNEY
+// ══════════════════════════════════════════════════════════
+const GUEST = [
+
+  // ── JOIN ────────────────────────────────────────────────
+  { group:'Join', badge:'G01',
+    label:'Tap invite link — browser opens', file:'guest.html', nav:'browser_invite',
+    ann:{ phase:'Phase 1 · Join',
+      title:'Invite opens in mobile browser',
+      body:'Guest scans the creator\'s QR code or taps a shared link. If LetsSplyt is installed, iOS/Android will deep-link straight into the app and the guest follows the App Member flow. No app → mobile browser opens here instead.',
+      tags:['flow','ux'], prd:'G01', hint:'No app install required at any point. The entire guest journey is browser-native.' }},
+
+  { group:'Join', badge:'G01b',
+    label:'Enter phone number', file:'guest.html', nav:'enter_phone',
+    ann:{ phase:'Phase 1 · Join',
+      title:'Phone-first identification',
+      body:'Guest enters their phone number before anything else. The system looks up the number — returning users are greeted by name; new users are prompted to enter their name next. This mirrors how modern auth flows work.',
+      tags:['flow','ux'], prd:'G01b', hint:'Phone is the only identifier. No username, no email — just the number used to deliver the bill.' }},
+
+  { group:'Join', badge:'G02',
+    label:'Enter name + verify OTP', file:'guest.html', nav:'name_phone',
+    ann:{ phase:'Phase 1 · Join',
+      title:'New guest: name + OTP on one screen',
+      body:'Phone not found — guest is new. They enter first and last name, then the verification code, all on the same page. OTP was sent automatically when they submitted their number. One "Verify & join" tap completes both steps.',
+      tags:['flow','ux'], prd:'G02', hint:'Returning users skip this screen entirely — they see a personalised greeting with the OTP field inline instead.' }},
+
+  { group:'Join', badge:'G04',
+    label:'Joined confirmation', file:'guest.html', nav:'joined_browser',
+    ann:{ phase:'Phase 1 · Join',
+      title:'You\'re in, Jordan!',
+      body:'Guest sees a clean "you\'re in" confirmation with a three-step timeline: Rohan scans → AI splits → you get a text. App download nudge is subtle and non-blocking. This page sets expectations so the SMS doesn\'t arrive out of the blue.',
+      tags:['ux'], prd:'G04', hint:'App install is a nudge, never a gate. Guest gets the full experience without installing anything.' }},
+
+  // ── RECEIVE ─────────────────────────────────────────────
+  { group:'Receive', badge:'G05',
+    label:'SMS payment request arrives', file:'guest.html', nav:'sms_received',
+    ann:{ phase:'Phase 2 · Receive',
+      title:'Bill arrives by SMS',
+      body:'After Rohan scans the receipt and sends splits, the guest gets a text from the LetsSplyt number. Their row is highlighted in the breakdown table. Pre-filled payment links — no amount to type, no handle to search for.',
+      tags:['flow','ai'], prd:'G05', hint:'Twilio routes via WhatsApp first if available; SMS fallback for all other numbers. Always includes STOP opt-out.' }},
+
+  { group:'Receive', badge:'G05a',
+    label:'Revised share SMS', file:'guest.html', nav:'revised_sms',
+    ann:{ phase:'Phase 2 · Receive',
+      title:'Payer revised the split',
+      body:'Rohan realised he missed the guest\'s bar tab. A second SMS arrives: old amount ($31.20) is struck through, new amount ($35.50) shown prominently, with a plain-language reason. Payment links auto-update to the new figure.',
+      tags:['flow','ux'], prd:'G05a', hint:'The old SMS thread is preserved above — guest can see the change in context.' }},
+
+  // ── PAY ─────────────────────────────────────────────────
+  { group:'Pay', badge:'G06',
+    label:'Tap payment link → Venmo', file:'guest.html', nav:'sms_received',
+    ann:{ phase:'Phase 3 · Pay',
+      title:'One-tap external payment',
+      body:'Guest taps the Venmo link in the SMS. Venmo (or PayPal) opens with Rohan\'s handle and the exact amount pre-filled. Guest confirms and pays without ever returning to the LetsSplyt app or browser.',
+      tags:['flow','ux'], prd:'G06', hint:'Payment confirmation happens outside LetsSplyt. Rohan sees it as a self-report when the guest marks themselves paid.' }},
+
+  // ── ALTERNATE PATH ───────────────────────────────────────
+  { group:'Alt: Manually Added', badge:'G08',
+    label:'WhatsApp: manually added guest', file:'guest.html', nav:'manual_sms',
+    ann:{ phase:'Phase 4 · Alt Path',
+      title:'Sub-type B — manually added',
+      body:'Some guests are added by the creator directly from contacts — they never scan a QR or join via browser. They receive a WhatsApp message (or SMS fallback) with the same breakdown + payment links. No OTP, no registration needed.',
+      tags:['flow'], prd:'G08', hint:'Twilio auto-detects whether the recipient\'s number has WhatsApp registered — routes accordingly.' }},
+];
+
+// ══════════════════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════════════════
+let curJourney = null;
+let cur = 0;
+let curFile = null;
+let pendingNav = null;
+
+const iframe = document.getElementById('proto-iframe');
+const loadingOverlay = document.getElementById('loading-overlay');
+
+// ══════════════════════════════════════════════════════════
+//  LAUNCH
+// ══════════════════════════════════════════════════════════
+const PERSONA_CONFIG = {
+  creator: {
+    journey: CREATOR,
+    emoji: '👤',
+    name: 'Creator Journey',
+    desc: function(n){ return n + ' steps · Full creator workflow'; },
+    chipStyle: 'background:rgba(99,102,241,.18);color:#A5B4FC;',
+  },
+  member: {
+    journey: MEMBER,
+    emoji: '📱',
+    name: 'App Member Journey',
+    desc: function(n){ return n + ' steps · Join → Receive → Pay → Settle'; },
+    chipStyle: 'background:rgba(16,185,129,.18);color:#6EE7B7;',
+  },
+  guest: {
+    journey: GUEST,
+    emoji: '🌐',
+    name: 'Guest Journey',
+    desc: function(n){ return n + ' steps · Browser join → SMS → Pay'; },
+    chipStyle: 'background:rgba(245,158,11,.18);color:#FCD34D;',
+  },
+};
+
+function startJourney(key) {
+  const cfg = PERSONA_CONFIG[key];
+  if (!cfg) return;
+  curJourney = cfg.journey;
+  cur = 0;
+  curFile = null;
+
+  document.getElementById('landing').style.display = 'none';
+  document.getElementById('sim').style.display = 'flex';
+
+  document.getElementById('tb-emoji').textContent = cfg.emoji;
+  document.getElementById('tb-name').textContent = cfg.name;
+  document.getElementById('tb-desc').textContent = cfg.desc(cfg.journey.length);
+
+  // Phase chip + sidebar persona colour
+  const chip = document.getElementById('phase-chip');
+  chip.setAttribute('style', cfg.chipStyle);
+  const simEl = document.getElementById('sim');
+  if (key === 'member') {
+    simEl.style.setProperty('--p-color', '#059669');
+    simEl.style.setProperty('--p-accent', '#6EE7B7');
+    document.getElementById('progress-fill').style.background = 'linear-gradient(90deg,#059669,#34D399)';
+  } else if (key === 'guest') {
+    simEl.style.setProperty('--p-color', '#D97706');
+    simEl.style.setProperty('--p-accent', '#FCD34D');
+    document.getElementById('progress-fill').style.background = 'linear-gradient(90deg,#D97706,#F59E0B)';
+  } else {
+    simEl.style.setProperty('--p-color', '#4F46E5');
+    simEl.style.setProperty('--p-accent', '#818CF8');
+    document.getElementById('progress-fill').style.background = 'linear-gradient(90deg,#6366F1,#A78BFA)';
+  }
+
+  renderSidebar();
+  goStep(0);
+}
+
+function goLanding() {
+  document.getElementById('sim').style.display = 'none';
+  document.getElementById('landing').style.display = 'flex';
+  iframe.src = 'about:blank';
+  curFile = null;
+}
+
+// ══════════════════════════════════════════════════════════
+//  STEP NAVIGATION
+// ══════════════════════════════════════════════════════════
+function goStep(idx) {
+  const steps = curJourney;
+  if (idx < 0 || idx >= steps.length) return;
+  cur = idx;
+  const s = steps[idx];
+
+  // Progress
+  const pct = Math.round(((idx + 1) / steps.length) * 100);
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('step-counter').textContent = (idx + 1) + ' / ' + steps.length;
+  document.getElementById('step-center').textContent = s.label;
+  document.getElementById('phase-chip').textContent = s.ann.phase.split('·')[1]?.trim() || s.group;
+
+  // Buttons
+  document.getElementById('prev-btn').disabled = idx === 0;
+  document.getElementById('next-btn').disabled = idx === steps.length - 1;
+  document.getElementById('next-btn').textContent = idx === steps.length - 1 ? '✓ Complete' : 'Next →';
+
+  updateSidebar(idx);
+  updateAnnotation(idx);
+  navigateIframe(s);
+}
+
+// ══════════════════════════════════════════════════════════
+//  IFRAME
+// ══════════════════════════════════════════════════════════
+function navigateIframe(s) {
+  const url = s.file + '?sim=1';
+  if (curFile !== s.file) {
+    curFile = s.file;
+    pendingNav = s;
+    showLoader(true);
+    iframe.src = url;
+  } else {
+    sendNav(s);
+  }
+}
+
+function sendNav(s) {
+  try {
+    const msg = {};
+    if (s.tab) msg.tab = s.tab;
+    if (s.nav) msg.nav = s.nav;
+    iframe.contentWindow.postMessage(msg, '*');
+  } catch(e) {}
+  showLoader(false);
+}
+
+function showLoader(on) {
+  loadingOverlay.classList.toggle('show', on);
+}
+
+iframe.addEventListener('load', function() {
+  if (pendingNav) {
+    setTimeout(function() {
+      sendNav(pendingNav);
+      pendingNav = null;
+    }, 420);
+  }
+});
+
+// Forward any loadFile messages from prototype iframes
+window.addEventListener('message', function(e) {
+  if (!e.data || !e.data.loadFile) return;
+  const s = { file: e.data.loadFile, nav: e.data.nav, tab: e.data.tab };
+  curFile = null;
+  navigateIframe(s);
+});
+
+// ══════════════════════════════════════════════════════════
+//  SIDEBAR
+// ══════════════════════════════════════════════════════════
+function renderSidebar() {
+  const steps = curJourney;
+  const panel = document.getElementById('step-panel');
+  let html = '';
+  let lastGroup = null;
+
+  steps.forEach(function(s, i) {
+    if (s.group !== lastGroup) {
+      html += '<div class="sg-label">' + s.group + '</div>';
+      lastGroup = s.group;
+    }
+    const isLast = (i === steps.length - 1) ||
+      (steps[i + 1] && steps[i + 1].group !== s.group);
+    html += `
+      <div class="si" id="si-${i}" onclick="goStep(${i})">
+        ${!isLast ? '<div class="si-connector"></div>' : ''}
+        <div class="si-dot">${i + 1}</div>
+        <div class="si-info">
+          <div class="si-label">${s.label}</div>
+          <div class="si-badge">${s.badge}</div>
+        </div>
+      </div>`;
+  });
+
+  panel.innerHTML = html;
+}
+
+function updateSidebar(activeIdx) {
+  curJourney.forEach(function(_, i) {
+    const el = document.getElementById('si-' + i);
+    if (!el) return;
+    el.classList.remove('active', 'done');
+    if (i < activeIdx) el.classList.add('done');
+    else if (i === activeIdx) el.classList.add('active');
+  });
+  const active = document.getElementById('si-' + activeIdx);
+  if (active) active.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+// ══════════════════════════════════════════════════════════
+//  ANNOTATION
+// ══════════════════════════════════════════════════════════
+const TAG_MAP = {
+  ai:   '🤖 AI Agent',
+  ux:   '✦ UX',
+  flow: '⟶ Flow',
+  gate: '🔒 Gate',
+  new:  '✨ New',
+};
+
+function updateAnnotation(idx) {
+  const s = curJourney[idx];
+  const a = s.ann;
+
+  document.getElementById('ann-phase').textContent = a.phase || '';
+  document.getElementById('ann-step').textContent = 'Step ' + (idx + 1) + ' of ' + curJourney.length + ' · ' + s.group;
+  document.getElementById('ann-title').textContent = a.title || s.label;
+  document.getElementById('ann-body').textContent = a.body || '';
+  document.getElementById('ann-hint').textContent = a.hint ? '💡 ' + a.hint : '';
+  document.getElementById('ann-prd').textContent = a.prd ? 'PRD ref: ' + a.prd : '';
+
+  const tagsHtml = (a.tags || []).map(function(t) {
+    return '<span class="ann-tag ' + t + '">' + (TAG_MAP[t] || t) + '</span>';
+  }).join('');
+  document.getElementById('ann-tags').innerHTML = tagsHtml;
+}
+
+// ══════════════════════════════════════════════════════════
+//  KEYBOARD
+// ══════════════════════════════════════════════════════════
+document.addEventListener('keydown', function(e) {
+  if (!curJourney) return;
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') goStep(cur + 1);
+  if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   goStep(cur - 1);
+});
+</script>
+</body>
+</html>

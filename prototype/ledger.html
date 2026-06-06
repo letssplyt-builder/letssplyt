@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LetsSplyt — Ledger & Account</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sans-serif;
+  background:#F0EFFF;display:flex;height:100vh;overflow:hidden;color:#1E1B3A;}
+
+#sidebar{width:240px;background:#fff;border-right:1px solid #E8E6F0;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0;}
+#sb-logo{padding:20px 18px 14px;border-bottom:1px solid #F0EEF8;}
+#sb-logo .mark{display:flex;align-items:center;gap:10px;margin-bottom:3px;}
+#sb-logo .gem{width:32px;height:32px;border-radius:10px;background:linear-gradient(135deg,#6366F1,#7C3AED);display:flex;align-items:center;justify-content:center;font-size:15px;color:#fff;}
+#sb-logo .name{font-size:16px;font-weight:800;color:#1E1B3A;letter-spacing:-.3px;}
+#sb-logo .sub{font-size:10px;color:#9CA3AF;letter-spacing:.05em;text-transform:uppercase;}
+#sb-screens{flex:1;overflow-y:auto;padding:6px 0 16px;}
+#sb-screens::-webkit-scrollbar{width:0;}
+.sg-hdr{padding:10px 16px 3px;font-size:9px;font-weight:700;color:#C4C0D8;text-transform:uppercase;letter-spacing:.1em;}
+.sc{display:flex;align-items:center;gap:9px;padding:7px 16px;cursor:pointer;border-left:2px solid transparent;transition:all .12s;border-radius:0 8px 8px 0;margin-right:8px;}
+.sc:hover{background:#F5F3FF;}
+.sc.active{background:#EEF2FF;border-left-color:#6366F1;}
+.sc-badge{font-size:9px;font-weight:700;color:#6366F1;min-width:28px;opacity:.8;flex-shrink:0;}
+.sc-name{font-size:11px;color:#6B7280;line-height:1.3;}
+.sc.active .sc-name{color:#4338CA;font-weight:600;}
+
+#center{flex:1;display:flex;align-items:center;justify-content:center;gap:24px;padding:24px;overflow:hidden;}
+#phone-wrap{display:flex;flex-direction:column;align-items:center;gap:12px;}
+#phone{width:375px;background:#E8E6F5;border-radius:54px;padding:12px;flex-shrink:0;
+  box-shadow:0 0 0 1px rgba(99,102,241,.12),0 28px 70px rgba(99,102,241,.14),0 6px 20px rgba(0,0,0,.05);}
+#di{width:120px;height:34px;background:#D1CFF0;border-radius:20px;margin:0 auto 8px;}
+#screen-wrap{width:351px;height:724px;border-radius:42px;overflow:hidden;position:relative;display:flex;flex-direction:column;}
+#sb-time-bar{position:absolute;top:0;left:0;right:0;height:48px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 24px 8px;z-index:100;pointer-events:none;}
+.time{font-size:15px;font-weight:700;}
+.icons{display:flex;gap:5px;align-items:center;}
+#screen{flex:1;overflow-y:auto;overflow-x:hidden;}
+#screen::-webkit-scrollbar{width:0;}
+#hi{height:32px;display:flex;align-items:center;justify-content:center;position:absolute;bottom:0;left:0;right:0;pointer-events:none;z-index:100;}
+#hi div{width:130px;height:5px;border-radius:3px;opacity:.25;}
+#ctrl{display:flex;align-items:center;gap:10px;}
+#back-btn{padding:8px 16px;background:#fff;border:1px solid #E5E7EB;color:#6B7280;border-radius:10px;font-size:12px;cursor:pointer;font-family:inherit;transition:all .15s;}
+#back-btn:hover{background:#F5F3FF;color:#4338CA;border-color:#C7D2FE;}
+#crumb{font-size:10px;color:#9CA3AF;font-family:monospace;}
+
+#info{width:210px;flex-shrink:0;display:flex;flex-direction:column;gap:10px;}
+.ic{background:#fff;border:1px solid #E8E6F0;border-radius:16px;padding:14px;box-shadow:0 1px 6px rgba(99,102,241,.05);}
+.ic-label{font-size:9px;font-weight:700;color:#C4C0D8;text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px;}
+.ic-badge{display:inline-block;background:#EEF2FF;color:#6366F1;font-size:10px;font-weight:700;padding:2px 8px;border-radius:6px;margin-bottom:6px;font-family:monospace;}
+.ic-name{font-size:13px;font-weight:600;color:#1E1B3A;margin-bottom:5px;line-height:1.3;}
+.ic-desc{font-size:11px;color:#9CA3AF;line-height:1.5;}
+#hist{display:flex;flex-direction:column;gap:3px;max-height:140px;overflow-y:auto;}
+#hist::-webkit-scrollbar{width:0;}
+.hi-row{display:flex;align-items:center;gap:7px;cursor:pointer;padding:3px 5px;border-radius:6px;}
+.hi-row:hover{background:#F5F3FF;}
+.hi-dot{width:5px;height:5px;border-radius:3px;background:#E5E7EB;flex-shrink:0;}
+.hi-row.cur .hi-dot{background:#6366F1;}
+.hi-lbl{font-size:10px;color:#9CA3AF;}
+.hi-row.cur .hi-lbl{color:#6366F1;font-weight:600;}
+#tip{background:#EEF2FF;border:1px solid #C7D2FE;border-radius:12px;padding:12px 14px;}
+#tip p{font-size:11px;color:#4338CA;line-height:1.5;}
+
+:root{
+  --bg:#F8F7FF;--white:#fff;
+  --indigo:#6366F1;--indigo-lt:#EEF2FF;--indigo-dk:#4338CA;
+  --purple:#7C3AED;
+  --green:#10B981;--green-lt:#D1FAE5;
+  --amber:#F59E0B;--amber-lt:#FEF3C7;
+  --red:#EF4444;--red-lt:#FEE2E2;
+  --t1:#1E1B3A;--t2:#6B7280;--t3:#9CA3AF;
+  --border:#F0EEF8;--border2:#E0DDFF;
+}
+.page{background:var(--bg);min-height:100%;}
+.card{background:var(--white);border-radius:20px;border:1px solid var(--border);box-shadow:0 2px 16px rgba(99,102,241,.07);}
+.pill{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:100px;}
+.pill-g{background:var(--green-lt);color:#059669;}
+.pill-i{background:var(--indigo-lt);color:var(--indigo);}
+.pill-a{background:var(--amber-lt);color:#B45309;}
+.pill-r{background:var(--red-lt);color:var(--red);}
+.nav-bar{display:flex;align-items:center;justify-content:space-between;padding:54px 22px 10px;position:relative;}
+.back{background:none;border:none;color:var(--indigo);font-size:15px;font-weight:600;cursor:pointer;font-family:inherit;}
+.nav-title{font-size:16px;font-weight:700;color:var(--t1);position:absolute;left:50%;transform:translateX(-50%);}
+.av{width:36px;height:36px;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;flex-shrink:0;}
+.btn-fill{display:flex;align-items:center;justify-content:center;width:100%;height:56px;border-radius:18px;border:none;cursor:pointer;font-family:inherit;background:linear-gradient(135deg,var(--indigo),var(--purple));color:#fff;font-size:16px;font-weight:700;box-shadow:0 4px 20px rgba(99,102,241,.3);}
+.btn-ghost{display:flex;align-items:center;justify-content:center;width:100%;height:44px;border-radius:14px;border:none;background:transparent;color:var(--t3);font-size:14px;cursor:pointer;font-family:inherit;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+@keyframes popIn{0%{transform:scale(.3);opacity:0;}65%{transform:scale(1.15);}100%{transform:scale(1);opacity:1;}}
+@keyframes slideUp{from{opacity:0;transform:translateY(40px);}to{opacity:1;transform:translateY(0);}}
+@keyframes barGrow{from{width:0;}to{width:var(--w);}}
+</style>
+</head>
+<body>
+
+<aside id="sidebar">
+  <div id="sb-logo">
+    <div class="mark"><div class="gem">✦</div><div class="name">LetsSplyt</div></div>
+    <div class="sub">Ledger & Account · P29–P31</div>
+  </div>
+  <div id="sb-screens">
+    <div class="sg-hdr">Owed to me</div>
+    <div class="sc active" data-id="owed_to_me" onclick="nav('owed_to_me')"><span class="sc-badge">P29</span><span class="sc-name">Owed to me — ledger</span></div>
+    <div class="sc" data-id="owed_person" onclick="nav('owed_person')"><span class="sc-badge">P29</span><span class="sc-name">Per-person breakdown</span></div>
+
+    <div class="sg-hdr" style="margin-top:4px;">I owe</div>
+    <div class="sc" data-id="i_owe" onclick="nav('i_owe')"><span class="sc-badge">P30</span><span class="sc-name">I owe — ledger</span></div>
+    <div class="sc" data-id="i_owe_event" onclick="nav('i_owe_event')"><span class="sc-badge">P30</span><span class="sc-name">Event I owe in</span></div>
+    <div class="sc" data-id="pay_now" onclick="nav('pay_now')"><span class="sc-badge">P30</span><span class="sc-name">Pay now — deep link</span></div>
+
+    <div class="sg-hdr" style="margin-top:4px;">Account</div>
+    <div class="sc" data-id="settings" onclick="nav('settings')"><span class="sc-badge">P31</span><span class="sc-name">Account settings</span></div>
+    <div class="sc" data-id="delete_warn" onclick="nav('delete_warn')"><span class="sc-badge">P31</span><span class="sc-name">Delete account — warning</span></div>
+    <div class="sc" data-id="delete_confirm" onclick="nav('delete_confirm')"><span class="sc-badge">P31</span><span class="sc-name">Delete — confirm phrase</span></div>
+    <div class="sc" data-id="deleted" onclick="nav('deleted')"><span class="sc-badge">P31</span><span class="sc-name">Account deleted</span></div>
+  </div>
+</aside>
+
+<div id="center">
+  <div id="phone-wrap">
+    <div id="phone">
+      <div id="di"></div>
+      <div id="screen-wrap">
+        <div id="sb-time-bar">
+          <span class="time" id="time-el">9:41</span>
+          <div class="icons">
+            <svg width="16" height="12" viewBox="0 0 16 12"><rect x="0" y="3" width="3" height="9" rx="1" fill="currentColor"/><rect x="4.5" y="2" width="3" height="10" rx="1" fill="currentColor"/><rect x="9" y="0" width="3" height="12" rx="1" fill="currentColor"/><rect x="13.5" y="1" width="2.5" height="10" rx="1" fill="currentColor" opacity=".3"/></svg>
+            <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x=".5" y="1" width="21" height="10" rx="2.5" stroke="currentColor" stroke-width="1.2"/><rect x="22" y="3.5" width="2.5" height="5" rx="1.2" fill="currentColor"/><rect x="2" y="2.5" width="17" height="7" rx="1.5" fill="currentColor"/></svg>
+          </div>
+        </div>
+        <div id="screen"></div>
+        <div id="tab-bar" style="display:flex;align-items:stretch;background:rgba(255,255,255,.96);border-top:1px solid #F0EEF8;backdrop-filter:blur(12px);flex-shrink:0;height:64px;">
+          <div onclick="navTab('home')" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;"><div style="font-size:22px;">⬡</div><div style="font-size:9px;font-weight:600;color:#9CA3AF;letter-spacing:.02em;">Dashboard</div></div>
+          <div onclick="navTab('events')" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;position:relative;"><div style="font-size:22px;">◫</div><div style="font-size:9px;font-weight:600;color:#9CA3AF;letter-spacing:.02em;">Events</div></div>
+          <div onclick="navTab('members')" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;position:relative;"><div style="font-size:22px;transform:scale(1.08);">◎</div><div style="font-size:9px;font-weight:600;color:#6366F1;letter-spacing:.02em;">Members</div></div>
+          <div onclick="navTab('settings')" style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;"><div style="font-size:22px;">◈</div><div style="font-size:9px;font-weight:600;color:#9CA3AF;letter-spacing:.02em;">Settings</div></div>
+        </div>
+        <div id="hi"><div></div></div>
+      </div>
+    </div>
+    <div id="ctrl">
+      <button id="back-btn" onclick="goBack()">← Back</button>
+      <span id="crumb"></span>
+    </div>
+  </div>
+
+  <div id="info">
+    <div class="ic">
+      <div class="ic-label">Current Screen</div>
+      <div id="ic-badge" class="ic-badge" style="display:none;"></div>
+      <div id="ic-name" class="ic-name">LetsSplyt</div>
+      <div id="ic-desc" class="ic-desc">Navigate screens from the sidebar.</div>
+    </div>
+    <div class="ic"><div class="ic-label">History</div><div id="hist"></div></div>
+    <div id="tip"><p>✦ The dual ledger turns LetsSplyt into a two-sided financial tool — you see what you're owed AND what you owe, all in one place.</p></div>
+  </div>
+</div>
+
+<script>
+const SCREENS={};
+function def(id,fn){SCREENS[id]=fn;}
+const META={
+  owed_to_me: {badge:'P29',name:'Owed to me',desc:'Aggregate across all events where you\'re the creator. Per-person running balance — shows who owes you across multiple events.'},
+  owed_person: {badge:'P29',name:'Per-person breakdown',desc:'Drill into one person — all events they owe you in, amounts, status. Running balance at top.'},
+  i_owe:       {badge:'P30',name:'I owe',desc:'Events where you were added as a participant by someone else. Outstanding amounts per event, ordered by urgency.'},
+  i_owe_event: {badge:'P30',name:'Event detail — I owe in',desc:'Your specific items and share in an event created by someone else. Payment links shown directly.'},
+  pay_now:     {badge:'P30',name:'Pay — deep link',desc:'Tapping a payment link pre-fills the payer\'s handle and your exact amount in Venmo/PayPal/etc. Leaves the app to complete payment.'},
+  settings:    {badge:'P31',name:'Account settings',desc:'Profile, payment handles, notification prefs, privacy settings. Delete account buried at the very bottom — deliberate friction.'},
+  delete_warn: {badge:'P31',name:'Delete — warning',desc:'Clear explanation of what deletion does: data removed, anonymised history, payment handles wiped. Two-step required — this is step 1.'},
+  delete_confirm:{badge:'P31',name:'Delete — confirm phrase',desc:'Type "DELETE" to confirm. Deliberate typing friction prevents accidental deletion of a financial account.'},
+  deleted:     {badge:'P31',name:'Account deleted',desc:'Confirmation screen. Data removal scheduled. No passive-aggressive messaging — clean, respectful exit.'},
+};
+let hist=['owed_to_me'];
+
+function navTab(tab){var dest={home:{f:'home.html',t:'home'},events:{f:'home.html',t:'events'},members:{f:'home.html',t:'members'},settings:{f:'home.html',t:'settings'}}[tab];if(!dest)return;if(window.parent!==window){window.parent.postMessage({loadFile:dest.f,tab:dest.t},'*');}else{location.href=dest.f;}}
+function nav(id){if(!SCREENS[id])return;hist.push(id);render(id);updateSB(id);updateInfo(id);updateHist();}
+function goBack(){if(hist.length<=1)return;hist.pop();const p=hist[hist.length-1];render(p);updateSB(p);updateInfo(p);updateHist();}
+function render(id){
+  if(!SCREENS[id])return;
+  const el=document.getElementById('screen');
+  el.style.opacity='0';
+  setTimeout(()=>{
+    el.innerHTML=SCREENS[id]();
+    el.style.opacity='1';el.style.transition='opacity .18s';el.scrollTop=0;
+    document.getElementById('time-el').style.color='#1E1B3A';
+    document.getElementById('hi').querySelector('div').style.background='#1E1B3A';
+    document.querySelectorAll('.icons svg').forEach(s=>s.style.color='#1E1B3A');
+  },80);
+  document.getElementById('crumb').textContent=id;
+}
+function updateSB(id){document.querySelectorAll('.sc').forEach(e=>e.classList.toggle('active',e.dataset.id===id));}
+function updateInfo(id){
+  const m=META[id]||{};
+  const b=document.getElementById('ic-badge');
+  if(m.badge){b.style.display='inline-block';b.textContent=m.badge;}else b.style.display='none';
+  document.getElementById('ic-name').textContent=m.name||id;
+  document.getElementById('ic-desc').textContent=m.desc||'';
+}
+function updateHist(){
+  document.getElementById('hist').innerHTML=hist.slice(-6).reverse().map((id,i)=>`
+    <div class="hi-row ${i===0?'cur':''}" onclick="nav('${id}')">
+      <div class="hi-dot"></div><span class="hi-lbl">${META[id]?.name||id}</span>
+    </div>`).join('');
+}
+
+/* ══════════════════════════════════════════
+   P29 — OWED TO ME
+══════════════════════════════════════════ */
+const OWED_TO_ME=[
+  {l:'R',name:'Raj',   bg:'#EF4444',total:66.64,events:['Dinner at Nobu'],       status:'overdue'},
+  {l:'J',name:'Jamie', bg:'#A78BFA',total:71.80,events:['Dinner at Nobu'],       status:'disputed'},
+  {l:'K',name:'Kim',   bg:'#F59E0B',total:67.80,events:['Dinner at Nobu','Rooftop drinks'],status:'pending'},
+  {l:'Ma',name:'Mark', bg:'#3B82F6',total:58.20,events:['Dinner at Nobu'],       status:'pending'},
+  {l:'S',name:'Sara',  bg:'#6366F1',total:0,    events:['Dinner at Nobu','Ski trip'],status:'settled'},
+  {l:'M',name:'Mike',  bg:'#10B981',total:0,    events:['Dinner at Nobu'],       status:'settled'},
+];
+const OUTSTANDING=OWED_TO_ME.filter(p=>p.total>0).reduce((s,p)=>s+p.total,0);
+
+def('owed_to_me',()=>`
+<div class="page" style="min-height:100%;display:flex;flex-direction:column;">
+
+  <!-- Hero header -->
+  <div style="padding:52px 22px 0;">
+    <div style="font-size:13px;font-weight:700;color:var(--indigo);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">Owed to you</div>
+    <div style="font-size:44px;font-weight:800;color:var(--t1);letter-spacing:-2px;line-height:1;">
+      $${OUTSTANDING.toFixed(2)}
+    </div>
+    <div style="font-size:14px;color:var(--t3);margin-top:4px;margin-bottom:20px;">across 2 active events</div>
+
+    <!-- Sparkline bar — visual breakdown by person -->
+    <div style="height:8px;border-radius:6px;overflow:hidden;display:flex;gap:2px;margin-bottom:6px;">
+      ${OWED_TO_ME.filter(p=>p.total>0).map(p=>{
+        const w=Math.round(p.total/OUTSTANDING*100);
+        const c={overdue:'var(--red)',disputed:'var(--amber)',pending:'var(--indigo)'}[p.status]||'var(--border)';
+        return `<div style="width:${w}%;background:${c};border-radius:3px;transition:width .6s;"></div>`;
+      }).join('')}
+    </div>
+    <div style="display:flex;gap:12px;margin-bottom:20px;">
+      ${[['var(--red)','Overdue'],['var(--amber)','Disputed'],['var(--indigo)','Pending']].map(([c,l])=>`
+      <div style="display:flex;align-items:center;gap:4px;">
+        <div style="width:7px;height:7px;border-radius:4px;background:${c};"></div>
+        <span style="font-size:10px;color:var(--t3);">${l}</span>
+      </div>`).join('')}
+    </div>
+  </div>
+
+  <!-- Person list -->
+  <div style="padding:0 18px;flex:1;overflow-y:auto;">
+    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">People</div>
+    ${OWED_TO_ME.map((p,i)=>{
+      const settled=p.status==='settled';
+      const borderC={overdue:'#FECACA',disputed:'#FDE68A',pending:'var(--border2)',settled:'var(--green-lt)'}[p.status];
+      const bgC={overdue:'#FFF5F5',disputed:'#FFFBEB',pending:'var(--white)',settled:'var(--green-lt)'}[p.status];
+      const amtC={overdue:'var(--red)',disputed:'var(--amber)',pending:'var(--t1)',settled:'var(--green)'}[p.status];
+      const tag={overdue:'🔴 Overdue',disputed:'⚠️ Disputed',pending:'Pending',settled:'✓ Settled'}[p.status];
+      return `
+      <div onclick="${!settled?`nav('owed_person')`:''}"
+        style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:18px;
+        background:${bgC};border:1.5px solid ${borderC};margin-bottom:8px;
+        cursor:${!settled?'pointer':'default'};
+        animation:fadeUp .25s ease ${i*.05}s both;transition:all .15s;">
+        <div class="av" style="background:${p.bg};${settled?'opacity:.65':''}">${p.l}</div>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:700;color:var(--t1);">${p.name}</div>
+          <div style="font-size:11px;color:var(--t3);margin-top:2px;">${p.events.join(' · ')}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:16px;font-weight:800;color:${amtC};">
+            ${settled?'–':'$'+p.total.toFixed(2)}</div>
+          <div style="font-size:10px;font-weight:700;color:${amtC};margin-top:3px;">${tag}</div>
+        </div>
+        ${!settled?`<div style="font-size:16px;color:var(--t3);">›</div>`:''}
+      </div>`;
+    }).join('')}
+    <div style="height:20px;"></div>
+  </div>
+</div>`);
+
+/* ══════════════════════════════════════════
+   P29 — PER-PERSON BREAKDOWN (Raj)
+══════════════════════════════════════════ */
+def('owed_person',()=>`
+<div class="page" style="min-height:100%;display:flex;flex-direction:column;">
+  <div class="nav-bar">
+    <button class="back" onclick="nav('owed_to_me')">‹ Back</button>
+    <span class="nav-title">Raj</span>
+    <div style="width:44px;"></div>
+  </div>
+
+  <div style="padding:0 22px 20px;">
+    <!-- Running balance hero -->
+    <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
+      <div class="av" style="background:#EF4444;width:56px;height:56px;border-radius:28px;font-size:22px;">R</div>
+      <div>
+        <div style="font-size:13px;color:var(--t3);">Raj Patel · running balance</div>
+        <div style="font-size:36px;font-weight:800;color:var(--red);letter-spacing:-1px;">$66.64</div>
+        <div style="font-size:12px;color:var(--red);font-weight:600;">🔴 Overdue · 3 days</div>
+      </div>
+    </div>
+
+    <!-- Events -->
+    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Events</div>
+
+    <div class="card" style="padding:6px 18px;margin-bottom:16px;">
+      <div style="display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--border);">
+        <div style="width:10px;height:10px;border-radius:5px;background:var(--red);flex-shrink:0;"></div>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:700;color:var(--t1);">Dinner at Nobu</div>
+          <div style="font-size:11px;color:var(--t3);">Sat 24 May · Tuna tartare · Yellowtail · Sake</div>
+        </div>
+        <div style="font-size:15px;font-weight:800;color:var(--red);">$66.64</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;padding:14px 0;">
+        <div style="width:10px;height:10px;border-radius:5px;background:var(--green);flex-shrink:0;"></div>
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:700;color:var(--t3);">Ski trip — Tahoe</div>
+          <div style="font-size:11px;color:var(--t3);">Fri 10 May · Fully settled</div>
+        </div>
+        <div style="font-size:15px;font-weight:700;color:var(--green);">✓ $130.00</div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display:flex;gap:10px;margin-bottom:12px;">
+      <button style="flex:1;height:44px;border-radius:14px;border:none;background:var(--amber-lt);
+        color:#B45309;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">⏰ Nudge</button>
+      <button style="flex:1;height:44px;border-radius:14px;border:none;background:var(--green-lt);
+        color:#059669;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;">✓ Mark paid</button>
+    </div>
+
+    <!-- History timeline -->
+    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">History</div>
+    <div class="card" style="padding:14px 16px;">
+      ${[
+        {icon:'📤',text:'Message sent · $66.64',time:'Sat 24 May',c:'var(--t2)'},
+        {icon:'⏰',text:'Nudge sent',time:'Sun 25 May',c:'var(--t3)'},
+        {icon:'⏰',text:'Nudge sent',time:'Mon 26 May',c:'var(--t3)'},
+      ].map((e,i,arr)=>`
+      <div style="display:flex;gap:12px;${i<arr.length-1?'margin-bottom:14px':''}">
+        <div style="display:flex;flex-direction:column;align-items:center;">
+          <div style="width:26px;height:26px;border-radius:13px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;">${e.icon}</div>
+          ${i<arr.length-1?`<div style="width:1px;flex:1;background:var(--border);margin:4px 0;min-height:10px;"></div>`:''}
+        </div>
+        <div style="padding-top:2px;">
+          <div style="font-size:12px;font-weight:600;color:${e.c};">${e.text}</div>
+          <div style="font-size:10px;color:var(--t3);">${e.time}</div>
+        </div>
+      </div>`).join('')}
+    </div>
+  </div>
+</div>`);
+
+/* ══════════════════════════════════════════
+   P30 — I OWE
+══════════════════════════════════════════ */
+const I_OWE=[
+  {organiser:'Priya',og:'P',og_bg:'#8B5CF6',event:'Team lunch — Chez TJ',date:'Wed 21 May',amt:48.50,status:'pending',items:'Salmon entrée · Sparkling water'},
+  {organiser:'Alex', og:'A',og_bg:'#EC4899',event:'Concert after-party',  date:'Fri 16 May',amt:22.00,status:'pending',items:'Two beers · nachos'},
+  {organiser:'Lena', og:'L',og_bg:'#14B8A6',event:'Lake house weekend',  date:'Sat 3 May', amt:95.00,status:'settled',items:'Groceries · gas split'},
+];
+const I_OWE_TOTAL=I_OWE.filter(e=>e.status==='pending').reduce((s,e)=>s+e.amt,0);
+
+def('i_owe',()=>`
+<div class="page" style="min-height:100%;display:flex;flex-direction:column;">
+
+  <!-- Hero -->
+  <div style="padding:52px 22px 0;">
+    <div style="font-size:13px;font-weight:700;color:var(--red);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;">You owe</div>
+    <div style="font-size:44px;font-weight:800;color:var(--t1);letter-spacing:-2px;line-height:1;">
+      $${I_OWE_TOTAL.toFixed(2)}
+    </div>
+    <div style="font-size:14px;color:var(--t3);margin-top:4px;margin-bottom:24px;">across 2 unsettled events</div>
+  </div>
+
+  <div style="padding:0 18px;flex:1;overflow-y:auto;">
+    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Events</div>
+
+    ${I_OWE.map((ev,i)=>{
+      const settled=ev.status==='settled';
+      return `
+      <div onclick="${!settled?`nav('i_owe_event')`:''}"
+        style="padding:16px;border-radius:20px;background:var(--white);
+        border:1.5px solid ${settled?'var(--green-lt)':'var(--border)'};
+        margin-bottom:10px;cursor:${!settled?'pointer':'default'};
+        box-shadow:${!settled?'0 4px 20px rgba(99,102,241,.08)':'none'};
+        animation:fadeUp .25s ease ${i*.07}s both;">
+
+        <!-- Top row -->
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+          <div class="av" style="background:${ev.og_bg};">${ev.og}</div>
+          <div style="flex:1;">
+            <div style="font-size:14px;font-weight:700;color:var(--t1);">${ev.event}</div>
+            <div style="font-size:11px;color:var(--t3);">${ev.organiser} · ${ev.date}</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:18px;font-weight:800;color:${settled?'var(--green)':'var(--red)'};">
+              ${settled?'✓':'$'+ev.amt.toFixed(2)}</div>
+          </div>
+        </div>
+
+        ${!settled?`
+        <!-- Items -->
+        <div style="font-size:11px;color:var(--t3);margin-bottom:12px;padding-left:46px;">${ev.items}</div>
+        <!-- Pay button -->
+        <button onclick="event.stopPropagation();nav('pay_now')"
+          style="width:100%;height:40px;border-radius:12px;border:none;
+          background:linear-gradient(135deg,var(--indigo),var(--purple));
+          color:#fff;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;
+          box-shadow:0 3px 14px rgba(99,102,241,.3);">
+          Pay $${ev.amt.toFixed(2)} now →
+        </button>`:`
+        <div style="padding-left:46px;font-size:11px;color:var(--green);font-weight:600;">Settled · ${ev.date}</div>`}
+      </div>`;
+    }).join('')}
+    <div style="height:20px;"></div>
+  </div>
+</div>`);
+
+/* ══════════════════════════════════════════
+   P30 — EVENT I OWE IN (Team lunch)
+══════════════════════════════════════════ */
+def('i_owe_event',()=>`
+<div class="page" style="min-height:100%;display:flex;flex-direction:column;">
+  <div class="nav-bar">
+    <button class="back" onclick="nav('i_owe')">‹ Back</button>
+    <span class="nav-title">Team lunch</span>
+    <div style="width:44px;"></div>
+  </div>
+
+  <div style="padding:0 20px;flex:1;overflow-y:auto;">
+
+    <!-- Organiser -->
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;padding:14px 16px;
+      background:var(--white);border-radius:16px;border:1px solid var(--border);">
+      <div class="av" style="background:#8B5CF6;">P</div>
+      <div style="flex:1;">
+        <div style="font-size:13px;color:var(--t3);">Organised by</div>
+        <div style="font-size:15px;font-weight:700;color:var(--t1);">Priya · Wed 21 May</div>
+      </div>
+    </div>
+
+    <!-- Your items -->
+    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Your items</div>
+    <div class="card" style="padding:6px 18px;margin-bottom:16px;">
+      ${[
+        {name:'Salmon entrée',price:'$32.00'},
+        {name:'Sparkling water',price:'$6.00'},
+        {name:'Tax + tip (proportional)',price:'$10.50'},
+      ].map((it,i,arr)=>`
+      <div style="display:flex;align-items:center;padding:12px 0;
+        border-bottom:${i<arr.length-1?'1px solid var(--border)':'none'};">
+        <div style="flex:1;font-size:13px;color:var(--t2);">${it.name}</div>
+        <div style="font-size:13px;font-weight:700;color:var(--t1);">${it.price}</div>
+      </div>`).join('')}
+      <div style="display:flex;justify-content:space-between;padding:12px 0;border-top:1px solid var(--border2);">
+        <span style="font-size:14px;font-weight:700;color:var(--t1);">Your total</span>
+        <span style="font-size:18px;font-weight:800;color:var(--indigo);">$48.50</span>
+      </div>
+    </div>
+
+    <!-- Group status strip -->
+    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Group status</div>
+    <div class="card" style="padding:10px 16px;margin-bottom:20px;">
+      ${[
+        {l:'P',bg:'#8B5CF6',name:'Priya',note:'organiser',done:true},
+        {l:'Y',bg:'#6366F1',name:'You',  note:'$48.50 pending',done:false,you:true},
+        {l:'D',bg:'#10B981',name:'Dev',  note:'paid',done:true},
+        {l:'N',bg:'#F59E0B',name:'Nina', note:'paid',done:true},
+      ].map(p=>`
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);">
+        <div class="av" style="background:${p.bg};width:30px;height:30px;border-radius:15px;font-size:11px;
+          ${p.done&&!p.you?'opacity:.65':''}
+          ${p.you?`box-shadow:0 0 0 2px #fff,0 0 0 4px var(--indigo);`:''}">${p.l}</div>
+        <div style="flex:1;font-size:13px;font-weight:${p.you?700:500};color:${p.you?'var(--indigo)':'var(--t1)'};">
+          ${p.name}</div>
+        <div style="font-size:11px;color:${p.done?'var(--green)':'var(--red)'};font-weight:600;">
+          ${p.done?'✓ paid':p.note}</div>
+      </div>`).join('')}
+    </div>
+
+    <!-- Pay button -->
+    <button onclick="nav('pay_now')" class="btn-fill" style="margin-bottom:12px;">Pay $48.50 now →</button>
+    <div style="font-size:11px;color:var(--t3);text-align:center;">Opens Venmo, PayPal, or Cash App pre-filled</div>
+    <div style="height:24px;"></div>
+  </div>
+</div>`);
+
+/* ══════════════════════════════════════════
+   P30 — PAY NOW (deep link transition)
+══════════════════════════════════════════ */
+def('pay_now',()=>`
+<div class="page" style="min-height:100%;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:32px 28px;text-align:center;">
+
+  <!-- App selector -->
+  <div style="font-size:13px;font-weight:700;color:var(--t3);margin-bottom:24px;letter-spacing:.05em;text-transform:uppercase;">Pay Priya via</div>
+
+  <div style="display:flex;flex-direction:column;gap:10px;width:100%;margin-bottom:28px;">
+    ${[
+      {name:'Venmo',     color:'#3D95CE',icon:'V', sub:'@priya-sharma · $48.50 pre-filled'},
+      {name:'PayPal',    color:'#009CDE',icon:'P', sub:'paypal.me/priyasharma · $48.50'},
+      {name:'Cash App',  color:'#00D632',icon:'$', sub:'$PriyaSharma · $48.50 pre-filled'},
+    ].map((app,i)=>`
+    <button onclick="nav('i_owe')"
+      style="width:100%;padding:16px 18px;border-radius:18px;border:none;cursor:pointer;
+      background:var(--white);border:1.5px solid var(--border);
+      display:flex;align-items:center;gap:14px;font-family:inherit;
+      box-shadow:0 2px 10px rgba(99,102,241,.06);transition:all .15s;
+      animation:fadeUp .25s ease ${i*.08}s both;">
+      <div style="width:44px;height:44px;border-radius:14px;background:${app.color};
+        display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;color:#fff;flex-shrink:0;">${app.icon}</div>
+      <div style="text-align:left;">
+        <div style="font-size:15px;font-weight:700;color:var(--t1);">${app.name}</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:2px;">${app.sub}</div>
+      </div>
+      <div style="margin-left:auto;font-size:16px;color:var(--t3);">›</div>
+    </button>`).join('')}
+  </div>
+
+  <div style="font-size:11px;color:var(--t3);line-height:1.6;">
+    Tapping opens the payment app with<br>Priya's handle and $48.50 already filled in.
+  </div>
+</div>`);
+
+/* ══════════════════════════════════════════
+   P31 — SETTINGS
+══════════════════════════════════════════ */
+def('settings',()=>`
+<div class="page" style="min-height:100%;display:flex;flex-direction:column;">
+  <div style="padding:52px 22px 16px;display:flex;align-items:center;gap:14px;">
+    <div class="av" style="background:linear-gradient(135deg,#6366F1,#7C3AED);width:52px;height:52px;border-radius:26px;font-size:20px;">P</div>
+    <div>
+      <div style="font-size:18px;font-weight:800;color:var(--t1);">Pawan Lawale</div>
+      <div style="font-size:13px;color:var(--t3);">+1 (555) 012-3456</div>
+    </div>
+  </div>
+
+  <div style="padding:0 18px;flex:1;overflow-y:auto;">
+
+    ${[
+      {section:'Profile',rows:[
+        {label:'Display name',value:'Pawan Lawale'},
+        {label:'Phone number',value:'+1 (555) 012-3456'},
+        {label:'Avatar',value:'Edit'},
+      ]},
+      {section:'Payment handles',rows:[
+        {label:'Venmo',value:'@pawan-lawale'},
+        {label:'PayPal',value:'paypal.me/pawan'},
+        {label:'Cash App',value:'$PawanL'},
+        {label:'Add handle',value:'+',accent:true},
+      ]},
+      {section:'Notifications',rows:[
+        {label:'Payment received',value:'On',toggle:true},
+        {label:'Nudge reminders',value:'On',toggle:true},
+        {label:'Weekly summary',value:'Off',toggle:true,off:true},
+      ]},
+      {section:'Privacy & data',rows:[
+        {label:'Download my data',value:'Export'},
+        {label:'Privacy policy',value:'›'},
+      ]},
+    ].map(({section,rows})=>`
+    <div style="margin-bottom:20px;">
+      <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">${section}</div>
+      <div class="card" style="padding:0 18px;">
+        ${rows.map((row,i,arr)=>`
+        <div style="display:flex;align-items:center;padding:14px 0;
+          border-bottom:${i<arr.length-1?'1px solid var(--border)':'none'};">
+          <div style="flex:1;font-size:14px;color:var(--t1);">${row.label}</div>
+          ${row.toggle
+            ?`<div style="width:44px;height:26px;border-radius:13px;position:relative;cursor:pointer;
+                background:${row.off?'#E5E7EB':'var(--indigo)'};transition:background .2s;">
+                <div style="position:absolute;top:3px;${row.off?'left:3px':'right:3px'};
+                  width:20px;height:20px;border-radius:10px;background:#fff;transition:all .2s;
+                  box-shadow:0 1px 4px rgba(0,0,0,.15);"></div>
+              </div>`
+            :`<div style="font-size:13px;color:${row.accent?'var(--indigo)':'var(--t3)'};font-weight:${row.accent?700:400};">${row.value}</div>`}
+        </div>`).join('')}
+      </div>
+    </div>`).join('')}
+
+    <!-- Danger zone -->
+    <div style="margin-bottom:32px;">
+      <div style="font-size:10px;font-weight:700;color:var(--red);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">Danger zone</div>
+      <div class="card" style="padding:0 18px;">
+        <div onclick="nav('delete_warn')"
+          style="display:flex;align-items:center;padding:16px 0;cursor:pointer;">
+          <div style="flex:1;font-size:14px;color:var(--red);font-weight:600;">Delete account & all data</div>
+          <div style="font-size:16px;color:var(--red);">›</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>`);
+
+/* ══════════════════════════════════════════
+   P31 — DELETE WARN (step 1)
+══════════════════════════════════════════ */
+def('delete_warn',()=>`
+<div class="page" style="min-height:100%;display:flex;flex-direction:column;">
+  <div class="nav-bar">
+    <button class="back" onclick="nav('settings')">‹ Back</button>
+    <span class="nav-title" style="color:var(--red);">Delete account</span>
+    <div style="width:44px;"></div>
+  </div>
+
+  <div style="padding:0 22px;flex:1;overflow-y:auto;">
+
+    <!-- Warning icon -->
+    <div style="display:flex;justify-content:center;margin-bottom:20px;">
+      <div style="width:72px;height:72px;border-radius:36px;background:var(--red-lt);
+        display:flex;align-items:center;justify-content:center;font-size:32px;">🗑</div>
+    </div>
+
+    <div style="font-size:20px;font-weight:800;color:var(--t1);text-align:center;margin-bottom:8px;">
+      This will delete everything
+    </div>
+    <div style="font-size:14px;color:var(--t3);text-align:center;line-height:1.6;margin-bottom:24px;">
+      This action is permanent and cannot be undone.
+    </div>
+
+    <!-- What gets deleted -->
+    <div class="card" style="padding:16px 18px;margin-bottom:16px;">
+      <div style="font-size:12px;font-weight:700;color:var(--t1);margin-bottom:12px;">What gets removed</div>
+      ${[
+        ['Your account & phone number','Permanent · cannot recover'],
+        ['All payment handles','Venmo, PayPal, Cash App, Zelle'],
+        ['Events you created','Settlement history anonymised'],
+        ['Your participation history','Removed from others\' records'],
+      ].map(([t,s])=>`
+      <div style="display:flex;gap:10px;margin-bottom:10px;align-items:flex-start;">
+        <div style="width:18px;height:18px;border-radius:9px;background:var(--red-lt);
+          display:flex;align-items:center;justify-content:center;font-size:9px;color:var(--red);flex-shrink:0;margin-top:1px;">✗</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--t1);">${t}</div>
+          <div style="font-size:11px;color:var(--t3);">${s}</div>
+        </div>
+      </div>`).join('')}
+    </div>
+
+    <!-- Outstanding balance warning -->
+    <div style="padding:14px 16px;background:var(--amber-lt);border-radius:14px;border:1px solid #FDE68A;margin-bottom:24px;
+      display:flex;gap:10px;align-items:flex-start;">
+      <span style="font-size:18px;">⚠️</span>
+      <div style="font-size:12px;color:#92400E;line-height:1.5;">
+        You have <strong>$264.44 outstanding</strong> across active events. Deleting your account won't cancel these obligations.
+      </div>
+    </div>
+
+    <button onclick="nav('delete_confirm')"
+      style="width:100%;height:52px;border-radius:16px;border:1.5px solid var(--red);
+      background:transparent;color:var(--red);font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px;">
+      I understand — continue
+    </button>
+    <button class="btn-ghost" onclick="nav('settings')">Cancel — keep my account</button>
+    <div style="height:24px;"></div>
+  </div>
+</div>`);
+
+/* ══════════════════════════════════════════
+   P31 — DELETE CONFIRM (step 2 — type phrase)
+══════════════════════════════════════════ */
+def('delete_confirm',()=>`
+<div class="page" style="min-height:100%;display:flex;flex-direction:column;">
+  <div class="nav-bar">
+    <button class="back" onclick="nav('delete_warn')">‹ Back</button>
+    <div style="width:44px;"></div>
+  </div>
+
+  <div style="padding:0 28px;flex:1;display:flex;flex-direction:column;justify-content:center;">
+
+    <div style="font-size:22px;font-weight:800;color:var(--t1);margin-bottom:8px;text-align:center;">
+      Confirm deletion
+    </div>
+    <div style="font-size:14px;color:var(--t3);text-align:center;line-height:1.6;margin-bottom:32px;">
+      Type <strong style="color:var(--t1);font-family:monospace;background:#F3F4F6;padding:2px 8px;border-radius:6px;">DELETE</strong> to confirm
+    </div>
+
+    <!-- Typing input -->
+    <div style="position:relative;margin-bottom:20px;">
+      <input type="text" value="DELETE"
+        style="width:100%;height:56px;border-radius:16px;border:2px solid var(--red);
+        background:var(--white);font-size:20px;font-weight:700;color:var(--red);
+        font-family:monospace;text-align:center;outline:none;letter-spacing:4px;"
+        placeholder="Type DELETE"/>
+    </div>
+
+    <button onclick="nav('deleted')"
+      style="width:100%;height:56px;border-radius:18px;border:none;background:var(--red);
+      color:#fff;font-size:16px;font-weight:700;cursor:pointer;font-family:inherit;
+      box-shadow:0 4px 20px rgba(239,68,68,.35);margin-bottom:12px;">
+      Delete my account permanently
+    </button>
+    <button class="btn-ghost" onclick="nav('settings')" style="color:var(--indigo);">
+      Actually, keep my account
+    </button>
+  </div>
+</div>`);
+
+/* ══════════════════════════════════════════
+   P31 — DELETED
+══════════════════════════════════════════ */
+def('deleted',()=>`
+<div class="page" style="min-height:100%;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;padding:40px 32px;text-align:center;">
+
+  <div style="width:80px;height:80px;border-radius:40px;background:#F3F4F6;
+    display:flex;align-items:center;justify-content:center;font-size:36px;margin-bottom:24px;
+    animation:popIn .4s cubic-bezier(.34,1.56,.64,1) both;">👋</div>
+
+  <div style="font-size:24px;font-weight:800;color:var(--t1);margin-bottom:8px;animation:fadeUp .3s ease .1s both;">
+    Account deleted
+  </div>
+  <div style="font-size:14px;color:var(--t3);line-height:1.7;margin-bottom:32px;animation:fadeUp .3s ease .15s both;">
+    Your data has been scheduled for removal.<br>
+    Payment handles wiped immediately.<br>
+    Thanks for using LetsSplyt.
+  </div>
+
+  <!-- What happens next -->
+  <div style="width:100%;padding:16px 18px;background:var(--white);border-radius:16px;
+    border:1px solid var(--border);text-align:left;margin-bottom:28px;animation:fadeUp .3s ease .2s both;">
+    <div style="font-size:12px;font-weight:700;color:var(--t1);margin-bottom:10px;">What happens now</div>
+    ${[
+      ['Payment handles','Wiped immediately'],
+      ['Account data','Removed within 30 days'],
+      ['Settlement history','Anonymised — not deleted'],
+      ['SMS opt-out','Preserved permanently'],
+    ].map(([t,s])=>`
+    <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);">
+      <div style="font-size:12px;color:var(--t2);">${t}</div>
+      <div style="font-size:12px;font-weight:600;color:var(--t3);">${s}</div>
+    </div>`).join('')}
+  </div>
+
+  <div style="font-size:12px;color:var(--t3);line-height:1.6;animation:fadeUp .3s ease .25s both;">
+    Questions? Email privacy@letssplyt.app
+  </div>
+</div>`);
+
+/* ── INIT ── */
+const s=document.createElement('style');
+s.textContent=`
+  @keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+  @keyframes popIn{0%{transform:scale(.3);opacity:0;}65%{transform:scale(1.15);}100%{transform:scale(1);opacity:1;}}
+  @keyframes slideUp{from{opacity:0;transform:translateY(40px);}to{opacity:1;transform:translateY(0);}}
+`;
+document.head.appendChild(s);
+render('owed_to_me');updateSB('owed_to_me');updateInfo('owed_to_me');updateHist();
+
+// ── SIM MODE ──
+(function(){
+  if(new URLSearchParams(location.search).get('sim')){
+    ['sidebar','info'].forEach(function(id){var el=document.getElementById(id);if(el)el.style.display='none';});
+    var c=document.getElementById('center');if(c){c.style.justifyContent='center';c.style.gap='0';}
+  }
+  window.addEventListener('message',function(e){
+    if(!e.data) return;
+    if(e.data.nav && SCREENS[e.data.nav]) nav(e.data.nav);
+  });
+})();
+</script>
+</body>
+</html>
