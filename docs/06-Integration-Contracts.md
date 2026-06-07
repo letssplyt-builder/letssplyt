@@ -322,9 +322,13 @@ client.messages.create({
   // messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
   to: '+15550001234',                       // participant's phone in E.164
   body: 'Hey Marcus! Thanks for coming...\n\nYour share is $32.50.\n\nPay here:\nVenmo: venmo://...',
-  statusCallback: `${process.env.APP_DOMAIN}/api/v1/webhooks/twilio/delivery`,
+  mediaUrl: [signedImageUrl],              // Supabase Storage signed URL for the split image (PNG)
+  // Only included when split image is available (after A1/split-image.generator.ts runs)
+  statusCallback: `${process.env.APP_URL}/api/v1/webhooks/twilio/delivery`,
 });
 ```
+
+**MMS fallback:** If MMS delivery fails (Twilio error `21617` or similar MMS-specific error), retry as SMS-only (same message text, no `mediaUrl`). Log the MMS failure to `ai_audit_log` with `error_code: 'MMS_FALLBACK'`. Do NOT retry the full A3 pipeline — just resend this participant's message as SMS.
 
 **Response shape (Twilio SDK object):**
 ```typescript
@@ -385,7 +389,7 @@ import express, { Request, Response } from 'express';
 export async function handleDeliveryWebhook(req: Request, res: Response): Promise<void> {
   // 1. Validate Twilio signature FIRST — reject without processing if invalid
   const twilioSignature = req.headers['x-twilio-signature'] as string;
-  const webhookUrl = `${process.env.APP_DOMAIN}/api/v1/webhooks/twilio/delivery`;
+  const webhookUrl = `${process.env.APP_URL}/api/v1/webhooks/twilio/delivery`;
 
   const isValid = twilio.validateRequest(
     process.env.TWILIO_AUTH_TOKEN!,
@@ -424,7 +428,7 @@ export async function handleDeliveryWebhook(req: Request, res: Response): Promis
 
 ```bash
 npx ngrok http 3000
-# Then set APP_DOMAIN=https://[your-ngrok-id].ngrok.io temporarily
+# Then set APP_URL=https://[your-ngrok-id].ngrok.io temporarily
 ```
 
 Alternatively, skip delivery webhook testing in development and rely on staging.
@@ -444,11 +448,63 @@ Alternatively, skip delivery webhook testing in development and rely on staging.
 The webhook handler validates the Twilio signature and hashes the phone number before storing in `sms_opt_outs`.
 
 ```typescript
-// POST /api/v1/webhooks/twilio/opt-out handler:
-const phone = req.body.From; // E.164 from Twilio
-const phoneHash = hashPhone(phone);
-await supabaseAdmin.from('sms_opt_outs').upsert({ phone_hash: phoneHash }, { onConflict: 'phone_hash' });
+// POST /api/v1/webhooks/twilio/stop handler (full implementation):
+
+import twilio from 'twilio';
+import { hashPhone } from '../../infrastructure/security/sanitize';
+
+// Step 1: Verify Twilio signature FIRST — before any DB work
+const isValid = twilio.validateRequest(
+  process.env.TWILIO_AUTH_TOKEN!,
+  req.headers['x-twilio-signature'] as string,
+  `${process.env.APP_URL}/webhooks/twilio/stop`,
+  req.body
+);
+if (!isValid) return res.status(403).send('Forbidden');
+
+// Step 2: Resolve phone hash from the incoming From field
+const incomingPhone = req.body.From as string; // E.164 from Twilio
+const phoneHash = hashPhone(incomingPhone);     // SHA-256 HMAC
+
+// Step 3: Update participants — mark ALL pending/self_reported participants for this phone as opted_out
+const { data: updatedParticipants } = await supabaseAdmin
+  .from('participants')
+  .update({ payment_status: 'opted_out', opted_out_at: new Date().toISOString() })
+  .in('payment_status', ['pending', 'self_reported'])
+  .eq('phone_hash', phoneHash)
+  .select('id, event_id, payment_status');
+
+// Step 4: Update sms_opt_outs table — upsert record
+await supabaseAdmin
+  .from('sms_opt_outs')
+  .upsert({ phone_hash: phoneHash, opted_out_at: new Date().toISOString() }, { onConflict: 'phone_hash' });
+
+// Step 5: Update users table — set is_opted_out flag if user exists
+await supabaseAdmin
+  .from('users')
+  .update({ is_opted_out: true })
+  .eq('phone_hash', phoneHash);
+
+// Step 6: Write to settlement_log for each participant updated in step 3
+for (const participant of updatedParticipants ?? []) {
+  await insertSettlementLog({
+    participant_id: participant.id,
+    event_id: participant.event_id,
+    from_status: participant.payment_status,
+    to_status: 'opted_out',
+    changed_by: 'twilio_stop',
+    note: 'STOP received via SMS',
+  });
+}
+
+// Step 7: Return TwiML response (Twilio expects XML)
+res.set('Content-Type', 'text/xml');
+res.send(`<Response><Message>You have been unsubscribed from LetsSplyt notifications. Reply START to resubscribe.</Message></Response>`);
 ```
+
+**Notes:**
+- The `opted_out_at` column must exist on the `participants` table (add to `04-Data-Architecture.md` if missing).
+- Use `APP_ENV` (not `NODE_ENV`) for any environment checks — Railway sets `NODE_ENV=production` on ALL deployments including staging.
 
 ### Error Handling
 
@@ -486,6 +542,7 @@ export async function sendSplitMessage(
   participantId: string,
   phoneE164: string | null,
   messageText: string,
+  splitImageUrl?: string,   // signed Supabase Storage URL (24h validity) for participant's split image PNG; undefined = SMS only
 ): Promise<SendMessageResult> {
   // Guard: no phone = cash participant, skip
   if (!phoneE164) {
@@ -507,7 +564,8 @@ export async function sendSplitMessage(
       from: process.env.TWILIO_PHONE_NUMBER!,
       to: phoneE164,
       body: messageText,
-      statusCallback: `${process.env.APP_DOMAIN}/api/v1/webhooks/twilio/delivery`,
+      mediaUrl: splitImageUrl ? [splitImageUrl] : undefined,  // MMS with split image if available
+      statusCallback: `${process.env.APP_URL}/api/v1/webhooks/twilio/delivery`,
     });
 
     // Store the SID in notification_log for delivery tracking
@@ -1206,9 +1264,9 @@ export class GeminiAdapter implements LLMProvider {
 
   async complete(
     messages: LLMMessage[],
-    maxTokens: number,
-    timeoutMs = 30_000,
+    options: LLMCompletionOptions,   // { maxTokens: number; timeoutMs: number; temperature?: number }
   ): Promise<LLMResponse> {
+    const { maxTokens, timeoutMs = 30_000 } = options;
     const genModel = this.genAI.getGenerativeModel({
       model: this.model,
       generationConfig: { maxOutputTokens: maxTokens },
@@ -1225,8 +1283,9 @@ export class GeminiAdapter implements LLMProvider {
           )
     );
 
+    const resolvedTimeout = timeoutMs ?? 30_000;
     const abortPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Gemini timeout after ' + timeoutMs + 'ms')), timeoutMs)
+      setTimeout(() => reject(new Error('Gemini timeout after ' + resolvedTimeout + 'ms')), resolvedTimeout)
     );
 
     const result = await Promise.race([
@@ -1460,9 +1519,9 @@ export class AnthropicAdapter implements LLMProvider {
 
   async complete(
     messages: LLMMessage[],
-    maxTokens: number,
-    timeoutMs = 60_000,
+    options: LLMCompletionOptions = {},
   ): Promise<LLMResponse> {
+    const { maxTokens = 4096, timeoutMs = 60_000, temperature = 0 } = options;
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -1515,7 +1574,7 @@ export class AnthropicAdapter implements LLMProvider {
 
 ### What LetsSplyt Uses It For
 
-Two primary uses: (1) OTP rate limiting — tracking how many OTP requests a phone number or IP has made in the current window, and (2) nudge cooldown tracking — preventing repeated nudges to the same participant within 24 hours.
+Two primary uses: (1) OTP rate limiting — tracking how many OTP requests a phone number or IP has made in the current window, and (2) nudge cooldown tracking — preventing repeated nudges to the same participant within 48 hours.
 
 ### Which Environments
 
@@ -1604,7 +1663,7 @@ Prevent the payer from nudging the same participant more than once in 24 hours.
 
 ```typescript
 // Set on nudge send:
-await redis.set(`nudge:${participantId}`, '1', { ex: 86400 });   // EX 86400 = 24 hours
+await redis.set(`nudge:${participantId}`, '1', { ex: 172800 });   // EX 172800 = 48 hours
 
 // Check before allowing nudge:
 const cooldownActive = await redis.get(`nudge:${participantId}`);
@@ -1617,6 +1676,24 @@ if (cooldownActive !== null) {
 ```
 
 Key pattern: `nudge:{participantId}` (UUID, not PII — safe to log).
+
+#### Pattern 2b: `buildNudgeMessage` — Nudge SMS Text Builder
+
+```typescript
+// File: backend/src/modules/messages/nudge.builder.ts
+
+export function buildNudgeMessage(params: {
+  participantDisplayName: string;   // already sanitized
+  payerDisplayName: string;         // already sanitized
+  amountFormatted: string;          // e.g. "$12.50" — from formatCurrency()
+  paymentHandles: Array<{ provider: string; handleDisplay: string }>;
+  eventTitle: string;
+}): string
+
+// Returns: a plain-text SMS string, max 160 characters (single SMS segment)
+// Example: "Hi Alex! Pawan is waiting for your $12.50 from Dinner at Nobu. Pay via Venmo @pawan or CashApp $pawan"
+// If handles exceed character limit, include only the first one with "& more in the app"
+```
 
 #### Pattern 3: Session Caching (Optional)
 
@@ -1693,7 +1770,7 @@ export async function otpRateLimitMiddleware(
 }
 
 export async function setNudgeCooldown(participantId: string): Promise<void> {
-  await redis.set(`nudge:${participantId}`, '1', { ex: 86400 });
+  await redis.set(`nudge:${participantId}`, '1', { ex: 172800 });   // 48-hour cooldown
 }
 
 export async function checkNudgeCooldown(participantId: string): Promise<void> {
@@ -1754,7 +1831,7 @@ import { Client } from '@upstash/qstash';
 const qstash = new Client({ token: process.env.QSTASH_TOKEN! });
 
 await qstash.publishJSON({
-  url: `${process.env.APP_DOMAIN}/api/v1/jobs/nudge-check`,
+  url: `${process.env.APP_URL}/api/v1/jobs/nudge-check`,
   body: {
     eventId: 'uuid-string',
     jobType: 'nudge_reminder',
@@ -1912,6 +1989,11 @@ export async function handleNudgeCheck(req: Request, res: Response): Promise<voi
     }
 
     // Get phone from guest_pii or users table
+    // Import resolveParticipantPhone from backend/src/infrastructure/security/sanitize.ts
+    // This function decrypts participant.phone_encrypted using PHONE_ENCRYPTION_KEY.
+    // If phone_encrypted is null (App Member), the phone is retrieved via
+    // supabaseAdmin.auth.admin.getUserById(participant.user_id) and the returned
+    // phone is used only within scope — never stored.
     const phoneE164 = await resolveParticipantPhone(participant);
     if (!phoneE164) { skippedCount++; continue; }
 
@@ -1924,7 +2006,16 @@ export async function handleNudgeCheck(req: Request, res: Response): Promise<voi
     }
 
     // Build nudge message and send
-    const nudgeText = buildNudgeMessage(participant.display_name);
+    const nudgeText = buildNudgeMessage({
+      participantDisplayName: sanitizePromptInput(participant.display_name, { maxLength: 100 }),
+      payerDisplayName: sanitizePromptInput(payer.display_name, { maxLength: 100 }),
+      amountFormatted: formatCurrency(participant.amount_owed_minor_units / 100, event.currency, event.locale),
+      paymentHandles: payer.paymentHandles.map(h => ({
+        provider: h.provider,
+        handleDisplay: h.handle_display  // already decrypted
+      })),
+      eventTitle: event.title
+    });
     await sendSplitMessage(participant.id, phoneE164, nudgeText);
     await setNudgeCooldown(participant.id);
 
@@ -1955,7 +2046,9 @@ Sends in-app push notifications to registered app users for: payment self-report
 
 In development, guard every push call with:
 ```typescript
-if (process.env.NODE_ENV === 'development') {
+// Use APP_ENV, NOT NODE_ENV — Railway sets NODE_ENV=production on ALL deployments including staging.
+// APP_ENV is set by Doppler and correctly reflects development | staging | production.
+if (process.env.APP_ENV === 'development') {
   logger.info('[DEV] Push notification (not sent):', { token, message });
   return;
 }
@@ -1966,11 +2059,33 @@ if (process.env.NODE_ENV === 'development') {
 ```
 1. App launches → mobile calls Notifications.getExpoPushTokenAsync()
 2. Mobile receives an Expo push token (e.g. 'ExponentPushToken[xxx...]')
-3. Mobile sends token to backend: PATCH /users/me with { expo_push_token: 'ExponentPushToken[...]' }
-4. Backend stores token in device_sessions.push_token and users.expo_push_token
+3. Mobile sends token to backend: POST /users/me/push-token with { device_id, token, platform }
+4. Backend upserts into device_sessions table (one row per device per user — see server-side handler below)
 5. Backend uses this token when sending push notifications to this user
 6. Token can change on reinstall or permission revoke — update on every app launch
 ```
+
+**Server-side push token registration handler (`POST /users/me/push-token`):**
+
+```typescript
+// POST /users/me/push-token handler:
+const { device_id, token, platform } = req.body;
+
+// Upsert into device_sessions table (one row per device per user)
+await supabase
+  .from('device_sessions')
+  .upsert({
+    user_id: req.user.id,
+    device_id,
+    push_token: token,
+    platform,
+    last_seen: new Date().toISOString(),
+  }, {
+    onConflict: 'user_id,device_id'  // unique constraint
+  });
+```
+
+> **Note:** The `device_sessions` table (defined in 04-Data-Architecture.md) stores one row per device per user. This allows multi-device support — a user with both iPhone and Android receives push notifications on all registered devices.
 
 ### Authentication
 
@@ -2034,7 +2149,7 @@ Send the token to the backend after obtaining it, and again on every app launch 
 // After login or on app foreground
 const token = await registerForPushNotifications();
 if (token) {
-  await updateUserPushToken(token);  // calls PATCH /users/me with expo_push_token
+  await updateUserPushToken(token);  // calls POST /users/me/push-token with { device_id, token, platform }
 }
 ```
 
@@ -2060,7 +2175,7 @@ export async function sendPushNotification(
   expoPushToken: string | null,
   payload: PushNotificationPayload,
 ): Promise<void> {
-  if (process.env.NODE_ENV === 'development') {
+  if (process.env.APP_ENV === 'development') {
     logger.info('[DEV] Push notification suppressed', { expoPushToken, payload });
     return;
   }
@@ -2096,7 +2211,7 @@ export async function sendBatchPushNotifications(
   recipients: Array<{ userId: string; token: string }>,
   payload: PushNotificationPayload,
 ): Promise<void> {
-  if (process.env.NODE_ENV === 'development') {
+  if (process.env.APP_ENV === 'development') {
     logger.info('[DEV] Batch push suppressed', { count: recipients.length });
     return;
   }
@@ -2265,7 +2380,7 @@ async function sendPushNotification(
   token: string,
   payload: { title: string; body: string; data?: Record<string, unknown> },
 ): Promise<void> {
-  if (process.env.NODE_ENV === 'development') {
+  if (process.env.APP_ENV === 'development') {
     logger.info('[DEV] Push suppressed', { token, payload });
     return;
   }
@@ -2347,7 +2462,8 @@ QSTASH_NEXT_SIGNING_KEY=sig_yyy...
 
 # ─── Application ──────────────────────────────────────────────────────────────
 NODE_ENV=development                   # 'development' | 'staging' | 'production'
-APP_DOMAIN=https://tryletssplyt.com    # full URL, no trailing slash
+APP_URL=https://letssplyt.app          # Full base URL (used for webhook signature verification)
+APP_DOMAIN=letssplyt.app               # Domain only (used for CORS, AASA, deep link config)
 HANDLE_ENCRYPTION_KEY=64-char-hex     # openssl rand -hex 32
 ANALYTICS_SALT=64-char-hex            # openssl rand -hex 32
 JWT_SECRET=128-char-hex               # openssl rand -hex 64

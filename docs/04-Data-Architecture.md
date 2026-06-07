@@ -72,9 +72,17 @@ Instead, `participants` holds only a `guest_pii_token UUID` — a foreign key re
 ### The guest_pii Lifecycle
 
 1. **Creation:** When a non-app guest registers via the browser QR flow, the Node.js backend inserts a row into `guest_pii` with `purge_after = NULL` (unknown at join time — the settlement date is not yet determined). The `id` UUID is stored in `participants.guest_pii_token`.
-2. **Purge date set:** A database trigger fires when `events.status` transitions to `'settled'`. The trigger sets `purge_after = NOW() + INTERVAL '90 days'` on all `guest_pii` rows linked to participants of that event. See Section 4 for the trigger definition.
+2. **Purge date set:** A database trigger fires when `events.status` transitions to `'settled'`. The trigger sets `purge_after = NOW() + INTERVAL '30 days'` on all `guest_pii` rows linked to participants of that event. See Section 4 for the trigger definition.
 3. **Use:** When the A3 message composer needs to send an SMS to this guest, it fetches the `guest_pii` row using the service role, decrypts `phone_encrypted` in-memory, sends via Twilio, and discards the plaintext.
 4. **Purge:** A nightly background job (QStash cron at 02:00 UTC) deletes all `guest_pii` rows where `purge_after IS NOT NULL AND purge_after < NOW()`. This satisfies GDPR data minimisation and CCPA deletion rights automatically.
+
+### Authoritative Data Retention Policy
+
+| Data | Retention | Trigger |
+|------|-----------|---------|
+| Guest PII (`phone_encrypted`, `phone_hash`) | **30 days** after event settles | `trg_set_guest_pii_purge_date` sets `purge_after`; nightly job deletes |
+| Receipt images (Supabase Storage `receipts` bucket) | **30 days** after event settles | Nightly cleanup job keyed off `events.fully_settled_at` |
+| `ai_audit_log` rows | **90 days** (support/debugging; not user PII) | Nightly QStash job deletes rows older than 90 days |
 
 ### Environment Variables for Encryption
 
@@ -118,7 +126,7 @@ Identity vault for non-app guests. This table is never accessible to the mobile 
 -- Isolated PII store for non-app guests.
 -- Only the backend service role can read or write this table.
 -- purge_after is NULL at creation; set by trigger when event reaches 'settled'.
--- Auto-purged 90 days after event settlement via nightly background job.
+-- Auto-purged 30 days after event settlement via nightly background job.
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE guest_pii (
   id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -130,7 +138,7 @@ CREATE TABLE guest_pii (
   name_encrypted  TEXT        NOT NULL,
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   -- purge_after: NULL at creation; set by trg_set_guest_pii_purge_date trigger when
-  -- the linked event transitions to 'settled'. Set to NOW() + INTERVAL '90 days'.
+  -- the linked event transitions to 'settled'. Set to NOW() + INTERVAL '30 days'.
   -- The nightly purge job deletes rows where purge_after IS NOT NULL AND purge_after < NOW()
   purge_after     TIMESTAMPTZ
 );
@@ -219,10 +227,9 @@ CREATE TABLE user_payment_handles (
   id               UUID      PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id          UUID      NOT NULL REFERENCES users(id) ON DELETE CASCADE,
 
-  -- Correction 12: fully enumerated provider list
   provider         TEXT      NOT NULL CHECK (provider IN (
                      'venmo', 'paypal', 'cashapp', 'zelle', 'wise',
-                     'bank_transfer', 'other'
+                     'upi', 'bank_transfer', 'other'
                    )),
 
   -- handle_encrypted: the encrypted payment handle string (e.g. "@username", "$cashtag")
@@ -280,8 +287,11 @@ CREATE TABLE events (
                     'archived'     -- payer archived / soft-deleted
                   )),
 
-  split_mode      TEXT        CHECK (split_mode IN (
-                    'even', 'itemised', 'amount', 'percent', 'portion'
+  -- 'equal' = everyone pays the same; 'portion' = custom amounts per person;
+  -- 'itemised' = items assigned to individuals.
+  -- 'amount' and 'percent' are client-side input modes that both map to 'portion' on save.
+  split_mode      VARCHAR(10)  CHECK (split_mode IN (
+                    'equal', 'portion', 'itemised'
                   )),
 
   -- snapshot of participant count when group was locked, for analytics
@@ -293,6 +303,10 @@ CREATE TABLE events (
 
   -- Correction 7: ai_stage column with full enum and NOT NULL constraint
   -- Used by the AI idempotency guard to prevent duplicate AI runs on retried requests
+  -- State machine: none → parsing → parsed → calculating → calculated → messaging → complete → failed
+  -- CHECK (ai_stage IN ('none','parsing','parsed','calculating','calculated','messaging','complete','failed'))
+  -- The failed → none reset is performed only by the admin utility
+  -- backend/scripts/reset-ai-stage.ts. Application code NEVER resets ai_stage directly.
   ai_stage        TEXT        NOT NULL DEFAULT 'none' CHECK (ai_stage IN (
                     'none',        -- no AI processing started
                     'parsing',     -- A1 receipt parsing in progress
@@ -307,6 +321,11 @@ CREATE TABLE events (
   -- Performance metrics (populated on transition; used for analytics)
   time_to_lock_seconds  INT,   -- seconds from event created_at to locked_at
   time_to_send_seconds  INT,   -- seconds from locked_at to messages_sent_at
+
+  tax_amount              NUMERIC(10,2),                       -- extracted by A1; NULL until parsed
+  tip_amount              NUMERIC(10,2),                       -- extracted by A1; NULL until parsed
+  locale                  VARCHAR(10)  NOT NULL DEFAULT 'en-US', -- detected from receipt by A1 (e.g. 'en-US', 'ja-JP')
+  last_parse_attempt_id   UUID,                                 -- set by A1 on scan; confirmed by POST /receipt/confirm; prevents stale confirmations
 
   -- Correction 11: locked_at timestamp — populated when payer taps "Lock & Split"
   locked_at           TIMESTAMPTZ,
@@ -406,6 +425,13 @@ CREATE TABLE participants (
   amount_owed     NUMERIC(10,2),
 
   -- payment_status: the current state in the settlement state machine
+  -- pending       → participant has joined, no payment action taken
+  -- self_reported → participant tapped "I've paid" in the app or web
+  -- payer_marked  → creator marked this participant as paid
+  -- confirmed     → both sides agree (auto-set when payer_marked after self_reported, or vice versa)
+  -- disputed      → creator rejected participant's self-report
+  -- opted_out     → STOP SMS received; participant will not receive further messages
+  -- settled       → final state; funds fully reconciled
   payment_status  TEXT        NOT NULL DEFAULT 'pending' CHECK (payment_status IN (
                     'pending',
                     'self_reported',
@@ -468,12 +494,17 @@ CREATE TABLE receipt_items (
   id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
   event_id        UUID        NOT NULL REFERENCES events(id) ON DELETE CASCADE,
 
-  description     TEXT        NOT NULL,
+  name            TEXT        NOT NULL,
   unit_price      NUMERIC(10,2) NOT NULL,
   quantity        NUMERIC(6,2) NOT NULL DEFAULT 1,
 
   -- line_total is always unit_price * quantity — computed by the DB
   line_total      NUMERIC(10,2) GENERATED ALWAYS AS (unit_price * quantity) STORED,
+
+  -- AI parse confidence columns — set by A1 (receipt parser).
+  -- The frontend highlights low-confidence items for creator review.
+  confidence_score  NUMERIC(3,2)  NOT NULL DEFAULT 1.00,   -- AI parse confidence 0.00–1.00
+  is_low_confidence BOOLEAN       NOT NULL DEFAULT false,  -- true when confidence_score < 0.80
 
   -- Flags that classify the item type for A2 tax/tip proration logic
   is_tax          BOOLEAN     NOT NULL DEFAULT FALSE,
@@ -563,9 +594,15 @@ CREATE TABLE settlement_log (
   -- actor_id: the user who performed the action; NULL means a system/automated action
   actor_id        UUID        REFERENCES users(id),
 
-  -- State snapshot at the time of this log entry
-  previous_status TEXT,
-  new_status      TEXT,
+  -- State snapshot at the time of this log entry (canonical names: from_status / to_status)
+  from_status     TEXT        CHECK (from_status IN (
+                    'pending','self_reported','payer_marked','confirmed',
+                    'disputed','opted_out','settled'
+                  )),
+  to_status       TEXT        CHECK (to_status IN (
+                    'pending','self_reported','payer_marked','confirmed',
+                    'disputed','opted_out','settled'
+                  )),
 
   -- amount at the time of logging (may differ from current amount_owed if split was revised)
   amount          NUMERIC(10,2),
@@ -768,34 +805,26 @@ Immutable record of every AI API call — provider, model, prompt, response, lat
 -- Used for: cost monitoring, hallucination investigation, prompt iteration,
 -- and idempotency verification (prevent duplicate AI runs on retries).
 -- NEVER update or delete rows from this table.
+-- RLS: only service-role key can INSERT. No RLS SELECT policy — this table is
+-- internal only. No user-facing API exposes it.
+-- Retention: rows kept for 90 days (for support/debugging; not user PII).
+-- A nightly QStash job deletes rows older than 90 days.
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE ai_audit_log (
-  id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  event_id        UUID        REFERENCES events(id),
-
-  agent           TEXT        NOT NULL CHECK (agent IN ('a1_receipt', 'a2_split', 'a3_message')),
-  provider        TEXT        NOT NULL CHECK (provider IN ('gemini', 'anthropic')),
-  model           TEXT        NOT NULL, -- e.g. 'gemini-2.5-flash', 'claude-haiku-4-5'
-
-  -- prompt_hash: SHA-256 of the prompt — stored instead of the prompt itself
-  -- to avoid storing receipt image data or PII in the audit log
-  prompt_hash     TEXT        NOT NULL,
-
-  -- tokens_in / tokens_out: for cost tracking and rate limit monitoring
-  tokens_in       INT,
-  tokens_out      INT,
-
-  latency_ms      INT,        -- wall-clock time for the API call
-  success         BOOLEAN     NOT NULL,
-  error_message   TEXT,       -- set when success = FALSE
-
-  -- confidence: for A1, the model's self-reported parse confidence (0.00–1.00)
-  confidence      NUMERIC(3,2),
-
-  -- metadata: additional structured data (e.g. item_count for A1, participant_count for A2)
-  metadata        JSONB,
-
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id          UUID         PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id    UUID         REFERENCES events(id) ON DELETE CASCADE,
+  agent       VARCHAR(2)   NOT NULL CHECK (agent IN ('A1','A2','A3')),
+  provider    TEXT         NOT NULL,  -- e.g. 'google', 'anthropic'
+  model_used  TEXT         NOT NULL,  -- e.g. 'gemini-2.5-flash', 'claude-haiku-4-5-20251001'
+  input_hash  TEXT,                   -- SHA-256 of the prompt (for dedup/audit, not reversible)
+  output_hash TEXT,                   -- SHA-256 of the response
+  input_tokens  INT,
+  output_tokens INT,
+  latency_ms    INT,
+  attempts      SMALLINT    NOT NULL DEFAULT 1,
+  success       BOOLEAN     NOT NULL,
+  error_code    TEXT,                  -- e.g. 'TIMEOUT', 'RATE_LIMITED', 'PARSE_FAILED'
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ```
 
@@ -967,7 +996,7 @@ Sets `guest_pii.purge_after` when an event transitions to `'settled'`. The purge
 ```sql
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Trigger function: set purge_after on guest_pii rows when the linked event
--- transitions to 'settled'. purge_after = NOW() + 90 days.
+-- transitions to 'settled'. purge_after = NOW() + 30 days.
 -- This satisfies GDPR data minimisation: PII is retained only as long as needed.
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE OR REPLACE FUNCTION set_guest_pii_purge_date()
@@ -975,7 +1004,7 @@ RETURNS TRIGGER AS $$
 BEGIN
   IF NEW.status = 'settled' AND OLD.status != 'settled' THEN
     UPDATE guest_pii
-    SET purge_after = NOW() + INTERVAL '90 days'
+    SET purge_after = NOW() + INTERVAL '30 days'
     WHERE id IN (
       SELECT guest_pii_token FROM participants 
       WHERE event_id = NEW.id AND guest_pii_token IS NOT NULL
@@ -1667,12 +1696,14 @@ export async function handlePartitionCreation(
 
 ## 9. Migration Strategy
 
-All schema changes are versioned migration files under `/supabase/migrations/`. Migrations are tracked by the Supabase CLI using timestamp-prefixed filenames. Never modify the production schema by hand.
+All schema changes are versioned migration files under `supabase/migrations/` at the repo root. Migrations are tracked by the Supabase CLI using timestamp-prefixed filenames. Never modify the production schema by hand.
+
+**Note:** `supabase/migrations/` lives at repo root, not inside `backend/`. Supabase CLI expects it at root. All migration commands run from the repo root.
 
 ### Migration File Structure
 
 ```
-/supabase/
+supabase/
   migrations/
     20260601000000_initial_schema.sql      ← all tables, triggers, indexes, RLS, seed data
     20260615000000_add_ai_audit_log.sql    ← if adding separately from initial
@@ -1783,7 +1814,7 @@ ALTER PUBLICATION supabase_realtime ADD TABLE participants;
 
 ## 11. Development Seed Data
 
-**File location:** `/backend/supabase/seed.sql`
+**File location:** `supabase/seed.sql` (repo root — same directory as `supabase/migrations/`)
 
 **Run command:** `supabase db reset --db-url $SUPABASE_URL` (resets local DB and applies all migrations + seed)
 
@@ -1958,8 +1989,12 @@ VALUES (
 
 ```
 event-members:{eventId}      — participant join/update during joining phase
+                               (participants table, filter event_id=eq.{eventId})
 event-settlement:{eventId}   — payment status updates during settlement phase
+                               (participants table, filter event_id=eq.{eventId}, payload includes payment_status changes)
 ```
+
+**Note:** Two separate channel subscriptions are used by the mobile app: one during the joining phase (Creator watching participants join) and one during settlement (Creator watching payment statuses). Both subscribe to the same `participants` table but the client can differentiate by the channel name. The colon (`:`) is used as the separator between the channel type prefix and the eventId.
 
 ### Mobile Client Subscriptions
 

@@ -375,7 +375,7 @@ export class OpenAICompatAdapter implements LLMProvider {
 ### Provider Factory
 
 ```typescript
-// src/infrastructure/llm/llm.factory.ts
+// src/infrastructure/llm/factory.ts
 import { LLMProvider } from './llm.provider';
 import { AnthropicAdapter } from './providers/anthropic.adapter';
 import { OpenAIAdapter } from './providers/openai.adapter';
@@ -475,7 +475,7 @@ ANTHROPIC_MONTHLY_SPEND_LIMIT=100
 
 ```typescript
 // CORRECT — always use the factory
-import { createLLMProvider } from '../../../infrastructure/llm/llm.factory';
+import { createLLMProvider } from '../../../infrastructure/llm/factory';
 
 const provider = createLLMProvider('A1');
 const result = await provider.complete(messages, { timeout: 30000, maxTokens: 1024 });
@@ -505,9 +505,10 @@ import { z } from 'zod';
 export const ReceiptItemSchema = z.object({
   id: z.string().uuid(),
   name: z.string().min(1).max(60),
-  price: z.number().positive().multipleOf(0.01),
+  unit_price: z.number().positive().multipleOf(0.01),
   quantity: z.number().int().positive().default(1),
-  confidence: z.number().min(0).max(1),
+  confidence_score: z.number().min(0).max(1),
+  is_low_confidence: z.boolean(),
 });
 
 export const ReceiptParseResultSchema = z.object({
@@ -517,6 +518,7 @@ export const ReceiptParseResultSchema = z.object({
   tip: z.number().nonnegative(),
   total: z.number().positive(),
   currency: z.string().length(3).toUpperCase(),
+  locale: z.string().optional(),
   parse_confidence: z.number().min(0).max(1),
 });
 
@@ -550,9 +552,9 @@ Return ONLY valid JSON matching this exact schema — no markdown, no explanatio
     {
       "id": "string (uuid v4 — generate a new uuid for each item)",
       "name": "string (item name as printed on receipt, max 60 chars)",
-      "price": "number (unit price in the receipt's currency, 2 decimal places, positive)",
+      "unit_price": "number (unit price in the receipt's currency, 2 decimal places, positive)",
       "quantity": "number (integer quantity, default 1 if not specified)",
-      "confidence": "number (0.0 to 1.0 — your confidence this item is correctly read)"
+      "confidence_score": "number (0.0 to 1.0 — your confidence this item is correctly read)"
     }
   ],
   "subtotal": "number (sum of all items before tax and tip)",
@@ -609,7 +611,7 @@ export async function preprocessReceiptImage(base64: string): Promise<string> {
 
 ### Confidence Scoring
 
-- `item.confidence < 0.75`: Flag that item for payer review. The item is still included in the result — payer can correct name or price before confirming.
+- `item.confidence_score < 0.75`: Flag that item for payer review. The item is still included in the result — payer can correct name or unit_price before confirming.
 - `parse_confidence < 0.80` or any low-confidence items: Set `requiresManualReview = true` in the harness result. The receipt review screen highlights flagged items in amber.
 - Never block the user. Low confidence = show a warning, not an error. The payer is the fallback.
 
@@ -750,14 +752,14 @@ export async function getCachedReceiptResult(eventId: string): Promise<ReceiptPa
   const mappedItems = (items ?? []).map(item => ({
     id: item.id,
     name: item.name,
-    unitPrice: item.unit_price,
+    unit_price: item.unit_price,
     quantity: item.quantity,
-    confidenceScore: item.confidence_score,
-    isLowConfidence: item.is_low_confidence,
+    confidence_score: item.confidence_score,
+    is_low_confidence: item.is_low_confidence,
   }));
 
   const subtotal = mappedItems.reduce(
-    (sum, item) => sum + item.unitPrice * item.quantity, 0
+    (sum, item) => sum + item.unit_price * item.quantity, 0
   );
 
   return {
@@ -779,11 +781,11 @@ export async function getCachedReceiptResult(eventId: string): Promise<ReceiptPa
 // src/modules/ai/receipt-parser/receipt-parser.harness.ts
 
 import { v4 as uuidv4 } from 'uuid';
-import { createLLMProvider } from '../../../infrastructure/llm/llm.factory';
+import { createLLMProvider } from '../../../infrastructure/llm/factory';
 import { buildReceiptParserPrompt } from './receipt-parser.prompt';
 import { ReceiptParseOutputSchema, ReceiptParseResult } from './receipt-parser.schema';
 import { preprocessReceiptImage } from './receipt-parser.preprocess';
-import { sanitizePromptInput } from '../../../infrastructure/llm/prompt-sanitizer';
+import { sanitizePromptInput } from '../../../infrastructure/security/sanitize';
 import { assertImageSize } from '../../../infrastructure/llm/input-guards';
 import {
   claimParsingSlot,
@@ -807,7 +809,16 @@ export interface ParseReceiptOptions {
 }
 
 export interface ParseReceiptHarnessResult {
+  success: boolean;
+  parseAttemptId: string;  // UUID generated before AI call; written to events.last_parse_attempt_id
   result: ReceiptParseResult;
+  items: ReceiptItem[];
+  subtotal: number;
+  tax: number | null;
+  tip: number | null;
+  total: number;
+  currency: string;
+  locale: string;
   lowConfidenceItems: string[]; // item IDs needing payer attention
   requiresManualReview: boolean;
   attempts: number;
@@ -818,7 +829,8 @@ export async function parseReceiptWithHarness(
   opts: ParseReceiptOptions,
 ): Promise<ParseReceiptHarnessResult> {
   // Input size guard — before any processing
-  assertImageSize(opts.imageBase64);
+  // assertImageSize takes sizeBytes (number), not the base64 string itself
+  assertImageSize(Buffer.byteLength(opts.imageBase64, 'base64'));
 
   // Idempotency: check current stage
   const currentStage = await getAiStage(opts.eventId);
@@ -908,27 +920,26 @@ export async function parseReceiptWithHarness(
       }));
 
       const lowConfidenceItems = validated.items
-        .filter(item => item.confidence < LOW_CONFIDENCE_THRESHOLD)
+        .filter(item => item.confidence_score < LOW_CONFIDENCE_THRESHOLD)
         .map(item => item.id);
 
       const requiresManualReview =
         validated.parse_confidence < OVERALL_CONFIDENCE_THRESHOLD ||
         lowConfidenceItems.length > 0;
 
-      await writeAuditLog({
+      writeAuditLog({
         eventId: opts.eventId,
         agent: 'A1',
         provider: process.env.AI_PROVIDER_A1 ?? 'gemini',
         modelUsed: response.modelUsed,
-        promptContent: prompt,
-        responseText: rawText,
-        confidence: validated.parse_confidence,
+        inputHash: sha256(prompt),
+        outputHash: sha256(rawText),
         inputTokens: response.usage.inputTokens,
         outputTokens: response.usage.outputTokens,
         latencyMs: Date.now() - start,
         attempts: attempt,
         success: true,
-      });
+      }).catch(console.error);
 
       await setAiStage(opts.eventId, 'parsed');
 
@@ -949,20 +960,20 @@ export async function parseReceiptWithHarness(
         throw err;
       }
 
-      await writeAuditLog({
+      writeAuditLog({
         eventId: opts.eventId,
         agent: 'A1',
         provider: process.env.AI_PROVIDER_A1 ?? 'gemini',
         modelUsed: process.env.AI_MODEL_A1 ?? 'gemini-2.5-flash',
-        promptContent: prompt,
-        responseText: rawText ?? '',
+        inputHash: sha256(prompt),
+        outputHash: sha256(rawText ?? ''),
         inputTokens: 0,
         outputTokens: 0,
         latencyMs: Date.now() - start,
         attempts: attempt,
         success: false,
         errorCode: lastError.message,
-      });
+      }).catch(console.error);
 
       if (attempt < MAX_RETRIES) await sleep(getRetryDelay(attempt));
     }
@@ -1001,10 +1012,29 @@ After `parseReceiptWithHarness` returns, the payer **must review all items** bef
 // In events.service.ts — the state machine enforces the checkpoint
 
 async function runA1AndAwaitReview(eventId: string): Promise<void> {
-  const parseResult = await parseReceiptWithHarness({ ... });
+  import { randomUUID } from 'crypto';
 
-  // Store parsed items with status = 'pending_review'
-  await storeReceiptItems(eventId, parseResult.result, 'pending_review');
+  // Generate parseAttemptId BEFORE the AI call so it can be passed to storeReceiptItems
+  const parseAttemptId = randomUUID();
+
+  const parseResult = await parseReceiptWithHarness({ ..., parseAttemptId });
+
+  // Store parsed items — 2nd arg is parseResult.result.items (not parseResult.result)
+  // 3rd arg is parseAttemptId UUID (not the string 'pending_review')
+  await storeReceiptItems(eventId, parseResult.result.items, parseAttemptId);
+
+  // Update the events table with the extracted financial summary
+  const { error: eventUpdateError } = await supabase
+    .from('events')
+    .update({
+      tax_amount: parseResult.result.tax ?? null,
+      tip_amount: parseResult.result.tip ?? null,
+      total_amount: parseResult.result.total,
+      locale: parseResult.result.locale ?? 'en-US',
+      currency: parseResult.result.currency,
+    })
+    .eq('id', eventId);
+  if (eventUpdateError) throw eventUpdateError;
 
   // Return to payer for review — A2 CANNOT run until payer confirms
   // event.receipt_status = 'awaiting_payer_review'
@@ -1047,16 +1077,22 @@ These two paths are completely separate.
 The model never sees amounts. The calculator never talks to an LLM.
 ```
 
+### Participant Name Matching
+
+A2 receives `display_name` from the participants table. The DB column is `display_name`; do NOT rename it to `name` in the A2 prompt or response parsing. The `display_name` value is what the participant typed when joining.
+
+`sanitizePromptInput()` is called before inserting any display_name into the A2 prompt; the truncation limit is 100 characters (set via `options.maxLength: 100`) to prevent name matching from breaking — do NOT use the default 2000-char limit for names.
+
 ### System Prompt (Production-Ready)
 
 ```typescript
 // src/modules/ai/split-calculator/split-calculator.prompt.ts
-import { sanitizePromptInput } from '../../../infrastructure/llm/prompt-sanitizer';
+import { sanitizePromptInput } from '../../../infrastructure/security/sanitize';
 
 export interface ConfirmedReceiptItem {
   id: string;
   name: string;
-  price: number;
+  unit_price: number;
   quantity: number;
 }
 
@@ -1071,17 +1107,17 @@ export function buildSplitCalculatorPrompt(
 ): string {
   const itemList = items
     .map(item =>
-      `  { "id": "${item.id}", "name": "${sanitizePromptInput(item.name, 60)}", ` +
-      `"price": ${item.price}, "qty": ${item.quantity} }`,
+      `  { "id": "${item.id}", "name": "${sanitizePromptInput(item.name, { maxLength: 60 })}", ` +
+      `"unit_price": ${item.unit_price}, "qty": ${item.quantity} }`,
     )
     .join(',\n');
 
   const participantList = participants
-    .map(p => `"${sanitizePromptInput(p.name, 50)}"`)
+    .map(p => `"${sanitizePromptInput(p.display_name, { maxLength: 100 })}"`)
     .join(', ');
 
   const instruction = naturalLanguageInstruction
-    ? `\nPayer's instruction: "${sanitizePromptInput(naturalLanguageInstruction, 200)}"`
+    ? `\nPayer's instruction: "${sanitizePromptInput(naturalLanguageInstruction, { maxLength: 200 })}"`
     : '';
 
   return `You are a bill-splitting assistant. Assign receipt items to participants.
@@ -1169,12 +1205,12 @@ The frontend shows unassigned items highlighted in amber. The payer drags them t
 This is the most important file in the AI subsystem. It is pure TypeScript. The model never touches it.
 
 ```typescript
-// src/modules/ai/split-calculator/split-calculator.ts
+// shared/utils/splitCalculator.ts
 
 export interface ConfirmedReceiptItem {
   id: string;
   name: string;
-  price: number;
+  unit_price: number;
   quantity: number;
 }
 
@@ -1229,7 +1265,7 @@ export function fromMinorUnits(minorAmount: number, currencyCode: string): numbe
 // - JPY: toMinorUnits(1200, 'JPY') === 1200 (no multiplication)
 // - USD: toMinorUnits(12.34, 'USD') === 1234
 // - BHD: toMinorUnits(1.234, 'BHD') === 1234
-// - calculateEvenSplit(1200, 3, 'JPY') returns [400, 400, 400] (not 120000/3)
+// - calculateSplits with equal JPY assignments: 3-way split of ¥1200 → each person owes ¥400 (not 120000/3)
 
 /**
  * Takes AI-generated assignments and produces final owed amounts.
@@ -1259,7 +1295,7 @@ export function calculateSplits(
     if (!item) throw new Error(`Unknown item id: ${assignment.item_id}`);
 
     // Price × qty then split evenly among assigned participants
-    const totalItemMinor = toMinorUnits(item.price * item.quantity, currencyCode);
+    const totalItemMinor = toMinorUnits(item.unit_price * item.quantity, currencyCode);
     const sharePerPersonMinor = Math.floor(totalItemMinor / assignment.assigned_to.length);
     const remainderMinor = totalItemMinor % assignment.assigned_to.length;
 
@@ -1305,7 +1341,15 @@ export function calculateSplits(
   }
 
   // Step 4: Largest-remainder rounding — ensures amounts sum exactly to total
-  const rounded = largestRemainderRound(finalAmounts, totals.total);
+  // largestRemainderRound takes arrays, not a Map — extract ordered arrays first
+  const participantIds = Array.from(finalAmounts.keys());
+  const fractionalShares = Array.from(finalAmounts.values()); // major-unit fractional amounts
+
+  // largestRemainderRound returns minor-unit integers in the same order
+  const roundedMinorUnits = largestRemainderRound(fractionalShares, currencyCode);
+
+  // Reconstruct the Map with rounded integer values
+  const rounded = new Map(participantIds.map((id, i) => [id, roundedMinorUnits[i]]));
 
   // Step 5: Invariant assertion — if this fails, something is structurally wrong
   const sumCheck = Array.from(rounded.values()).reduce((a, b) => a + b, 0);
@@ -1326,63 +1370,78 @@ export function calculateSplits(
 
 /**
  * Largest-remainder method — the correct algorithm for rounding currency splits.
+ * Uses getCurrencyMinorUnits(currency) to determine the correct multiplier.
  *
- * Problem: naive rounding of each share loses or gains pennies.
+ * For JPY (0 decimal places), multiplier=1, so shares stay as whole yen.
+ * For BHD (3 decimal places), multiplier=1000.
+ * For USD/EUR/GBP etc. (2 decimal places), multiplier=100.
+ *
+ * Problem: naive rounding of each share loses or gains minor units.
  * Example: 3 people splitting $10.00
  *   Each person's exact share = $3.333...
  *   Naive: round each to $3.33 → sum = $9.99 (penny lost)
  *   This algorithm: two people pay $3.33, one pays $3.34 → sum = $10.00 exactly
  *
  * How it works:
- * 1. Floor every amount to 2 decimal places.
- * 2. Count how many pennies are left to distribute (targetTotal - sum of floored amounts).
- * 3. Sort participants by the fractional part of their amount, descending.
- * 4. Give one extra penny to the top N participants where N = pennies left.
+ * 1. Floor every fractional major-unit amount to minor units (using currency multiplier).
+ * 2. Count how many minor units are left to distribute (targetMinor - sum of floored amounts).
+ * 3. Sort participants by the fractional part of their minor-unit amount, descending.
+ * 4. Give one extra minor unit to the top N participants where N = units left.
+ *
+ * Sum invariant: sum(output) === Math.round(sum(shares) * multiplier) ± 1
  */
-export function largestRemainderRound(
-  amounts: Map<string, number>,
-  targetTotal: number,
-): Map<string, number> {
-  const entries = Array.from(amounts.entries());
-  const targetCents = Math.round(targetTotal * 100);
+import { getCurrencyMinorUnits } from 'shared/utils/currency';
 
-  const withFloor = entries.map(([name, amount]) => {
-    const amountCents = amount * 100;
-    const flooredCents = Math.floor(amountCents);
+export function largestRemainderRound(
+  shares: number[],   // fractional amounts in MAJOR units (e.g. 12.333...)
+  currency: string
+): number[] {
+  const multiplier = Math.pow(10, getCurrencyMinorUnits(currency));
+  const targetMinor = Math.round(shares.reduce((a, b) => a + b, 0) * multiplier);
+
+  const withFloor = shares.map((amount) => {
+    const amountMinor = amount * multiplier;
+    const flooredMinor = Math.floor(amountMinor);
     return {
-      name,
-      flooredCents,
-      remainder: amountCents - flooredCents,
+      flooredMinor,
+      remainder: amountMinor - flooredMinor,
     };
   });
 
-  const flooredSumCents = withFloor.reduce((sum, e) => sum + e.flooredCents, 0);
-  let penniesLeft = targetCents - flooredSumCents;
+  const flooredSum = withFloor.reduce((sum, e) => sum + e.flooredMinor, 0);
+  let unitsLeft = targetMinor - flooredSum;
 
-  // Sort by remainder descending — biggest fractions get the extra penny.
+  // Sort by remainder descending — biggest fractions get the extra minor unit.
   // When two participants have equal fractional remainders, the tiebreaker
-  // is deterministic: the participant with the LOWEST name (lexicographic sort)
-  // receives the extra cent first. This is arbitrary but deterministic — the same
-  // input always produces the same output, making the split auditable.
+  // is deterministic: the participant with the LOWEST index receives the extra unit first.
+  // This is arbitrary but deterministic — the same input always produces the same output,
+  // making the split auditable.
   // NOTE: The tiebreaker is intentionally deterministic and not randomised.
   // Randomised tiebreakers would produce non-deterministic output, making evals
   // unreliable and making disputes harder to resolve.
-  withFloor.sort((a, b) => {
+  const indexed = withFloor.map((e, i) => ({ ...e, index: i }));
+  indexed.sort((a, b) => {
     if (Math.abs(b.remainder - a.remainder) > 1e-10) {
       return b.remainder - a.remainder;  // Highest remainder first
     }
-    return a.name.localeCompare(b.name); // ← tiebreaker: lexicographic name sort
+    return a.index - b.index; // ← tiebreaker: original order (deterministic)
   });
 
-  const result = new Map<string, number>();
-  for (const entry of withFloor) {
-    const extra = penniesLeft > 0 ? 1 : 0;
-    result.set(entry.name, parseFloat(((entry.flooredCents + extra) / 100).toFixed(2)));
-    if (penniesLeft > 0) penniesLeft--;
+  const result = new Array<number>(shares.length);
+  for (const entry of indexed) {
+    const extra = unitsLeft > 0 ? 1 : 0;
+    result[entry.index] = entry.flooredMinor + extra;
+    if (unitsLeft > 0) unitsLeft--;
   }
 
+  // Output is in minor units (integers)
   return result;
 }
+
+// NOTE: The calculateSplits() function above calls largestRemainderRound differently than this
+// signature — it passes a Map<string, number>. Align the call site to this array-based signature
+// or keep an overloaded version. The key invariant is: use getCurrencyMinorUnits(currency)
+// for the multiplier — never hardcode * 100.
 ```
 
 ### Harness Implementation
@@ -1390,7 +1449,7 @@ export function largestRemainderRound(
 ```typescript
 // src/modules/ai/split-calculator/split-calculator.harness.ts
 
-import { createLLMProvider } from '../../../infrastructure/llm/llm.factory';
+import { createLLMProvider } from '../../../infrastructure/llm/factory';
 import { buildSplitCalculatorPrompt, ConfirmedReceiptItem, ParticipantName } from './split-calculator.prompt';
 import { SplitAssignmentOutputSchema } from './split-calculator.schema';
 import { calculateSplits, ReceiptTotals, ParticipantSplit } from './split-calculator';
@@ -1421,9 +1480,9 @@ export async function assignAndCalculateSplits(
   naturalLanguageInstruction: string | null,
   currencyCode: string = 'USD', // passed through to calculateSplits for correct minor-unit arithmetic
 ): Promise<SplitCalculationResult> {
-  // Input guards
-  assertItemCount(items);
-  assertParticipantCount(participants);
+  // Input guards — functions take number, not array; pass .length explicitly
+  assertItemCount(items.length);
+  assertParticipantCount(participants.length);
 
   // Atomic stage guard — atomically transition from 'parsed' to 'calculating'
   await claimCalculatingSlot(eventId);
@@ -1436,8 +1495,10 @@ export async function assignAndCalculateSplits(
     const start = Date.now();
     let rawText: string | null = null;
 
+    // Declare before try so promptText is accessible in the catch block for audit logging
+    let promptText = '';
     try {
-      const promptText = buildSplitCalculatorPrompt(items, participants, naturalLanguageInstruction);
+      promptText = buildSplitCalculatorPrompt(items, participants, naturalLanguageInstruction);
       const messages: LLMMessage[] = [{ role: 'user', content: promptText }];
 
       const response = await provider.complete(messages, { maxTokens: 512, timeout: 30_000 });
@@ -1466,20 +1527,19 @@ export async function assignAndCalculateSplits(
         }
       }
 
-      await writeAuditLog({
+      writeAuditLog({
         eventId,
         agent: 'A2',
         provider: process.env.AI_PROVIDER_A2 ?? 'gemini',
         modelUsed: response.modelUsed,
-        promptContent: promptText,
-        responseText: rawText,
-        confidence: validated.confidence,
+        inputHash: sha256(promptText),
+        outputHash: sha256(rawText),
         inputTokens: response.usage.inputTokens,
         outputTokens: response.usage.outputTokens,
         latencyMs: Date.now() - start,
         attempts: attempt,
         success: true,
-      });
+      }).catch(console.error);
 
       // Partial assignment — return without running calculator on unassigned items
       if (validated.unassigned_item_ids.length > 0) {
@@ -1490,7 +1550,7 @@ export async function assignAndCalculateSplits(
 
         // Recalculate subtotal for assigned items only
         const assignedSubtotal = assignedItems.reduce(
-          (sum, item) => sum + item.price * item.quantity,
+          (sum, item) => sum + item.unit_price * item.quantity,
           0,
         );
 
@@ -1533,20 +1593,20 @@ export async function assignAndCalculateSplits(
     } catch (err) {
       lastError = err as Error;
 
-      await writeAuditLog({
+      writeAuditLog({
         eventId,
         agent: 'A2',
         provider: process.env.AI_PROVIDER_A2 ?? 'gemini',
         modelUsed: process.env.AI_MODEL_A2 ?? 'gemini-2.5-flash',
-        promptContent: buildSplitCalculatorPrompt(items, participants, naturalLanguageInstruction),
-        responseText: rawText ?? '',
+        inputHash: sha256(promptText),
+        outputHash: sha256(rawText ?? ''),
         inputTokens: 0,
         outputTokens: 0,
         latencyMs: Date.now() - start,
         attempts: attempt,
         success: false,
         errorCode: lastError.message,
-      });
+      }).catch(console.error);
 
       if (attempt < MAX_RETRIES) await sleep(getRetryDelay(attempt));
     }
@@ -1603,7 +1663,7 @@ The model never generates a payment URL.
 
 ```typescript
 // src/modules/ai/message-composer/message-composer.prompt.ts
-import { sanitizePromptInput } from '../../../infrastructure/llm/prompt-sanitizer';
+import { sanitizePromptInput } from '../../../infrastructure/security/sanitize';
 
 export function buildMessageComposerPrompt(
   eventName: string,
@@ -1614,14 +1674,14 @@ export function buildMessageComposerPrompt(
 ): string {
   // NOTE: Full names and amounts are inserted AFTER the AI call, during assembly.
   // Never pass surnames, full phone numbers, or dollar amounts to the AI.
-  const safeName      = sanitizePromptInput(participantFirstName, 30);
-  const safePayerName = sanitizePromptInput(payerFirstName, 30);
-  const safeEvent     = sanitizePromptInput(eventName, 80);
-  const safeRestaurant = restaurantName ? sanitizePromptInput(restaurantName, 80) : null;
+  const safeName      = sanitizePromptInput(participantFirstName, { maxLength: 30 });
+  const safePayerName = sanitizePromptInput(payerFirstName, { maxLength: 30 });
+  const safeEvent     = sanitizePromptInput(eventName, { maxLength: 80 });
+  const safeRestaurant = restaurantName ? sanitizePromptInput(restaurantName, { maxLength: 80 }) : null;
   const restaurant = safeRestaurant ? ` at ${safeRestaurant}` : '';
 
   const itemContext = itemNames.length > 0
-    ? `They had: ${itemNames.slice(0, 5).map(n => sanitizePromptInput(n, 40)).join(', ')}.`
+    ? `They had: ${itemNames.slice(0, 5).map(n => sanitizePromptInput(n, { maxLength: 40 })).join(', ')}.`
     : '';
 
   return `Write a friendly, warm 2-sentence payment reminder message.
@@ -1649,8 +1709,10 @@ Hey Marcus! Hope you had an amazing time at Nobu — here's your share from dinn
 
 A3 composes messages for events that can have any currency. The dollar sign `$` must never be hardcoded. Use the event's `currency` (ISO 4217) and `locale` fields to format amounts correctly.
 
+`formatCurrency` lives in the **shared package** so it is available to both mobile and backend without duplication:
+
 ```typescript
-// src/modules/ai/message-composer/format-currency.ts
+// File: shared/utils/formatCurrency.ts (shared package, available to both mobile and backend)
 
 /**
  * Format a numeric amount using the event's currency and locale.
@@ -1659,11 +1721,8 @@ A3 composes messages for events that can have any currency. The dollar sign `$` 
  * Callers must use fromMinorUnits() to convert before calling this function if the amount
  * is stored as minor units in the database or in-memory calculator.
  *
- * formatCurrency() relies on Intl.NumberFormat which handles zero-decimal currencies
- * automatically: JPY produces '¥1200' (no decimal places), not '¥1200.00'.
- * The minimumFractionDigits/maximumFractionDigits overrides below are explicit for clarity
- * but Intl.NumberFormat would infer the same values from the currency code itself.
- * No fix is needed here — this function is correct for all supported currencies.
+ * Uses Intl.NumberFormat. If currency is unrecognized, logs a warning and falls back to
+ * `${currency} ${amount}` — does NOT throw.
  *
  * Examples:
  *   formatCurrency(1234.56, 'INR', 'en-IN') → '₹1,234.56'
@@ -1677,44 +1736,22 @@ A3 composes messages for events that can have any currency. The dollar sign `$` 
  *   formatCurrency(1.234,   'BHD', 'ar-BH') → 'BHD 1.234' (three decimals — correct)
  */
 export function formatCurrency(
-  amountInMajorUnits: number,
-  currencyCode: string,
-  locale: string
+  amount: number,  // in major units (e.g. 12.50 for $12.50, not 1250)
+  currency: string,
+  locale?: string
 ): string {
-  const SUPPORTED_CURRENCIES = new Set([
-    'USD', 'INR', 'EUR', 'GBP', 'AUD', 'CAD', 'SGD', 'JPY', 'MXN', 'BRL'
-  ]);
-  
-  // Normalise currency code
-  const normalised = currencyCode?.toUpperCase?.() ?? 'USD';
-  const safeCurrency = SUPPORTED_CURRENCIES.has(normalised) ? normalised : 'USD';
   const safeLocale = locale ?? 'en-US';
-  
-  if (!SUPPORTED_CURRENCIES.has(normalised)) {
-    // Log unknown currency but do not throw — degrade gracefully
-    console.warn(`formatCurrency: unknown currency code '${currencyCode}', falling back to USD`);
-  }
-  
+  const normalisedCurrency = currency?.toUpperCase?.() ?? '';
+
   try {
-    // Intl.NumberFormat handles zero-decimal currencies (JPY, KRW, etc.) automatically.
-    // We pass explicit fraction digit counts derived from getCurrencyMinorUnits() for
-    // correctness and clarity — this also ensures three-decimal currencies (BHD, KWD, etc.)
-    // render correctly without a separate code path.
-    // Import getCurrencyMinorUnits from split-calculator.ts (or extract to a shared util).
-    // const decimalPlaces = getCurrencyMinorUnits(safeCurrency);
-    // For now the existing JPY guard is extended below; full migration uses the helper above.
     return new Intl.NumberFormat(safeLocale, {
       style: 'currency',
-      currency: safeCurrency,
-      minimumFractionDigits: safeCurrency === 'JPY' ? 0 : 2,
-      maximumFractionDigits: safeCurrency === 'JPY' ? 0 : 2,
-      // TODO: replace the two lines above with:
-      // minimumFractionDigits: getCurrencyMinorUnits(safeCurrency),
-      // maximumFractionDigits: getCurrencyMinorUnits(safeCurrency),
-    }).format(amountInMajorUnits);
+      currency: normalisedCurrency,
+    }).format(amount);
   } catch {
-    // Final fallback — should never reach here with validated inputs
-    return `${safeCurrency} ${amountInMajorUnits.toFixed(2)}`;
+    // Unknown or invalid currency code — log warning, never throw
+    console.warn(`formatCurrency: unknown currency code '${currency}', using plain fallback`);
+    return `${currency} ${amount}`;
   }
 }
 
@@ -1833,7 +1870,7 @@ export function getPaymentConfigForPhone(
 // src/modules/ai/message-composer/payment-links.ts
 
 import { PaymentMethod } from '../../../config/payment-methods.config';
-import { formatCurrency } from './format-currency';
+import { formatCurrency } from '@letssplyt/shared/utils/formatCurrency';
 
 export interface PaymentHandle {
   method: PaymentMethod;
@@ -1962,7 +1999,7 @@ const fullMessage = assembleMessage(aiGreeting, params.participantDisplayName, .
 ```typescript
 // src/modules/ai/message-composer/message-composer.assembler.ts
 
-import { formatCurrency, defaultLocaleForCurrency } from './format-currency';
+import { formatCurrency, defaultLocaleForCurrency } from '@letssplyt/shared/utils/formatCurrency';
 import { buildPaymentLink, buildZelleInstruction, buildBankTransferText, PaymentHandle } from './payment-links';
 import { getPaymentConfigForPhone } from '../../../config/payment-methods.config';
 
@@ -2055,7 +2092,7 @@ export async function assembleMessage(params: AssembleMessageParams): Promise<As
 ```typescript
 // src/modules/ai/message-composer/message-composer.validator.ts
 
-import { formatCurrency, defaultLocaleForCurrency } from './format-currency';
+import { formatCurrency, defaultLocaleForCurrency } from '@letssplyt/shared/utils/formatCurrency';
 
 export function validateMessageBeforeSend(
   message: string,
@@ -2121,7 +2158,7 @@ export function validateGreeting(greeting: string, participantFirstName: string)
 ```typescript
 // src/modules/ai/message-composer/message-composer.harness.ts
 
-import { createLLMProvider } from '../../../infrastructure/llm/llm.factory';
+import { createLLMProvider } from '../../../infrastructure/llm/factory';
 import { buildMessageComposerPrompt } from './message-composer.prompt';
 import { assembleMessage, AssembleMessageParams, AssembledMessage } from './message-composer.assembler';
 import { validateMessageBeforeSend } from './message-composer.validator';
@@ -2130,7 +2167,7 @@ import { setAiStage, getAiStage } from '../ai-idempotency';
 import { writeAuditLog } from '../../../infrastructure/llm/ai-audit';
 import { AppError } from '../../../infrastructure/errors';
 import { LLMMessage } from '../../../infrastructure/llm/llm.provider';
-import { defaultLocaleForCurrency } from './format-currency';
+import { defaultLocaleForCurrency } from '@letssplyt/shared/utils/formatCurrency';
 
 const MAX_RETRIES = parseInt(process.env.MESSAGE_COMPOSE_MAX_RETRIES ?? '3', 10);
 
@@ -2185,39 +2222,39 @@ export async function composeMessageWithHarness(
       // Final safety check — formatted amount must appear verbatim
       validateMessageBeforeSend(composed.messageText, params.amountOwed, params.currency, locale);
 
-      await writeAuditLog({
+      writeAuditLog({
         eventId: params.eventId,
         agent: 'A3',
         provider: process.env.AI_PROVIDER_A3 ?? 'gemini',
         modelUsed: response.modelUsed,
-        promptContent: promptText,
-        responseText: rawText,
+        inputHash: sha256(promptText),
+        outputHash: sha256(rawText),
         inputTokens: response.usage.inputTokens,
         outputTokens: response.usage.outputTokens,
         latencyMs: Date.now() - start,
         attempts: attempt,
         success: true,
-      });
+      }).catch(console.error);
 
       return composed;
 
     } catch (err) {
       lastError = err as Error;
 
-      await writeAuditLog({
+      writeAuditLog({
         eventId: params.eventId,
         agent: 'A3',
         provider: process.env.AI_PROVIDER_A3 ?? 'gemini',
         modelUsed: process.env.AI_MODEL_A3 ?? 'gemini-2.5-flash',
-        promptContent: promptText,
-        responseText: rawText ?? '',
+        inputHash: sha256(promptText),
+        outputHash: sha256(rawText ?? ''),
         inputTokens: 0,
         outputTokens: 0,
         latencyMs: Date.now() - start,
         attempts: attempt,
         success: false,
         errorCode: lastError.message,
-      });
+      }).catch(console.error);
 
       if (attempt < MAX_RETRIES) await sleep(getRetryDelay(attempt));
     }
@@ -2225,7 +2262,10 @@ export async function composeMessageWithHarness(
 
   // All retries exhausted — use deterministic fallback greeting
   // The message still goes out. Personalisation degrades, accuracy does not.
-  const fallbackGreeting = `Hi ${participantFirstName}! Here's your share from ${params.eventName}.`;
+  // Empty display_name guard: if sanitized name is empty, fall back to 'Hi there' (not 'Hi !')
+  const sanitizedFirstName = sanitizePromptInput(participantFirstName, { maxLength: 100 });
+  const greetingName = sanitizedFirstName.length > 0 ? sanitizedFirstName : 'there';
+  const fallbackGreeting = `Hi ${greetingName}! Here's your share from ${params.eventName}.`;
   const composed = await assembleMessage({
     ...params,
     aiGreeting: fallbackGreeting,
@@ -2246,26 +2286,84 @@ function sleep(ms: number): Promise<void> {
 }
 ```
 
+### Split Image Visual Specification
+
+File: `backend/src/modules/messages/split-image.generator.ts`
+Package: `@napi-rs/canvas`
+
+```
+Canvas dimensions: 800 × 400 px
+Background: #FFFFFF (white)
+Font: Roboto (or system-ui fallback)
+
+Header row: height 48px, background #1E293B (dark slate), text #FFFFFF
+  - Columns: "Item" (width 320px), "Qty" (width 80px), "Your share" (width 160px), "Total" (width 160px), padding 12px
+  - Font size: 14px, weight 600
+
+Participant rows: height 48px each, alternating #FFFFFF / #F8FAFC
+  - Highlighted row (this participant): background #EEF2FF (light indigo), border-left 4px solid #6366F1
+
+Text colors:
+  - Item name: #1E293B
+  - Numbers: #1E293B, right-aligned within their column
+  - Subtotal/tax/tip rows: italic, #64748B
+  - Total row: bold, #1E293B
+
+Footer strip: height 56px, background #F1F5F9
+  - Left: "LetsSplyt" logo text, 18px, weight 700, #6366F1
+  - Right: "Your total: {formattedAmount}", 18px, weight 700, #1E293B
+
+Maximum rows before truncation: if more than 6 item rows, show first 5 + "...and X more items" in italics
+
+Output: PNG buffer, written to Supabase Storage bucket split-images/{eventId}/{participantId}.png
+  - Bucket is PRIVATE — accessed via signed URL valid for 24h (passed as mediaUrl in Twilio MMS)
+```
+
+### No-Payment-Handles Guard
+
+Before generating messages, validate that the creator has at least one payment handle in `user_payment_handles`. If none exist, abort A3 immediately: set `ai_stage` back to `calculated`, return a 422 response to the API with error code `NO_PAYMENT_HANDLES`. The Creator app should surface this as: "Add a payment method before sending requests."
+
 ### A3 Stage Guard and Orchestration
 
 ```typescript
 // In the orchestrating service — before calling composeMessageWithHarness for any participant
 
-// Atomic stage guard — atomically transition from 'calculated' to 'messaging'
+// Atomic stage guard — claim messaging slot for the ENTIRE event (idempotency guard at event level)
+// Do NOT call claimMessagingSlot once per participant — claim it once for the event.
 await claimMessagingSlot(eventId);
 
-try {
-  // Compose messages for all N participants (can be parallelised with Promise.all)
-  const messages = await Promise.all(
-    participants.map(p => composeMessageWithHarness({ ...p, eventId })),
-  );
-  await setAiStage(eventId, 'complete');
-  return messages;
-} catch (err) {
+// No-payment-handles guard — abort before any AI calls if creator has no payment handles
+const handles = await getUserPaymentHandles(creatorId);
+if (handles.length === 0) {
+  await setAiStage(eventId, 'calculated'); // reset so creator can add handles and retry
+  throw new AppError('NO_PAYMENT_HANDLES', 'Add a payment method before sending requests.', 422);
+}
+
+// Compose messages for all N participants — wrap each individually so one failure does not abort others
+const results = await Promise.allSettled(
+  participants.map(p => composeAndSendWithHarness({ ...p, eventId }))
+);
+
+const failures = results.filter(r => r.status === 'rejected');
+const successes = results.filter(r => r.status === 'fulfilled');
+
+if (failures.length === results.length) {
+  // ALL participants failed — mark event as failed
   await setAiStage(eventId, 'failed');
-  throw err;
+  throw new AppError('A3_ALL_FAILED', 'Failed to send messages to all participants', 500);
+} else {
+  // At least one succeeded — mark complete, log partial failures to event metadata
+  await setAiStage(eventId, 'complete');
+  if (failures.length > 0) {
+    // Log failure summary to event metadata (does not change ai_stage to 'failed')
+    await recordPartialSendFailures(eventId, failures);
+  }
 }
 ```
+
+**Key rule:** A single participant's Twilio failure MUST NOT abort the other participants. Wrap each participant's send in try/catch (via `Promise.allSettled`), log the failure to `ai_audit_log` with `success: false`, and continue to the next participant. Only set `ai_stage = 'failed'` if ALL participants failed.
+
+**Empty display_name guard:** Before building the greeting, check that `participant.display_name` is non-empty after sanitization. If `sanitizePromptInput(display_name, { maxLength: 100 })` returns an empty string, fall back to the greeting "Hi there" (not "Hi !"). This guard must be applied to every participant in the parallel send loop.
 
 ---
 
@@ -2841,38 +2939,44 @@ When either Google or Anthropic releases a new model version:
 
 ### sanitizePromptInput Implementation
 
-Every participant name, item name, and NLP instruction that is interpolated into any prompt must be wrapped in `sanitizePromptInput()` with the appropriate `context` option. The function is defined in `src/infrastructure/llm/prompt-sanitizer.ts`.
+Every participant name, item name, and NLP instruction that is interpolated into any prompt must be wrapped in `sanitizePromptInput()`. There is exactly ONE file and ONE function:
 
 ```typescript
-// src/infrastructure/llm/prompt-sanitizer.ts
+// File: backend/src/infrastructure/security/sanitize.ts
 
 /**
  * Sanitises user-controlled strings before interpolation into AI prompts.
  * Prevents prompt injection attacks where receipt item names or participant
  * names contain instructions that manipulate AI behaviour.
+ *
+ * Behavior:
+ * - Strips XML/HTML tags and CDATA sections
+ * - Strips triple-dash prompt injection patterns (`---`)
+ * - Strips Llama role tokens (<|user|>, <|assistant|>, <|system|>, etc.)
+ * - Truncates to options.maxLength characters (default: 2000) with … suffix
+ * - Returns the sanitized string
  */
 export function sanitizePromptInput(
   input: string,
-  options: {
-    maxLength?: number;
-    context?: 'item_name' | 'participant_name' | 'nlp_instruction';
-  } = {}
+  options?: { maxLength?: number }
 ): string {
-  const { maxLength = 200, context = 'item_name' } = options;
-  
+  const maxLength = options?.maxLength ?? 2000;
+
   if (typeof input !== 'string') return '';
-  
-  return input
-    .slice(0, maxLength)                    // Truncate before other transforms
-    .replace(/\n/g, ' ')                    // Newlines used for prompt injection
-    .replace(/\r/g, ' ')                    // Carriage returns
-    .replace(/\|/g, '/')                    // Pipe characters (table injection in some models)
-    .replace(/`/g, "'")                     // Backtick code blocks
-    .replace(/#{1,6}\s/g, '')              // Markdown headers
-    .replace(/\[INST\]|\[\/INST\]/gi, '')  // Llama instruction tokens
-    .replace(/<\|.*?\|>/g, '')             // Generic special tokens
-    .replace(/system:|user:|assistant:/gi, '') // Role injection
+
+  let result = input
+    .replace(/<!\[CDATA\[[\s\S]*?\]\]>/g, '')  // CDATA sections
+    .replace(/<[^>]+>/g, '')                     // XML/HTML tags
+    .replace(/---+/g, '')                        // Triple-dash injection patterns
+    .replace(/<\|[^|]*\|>/g, '')                 // Llama role tokens
+    .replace(/\[INST\]|\[\/INST\]/gi, '')        // Llama instruction tokens
     .trim();
+
+  if (result.length > maxLength) {
+    result = result.slice(0, maxLength) + '…';
+  }
+
+  return result;
 }
 ```
 
@@ -2880,35 +2984,165 @@ export function sanitizePromptInput(
 
 ```typescript
 // Item names — in buildSplitCalculatorPrompt
-sanitizePromptInput(item.name, { maxLength: 60, context: 'item_name' })
+sanitizePromptInput(item.name, { maxLength: 60 })
 
-// Participant names — in buildSplitCalculatorPrompt and buildMessageComposerPrompt
-sanitizePromptInput(p.name, { maxLength: 50, context: 'participant_name' })
+// Participant display_name — in buildSplitCalculatorPrompt (maxLength: 100 for name matching safety)
+sanitizePromptInput(p.display_name, { maxLength: 100 })
 
 // NLP instructions — in buildSplitCalculatorPrompt
-sanitizePromptInput(naturalLanguageInstruction, { maxLength: 200, context: 'nlp_instruction' })
+sanitizePromptInput(naturalLanguageInstruction, { maxLength: 200 })
 
 // Event and restaurant names — in buildMessageComposerPrompt
-sanitizePromptInput(eventName, { maxLength: 80, context: 'item_name' })
-sanitizePromptInput(restaurantName, { maxLength: 80, context: 'item_name' })
+sanitizePromptInput(eventName, { maxLength: 80 })
+sanitizePromptInput(restaurantName, { maxLength: 80 })
 
 // Item names passed as context to A3 — in buildMessageComposerPrompt
-itemNames.slice(0, 5).map(n => sanitizePromptInput(n, { maxLength: 40, context: 'item_name' }))
+itemNames.slice(0, 5).map(n => sanitizePromptInput(n, { maxLength: 40 }))
 ```
 
-> Note: The existing prompt builder code uses a legacy two-argument form `sanitizePromptInput(str, maxLength)`. Migrate all call sites to the options-object form above for consistent context tagging.
+### writeAuditLog
+
+File: `backend/src/infrastructure/llm/ai-audit.ts`
+
+```typescript
+export async function writeAuditLog(entry: {
+  eventId: string;
+  agent: 'A1' | 'A2' | 'A3';
+  provider: string;
+  modelUsed: string;
+  inputHash: string;
+  outputHash: string;
+  inputTokens: number;
+  outputTokens: number;
+  latencyMs: number;
+  attempts: number;
+  success: boolean;
+  errorCode?: string;
+}): Promise<void>
+```
+
+Implementation notes:
+- Uses service-role Supabase client (bypasses RLS)
+- Fires and forgets — `writeAuditLog` calls are NOT awaited in hot paths; wrap in `.catch(console.error)`
+- Never throws; errors in audit logging MUST NOT break the AI pipeline
+- `inputHash` and `outputHash` are SHA-256 of the raw prompt string and raw response string respectively
+
+> Note: Harness call sites compute `inputHash = sha256(promptText)` and `outputHash = sha256(rawText)` inline before calling `writeAuditLog`. The raw prompt and response strings MUST NOT be stored or logged — only their hashes are persisted.
+
+---
+
+### AppError
+
+File: `backend/src/infrastructure/errors.ts`
+
+```typescript
+export class AppError extends Error {
+  constructor(
+    public readonly code: string,        // e.g. 'RECEIPT_TOO_LARGE', 'AI_TIMEOUT'
+    message: string,
+    public readonly statusCode: number = 500,
+    public readonly isOperational: boolean = true
+  ) {
+    super(message);
+    this.name = 'AppError';
+  }
+}
+
+// Convenience constructors
+export const Errors = {
+  receiptTooLarge: () => new AppError('RECEIPT_TOO_LARGE', 'Receipt image exceeds 10 MB', 413),
+  tooManyItems:    () => new AppError('TOO_MANY_ITEMS', 'Receipt has more than 50 line items', 422),
+  tooManyParticipants: () => new AppError('TOO_MANY_PARTICIPANTS', 'Event has more than 50 participants', 422),
+  aiTimeout:       () => new AppError('AI_TIMEOUT', 'AI provider did not respond in time', 504),
+  aiStageMismatch: (expected: string, actual: string) =>
+    new AppError('AI_STAGE_MISMATCH', `Expected ai_stage '${expected}' but found '${actual}'`, 409),
+};
+```
+
+Note: `isOperational = true` means the error is expected (user/input error); `false` means programmer error. Global error handler uses this to decide whether to send 500 vs re-throw.
+
+---
+
+### Input Guards
+
+File: `backend/src/infrastructure/llm/input-guards.ts`
+
+```typescript
+export function assertImageSize(sizeBytes: number): void
+// Throws Errors.receiptTooLarge() if sizeBytes > 10_485_760 (10 MB)
+
+export function assertItemCount(itemCount: number): void
+// Throws Errors.tooManyItems() if itemCount > 50
+
+export function assertParticipantCount(participantCount: number): void
+// Throws Errors.tooManyParticipants() if participantCount > 50
+```
+
+These are called BEFORE sending to the AI provider. They throw `AppError` which the global error handler converts to 413/422 responses.
+
+---
+
+### storeReceiptItems
+
+File: `backend/src/modules/receipts/receipt.repository.ts`
+
+```typescript
+export async function storeReceiptItems(
+  eventId: string,
+  items: Array<{
+    name: string;
+    quantity: number;
+    unit_price: number;  // in minor units of the event's currency
+    confidence_score: number;
+    is_low_confidence: boolean;
+  }>,
+  parseAttemptId: string
+): Promise<void>
+```
+
+Implementation:
+1. Deletes any existing receipt_items for this eventId (idempotent re-parse support)
+2. Bulk-inserts new rows
+3. Updates `events.last_parse_attempt_id = parseAttemptId` atomically in the same transaction
+4. Does NOT update `ai_stage` — that is done separately via the atomic UPDATE WHERE pattern
+
+---
+
+### resolveParticipantPhone
+
+File: `backend/src/infrastructure/security/sanitize.ts`
+
+```typescript
+export async function resolveParticipantPhone(
+  participant: {
+    user_id: string | null;
+    phone_encrypted: string | null;  // Only set for guests (via guest_pii join)
+  }
+): Promise<string | null>
+```
+
+Implementation:
+1. If `participant.phone_encrypted` is non-null (guest): decrypt using AES-256-GCM with `PHONE_ENCRYPTION_KEY` and return E.164 string
+2. If `participant.user_id` is non-null (App Member): call `supabaseAdmin.auth.admin.getUserById(participant.user_id)` and return `user.phone` (already E.164 in Supabase Auth)
+3. If both are null: return null (manual-name-only participant, no phone)
+
+**Note:** The `participants` table does NOT have `phone_encrypted` directly. For guests, it is accessed via a JOIN to `guest_pii` on `guest_pii_token`. Callers must join the `guest_pii` table to get `phone_encrypted` for guests before passing to this function. For App Members, only `user_id` is needed.
+
+- The decrypted value MUST be used only within the current function scope — never stored in a variable that escapes to a log, returned in an API response, or persisted to DB
+
+---
 
 ### Infrastructure Files Summary
 
 | File | Purpose |
 |------|---------|
 | `src/infrastructure/llm/llm.provider.ts` | `LLMProvider` interface and message types |
-| `src/infrastructure/llm/llm.factory.ts` | `createLLMProvider(agent)` — the only entry point for harnesses |
+| `src/infrastructure/llm/factory.ts` | `createLLMProvider(agent)` — the only entry point for harnesses |
 | `src/infrastructure/llm/providers/anthropic.adapter.ts` | Anthropic SDK adapter |
 | `src/infrastructure/llm/providers/gemini.adapter.ts` | Gemini SDK adapter |
 | `src/infrastructure/llm/providers/openai.adapter.ts` | OpenAI SDK adapter |
 | `src/infrastructure/llm/providers/openai-compat.adapter.ts` | Generic OpenAI-compat adapter |
-| `src/infrastructure/llm/prompt-sanitizer.ts` | `sanitizePromptInput()` — strips injection attempts |
+| `src/infrastructure/security/sanitize.ts` | `sanitizePromptInput()` — strips injection attempts, `resolveParticipantPhone()` |
 | `src/infrastructure/llm/input-guards.ts` | `assertImageSize()`, `assertItemCount()`, `assertParticipantCount()` |
 | `src/infrastructure/llm/ai-audit.ts` | `writeAuditLog()` — structured AI call log |
 | `src/modules/ai/ai-idempotency.ts` | `claimParsingSlot()`, `setAiStage()`, `getCachedReceiptResult()` |
@@ -2923,29 +3157,9 @@ itemNames.slice(0, 5).map(n => sanitizePromptInput(n, { maxLength: 40, context: 
 -- Add to events table
 ALTER TABLE events ADD COLUMN ai_stage TEXT NOT NULL DEFAULT 'none'
   CHECK (ai_stage IN ('none','parsing','parsed','calculating','calculated','messaging','complete','failed'));
-
--- AI audit log
-CREATE TABLE ai_audit_log (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  event_id        UUID REFERENCES events(id) ON DELETE CASCADE,
-  agent           TEXT NOT NULL CHECK (agent IN ('A1','A2','A3')),
-  provider        TEXT NOT NULL,
-  model_used      TEXT NOT NULL,
-  input_hash      TEXT NOT NULL,   -- SHA-256 of prompt — never raw prompt
-  output_hash     TEXT NOT NULL,   -- SHA-256 of response
-  confidence      NUMERIC(4,3),
-  input_tokens    INTEGER,
-  output_tokens   INTEGER,
-  latency_ms      INTEGER,
-  attempts        INTEGER NOT NULL DEFAULT 1,
-  success         BOOLEAN NOT NULL,
-  error_code      TEXT,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
-CREATE INDEX idx_ai_audit_event   ON ai_audit_log(event_id);
-CREATE INDEX idx_ai_audit_created ON ai_audit_log(created_at);
 ```
+
+See `04-Data-Architecture.md` Section 3.14 for the authoritative `ai_audit_log` schema. Do NOT maintain a separate DDL here.
 
 ### Privacy Disclosure Requirements
 

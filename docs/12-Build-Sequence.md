@@ -6,7 +6,7 @@
 
 ## How to Use This Document
 
-This document is your daily build companion. Each story in this document maps to a single Cursor session. Here is the exact workflow for every story, without exception.
+This document is your daily build companion. Each of the 46 stories in this document maps to a single Cursor session. Here is the exact workflow for every story, without exception.
 
 First, confirm that all dependencies listed at the top of the epic are fully complete — meaning you have verified every acceptance criterion in those stories on your phone or in your terminal. Do not skip this check. A broken foundation cascades into hours of debugging later.
 
@@ -21,6 +21,8 @@ Run the specified tests with `npm test` or the relevant `npm run test:unit` / `n
 Only after all acceptance criteria are verified and all tests pass, mark the story complete in your task tracker and move to the next story. Starting the next story before the current one is fully verified is the most common cause of wasted build time in solo projects.
 
 **After each confirmed story:** Cursor commits all changed files to git with message `E##-S##: [story name]` and pushes to `origin main`. Do not confirm a story done until all its tests pass — committing broken code means the next story starts from a broken base.
+
+**When uncertain, stop.** If anything in a story's requirements is ambiguous, not fully specified by the referenced documentation, or if two docs appear to contradict each other — STOP before writing any code. Do not guess. Do not invent a solution to fill the gap. State clearly what is unclear and ask Pawan for clarification. This is especially critical for financial arithmetic (`splitCalculator.ts`), PII handling (`crypto.ts`, `sanitize.ts`), and all security-related code, where a confident wrong answer is worse than asking.
 
 ---
 
@@ -259,7 +261,6 @@ export const mockLLMProvider = {
 };
 
 export const createLLMProvider = jest.fn().mockReturnValue(mockLLMProvider);
-export const resolveProvider = jest.fn().mockReturnValue(mockLLMProvider);
 ```
 
 **`backend/package.json` scripts:**
@@ -730,6 +731,8 @@ Thumbs.db
 - `backend/src/middleware/authenticate.ts`
 - `backend/src/middleware/piiScrubber.ts`
 - `backend/src/middleware/rateLimiter.ts`
+- `backend/src/middleware/requestId.ts`
+- `backend/src/middleware/validate.ts`
 - `backend/src/infrastructure/logger.ts`
 - `backend/src/types/express.d.ts`
 
@@ -739,6 +742,8 @@ Thumbs.db
 3. `curl -X POST http://localhost:3000/api/v1/auth/otp/request` (without Authorization header — this route will be built in E03, for now add a placeholder that returns 501) returns 401 when authenticate middleware is manually applied — verify the middleware logic in the unit tests
 4. Send a response body `{"phone_e164":"+15005550001","name":"Test User"}` through the PII scrubber — verify the client receives `{"name":"Test User"}` with `phone_e164` removed (test this via the unit test, not a live endpoint for now)
 5. In the terminal, make any request — confirm no E.164 phone number pattern appears in any log line (even in debug mode)
+6. `requestId` middleware added to Express app at startup (generates UUID per request, attaches to `req.requestId`, included in all log entries). File: `backend/src/middleware/requestId.ts`
+7. `validate` middleware in `backend/src/middleware/validate.ts`: `(schema: ZodSchema) => RequestHandler` — validates `req.body` against schema, returns 400 with validation errors as `{ error: { code: 'VALIDATION_ERROR', details: ZodError.issues } }` if invalid. Used by all subsequent stories.
 
 **Tests required:**
 ```
@@ -798,31 +803,32 @@ backend/src/__tests__/unit/infrastructure/supabase.test.ts
 **Description:** Build the AI provider factory as specified in `docs/07-AI-Agent-Specification.md` Section 2. The factory reads per-agent environment variables and returns the correct adapter. All three AI agents (A1, A2, A3) use this factory exclusively — harness files must never import AI SDKs directly.
 
 **Prompt:**
-*"Build the LLM provider factory as specified in docs/07-AI-Agent-Specification.md Section 2. Copy the exact code from that document — do not paraphrase or simplify it. Create these files in order: (1) backend/src/infrastructure/llm/llm.provider.ts — copy the exact LLMProvider interface, LLMMessage, LLMContentBlock, LLMTextBlock, LLMImageBlock, LLMUsage, LLMResponse, and LLMCompletionOptions types from the spec. (2) backend/src/infrastructure/llm/providers/gemini.adapter.ts — copy the exact GeminiAdapter class from the spec. Add exponential backoff with full jitter retry logic wrapping the provider.complete() call: 3 max attempts, base delay 500ms, max delay 10,000ms, jitter = Math.random() * exponential. The adapter itself does not have retry — the retry logic wraps the generateContent call inside a for-loop in the complete() method. (3) backend/src/infrastructure/llm/providers/anthropic.adapter.ts — copy the exact AnthropicAdapter from the spec. Same retry pattern. (4) backend/src/infrastructure/llm/providers/openai.adapter.ts and openai-compat.adapter.ts — copy from spec. (5) backend/src/infrastructure/llm/factory.ts — copy the exact createLLMProvider function from the spec, renamed from resolveProvider to createLLMProvider (the spec uses createLLMProvider). Add one additional guard: if agent is 'A1' and the resolved provider has supportsVision === false, throw new Error('Provider for A1 does not support vision input. A1 requires vision capability.'). Export type AgentKey = 'A1' | 'A2' | 'A3'. (6) backend/src/infrastructure/llm/index.ts — re-export createLLMProvider and AgentKey from factory.ts, and LLMProvider, LLMMessage, LLMResponse from llm.provider.ts. RULE: No file outside of providers/ may import @google/generative-ai, @anthropic-ai/sdk, or openai directly."*
+*"Build the LLM provider factory as specified in docs/07-AI-Agent-Specification.md Section 2. Copy the exact code from that document — do not paraphrase or simplify it. Create these files in order: (1) backend/src/infrastructure/llm/llm.provider.ts — copy the exact LLMProvider interface, LLMMessage, LLMContentBlock, LLMTextBlock, LLMImageBlock, LLMUsage, LLMResponse, and LLMCompletionOptions types from the spec. (2) backend/src/infrastructure/llm/providers/gemini.adapter.ts — copy the exact GeminiAdapter class from the spec. Add exponential backoff with full jitter retry logic wrapping the provider.complete() call: 3 max attempts, base delay 500ms, max delay 10,000ms, jitter = Math.random() * exponential. The adapter itself does not have retry — the retry logic wraps the generateContent call inside a for-loop in the complete() method. (3) backend/src/infrastructure/llm/providers/anthropic.adapter.ts — copy the exact AnthropicAdapter from the spec. Same retry pattern. NOTE: OpenAI is not a supported provider for LetsSplyt. Only Gemini (dev/staging) and Claude Haiku (production) are used — do NOT create openai.adapter.ts or openai-compat.adapter.ts. (4) backend/src/infrastructure/llm/factory.ts — the function is named `createLLMProvider` (not `resolveProvider`). Add one additional guard: if agent is 'A1' and the resolved provider has supportsVision === false, throw new Error('Provider for A1 does not support vision input. A1 requires vision capability.'). Export type AgentKey = 'A1' | 'A2' | 'A3'. (5) backend/src/infrastructure/llm/index.ts — re-export createLLMProvider and AgentKey from factory.ts, and LLMProvider, LLMMessage, LLMResponse from llm.provider.ts. RULE: No file outside of providers/ may import @google/generative-ai or @anthropic-ai/sdk directly. (6) backend/src/infrastructure/errors.ts — export AppError class extending Error with fields: code: string, statusCode: number, details?: unknown. Export Errors convenience namespace with static constructors: Errors.notFound(message), Errors.forbidden(message), Errors.conflict(message, code), Errors.validation(message, details), Errors.internal(message). (7) backend/src/infrastructure/llm/ai-audit.ts — export writeAuditLog(params: { agent: AgentKey, eventId: string, inputTokens: number, outputTokens: number, modelUsed: string, success: boolean, errorCode?: string }): void (fire-and-forget — never throws, catches all errors internally and logs them). (8) backend/src/modules/receipts/receipt.repository.ts — export storeReceiptItems(eventId: string, items: ReceiptItem[]): Promise<void> (stub implementation for now — actual logic filled in E07 stories)."*
 
 **Files created:**
 - `backend/src/infrastructure/llm/llm.provider.ts`
 - `backend/src/infrastructure/llm/providers/gemini.adapter.ts`
 - `backend/src/infrastructure/llm/providers/anthropic.adapter.ts`
-- `backend/src/infrastructure/llm/providers/openai.adapter.ts`
-- `backend/src/infrastructure/llm/providers/openai-compat.adapter.ts`
 - `backend/src/infrastructure/llm/factory.ts`
+- `backend/src/infrastructure/llm/ai-audit.ts`
 - `backend/src/infrastructure/llm/index.ts`
+- `backend/src/infrastructure/errors.ts`
+- `backend/src/modules/receipts/receipt.repository.ts` (stub)
 
 **Acceptance Criteria:**
 1. With `AI_PROVIDER_A1=gemini AI_MODEL_A1=gemini-2.5-flash` in the environment, `createLLMProvider('A1')` returns an instance whose constructor name is `GeminiAdapter`
 2. With `AI_PROVIDER_A1=anthropic`, `createLLMProvider('A1')` returns an `AnthropicAdapter` instance
 3. With `AI_PROVIDER_A1=unknown`, `createLLMProvider('A1')` throws an error containing the string `Unknown AI provider`
-4. `createLLMProvider('A1')` when `AI_PROVIDER_A1=openai-compat` and `AI_BASE_URL_A1` is not set throws an error about the missing base URL
-5. `cd backend && npm run typecheck` passes with zero errors
+4. `AppError` instances have `code`, `statusCode`, and optional `details` fields — `Errors.notFound('Event not found')` returns an `AppError` with `statusCode: 404`
+5. `writeAuditLog(...)` never throws even when the DB call fails — wrap in try/catch internally
+6. `cd backend && npm run typecheck` passes with zero errors
 
 **Tests required:**
 ```
 backend/src/__tests__/unit/infrastructure/llm/factory.test.ts
   - returns GeminiAdapter when AI_PROVIDER_A1=gemini
   - returns AnthropicAdapter when AI_PROVIDER_A1=anthropic
-  - returns OpenAIAdapter when AI_PROVIDER_A1=openai
-  - throws for unknown provider string
+  - throws for unknown provider string (e.g. AI_PROVIDER_A1=openai — not supported)
   - each agent reads its own env vars (A1 can have different provider than A2)
   - throws vision error when non-vision provider is configured for A1
 
@@ -866,6 +872,7 @@ backend/src/__tests__/unit/infrastructure/llm/anthropic.adapter.test.ts
 3. `cd backend && npm run typecheck` passes with zero TypeScript errors
 4. `cd mobile && npm run typecheck` passes with zero TypeScript errors
 5. After pushing to GitHub, the Actions tab shows the CI workflow triggered and the `lint-typecheck` job passes
+6. `git-secrets` pre-commit hook installed: `git secrets --install && git secrets --register-aws`. Prevents committing AWS keys, and configured to also scan for Supabase JWT secrets and Twilio auth tokens via `git secrets --add 'SUPABASE_SERVICE_ROLE_KEY.*='` pattern.
 
 **Tests required:**
 ```
@@ -890,6 +897,28 @@ backend/src/__tests__/unit/mocks/supabase.mock.test.ts
 - `backend/src/infrastructure/security/crypto.ts`
 - `backend/src/infrastructure/security/sanitize.ts`
 - `backend/src/infrastructure/security/index.ts`
+
+**Additional deliverable — `resolveParticipantPhone`:**
+
+Add `resolveParticipantPhone` to `backend/src/infrastructure/security/sanitize.ts`:
+
+```typescript
+export async function resolveParticipantPhone(
+  participant: {
+    user_id: string | null;
+    phone_encrypted: string | null;  // only set for guests (from guest_pii join)
+  }
+): Promise<string | null>
+```
+
+- For guests (`user_id` is null): decrypts `phone_encrypted` using `decrypt(phone_encrypted, process.env.PHONE_ENCRYPTION_KEY)`
+- For App Members (`user_id` is set): calls `supabaseAdmin.auth.admin.getUserById(user_id)` to retrieve the phone number from Supabase Auth
+- Returns `null` if neither is available (manual-name-only participant with no phone)
+- The decrypted phone must NEVER be logged or stored in any intermediate variable that could outlive the function call
+
+Add acceptance criterion: "`resolveParticipantPhone` returns null for a name-only participant with no phone_encrypted and no user_id"
+
+Also re-export `resolveParticipantPhone` from `backend/src/infrastructure/security/index.ts`.
 
 **Acceptance Criteria:**
 1. `encrypt('hello world', 'my-secret-key')` returns a string in the format `xxx:yyy:zzz` (three colon-separated base64 segments) and never contains the substring `hello world`
@@ -940,79 +969,130 @@ backend/src/__tests__/unit/security/sanitize.test.ts
 **Depends on:** E01 complete (monorepo scaffold, TypeScript config, security utilities)
 **Delivers:** All tables, RLS policies, triggers, indexes, and seed data applied to local Supabase
 
-### E02-S01 — Database Migrations
+### E02-S01 — Core Tables + Indexes
 
-**Description:** Create all SQL migration files from `docs/04-Data-Architecture.md`. These are the definitive tables, triggers, indexes, and RLS policies. The document is the single source of truth — if anything in this prompt conflicts with `docs/04-Data-Architecture.md`, the document wins.
+**What this builds:** All PostgreSQL tables and indexes via Supabase migration — no triggers, no RLS yet.
 
 **Prompt:**
-*"Create all SQL migration files in backend/supabase/migrations/ using the exact schema from docs/04-Data-Architecture.md as the authoritative source. Create eight migration files: (1) 20260601000001_extensions.sql — enable extensions: CREATE EXTENSION IF NOT EXISTS pgcrypto; CREATE EXTENSION IF NOT EXISTS 'uuid-ossp'; CREATE EXTENSION IF NOT EXISTS pg_cron; (pg_cron may not be available on free tier — wrap in DO block that catches the error). (2) 20260601000002_base_tables.sql — create all tables from Section 3 of docs/04-Data-Architecture.md in dependency order: guest_pii, users, user_payment_handles, events, event_join_tokens, participants, receipt_items, item_assignments, settlement_log, notification_log, funnel_checkpoints, device_sessions, sms_opt_outs, ai_audit_log, analytics_events (partitioned table). Copy the exact CREATE TABLE statements from the document — do not simplify or modify column definitions. (3) 20260601000003_alter_tables.sql — the post-creation ALTER TABLE for the circular FK: ALTER TABLE users ADD COLUMN IF NOT EXISTS acquisition_event_id UUID REFERENCES events(id) ON DELETE SET NULL; and its index. (4) 20260601000004_indexes.sql — all indexes from Section 5 of docs/04-Data-Architecture.md. Copy every CREATE INDEX statement exactly. (5) 20260601000005_functions.sql — create the set_updated_at() function, increment_events_created() function, increment_events_joined() function, set_guest_pii_purge_date() function, and create_analytics_partition() function — all from Section 4 of docs/04-Data-Architecture.md. (6) 20260601000006_triggers.sql — all triggers from Section 4: trg_users_updated_at, trg_events_updated_at, trg_participants_updated_at, trg_events_created_count, trg_events_joined_count, trg_set_guest_pii_purge_date. Copy exact trigger definitions. (7) 20260601000007_analytics.sql — create the four initial monthly partitions from Section 8: analytics_events_2026_06 through analytics_events_2026_09. (8) 20260601000008_rls.sql — enable RLS on all tables and create all policies from Section 6. Use payer_id (NOT creator_id) in all event-related policies — creator_id does not exist on the events table. Each file must begin with a comment: -- DESCRIPTION, -- ROLLBACK, -- TESTED IN STAGING."*
+Read docs/04-Data-Architecture.md for the authoritative schema. Create `supabase/migrations/20240101000001_core_tables.sql` with:
+
+1. Extensions: `CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`, `pgcrypto`, `moddatetime`
+2. All CREATE TABLE statements for: users, events, participants, guest_pii, receipt_items, payment_handles, sms_opt_outs, settlement_confirmations, funnel_checkpoints, device_sessions — exact column names, types, defaults and constraints from 04-Data-Architecture.md. The `users` table must include `is_opted_out BOOLEAN NOT NULL DEFAULT false` (set to TRUE when user sends STOP via Twilio SMS).
+3. The circular FK fix: after all tables are created, add `ALTER TABLE users ADD COLUMN acquisition_event_id UUID REFERENCES events(id) ON DELETE SET NULL`
+4. All indexes listed in 04-Data-Architecture.md (including the partial unique index `idx_participants_guest_unique` on `(event_id, guest_pii_token) WHERE guest_pii_token IS NOT NULL`)
+5. No triggers, no RLS policies in this file
+
+Run `npx supabase db push` and confirm all tables exist.
 
 **Files created:**
-- `backend/supabase/migrations/20260601000001_extensions.sql`
-- `backend/supabase/migrations/20260601000002_base_tables.sql`
-- `backend/supabase/migrations/20260601000003_alter_tables.sql`
-- `backend/supabase/migrations/20260601000004_indexes.sql`
-- `backend/supabase/migrations/20260601000005_functions.sql`
-- `backend/supabase/migrations/20260601000006_triggers.sql`
-- `backend/supabase/migrations/20260601000007_analytics.sql`
-- `backend/supabase/migrations/20260601000008_rls.sql`
-- `backend/supabase/config.toml`
+- `supabase/migrations/20240101000001_core_tables.sql`
 
-**Acceptance Criteria:**
-1. `supabase start` starts the local Supabase stack without errors
-2. `supabase db push` applies all 8 migrations with zero errors — no SQL syntax errors, no missing reference errors
-3. `supabase db reset` completes — runs all migrations in order then applies seed (seed may be empty at this point)
-4. In Supabase Studio at `http://localhost:54323`, the Table Editor shows all 15 tables: guest_pii, users, user_payment_handles, events, event_join_tokens, participants, receipt_items, item_assignments, settlement_log, notification_log, funnel_checkpoints, device_sessions, sms_opt_outs, ai_audit_log, analytics_events
-5. Run `SELECT trigger_name FROM information_schema.triggers WHERE trigger_schema='public' ORDER BY trigger_name` in the SQL editor — it must return exactly 6 rows: trg_events_created_count, trg_events_joined_count, trg_events_updated_at, trg_participants_updated_at, trg_set_guest_pii_purge_date, trg_users_updated_at
-6. Run `SELECT proname FROM pg_proc WHERE proname IN ('set_updated_at','create_analytics_partition','set_guest_pii_purge_date','increment_events_created','increment_events_joined')` — returns all 5 function names
+**Acceptance criteria:**
+- [ ] All 10 tables created with correct columns and types
+- [ ] `uuid-ossp`, `pgcrypto`, `moddatetime` extensions enabled
+- [ ] `acquisition_event_id` added via ALTER TABLE after events table exists
+- [ ] Partial unique index on participants for guest deduplication
+- [ ] `supabase db push` exits with code 0
+- [ ] `SELECT tablename FROM pg_tables WHERE schemaname = 'public'` returns all 10 tables
 
-**Tests required:**
+**Tests to run:**
+```bash
+npx supabase db push
 ```
-backend/src/__tests__/rls/rls-setup.ts  (helper, not a test file)
-  - Creates three test users (User A, B, C) with service role
-  - Creates one test event owned by User A (payer_id = User A)
-  - Creates participant rows: User B is a participant, User C is not
-  - Exports client factory functions
 
-backend/src/__tests__/rls/events.rls.test.ts
-  - User A (payer) can SELECT their own events
-  - User B (participant) can SELECT events they are a participant in
-  - User B cannot SELECT events where they are not a participant
-  - User C cannot SELECT User A's events (not a participant, not the payer)
-  - Anon client cannot SELECT any events
-  - User A can INSERT an event with payer_id = their own user ID
-  - User A cannot INSERT an event with payer_id = User B's ID (RLS CHECK violation)
-
-backend/src/__tests__/rls/participants.rls.test.ts
-  - User A (payer) can SELECT all participants in their events
-  - User B can SELECT their own participant row
-  - User B cannot SELECT User C's participant row (even in the same event)
-  - Anon client cannot SELECT any participants
-  - Mobile client (anon key) cannot write payment_status directly (enforced at API layer — document this as a note, not as an RLS test since column-level RLS is not supported)
-
-backend/src/__tests__/rls/users.rls.test.ts
-  - User A can SELECT their own user row
-  - User A cannot SELECT User B's user row
-  - User A can INSERT their own user row (id = auth.uid())
-  - User A cannot INSERT a user row with id = User B's ID
-
-backend/src/__tests__/rls/guest_pii.rls.test.ts
-  - Anon client: SELECT on guest_pii returns zero rows (policy returns false)
-  - Authenticated user client: SELECT on guest_pii returns zero rows
-  - Service role client: SELECT on guest_pii returns the rows (bypasses RLS)
-```
+**Expected output:** Migration applied successfully, 10 tables visible in Supabase dashboard.
 
 ---
 
-### E02-S02 — Seed Data
+### E02-S02 — Triggers + Functions
+
+**What this builds:** All PostgreSQL trigger functions and triggers — updated_at automation, guest PII purge scheduling, analytics partitioning.
+
+**Prompt:**
+Read docs/04-Data-Architecture.md for trigger specifications. Create `supabase/migrations/20240101000002_triggers_functions.sql` with:
+
+1. `updated_at` trigger function using moddatetime extension
+2. Apply `updated_at` trigger to all tables that have an `updated_at` column: users, events, participants, guest_pii, payment_handles, settlement_confirmations
+3. `guest_pii_set_purge_after()` trigger function: when a participant's `settlement_status` changes to `CONFIRMED`, set `guest_pii.purge_after = NOW() + INTERVAL '30 days'` for that participant's guest_pii record
+4. Analytics partition creation function (creates monthly partitions for funnel_checkpoints if the table is partitioned, otherwise a no-op stub)
+
+Run `npx supabase db push`.
+
+**Files created:**
+- `supabase/migrations/20240101000002_triggers_functions.sql`
+
+**Acceptance criteria:**
+- [ ] `updated_at` auto-updates on row modification for all 6 applicable tables
+- [ ] Guest PII purge trigger sets `purge_after` correctly on CONFIRMED status
+- [ ] `supabase db push` exits with code 0
+- [ ] Manually updating a row confirms `updated_at` changes
+
+**Tests to run:**
+```bash
+npx supabase db push
+```
+
+**Expected output:** Migration applied, triggers visible in Supabase dashboard under Database → Triggers.
+
+---
+
+### E02-S03 — RLS Policies
+
+**What this builds:** Row Level Security policies for all tables — enforcing per-user data isolation.
+
+**Prompt:**
+Read docs/04-Data-Architecture.md for the exact RLS policy specifications. Create `supabase/migrations/20240101000003_rls_policies.sql` with:
+
+1. `ALTER TABLE [table] ENABLE ROW LEVEL SECURITY` for all 10 tables
+2. All RLS policies exactly as specified in 04-Data-Architecture.md. Key rules:
+   - `users`: users can only read/update their own row (`auth.uid() = id`)
+   - `events`: creator can do all; participants can read events they are in
+   - `participants`: payer can read all in their events; participants can read their own row; service role bypasses all
+   - `guest_pii`: service role only
+   - `receipt_items`: creator of the event can CRUD; participants can read
+   - `payment_handles`: owner only
+   - `sms_opt_outs`: service role only
+   - `settlement_confirmations`: payer can read all in their events; participant can read their own
+   - `funnel_checkpoints` and `device_sessions`: service role only
+3. Note: payer is identified via `events.payer_id`, NOT `events.creator_id`
+
+Also create `backend/src/tests/rls.test.ts` using the test helper pattern:
+- Use `supabaseAdmin.auth.admin.createSession({ userId })` to create test sessions (NOT generateLink — LetsSplyt users have no email)
+- Test that each policy allows what it should and blocks what it should
+- At minimum: test that user A cannot read user B's payment handles, and that a participant can read event details
+
+Run `npx supabase db push` then `npm test backend/src/tests/rls.test.ts`.
+
+**Files created:**
+- `supabase/migrations/20240101000003_rls_policies.sql`
+- `backend/src/tests/rls.test.ts`
+
+**Acceptance criteria:**
+- [ ] RLS enabled on all 10 tables
+- [ ] All policies use `payer_id` not `creator_id` for event ownership checks
+- [ ] Service role bypasses RLS (used in backend for admin operations)
+- [ ] RLS tests pass — at minimum user isolation and participant read access verified
+- [ ] `supabase db push` exits with code 0
+
+**Tests to run:**
+```bash
+npx supabase db push
+cd backend && npm test src/tests/rls.test.ts
+```
+
+**Expected output:** All RLS tests pass. Supabase dashboard shows RLS enabled on all tables.
+
+---
+
+### E02-S04 — Seed Data
 
 **Description:** Create comprehensive seed data for development. Three test users, two events representing every lifecycle state, all four payment statuses, and enough data to exercise every screen in the app without setting up real data each time.
 
 **Prompt:**
-*"Create backend/supabase/seed.sql with the complete development seed data from Section 11 of docs/04-Data-Architecture.md. Copy the exact INSERT statements from that document. The seed must create: (1) Three test users with the exact UUIDs and placeholder hashes shown in the document: User 1 Alex R. (id 00000000-0000-0000-0000-000000000001, phone Twilio magic number +15005550001), User 2 Jordan K. (id ...000000000002, phone +15005550002), User 3 Sam T. (id ...000000000003, phone +15005550003). Use the exact dev-placeholder hash and encrypted values from the document — these are intentionally fake dev values, not real encrypted data. (2) Three payment handles for User 1 (Alex): venmo and cashapp. One handle for User 2 (Jordan): venmo. All using the dev_encrypted_handle placeholder format from the document. (3) Event 1: 'Team Dinner — Osteria Morini', status='settled', ai_stage='complete', split_mode='even', with all timestamps set as shown in the document. (4) Four participants for Event 1 covering all payment statuses: Alex (confirmed), Jordan (confirmed), Sam (self_reported — payer has not yet confirmed), Casey M. (opted_out, manual_name_only, user_id NULL). (5) Event 2: 'Birthday Brunch', status='open', ai_stage='none', total_amount NULL (no receipt scanned yet). (6) Two participants for Event 2: Alex and Jordan, both pending. (7) One active join token for Event 2 with token 'dev-seed-token-birthday-brunch-2026' and expires_at NOW() + 23 hours. After creating all tables, also insert three funnel_checkpoint rows for the birthday brunch event showing the join flow for Jordan: join_page_loaded, otp_sent, join_confirmed."*
+*"Create supabase/seed.sql with the complete development seed data from Section 11 of docs/04-Data-Architecture.md. Copy the exact INSERT statements from that document. The seed must create: (1) Three test users with the exact UUIDs and placeholder hashes shown in the document: User 1 Alex R. (id 00000000-0000-0000-0000-000000000001, phone Twilio magic number +15005550001), User 2 Jordan K. (id ...000000000002, phone +15005550002), User 3 Sam T. (id ...000000000003, phone +15005550003). Use the exact dev-placeholder hash and encrypted values from the document — these are intentionally fake dev values, not real encrypted data. (2) Three payment handles for User 1 (Alex): venmo and cashapp. One handle for User 2 (Jordan): venmo. All using the dev_encrypted_handle placeholder format from the document. (3) Event 1: 'Team Dinner — Osteria Morini', status='settled', ai_stage='complete', split_mode='equal', with all timestamps set as shown in the document. (4) Four participants for Event 1 covering all payment statuses: Alex (confirmed), Jordan (confirmed), Sam (self_reported — payer has not yet confirmed), Casey M. (opted_out, manual_name_only, user_id NULL). (5) Event 2: 'Birthday Brunch', status='open', ai_stage='none', total_amount NULL (no receipt scanned yet). (6) Two participants for Event 2: Alex and Jordan, both pending. (7) One active join token for Event 2 with token 'dev-seed-token-birthday-brunch-2026' and expires_at NOW() + 23 hours. After creating all tables, also insert three funnel_checkpoint rows for the birthday brunch event showing the join flow for Jordan: join_page_loaded, otp_sent, join_confirmed."*
 
 **Files created:**
-- `backend/supabase/seed.sql`
+- `supabase/seed.sql`
 
 **Acceptance Criteria:**
 1. `supabase db reset` completes with zero SQL errors
@@ -1092,12 +1172,32 @@ backend/src/__tests__/integration/auth/otp-request.test.ts  (supertest)
 - `backend/src/modules/auth/auth.controller.ts` (updated)
 - `shared/types/auth.types.ts` (updated with OtpVerifyBody, AuthSession)
 
+**Response shape:** The OTP verify endpoint must return exactly this shape:
+```json
+{
+  "access_token": "...",
+  "refresh_token": "...",
+  "expires_in": 3600,
+  "user": {
+    "id": "uuid",
+    "display_name": "Pawan",
+    "avatar_colour": "#4F46E5",
+    "is_new_user": true
+  }
+}
+```
+
+On new user creation, randomly assign `avatar_colour` from a predefined palette of 8 colors: `['#4F46E5','#7C3AED','#DB2777','#DC2626','#D97706','#059669','#0284C7','#0891B2']`. Persist the assigned colour in `public.users.avatar_colour` — it must not change on subsequent logins.
+
 **Acceptance Criteria:**
-1. `curl -X POST http://localhost:3000/api/v1/auth/otp/verify -H "Content-Type: application/json" -d '{"phone_e164":"+15005550001","code":"000000"}'` with Twilio test mode returns `{"verified":true,"access_token":"...","refresh_token":"...","user":{"id":"...","display_name":""}}`
+1. `curl -X POST http://localhost:3000/api/v1/auth/otp/verify -H "Content-Type: application/json" -d '{"phone_e164":"+15005550001","code":"000000"}'` with Twilio test mode returns `{"verified":true,"access_token":"...","refresh_token":"...","user":{"id":"...","display_name":"","avatar_colour":"#XXXXXX","is_new_user":true}}`
 2. Sending code `"111111"` (wrong code in Twilio test mode) returns `{"verified":false,"error":"INVALID_CODE"}` with status 400
 3. After a successful verify for `+15005550009` (a new number), `SELECT count(*) FROM public.users WHERE phone_hash = hashPhone('+15005550009')` returns 1 (new row created)
 4. Calling verify twice for the same number returns the same `user.id` both times (idempotent upsert)
 5. Decode the returned `access_token` at jwt.io — the `sub` claim must match the `user.id` in the response
+6. OTP verify rate limit: 5 incorrect-code attempts per phone per 10 minutes — the 6th attempt within that window returns 429 with `{ error: { code: 'TOO_MANY_REQUESTS', retry_after_seconds: N } }`
+7. Response includes `is_new_user: boolean` — true if this OTP verify created the user record (first login), false for returning users
+8. Response includes `user.avatar_colour: string` — a randomly-assigned hex color from the palette on first creation, persisted thereafter (same colour returned on every subsequent login)
 
 **Tests required:**
 ```
@@ -1131,55 +1231,96 @@ Important: The user.id from auth.users must equal the id in public.users. They a
 
 ---
 
-### E03-S03 — Mobile Auth Screens
+### E03-S03 — Welcome + PhoneEntry Screens + authStore
 
-**Description:** Build WelcomeScreen, PhoneEntryScreen, and OTPVerifyScreen. Wire them to the backend. Store tokens in SecureStore. Restore session on app launch. These are the first screens users see.
+**What this builds:** The first two auth screens and the Zustand auth store skeleton — phone entry triggers OTP request.
 
 **Prompt:**
-*"Build the authentication screens. Refer to Prototype/dusk-auth.html in the project for the visual design. (1) mobile/src/screens/auth/WelcomeScreen.tsx: a screen with a clean dark background matching the prototype's dusk colour scheme. Show the app name 'LetsSplyt' in large bold text, tagline 'Split bills. No chasing. No drama.', then three value proposition rows each with a leading emoji and a one-line benefit: '📸 Photograph any receipt — AI reads every item', '⚡ Everyone pays their exact share, automatically', '👤 Guests pay via browser — no app needed'. At the bottom: a primary 'Get Started' button navigating to PhoneEntryScreen with params { mode: 'register' }, and a secondary text link 'I already have an account' navigating to PhoneEntryScreen with params { mode: 'login' }. (2) mobile/src/screens/auth/PhoneEntryScreen.tsx: country code selector using react-native-phone-number-input, phone number text input, a 'Continue' button. On press: set loading state, call POST /api/v1/auth/otp/request via a fetch call to the API URL from process.env.EXPO_PUBLIC_API_URL. On success navigate to OTPVerifyScreen passing { phoneE164 }. On error show a toast or inline error message. (3) mobile/src/screens/auth/OTPVerifyScreen.tsx: show the last 4 digits of the phone number at the top. Render 6 TextInput boxes side-by-side, each accepting one digit, auto-advancing focus to the next box on digit entry. When the 6th digit is entered, auto-submit by calling POST /api/v1/auth/otp/verify. On success: call SecureStore.setItemAsync('letssplyt_access_token', access_token) and SecureStore.setItemAsync('letssplyt_refresh_token', refresh_token), then call authStore.setUser(user), then navigate to MainTabs (even if MainTabs is a placeholder screen for now). Show a 'Resend code' text link, disabled for 60 seconds after arrival on the screen (countdown timer), enabled after 60 seconds. On error: show 'Invalid code — please try again' below the boxes and clear the inputs. (4) mobile/src/store/authStore.ts: Zustand store with: state { user: { id: string, display_name: string } | null, isAuthenticated: boolean, isLoading: boolean }, actions { setUser(user): sets user and isAuthenticated=true, setLoading(bool), logout(): calls SecureStore.deleteItemAsync for both token keys then sets user=null and isAuthenticated=false, restoreSession(): reads both token keys from SecureStore — if access_token exists, calls GET /api/v1/users/me with the token, sets user if the call succeeds, sets isAuthenticated=true, does nothing if call fails (expired token) }. (5) mobile/src/navigation/RootNavigator.tsx: on mount, call authStore.restoreSession(). While restoring show a splash/loading screen. If isAuthenticated, show MainTabsNavigator (placeholder). If not, show AuthStackNavigator (WelcomeScreen → PhoneEntryScreen → OTPVerifyScreen). (6) mobile/src/services/auth.service.ts: contains requestOtp(phoneE164) and verifyOtp(phoneE164, code) functions that wrap fetch calls to the backend — include Authorization header when needed."*
+Read docs/08-Mobile-App-Specification.md for screen specs and the authStore spec. Build:
+
+1. `mobile/src/screens/auth/WelcomeScreen.tsx` — app logo/name, tagline, single "Get Started" button that navigates to PhoneEntry
+2. `mobile/src/screens/auth/PhoneEntryScreen.tsx` — phone number text input (E.164 format helper), country code picker defaulting to +1, "Send Code" button that calls `POST /auth/otp/request`, loading state, error display
+3. `mobile/src/store/authStore.ts` — Zustand store with:
+   - State: `session: Session | null`, `user: User | null`, `isLoading: boolean`
+   - Actions: `setSession(session)`, `clearSession()`, `setLoading(bool)`
+   - Uses `expo-secure-store` to persist the access token (key: `auth_token`) — NEVER AsyncStorage
+4. Wire WelcomeScreen and PhoneEntryScreen into `mobile/src/navigation/RootNavigator.tsx` auth stack
+
+Match the visual design in `prototype/dusk-auth.html`.
 
 **Files created:**
 - `mobile/src/screens/auth/WelcomeScreen.tsx`
 - `mobile/src/screens/auth/PhoneEntryScreen.tsx`
-- `mobile/src/screens/auth/OTPVerifyScreen.tsx`
 - `mobile/src/store/authStore.ts`
-- `mobile/src/navigation/RootNavigator.tsx`
-- `mobile/src/navigation/AuthStackNavigator.tsx`
-- `mobile/src/services/auth.service.ts`
+- Updates to `mobile/src/navigation/RootNavigator.tsx`
 
-**Acceptance Criteria:**
-1. On Expo Go (scan QR from `expo start`): app opens to WelcomeScreen showing the logo, tagline, and three value proposition rows
-2. Tap "Get Started" → PhoneEntryScreen appears with a country flag picker and phone input field
-3. Enter `+15005550001` and tap Continue → navigates to OTPVerifyScreen showing the last 4 digits `0001` at the top
-4. Type `000000` into the OTP boxes — they auto-advance digit by digit — and the screen auto-submits on the 6th digit — navigates to MainTabs (placeholder is fine)
-5. Kill the Expo Go app entirely, reopen it → app goes directly to MainTabs without showing WelcomeScreen (session restored from SecureStore)
-6. In the Expo Go terminal log, search for `+15005550001` — it must not appear anywhere in the output
+**Acceptance criteria:**
+- [ ] Welcome screen renders with "Get Started" button
+- [ ] PhoneEntry screen accepts phone number and calls `/auth/otp/request`
+- [ ] authStore uses expo-secure-store, never AsyncStorage
+- [ ] Loading state shown during API call
+- [ ] Error message shown if API returns error
+- [ ] Navigation: Welcome → PhoneEntry works
 
-**Tests required:**
+**Tests to run:**
+```bash
+cd mobile && npm test src/screens/auth/WelcomeScreen.test.tsx
+cd mobile && npm test src/store/authStore.test.ts
 ```
-mobile/src/__tests__/unit/store/authStore.test.ts
-  - setUser(user) sets isAuthenticated to true and stores the user
-  - logout() calls SecureStore.deleteItemAsync for both token keys
-  - logout() sets user to null and isAuthenticated to false
-  - restoreSession() with a stored access_token calls GET /users/me and populates user
-  - restoreSession() with no stored token leaves isAuthenticated as false
-  - restoreSession() with an expired token (API returns 401) leaves isAuthenticated as false
 
-mobile/src/__tests__/components/auth/OTPVerifyScreen.test.tsx
-  - renders exactly 6 input boxes
-  - entering a digit in box 1 moves focus to box 2
-  - entering a digit in box 6 calls verifyOtp with the full 6-digit code
-  - shows a loading indicator while the API call is in flight
-  - navigates to MainTabs on successful verification
-  - shows an error message when the API returns INVALID_CODE
-  - clears all inputs after an error
+**Expected output:** Screens render without errors. Store initialises with null session.
 
-mobile/src/__tests__/components/auth/WelcomeScreen.test.tsx
-  - renders the app name 'LetsSplyt'
-  - renders the tagline text
-  - 'Get Started' button navigates to PhoneEntryScreen
-  - 'I already have an account' link navigates to PhoneEntryScreen
+---
+
+### E03-S04 — OTPVerify Screen + initAuthListener + Token Refresh
+
+**What this builds:** OTP verification screen, completes the authStore with JWT refresh listener, and handles the biometric re-enrolment edge case.
+
+**Prompt:**
+Read docs/08-Mobile-App-Specification.md for the OTPVerify screen spec and the `initAuthListener` specification. Build:
+
+1. `mobile/src/screens/auth/OTPVerifyScreen.tsx`:
+   - 6-digit OTP input (individual digit boxes per prototype)
+   - "Verify" button calls `POST /auth/otp/verify` with phone + OTP
+   - On success: calls `authStore.setSession()`, stores token in expo-secure-store, navigates to Home
+   - "Resend" link (cooldown 30 seconds)
+   - Error display for wrong OTP
+
+2. Complete `mobile/src/store/authStore.ts` with `initAuthListener()`:
+   - Calls `supabase.auth.onAuthStateChange((event, session) => ...)`
+   - On `TOKEN_REFRESHED`: calls `setSession(session)`, updates expo-secure-store
+   - On `SIGNED_OUT`: calls `clearSession()`, removes from expo-secure-store
+   - This must be called once in the app root (RootNavigator) on mount
+   - Biometric re-enrolment edge case: if `event === 'USER_UPDATED'` and biometric was previously enrolled, prompt re-enrolment
+
+3. Call `authStore.getState().initAuthListener()` in RootNavigator on mount
+
+Match the OTP screen design in `prototype/dusk-auth.html`.
+
+**Files created:**
+- `mobile/src/screens/auth/OTPVerifyScreen.tsx`
+- Updates to `mobile/src/store/authStore.ts` (add initAuthListener)
+- Updates to `mobile/src/navigation/RootNavigator.tsx` (call initAuthListener on mount)
+
+**Acceptance criteria:**
+- [ ] OTP screen renders 6 individual digit inputs
+- [ ] Correct OTP navigates to Home and stores token in expo-secure-store
+- [ ] Wrong OTP shows error message
+- [ ] Resend shows 30-second cooldown
+- [ ] `initAuthListener` wired in RootNavigator
+- [ ] TOKEN_REFRESHED event updates stored token
+- [ ] SIGNED_OUT event clears store and secure storage
+- [ ] OTP request rate limit: 3 requests per phone per 10 minutes, 20 requests per IP per hour. Returns 429 with `{ error: { code: 'TOO_MANY_REQUESTS', retry_after_seconds: N } }` when exceeded.
+- [ ] OTP verify rate limit: 5 incorrect-code attempts per phone per 10 minutes. Returns 429 when exceeded.
+- [ ] Wrong OTP code returns an inline error message with the code input cleared and the phone field pre-filled for re-entry.
+
+**Tests to run:**
+```bash
+cd mobile && npm test src/screens/auth/OTPVerifyScreen.test.tsx
+cd mobile && npm test src/store/authStore.test.ts
 ```
+
+**Expected output:** OTP flow tests pass, token refresh path covered.
 
 ---
 
@@ -1192,7 +1333,7 @@ mobile/src/__tests__/components/auth/WelcomeScreen.test.tsx
 **Description:** Build the five profile endpoints. Handle encryption and decryption happens entirely in the service layer — encrypted values reach the database, decrypted values reach the client. The authenticated user can only read and modify their own profile.
 
 **Prompt:**
-*"Build the profile module in backend/src/modules/profile/. All routes require the authenticate middleware. (1) GET /api/v1/users/me — use getSupabaseForUser(jwt) to fetch the user row by req.user.id. Return { id, display_name, avatar_colour, avatar_url, total_events_created, total_events_joined, created_at }. NEVER return phone_hash, phone_encrypted, or name_encrypted — these must be explicitly excluded from the SELECT query. (2) PATCH /api/v1/users/me — accepts { display_name?: string, expo_push_token?: string, avatar_colour?: string }. Validate with Zod (display_name max 50 chars, expo_push_token max 200 chars). If display_name provided: UPDATE users SET display_name = $1 WHERE id = req.user.id via getSupabaseForUser. If expo_push_token provided: read X-Device-ID header (required if expo_push_token is present — return 400 if missing), read X-Platform header (must be 'ios' or 'android'), then upsert into device_sessions: { user_id: req.user.id, device_id: deviceId, expo_push_token, platform, last_active_at: new Date() } ON CONFLICT (user_id, device_id) DO UPDATE SET expo_push_token = EXCLUDED.expo_push_token, last_active_at = NOW(). Return the updated user object. (3) GET /api/v1/users/me/handles — SELECT id, provider, handle_encrypted, display_order FROM user_payment_handles WHERE user_id = req.user.id AND is_active = true ORDER BY display_order ASC via supabaseAdmin (must use admin to decrypt — anon key cannot read handle_encrypted). Decrypt each handle_encrypted using decrypt(handle_encrypted, process.env.HANDLE_ENCRYPTION_KEY). Return [{ id, provider, handle_value, display_order }] — never return handle_encrypted in the response. (4) POST /api/v1/users/me/handles — accepts { provider: z.enum(['venmo','paypal','cashapp','zelle','wise','bank_transfer','other']), handle_value: z.string().min(1).max(100) }. Encrypt handle_value: encryptedValue = encrypt(handle_value, process.env.HANDLE_ENCRYPTION_KEY). Get current max display_order for this user and add 1 for the new handle's order. INSERT into user_payment_handles. Return { id, provider, display_order }. (5) DELETE /api/v1/users/me/handles/:id — first verify ownership: SELECT user_id FROM user_payment_handles WHERE id = handleId via supabaseAdmin — if user_id !== req.user.id, return 403 { error: 'FORBIDDEN' }. If owner, perform a soft delete: UPDATE user_payment_handles SET is_active = false WHERE id = handleId. All types in shared/types/profile.types.ts. Register routes in backend/src/app.ts."*
+*"Build the profile module in backend/src/modules/profile/. All routes require the authenticate middleware. (1) GET /api/v1/users/me — use getSupabaseForUser(jwt) to fetch the user row by req.user.id. Return { id, display_name, avatar_colour, avatar_url, total_events_created, total_events_joined, created_at }. NEVER return phone_hash, phone_encrypted, or name_encrypted — these must be explicitly excluded from the SELECT query. (2) PATCH /api/v1/users/me — accepts { display_name?: string, expo_push_token?: string, avatar_colour?: string }. Validate with Zod (display_name max 50 chars, expo_push_token max 200 chars). If display_name provided: UPDATE users SET display_name = $1 WHERE id = req.user.id via getSupabaseForUser. If expo_push_token provided: read X-Device-ID header (required if expo_push_token is present — return 400 if missing), read X-Platform header (must be 'ios' or 'android'), then upsert into device_sessions: { user_id: req.user.id, device_id: deviceId, expo_push_token, platform, last_active_at: new Date() } ON CONFLICT (user_id, device_id) DO UPDATE SET expo_push_token = EXCLUDED.expo_push_token, last_active_at = NOW(). Return the updated user object. (3) GET /api/v1/users/me/handles — SELECT id, provider, handle_encrypted, display_order FROM user_payment_handles WHERE user_id = req.user.id AND is_active = true ORDER BY display_order ASC via supabaseAdmin (must use admin to decrypt — anon key cannot read handle_encrypted). Decrypt each handle_encrypted using decrypt(handle_encrypted, process.env.HANDLE_ENCRYPTION_KEY). Return [{ id, provider, handle_value, display_order }] — never return handle_encrypted in the response. (4) POST /api/v1/users/me/handles — accepts { provider: z.enum(['venmo','paypal','cashapp','zelle','wise','upi','bank_transfer','other']), handle_value: z.string().min(1).max(100) }. Encrypt handle_value: encryptedValue = encrypt(handle_value, process.env.HANDLE_ENCRYPTION_KEY). Get current max display_order for this user and add 1 for the new handle's order. INSERT into user_payment_handles. Return { id, provider, display_order }. (5) DELETE /api/v1/users/me/handles/:id — first verify ownership: SELECT user_id FROM user_payment_handles WHERE id = handleId via supabaseAdmin — if user_id !== req.user.id, return 403 { error: 'FORBIDDEN' }. If owner, perform a soft delete: UPDATE user_payment_handles SET is_active = false WHERE id = handleId. All types in shared/types/profile.types.ts. Register routes in backend/src/app.ts."*
 
 **Files created:**
 - `backend/src/modules/profile/profile.service.ts`
@@ -1247,6 +1388,11 @@ backend/src/__tests__/integration/profile/profile.test.ts  (supertest)
 3. Tap "+ Add payment method" → AddHandleScreen → tap "Venmo" chip (it highlights) → type "@testhandle" → tap Save → navigate back → "Venmo @testhandle" appears in the handles list on ProfileScreen
 4. Swipe left on a handle → red Delete button appears → tap Delete → confirmation alert appears → confirm → handle disappears from the list
 5. In Supabase Studio: `SELECT handle_encrypted FROM user_payment_handles WHERE is_active = true` — the stored values are encrypted blobs, not readable handle strings
+6. `PushPermissionScreen` is rendered when `is_new_user === true` after OTP verify (routed from OTPVerifyScreen)
+7. `PushPermissionScreen` shows explanation: 'Enable notifications to get payment reminders and confirmations'
+8. 'Allow' button on `PushPermissionScreen` → calls `POST /api/v1/users/me/push-token` with `{ device_id, token, platform }` → navigates to HomeScreen
+9. 'Not now' button on `PushPermissionScreen` → skips token registration, navigates to HomeScreen
+10. If user already has a push token (`is_new_user === false`), `PushPermissionScreen` is NOT shown
 
 **Tests required:**
 ```
@@ -1279,7 +1425,7 @@ mobile/src/__tests__/components/profile/AddHandleScreen.test.tsx
 **Description:** Build all event endpoints: create, list (paginated), get by ID, lock, reopen, regenerate expired token. These endpoints are the backbone of the entire event lifecycle and must handle token generation, ownership verification, and state transitions correctly before any UI is built.
 
 **Prompt:**
-*"Build the complete event CRUD API for LetsSplyt. (1) POST /api/v1/events: body { name: string, date?: string }, creates event with payer_id=req.user.id, status='open', ai_stage='none', generates join token using crypto.randomBytes(18).toString('base64url') stored in event_join_tokens with expires_at=NOW()+24h, returns { id, name, status, join_url: process.env.APP_DOMAIN+'/join/'+token, token_expires_at }. (2) GET /api/v1/events: cursor pagination (cursor + limit query params, default limit 20), returns { events: [...], next_cursor, has_more }, each event includes { id, name, status, participant_count, total_amount, created_at }. (3) GET /api/v1/events/:id: returns full event including participant list (display_name only, no phone), join_url if status='open', settlement summary if status!='open'. (4) POST /api/v1/events/:id/lock: verifies payer_id=req.user.id, checks participant count >= 2, sets status='locked' and locked_at=NOW(), returns updated event. (5) POST /api/v1/events/:id/reopen: verifies payer_id, sets status='open', generates new join token (old one deactivated via is_active=false), returns new join_url. (6) POST /api/v1/events/:id/join-token/regenerate: for expired tokens with status='open', generates new token and deactivates the old one. All routes require authenticate middleware. Place shared types in shared/types/event.types.ts."*
+*"Build the complete event CRUD API for LetsSplyt. (1) POST /api/v1/events: body { title: string, date?: string }, creates event with payer_id=req.user.id, status='open', ai_stage='none', generates join token using crypto.randomBytes(18).toString('base64url') stored in event_join_tokens with expires_at=NOW()+24h, returns { id, title, status, join_url: process.env.APP_DOMAIN+'/join/'+token, token_expires_at }. (2) GET /api/v1/events: cursor pagination (cursor + limit query params, default limit 20), returns { events: [...], next_cursor, has_more }, each event includes { id, title, status, participant_count, total_amount, created_at }. (3) GET /api/v1/events/:id: returns full event including participant list (display_name only, no phone), join_url if status='open', settlement summary if status!='open'. (4) POST /api/v1/events/:id/lock: verifies payer_id=req.user.id, checks participant count >= 2, sets status='locked' and locked_at=NOW(), returns updated event. (5) POST /api/v1/events/:id/reopen: verifies payer_id, sets status='open', generates new join token (old one deactivated via is_active=false), returns new join_url. (6) POST /api/v1/events/:id/join-token/regenerate: for expired tokens with status='open', generates new token and deactivates the old one. All routes require authenticate middleware. Use `events.title` (not `events.name`) for the event title column in all SQL queries and TypeScript types. Place shared types in shared/types/event.types.ts."*
 
 **Files created:**
 - `backend/src/modules/events/event.controller.ts`
@@ -1359,7 +1505,7 @@ backend/src/__tests__/integration/events/participants.test.ts
 **Description:** Build CreateEventModal, QRDisplayModal, EventDetailScreen (joining phase with Realtime), HomeScreen, and EventsScreen. The EventDetailScreen uses Supabase Realtime to update the member list automatically when new participants join — the creator should see new members appear without refreshing.
 
 **Prompt:**
-*"Build the complete event creation and management screens for LetsSplyt mobile. (1) HomeScreen: net balance hero card (green if positive 'You're owed $X', red if negative 'You owe $X', grey if zero), Needs attention section (pending confirmations), recent events list (last 3), FAB '+ New event' → CreateEventModal. Balance fetched from GET /api/v1/settlement/summary. (2) EventsScreen: segmented control Active|Settled, paginated list of event cards (name, date, participant count, status chip, outstanding amount), FAB → CreateEventModal, tap card → EventDetailScreen. (3) CreateEventModal (bottom sheet): event name autofocused, Create button → POST /events, on success dismiss modal then open QRDisplayModal. (4) QRDisplayModal (fullscreen): large QR code using react-native-qrcode-svg, event name above, Copy link + Share buttons below, Expired state shows 'Regenerate' button that calls POST /events/:id/join-token/regenerate. (5) EventDetailScreen (joining phase, refer to prototype/participant.html): QR at top (tap → fullscreen QRDisplayModal), live member list via Supabase Realtime channel 'event-members:[eventId]', each member shows display_name + join_method chip (QR Web / App / Manual), '+Add manually' button → AddParticipantModal (bottom sheet: name field + optional phone with country picker, or 'Name only' toggle), 'Lock group →' button disabled if fewer than 2 members with count badge '3 members'. On Realtime event: subscribe to channel 'event-members:[eventId]', on ANY change re-fetch GET /events/:id (never use payload.new directly to update state). Zustand eventStore: events list, currentEvent, participants list — actions: createEvent, loadEvents, loadParticipants, lockEvent."*
+*"Build the complete event creation and management screens for LetsSplyt mobile. IMPORTANT: The event title field from the API is `event.title` (not `event.name`) — use `event.title` in all TypeScript component code, Zustand store, and API calls. (1) HomeScreen: net balance hero card (green if positive 'You're owed $X', red if negative 'You owe $X', grey if zero), Needs attention section (pending confirmations), recent events list (last 3 — display `event.title` for each), FAB '+ New event' → CreateEventModal. Balance fetched from GET /api/v1/users/me/balance (built in E09-S02 — see E05-S03 acceptance criteria for graceful degradation). (2) EventsScreen: segmented control Active|Settled, paginated list of event cards (`event.title`, date, participant count, status chip, outstanding amount), FAB → CreateEventModal, tap card → EventDetailScreen. (3) CreateEventModal (bottom sheet): title input autofocused (label 'Event title'), Create button → POST /events with body `{ title }`, on success dismiss modal then open QRDisplayModal. (4) QRDisplayModal (fullscreen): large QR code using react-native-qrcode-svg, `event.title` above, Copy link + Share buttons below, Expired state shows 'Regenerate' button that calls POST /events/:id/join-token/regenerate. (5) EventDetailScreen (joining phase, refer to prototype/participant.html): display `event.title` at top, QR below (tap → fullscreen QRDisplayModal), live member list via Supabase Realtime channel 'event-members:[eventId]', each member shows display_name + join_method chip (QR Web / App / Manual), '+Add manually' button → AddParticipantModal (bottom sheet: name field + optional phone with country picker, or 'Name only' toggle), 'Lock group →' button disabled if fewer than 2 members with count badge '3 members'. On Realtime event: subscribe to channel 'event-members:[eventId]', on ANY change re-fetch GET /events/:id (never use payload.new directly to update state). Zustand eventStore: events list, currentEvent, participants list — actions: createEvent, loadEvents, loadParticipants, lockEvent."*
 
 **Files created:**
 - `mobile/src/screens/HomeScreen.tsx`
@@ -1380,6 +1526,8 @@ backend/src/__tests__/integration/events/participants.test.ts
 4. When the browser device joins, the member list on the creator's phone updates AUTOMATICALLY within 2 seconds (Realtime working)
 5. Lock group button is disabled when 0 members are shown, enabled when 1 or more members are present
 6. Tap Lock → event status transitions → screen moves to settlement phase view
+7. Balance card calls `GET /api/v1/users/me/balance` but gracefully degrades: if the endpoint returns 404 or the call fails, show 'Balance unavailable' placeholder. Do NOT hard-fail. The endpoint is built in E09-S02.
+8. Do NOT call any settlement endpoint that isn't built yet. Use a stub response shape for the balance card.
 
 **Tests required:**
 ```
@@ -1434,6 +1582,9 @@ mobile/src/__tests__/components/events/EventDetailScreen.test.tsx
 4. On creator's phone, the new member appears in EventDetailScreen within 2 seconds of OTP verification
 5. Visiting an expired token URL shows the expiry message page, not a 404 or crash
 6. Visiting a locked group's URL shows the locked message page
+7. **Existing user detection:** Before creating a guest participant, the server hashes the submitted phone and queries the `users` table. If a matching user exists (`phone_hash` match), return 409 with `{ error: { code: 'APP_USER_REDIRECT', deep_link_url: 'letssplyt://join/:token' } }`. The web page shows: 'You already have LetsSplyt! Open the app to join.' with a deep-link button.
+8. **Race condition with event lock:** If the event locks WHILE the guest is entering their phone/OTP (between `GET /join/:token` and `POST /join/:token/otp/verify`), the server returns 409 `EVENT_LOCKED`. The web page shows: 'This event has been locked. Ask the bill payer to unlock it or contact them directly.'
+9. **Wrong OTP code HTML response:** Invalid OTP code on `POST /join/:token/otp/verify` returns the web page (not JSON) with an error message inline. The phone input remains populated. The code input is cleared.
 
 **Tests required:**
 ```
@@ -1455,6 +1606,8 @@ backend/src/__tests__/unit/join/join.service.test.ts
 ---
 
 ### E06-S02 — In-App Join + Deep Link Handler
+
+**PREREQUISITE: Complete E06-S03 (Deep Link Infrastructure) BEFORE running E06-S02's Xcode/Android acceptance tests.** The Universal Link test in E06-S02 ('paste URL → app opens') requires the AASA file served by E06-S03's backend changes. Build E06-S03 first, deploy it, then return to E06-S02.
 
 **Description:** When a participant with the app installed taps the join link, the app intercepts it via Universal Link and handles joining in-app. Must work in all three app states: open (foreground), backgrounded, and completely closed (cold start). Unauthenticated users are routed through auth and returned to the join flow after logging in.
 
@@ -1493,6 +1646,41 @@ mobile/src/__tests__/components/join/AppJoinScreen.test.tsx
   - navigates to AppJoinedScreen on success
   - navigates to AppLockedScreen when event is locked
 ```
+
+---
+
+### E06-S03 — Deep Link Infrastructure (AASA, App Links, Expo Config)
+
+**What:** Serve the Universal Links (iOS) and App Links (Android) verification files from the backend, and configure the Expo app to intercept LetsSplyt deep links.
+
+**Acceptance Criteria:**
+- `GET /.well-known/apple-app-site-association` served as `application/json`, no redirect, no `.json` extension. Content includes the app's bundle ID and team ID. File stored at `backend/public/.well-known/apple-app-site-association`.
+- `GET /.well-known/assetlinks.json` served as `application/json`. Content includes the app's SHA-256 fingerprint and package name. File stored at `backend/public/.well-known/assetlinks.json`.
+- Express serves the `backend/public/` directory as static files (add `app.use(express.static('public'))` before all routes).
+- In `mobile/app.config.js`, configure:
+  - iOS: `expo.ios.associatedDomains: ['applinks:letssplyt.app', 'applinks:staging.letssplyt.app']`
+  - Android: `expo.android.intentFilters` with `action: 'VIEW'`, `category: ['BROWSABLE', 'DEFAULT']`, `data: { scheme: 'https', host: 'letssplyt.app', pathPrefix: '/join/' }`
+- `app.config.js` does NOT include `expo-router` plugin — confirm this is absent.
+- Test: On iOS simulator, tapping a `https://letssplyt.app/join/abc123` link opens the app (not Safari). On Android, same with intent filter.
+- Test: `curl -I http://localhost:3000/.well-known/apple-app-site-association` returns 200 with `Content-Type: application/json`.
+
+**Prompt:**
+Read CLAUDE.md, BUILD-PROGRESS.md, and this story. Read `backend/src/app.ts`, `mobile/app.config.js`, and `docs/02-User-Flows.md` (deep link handling section). Then implement:
+
+1. Create `backend/public/.well-known/apple-app-site-association` JSON file.
+2. Create `backend/public/.well-known/assetlinks.json` JSON file.
+3. Add `express.static('public')` to `backend/src/app.ts` before any routes.
+4. Update `mobile/app.config.js` to add `associatedDomains` (iOS) and `intentFilters` (Android). Do NOT add expo-router plugin.
+
+Use placeholder values for bundle ID (`com.letssplyt.app`), team ID (`TEAMID_PLACEHOLDER`), SHA-256 fingerprint (`00:11:22:...`). These will be replaced with real values when Apple Developer and Google Play accounts are set up.
+
+Run: `curl http://localhost:3000/.well-known/apple-app-site-association` and verify 200 response with JSON.
+
+**Files created:**
+- `backend/public/.well-known/apple-app-site-association`
+- `backend/public/.well-known/assetlinks.json`
+- Updates to `backend/src/app.ts` (add static file serving)
+- Updates to `mobile/app.config.js` (add associatedDomains and intentFilters)
 
 ---
 
@@ -1544,7 +1732,7 @@ backend/src/__tests__/unit/receipts/receipts.service.test.ts
 **Description:** The core AI feature. Takes the uploaded receipt image path, sends to Gemini (dev) or Claude Haiku (prod) via the LLM factory, extracts line items with Zod validation, handles partial failures gracefully, and uses an atomic idempotency guard to prevent duplicate AI calls from concurrent requests.
 
 **Prompt:**
-*"Build the A1 receipt parsing AI agent for LetsSplyt. POST /api/v1/receipts/parse (requires authenticate middleware): body { event_id, storage_path }. (1) Atomic idempotency guard: run UPDATE events SET ai_stage='parsing' WHERE id=event_id AND ai_stage='none' — if 0 rows were updated, check the current ai_stage: if 'parsing' return 409 ALREADY_PROCESSING, if at any stage past 'parsing' call getCachedReceiptResult(event_id) and return it without calling AI. (2) Get a signed download URL from Supabase Storage for the storage_path. (3) Provider routing: for Gemini pass the URL directly as an image part; for Anthropic fetch the image bytes and convert to base64. (4) Call resolveProvider('A1') from the LLM factory, call provider.complete() with the A1 system prompt from docs/07-AI-Agent-Specification.md. Call sanitizePromptInput() on any user-provided context before including in the prompt. (5) Validate the AI response text with Zod against ReceiptParseResult schema: { items: [{ name: string, price: number, quantity: number, confidence: 'high'|'medium'|'low' }], tax: number, tip: number, total: number, currency: string, locale: string } — all monetary amounts in minor units (integer cents or paise). If Zod validation fails: UPDATE events SET ai_stage='failed', return 500 PARSE_FAILED. (6) On success: write all items to receipt_items table, UPDATE events SET ai_stage='parsed'. Return the ReceiptParseResult. (7) getCachedReceiptResult(eventId): reads receipt_items joined with events to get tax, tip, total, currency, locale from the events table (not from receipt_items columns)."*
+*"Build the A1 receipt parsing AI agent for LetsSplyt. POST /api/v1/receipts/parse (requires authenticate middleware): body { event_id, storage_path }. (1) Atomic idempotency guard: run UPDATE events SET ai_stage='parsing' WHERE id=event_id AND ai_stage='none' — if 0 rows were updated, check the current ai_stage: if 'parsing' return 409 ALREADY_PROCESSING, if at any stage past 'parsing' call getCachedReceiptResult(event_id) and return it without calling AI. (2) Get a signed download URL from Supabase Storage for the storage_path. (3) Provider routing: for Gemini pass the URL directly as an image part; for Anthropic fetch the image bytes and convert to base64. (4) Call `createLLMProvider('A1')` from `src/infrastructure/llm/factory.ts`, call provider.complete() with the A1 system prompt from docs/07-AI-Agent-Specification.md. Call sanitizePromptInput() on any user-provided context before including in the prompt. (5) Validate the AI response text with Zod against ReceiptParseResult schema: { items: [{ name: string, price: number, quantity: number, confidence: 'high'|'medium'|'low' }], tax: number, tip: number, total: number, currency: string, locale: string }. Note: the `receipt_items` table column is named `name` (not `description`) — use `item.name` throughout. — all monetary amounts in minor units (integer cents or paise). If Zod validation fails: UPDATE events SET ai_stage='failed', return 500 PARSE_FAILED. (6) On success: write all items to receipt_items table, UPDATE events SET ai_stage='parsed'. Return the ReceiptParseResult. (7) getCachedReceiptResult(eventId): reads receipt_items joined with events to get tax, tip, total, currency, locale from the events table (not from receipt_items columns)."*
 
 **Files created:**
 - `backend/src/modules/ai/a1-receipt-parser.ts`
@@ -1614,52 +1802,105 @@ backend/src/__tests__/unit/receipts/confirm.test.ts
 
 ---
 
-### E07-S04 — Split Calculator + A2 NLP
+### E07-S04 — Split Calculator
 
-**Description:** The split calculation module: pure TypeScript arithmetic for Even, Amount, Percent, and Portion modes, plus A2 NLP for natural language item assignment. splitCalculator.ts has zero AI dependency and must be tested first — it processes real money and a silent rounding bug means real users receive wrong payment requests.
+**What this builds:** Pure TypeScript split calculator — the arithmetic core of the entire app. 100% test coverage required.
+
+> **Canonical file path:** The split calculator file is: `shared/utils/splitCalculator.ts` (in the shared workspace, importable by both mobile and backend). The backend's A2 harness imports it as: `import { calculateSplits } from '@letssplyt/shared/utils/splitCalculator'`. Do NOT place this file in `backend/src/modules/splits/splitCalculator.ts` or `src/modules/ai/split-calculator/split-calculator.ts` — only `shared/utils/splitCalculator.ts` is correct.
 
 **Prompt:**
-*"Build the split calculator and A2 NLP assignment for LetsSplyt. Write tests FIRST for splitCalculator.ts before implementing it. (1) backend/src/modules/splits/splitCalculator.ts: pure TypeScript, no async, no imports from other app modules. Export: calculateEvenSplit(total: number, participantCount: number): number[] — uses the largest-remainder method; tiebreaker for equal fractional parts: participant insertion order wins (first participant in array gets the extra cent). calculateProportionalSplit(itemSubtotals: number[], tax: number, tip: number): number[] — prorates tax and tip proportionally by each person's item subtotal. assertSumInvariant(splits: number[], expectedTotal: number): void — throws SumInvariantError if Math.abs(sum(splits) - expectedTotal) > 1. All inputs and outputs are integers in minor units (multiply by 100 before calculating, never use floats for money). (2) POST /api/v1/splits/nlp-assign (requires authenticate): body { event_id, instruction: string }. Call sanitizePromptInput(instruction). Build A2 prompt using sanitized item names and participant display_names only (never phone numbers). Call resolveProvider('A2'). Parse response as { assignments: [{ item_id: string, participant_ids: string[] }], unassigned_item_ids: string[] }. If unassigned_item_ids is non-empty: UPDATE events SET ai_stage='parsed' (reset to allow retry), return { status: 'partial', assignments, unassigned_item_ids, message: 'Some items could not be assigned. Please assign them manually.' }. If all assigned: UPDATE ai_stage='calculating', return { status: 'complete', assignments }. (3) POST /api/v1/splits/calculate (requires authenticate): body { event_id, mode: 'even'|'itemised'|'amount'|'percent'|'portion', values?: Record<string, number> }. Runs the appropriate splitCalculator function. Calls assertSumInvariant before writing. Writes amount_owed to each participant row. UPDATE ai_stage='calculated'. Returns per-person breakdown array."*
+Read docs/07-AI-Agent-Specification.md for the split calculator specification. Create `shared/utils/splitCalculator.ts` as a pure TypeScript module with zero AI, zero side effects, zero network calls:
+
+1. `getCurrencyMinorUnits(currency: string): number` — returns decimal places per currency:
+   - JPY, KRW, VND, CLP → 0
+   - BHD, KWD, OMR → 3
+   - All others (USD, EUR, GBP, INR, AUD, etc.) → 2
+   - NEVER multiply all amounts by 100 universally
+
+2. `toMinorUnits(amount: number, currency: string): number` — converts decimal amount to minor units
+
+3. `fromMinorUnits(amount: number, currency: string): number` — converts minor units back to decimal
+
+4. `calculateSplits(items, assignments, totals, participantNames, currencyCode): ParticipantSplit[]` — takes AI-generated item assignments and produces final owed amounts per participant. Performs all arithmetic internally (item prices → subtotal per person → proportional tax/tip → largest-remainder rounding). Sum invariant: all shares must sum exactly to the event total ± 1 minor unit.
+
+5. `largestRemainderRound(shares: number[], currency: string): number[]` — the correct algorithm for rounding currency splits. Takes fractional major-unit amounts, returns integer minor-unit amounts. Distributes the rounding remainder to participants with the largest fractional parts. Deterministic tiebreaker: lowest original index receives extra minor unit first. Sum invariant: `sum(output) === Math.round(sum(shares) * multiplier) ± 1`.
+
+Create `shared/utils/splitCalculator.test.ts` with 100% coverage:
+- Even split: 3-way split of $10.00 → [334, 333, 333] cents, sum = 1000
+- Even split: JPY ¥1000 3-way → [334, 333, 333], sum = 1000 (no decimal conversion)
+- Even split: BHD 10.000 3-way → correct millifils
+- Edge case: 1 participant gets 100%
+- Edge case: amounts already divide evenly
+- Itemised: assignments sum to total
+- Itemised: rounding gap distributed correctly
+- Percentage: 33.33% + 33.33% + 33.34% = 100%, sum invariant holds
 
 **Files created:**
-- `backend/src/modules/splits/splitCalculator.ts`
-- `backend/src/modules/splits/split.controller.ts`
-- `backend/src/modules/splits/split.service.ts`
-- `backend/src/modules/splits/split.routes.ts`
-- `backend/src/__tests__/unit/splits/splitCalculator.test.ts`
-- `backend/src/__tests__/unit/ai/a2-nlp.test.ts`
+- `shared/utils/splitCalculator.ts`
+- `shared/utils/splitCalculator.test.ts`
 
-**Acceptance Criteria:**
-1. POST /splits/calculate mode='even' for 3 participants on a $47.35 event → the three returned amounts sum to exactly 4735 (minor units) ± 1
-2. At least one participant receives 1579 and at least one receives 1578 (correct largest-remainder rounding for $47.35 / 3)
-3. POST /splits/nlp-assign with instruction "Mark had the salmon" → Mark's participant_id appears in the assignments for the salmon item_id
-4. NLP instruction containing a pipe character `|` → character is sanitized before being passed to the AI prompt
-5. POST /splits/calculate mode='itemised' → each participant's tax and tip share is proportional to their item subtotal, not equal
+**Acceptance criteria:**
+- [ ] All currency minor unit values correct (JPY=0, BHD=3, USD=2)
+- [ ] Sum invariant holds for all split modes — shares always sum to total ± 0
+- [ ] Largest-remainder rounding distributes extra cents correctly
+- [ ] 100% line, branch, and function coverage
+- [ ] Zero dependencies on AI, network, or database
 
-**Tests required:**
+**Tests to run:**
+```bash
+cd shared && npm test utils/splitCalculator.test.ts -- --coverage
 ```
-backend/src/__tests__/unit/splits/splitCalculator.test.ts (WRITE THESE FIRST)
-  - even split $47.35 / 3 = [1579, 1578, 1578] (largest remainder assigns extra cent)
-  - even split $10.00 / 3 = [334, 333, 333] (sum = 1000)
-  - even split $1.00 / 3 = [34, 33, 33] (sum = 100)
-  - even split $0.01 / 3 = [1, 0, 0] (handles minimum amounts)
-  - proportional: person with 60% of items gets 60% of tax+tip
-  - assertSumInvariant: does not throw when sum matches
-  - assertSumInvariant: throws SumInvariantError when off by 2+
-  - assertSumInvariant: allows ±1 (acceptable rounding)
-  - all inputs are integers (minor units) — never floats
 
-backend/src/__tests__/unit/ai/a2-nlp.test.ts
-  - sanitizes NLP instruction before AI prompt
-  - returns partial status when items unassigned
-  - returns complete status when all items assigned
-  - never passes phone numbers to AI prompt
-  - resets ai_stage to 'parsed' on partial result
-```
+**Expected output:** All tests pass. Coverage report shows 100% for splitCalculator.ts.
 
 ---
 
-### E07-S05 — Split Entry + Review Screens (Mobile)
+### E07-S05 — A2 NLP Assignment Agent
+
+**What this builds:** The AI agent that reads natural language item assignments and maps them to participants — all math delegated to splitCalculator.ts.
+
+**Prompt:**
+Read docs/07-AI-Agent-Specification.md for the A2 agent specification. Build:
+
+1. `backend/src/modules/splits/a2.agent.ts`:
+   - `assignItems(eventId, rawText, items, participants)` function
+   - Uses `createLLMProvider()` from `src/infrastructure/llm/factory.ts`
+   - Calls `sanitizePromptInput()` on ALL user-supplied text before inserting into prompt
+   - Prompt: given a list of receipt items and participant names, return a JSON mapping of which participant gets which items (NLP only — no math)
+   - Validates response with Zod schema
+   - Atomic idempotency: `UPDATE events SET ai_stage='calculating' WHERE id=$1 AND ai_stage='parsed'` — if 0 rows updated, return cached result
+   - On success: update `ai_stage='calculated'`, store assignments in `receipt_items`
+   - Exponential backoff with full jitter on LLM errors (3 retries max)
+   - After NLP assignment, calls `calculateSplits()` from `import { calculateSplits } from '@letssplyt/shared/utils/splitCalculator'` for the actual math
+
+2. `backend/src/modules/splits/splits.router.ts`:
+   - `POST /events/:id/splits/assign` — triggers A2 agent, returns assignments
+   - `POST /events/:id/splits/calculate` — accepts manual assignments or mode (`equal` | `itemised` | `portion`), calls splitCalculator, returns shares per participant
+
+**Files created:**
+- `backend/src/modules/splits/a2.agent.ts`
+- `backend/src/modules/splits/splits.router.ts`
+
+**Acceptance criteria:**
+- [ ] A2 agent uses `createLLMProvider()` from `factory.ts`, never hardcodes provider
+- [ ] `sanitizePromptInput()` called on all user text before LLM prompt
+- [ ] Atomic ai_stage guard: `UPDATE events SET ai_stage='calculating' WHERE id=$1 AND ai_stage='parsed'` — prevents double-processing
+- [ ] On success: `ai_stage` updated to `'calculated'`
+- [ ] All math done by splitCalculator.ts — agent does zero arithmetic
+- [ ] Zod validation on LLM response
+- [ ] Exponential backoff on LLM failure
+
+**Tests to run:**
+```bash
+cd backend && npm test src/modules/splits/a2.agent.test.ts
+cd backend && npm test src/modules/splits/splits.router.test.ts
+```
+
+**Expected output:** All tests pass with mocked LLM provider.
+
+---
+
+### E07-S06 — Split Entry + Review Screens (Mobile)
 
 **Description:** Four-tab split mode picker and the split review screen showing per-person amounts. The most complex mobile screen in the app — it must keep a live sum invariant check, support drag-and-drop item assignment, and integrate with A2 NLP for natural language assignment. The Review screen must confirm the sum before enabling the Send button.
 
@@ -1706,7 +1947,7 @@ mobile/src/__tests__/components/splits/SplitReviewScreen.test.tsx
 **Description:** A3 generates personalised payment request messages for each participant. Names and payment links are assembled AFTER the AI call completes — never inside the AI prompt — to prevent PII from appearing in prompt logs or AI training data. Payment deep links are filtered by the participant's country.
 
 **Prompt:**
-*"Build the A3 message generation and preview API for LetsSplyt. POST /api/v1/messages/preview (requires authenticate middleware): body { event_id }. (1) Atomic guard: UPDATE events SET ai_stage='messaging' WHERE id=event_id AND ai_stage='calculated' — return 409 if 0 rows updated. (2) Load participants, receipt summary, and the payer's payment handles from the database. (3) For each participant: build the A3 prompt using ONLY sanitized item names and the amount formatted via formatCurrency(amount, event.currency, event.locale). Use the label 'Recipient' as the placeholder — never include the participant's real name or phone number in the prompt. Call resolveProvider('A3') and call provider.complete() with the A3 system prompt from docs/07-AI-Agent-Specification.md. The AI generates: greeting text (generic), message body listing items and the formatted amount, closing text. (4) AFTER the AI call returns: string-replace 'Recipient' with participant.display_name in the generated text. (5) Generate payment deep links from the payer's handles: Venmo deep link format venmo://paycharge?txn=pay&recipients={handle}&amount={amount}&note={note}, PayPal format https://paypal.me/{handle}/{amount}, CashApp format https://cash.app/${cashtag}/{amount}, Zelle: return the handle text only (no universal deep link exists), Wise format https://wise.com/pay/me/{handle}. Filter links by participant country: Canadian (+1 with area codes 204/226/236/249/250/289/306/343/365/387/403/416/418/431/437/438/450/506/514/519/548/579/581/587/604/613/639/647/672/705/709/742/753/778/780/782/807/819/825/867/873/902/905) removes Venmo and Zelle links. Indian numbers (+91) removes Venmo and CashApp, adds Wise. (6) Return array of { participant_id, display_name, message_text, payment_links: [{ provider, label, url|handle }], amount }."*
+*"Build the A3 message generation and preview API for LetsSplyt. POST /api/v1/messages/preview (requires authenticate middleware): body { event_id }. (1) Atomic guard: UPDATE events SET ai_stage='messaging' WHERE id=event_id AND ai_stage='calculated' — return 409 if 0 rows updated. (2) Load participants, receipt summary, and the payer's payment handles from the database. (3) For each participant: build the A3 prompt using ONLY sanitized item names and the amount formatted via formatCurrency(amount, event.currency, event.locale). Use the label 'Recipient' as the placeholder — never include the participant's real name or phone number in the prompt. Call createLLMProvider('A3') from `src/infrastructure/llm/factory.ts` and call provider.complete() with the A3 system prompt from docs/07-AI-Agent-Specification.md. The AI generates: greeting text (generic), message body listing items and the formatted amount, closing text. (4) AFTER the AI call returns: string-replace 'Recipient' with participant.display_name in the generated text. (5) Generate payment deep links from the payer's handles: Venmo deep link format venmo://paycharge?txn=pay&recipients={handle}&amount={amount}&note={note}, PayPal format https://paypal.me/{handle}/{amount}, CashApp format https://cash.app/${cashtag}/{amount}, Zelle: return the handle text only (no universal deep link exists), Wise format https://wise.com/pay/me/{handle}. Filter links by participant country: Canadian (+1 with area codes 204/226/236/249/250/289/306/343/365/387/403/416/418/431/437/438/450/506/514/519/548/579/581/587/604/613/639/647/672/705/709/742/753/778/780/782/807/819/825/867/873/902/905) removes Venmo and Zelle links. Indian numbers (+91) removes Venmo and CashApp, adds Wise. (6) Return array of { participant_id, display_name, message_text, payment_links: [{ provider, label, url|handle }], amount }."*
 
 **Files created:**
 - `backend/src/modules/messages/messages.controller.ts`
@@ -1819,40 +2060,132 @@ backend/src/__tests__/unit/messages/send.service.test.ts (extend)
 
 ---
 
-### E08-S04 — Message Preview + Sending Screens (Mobile)
+### E08-S04 — Message Preview Screen
 
-**Description:** Show the creator a carousel preview of each personalised message before sending, then a real-time delivery tracking screen. Spinners transition to checkmarks as Twilio delivers each message via webhooks updating notification_log, which Supabase Realtime broadcasts to the mobile screen. A confetti animation fires when all messages are delivered.
+**What this builds:** The carousel screen showing each participant's personalised message and split image before sending.
 
 **Prompt:**
-*"Build MessagePreviewScreen and MessageSendingScreen for LetsSplyt mobile. (1) MessagePreviewScreen (refer to prototype/send-messages.html ID 'preview'): horizontal FlatList with pagingEnabled showing one card per participant. Each card shows: participant display_name at the top, message text in a message bubble styled to look like an SMS, the split amount highlighted in bold, and payment link buttons rendered but greyed out and not pressable (preview only). Pagination dots below the carousel. Header 'Message preview (N of M)' updates as user swipes. Footer: '← Back' button and 'Send to all →' button. Tapping 'Send to all' shows an Alert.alert confirmation dialog listing the participant count. On confirmation: call POST /messages/send, then navigate to MessageSendingScreen. (2) MessageSendingScreen (refer to prototype/send-messages.html IDs 'generating', 'send_progress', 'all_sent'): scrollable list of all participants, each row shows their name and an ActivityIndicator spinner. Subscribe to Supabase Realtime channel 'event-settlement:[eventId]' on mount. When a notification_log row gains a delivered_at value (broadcast by the webhook): replace that participant's spinner with a green checkmark. When ALL participants have checkmarks: show 'All sent!' header with a confetti animation (use react-native-confetti-cannon firing from the top center of the screen) and a 'Done' button that navigates to EventDetailScreen in settlement phase. Unsubscribe from Realtime on unmount."*
+Read docs/08-Mobile-App-Specification.md for the MessagePreview screen spec. Read `prototype/send-messages.html` for the visual design. Build `mobile/src/screens/messages/MessagePreviewScreen.tsx`:
+
+1. Horizontal scroll carousel — one card per participant
+2. Each card shows: participant name, their share amount (formatted with `formatCurrency`), payment links (Venmo/PayPal/etc.), and their personalised split image (fetched from Supabase Storage signed URL)
+3. "Edit" button on each card navigates back to split entry for adjustments
+4. Sticky "Send to All" button at bottom — disabled until all cards have been previewed (track scroll position or card visibility)
+5. Split image displayed as an `<Image>` component — show placeholder while loading
+6. Use `eventStore` to get participants and their calculated shares
+
+Match the design in `prototype/send-messages.html` exactly.
 
 **Files created:**
-- `mobile/src/screens/MessagePreviewScreen.tsx`
-- `mobile/src/screens/MessageSendingScreen.tsx`
-- `mobile/src/__tests__/components/messages/MessagePreviewScreen.test.tsx`
-- `mobile/src/__tests__/components/messages/MessageSendingScreen.test.tsx`
+- `mobile/src/screens/messages/MessagePreviewScreen.tsx`
+
+**Acceptance criteria:**
+- [ ] Carousel renders one card per participant
+- [ ] Split image loads from signed URL with placeholder fallback
+- [ ] "Send to All" button disabled until all cards previewed
+- [ ] Share amount formatted correctly per currency
+- [ ] "Edit" navigates back to split entry
+
+**Tests to run:**
+```bash
+cd mobile && npm test src/screens/messages/MessagePreviewScreen.test.tsx
+```
+
+**Expected output:** Component renders with mocked participants and images, Send button behaviour tested.
+
+---
+
+### E08-S05 — Send + Realtime Delivery Tracking
+
+**What this builds:** The send action and live delivery status screen — triggers Twilio SMS and tracks delivery in real time via Supabase Realtime.
+
+**Prompt:**
+Read docs/08-Mobile-App-Specification.md for the delivery tracking screen spec. Build:
+
+1. Wire the "Send to All" button in MessagePreviewScreen to call `POST /events/:id/messages/send`
+2. On success, navigate to `DeliveryTrackingScreen`
+3. `mobile/src/screens/messages/DeliveryTrackingScreen.tsx`:
+   - Shows list of all participants with per-row delivery status badges: QUEUED → SENT → DELIVERED / FAILED
+   - Subscribe to Supabase Realtime on `participants` table filtered by `event_id` on mount
+   - Update status badges in real time as `message_status` column changes
+   - Unsubscribe on unmount (call `supabaseClient.removeChannel(channel)`)
+   - "Done" button navigates to Settlement tab when all statuses are terminal (not QUEUED)
+   - Failed entries show a "Retry" button that calls `POST /events/:id/messages/retry/:participantId`
+
+**Files created:**
+- `mobile/src/screens/messages/DeliveryTrackingScreen.tsx`
+- Updates to `mobile/src/screens/messages/MessagePreviewScreen.tsx` (wire send button)
+
+**Acceptance criteria:**
+- [ ] Send button calls the messages API and navigates to tracking screen
+- [ ] Realtime subscription updates status badges without page refresh
+- [ ] Channel unsubscribed on unmount — no memory leak
+- [ ] "Done" only enabled when all statuses are terminal
+- [ ] Failed status shows Retry button
+
+**Tests to run:**
+```bash
+cd mobile && npm test src/screens/messages/DeliveryTrackingScreen.test.tsx
+```
+
+**Expected output:** Realtime subscription mocked, status transitions tested.
+
+---
+
+### E08-S06 — Twilio STOP Webhook Handler
+
+**What:** Handle STOP/UNSUBSCRIBE SMS replies from participants. When Twilio receives a STOP reply, it forwards a webhook to our server. We must: verify the webhook signature, update all relevant DB tables, and respond with TwiML.
 
 **Acceptance Criteria:**
-1. MessagePreviewScreen shows a horizontal carousel — swiping left and right moves between participant message cards
-2. Each card shows the participant's name and their personalised amount in the message bubble
-3. Tap "Send to all" → an Alert dialog appears asking for confirmation before sending
-4. Confirm → navigates to MessageSendingScreen showing all participants with individual spinners
-5. As Twilio delivers each message (webhook updates delivered_at, Realtime broadcasts the change), each participant's spinner transitions to a green checkmark in real time on screen
+- `POST /webhooks/twilio/stop` endpoint registered in backend (not under `/api/v1/`).
+- Twilio signature verified using `twilio.validateRequest()` before ANY DB operations. Returns 403 if signature invalid.
+- On valid STOP: hash the `From` phone number → update `participants.payment_status = 'opted_out'` and `opted_out_at = NOW()` for all this participant's pending/self_reported rows → upsert `sms_opt_outs` → update `users.is_opted_out = TRUE` → write `settlement_log` entry with `changed_by = 'twilio_stop'`.
+- Response is valid TwiML XML: `<Response><Message>You have been unsubscribed...</Message></Response>`.
+- The `opted_out_at TIMESTAMPTZ` column added to `participants` table via migration.
+- Before any A3 send, check `sms_opt_outs` table for the recipient's `phone_hash` — skip sending if opted out.
+- Test: POST to `/webhooks/twilio/stop` with valid Twilio signature and `From=+12125551234` — verify participant record updated.
+- Test: POST with invalid signature — verify 403 response with no DB changes.
 
-**Tests required:**
-```
-mobile/src/__tests__/components/messages/MessagePreviewScreen.test.tsx
-  - renders one card per participant
-  - payment buttons are not tappable in preview
-  - Send button shows confirmation before sending
+**Prompt:**
+Read CLAUDE.md, BUILD-PROGRESS.md, and this story. Read `docs/06-Integration-Contracts.md` (STOP webhook section) and `docs/04-Data-Architecture.md` (participants table, sms_opt_outs table). Then implement:
 
-mobile/src/__tests__/components/messages/MessageSendingScreen.test.tsx
-  - shows spinner for each participant initially
-  - spinner turns to checkmark when delivered_at is set
-  - subscribes to Realtime channel on mount
-  - shows success state when all delivered
-  - unsubscribes on unmount
-```
+1. New migration: add `opted_out_at TIMESTAMPTZ` to `participants` in a new file `supabase/migrations/20240101000010_add_opted_out_at.sql`.
+2. Implement `POST /webhooks/twilio/stop` with full signature verification and all 6 DB update steps.
+3. Update A3 send loop to check `sms_opt_outs` before sending to each participant.
+4. Write tests for both valid and invalid signature cases.
+
+**Files created:**
+- `supabase/migrations/20240101000010_add_opted_out_at.sql`
+- Updates to `backend/src/modules/webhooks/twilio.controller.ts` (add `/stop` handler)
+- Updates to `backend/src/modules/messages/send.service.ts` (pre-send opt-out check)
+- `backend/src/__tests__/unit/webhooks/twilio-stop.test.ts`
+
+---
+
+### E08-S07 — Post-Send Split Edit (P20a — MVP Feature)
+
+**What:** After splits are sent, the Creator discovers a mistake (wrong item assignment, missed participant). Allow the Creator to re-open the split editor, make corrections, and selectively re-send ONLY to affected participants.
+
+**Acceptance Criteria:**
+- `PATCH /api/v1/events/:eventId/splits` endpoint: allows updating individual participant share amounts AFTER messaging is complete (`ai_stage = 'complete'`).
+- Request body: `{ corrections: [{ participant_id: uuid, new_amount_minor_units: number }] }`. Sum of all participant amounts (including uncorrected) must still equal the event total ± 1 minor unit.
+- After split update: marks affected participants' `payment_status` back to `pending`. Does NOT touch already-confirmed participants.
+- `POST /api/v1/events/:eventId/splits/resend` endpoint: re-sends messages ONLY to participants whose `payment_status` is `pending` AND who were affected by the correction. Does NOT resend to already-confirmed participants.
+- The re-sent message includes the updated amount and a note: "Your share has been updated."
+- Creator app: after the event is in `ai_stage = 'complete'`, the SettlementScreen shows an "Edit split" button. Tapping opens a modal allowing amount corrections per participant.
+- Test: update one participant's amount, verify sum invariant holds, verify only affected participant receives new SMS.
+- Test: attempt to over-correct (amounts don't sum to total) — returns 422.
+
+**Prompt:**
+Read CLAUDE.md, BUILD-PROGRESS.md, and this story. Read `docs/05-API-Specification.md` (splits section), `docs/07-AI-Agent-Specification.md` (largestRemainderRound, splitCalculator), and `docs/08-Mobile-App-Specification.md` (SettlementScreen). Then implement:
+
+1. `PATCH /events/:eventId/splits` with sum validation using `splitCalculator.ts`.
+2. `POST /events/:eventId/splits/resend` — builds new messages and sends via Twilio to affected participants only.
+3. Update SettlementScreen in mobile: add "Edit split" button (visible only to Creator when `ai_stage = 'complete'`).
+
+**Files created:**
+- Updates to `backend/src/modules/splits/splits.router.ts` (add PATCH and resend endpoints)
+- Updates to `mobile/src/screens/settlement/SettlementScreen.tsx` (add "Edit split" button)
 
 ---
 
@@ -1865,7 +2198,7 @@ mobile/src/__tests__/components/messages/MessageSendingScreen.test.tsx
 **Description:** Build the four settlement action endpoints that drive the payment state machine. All transitions are atomic database updates with settlement_log audit entries written for every change.
 
 **Prompt:**
-*"Build backend/src/modules/settlement/settlement.service.ts and settlement.controller.ts with four endpoints, all requiring authenticate middleware. Payment state machine (from docs/04-Data-Architecture.md): PENDING → SELF_REPORTED (participant reports), SELF_REPORTED → CONFIRMED (creator confirms) or DISPUTED (creator disputes), DISPUTED → PENDING (participant must re-pay). (1) POST /api/v1/settlement/:participantId/self-report: called by participant (verifies req.user.id matches participant.user_id). Validates current payment_status is 'pending'. Uses supabaseAdmin to UPDATE participants SET payment_status='self_reported' WHERE id=participantId AND payment_status='pending' — must be atomic (use RETURNING to verify update happened). Writes settlement_log row { event_id, participant_id, action:'self_reported', actor_id:req.user.id, amount_at_time:participant.amount_owed }. Returns { updated: true, new_status: 'self_reported' }. (2) POST /api/v1/settlement/:participantId/confirm: called by event creator (verifies event.payer_id=req.user.id). Validates current status is 'self_reported'. Atomic UPDATE SET payment_status='confirmed'. Writes settlement_log action:'confirmed'. Checks if ALL participants for this event are now confirmed or opted_out — if yes, UPDATE events SET status='settled'. Returns { updated: true, event_settled: boolean }. (3) POST /api/v1/settlement/:participantId/dispute: creator only. Validates status is 'self_reported'. Atomic UPDATE SET payment_status='pending' (resets to pending, NOT self_reported). Writes settlement_log action:'disputed'. (4) POST /api/v1/settlement/:participantId/nudge: creator only. Checks last_nudged_at — if set and NOW() < last_nudged_at + 24 hours, return 429 { error: 'NUDGE_COOLDOWN', retry_after: ISO timestamp }. Otherwise: UPDATE participants SET last_nudged_at=NOW(). Send Twilio SMS via twilio.messages.create with nudge message. Write notification_log. Return { sent: true, next_nudge_after: ISO timestamp }."*
+*"Build backend/src/modules/settlement/settlement.service.ts and settlement.controller.ts with four endpoints, all requiring authenticate middleware. Payment state machine (from docs/04-Data-Architecture.md): PENDING → SELF_REPORTED (participant reports), SELF_REPORTED → CONFIRMED (creator confirms) or DISPUTED (creator disputes), DISPUTED → PENDING (participant must re-pay). The `eventId` in every route path is used for authorization — verify the authenticated user is the payer of that event before executing the action. (1) POST /api/v1/events/:eventId/settlement/:participantId/self-report: called by participant (verifies req.user.id matches participant.user_id). Validates current payment_status is 'pending'. Uses supabaseAdmin to UPDATE participants SET payment_status='self_reported' WHERE id=participantId AND payment_status='pending' — must be atomic (use RETURNING to verify update happened). Writes settlement_log row { event_id, participant_id, action:'self_reported', actor_id:req.user.id, amount_at_time:participant.amount_owed }. Returns { updated: true, new_status: 'self_reported' }. (2) POST /api/v1/events/:eventId/settlement/:participantId/confirm: called by event creator (verifies event.payer_id=req.user.id). Validates current status is 'self_reported'. Atomic UPDATE SET payment_status='confirmed'. Writes settlement_log action:'confirmed'. Checks if ALL participants for this event are now confirmed or opted_out — if yes, UPDATE events SET status='settled'. Returns { updated: true, event_settled: boolean }. (3) POST /api/v1/events/:eventId/settlement/:participantId/dispute: creator only. Validates status is 'self_reported'. Atomic UPDATE SET payment_status='pending' (resets to pending, NOT self_reported). Writes settlement_log action:'disputed'. (4) POST /api/v1/events/:eventId/messages/nudge/:participantId: creator only. Checks last_nudged_at — if set and NOW() < last_nudged_at + 48 hours, return 429 { error: 'NUDGE_COOLDOWN', retry_after: ISO timestamp }. Otherwise: UPDATE participants SET last_nudged_at=NOW(). Send Twilio SMS via twilio.messages.create with nudge message. Write notification_log. Return { sent: true, next_nudge_after: ISO timestamp }."*
 
 **Files created:**
 - `backend/src/modules/settlement/settlement.service.ts`
@@ -1876,8 +2209,10 @@ mobile/src/__tests__/components/messages/MessageSendingScreen.test.tsx
 1. POST self-report → `SELECT payment_status FROM participants WHERE id=...` returns `self_reported`
 2. POST confirm → `SELECT payment_status` returns `confirmed`; when last participant confirmed, `SELECT status FROM events` returns `settled`
 3. POST dispute → payment_status resets to `pending` (not `self_reported`)
-4. POST nudge twice within 24 hours → second call returns 429 with `retry_after` timestamp
+4. POST nudge twice within 48 hours → second call returns 429 with `retry_after` timestamp (rate limit: 1 per participant per 48 hours)
 5. Participant cannot call confirm on their own payment (403 — only creator can confirm)
+
+> **Note:** Push notification to creator on self-report is added in E10-S02 (after push infrastructure is built). Do NOT wire push.service.ts in this story.
 
 **Tests required:**
 ```
@@ -1886,14 +2221,14 @@ backend/src/__tests__/unit/settlement/settlement.service.test.ts
   - self-report: writes settlement_log with correct action
   - confirm: sets event status='settled' when last participant confirms
   - dispute: resets to 'pending' (not 'self_reported')
-  - nudge: rejects within 24h cooldown with retry_after timestamp
+  - nudge: rejects within 48h cooldown with retry_after timestamp
   - nudge: calls Twilio after cooldown expires
 
 backend/src/__tests__/integration/settlement/settlement.test.ts
   - full lifecycle: pending → self_reported → confirmed
   - full lifecycle: pending → self_reported → disputed → pending
   - event settles when all participants confirmed or opted_out
-  - 429 on second nudge within 24h
+  - 429 on second nudge within 48h
   - Participant cannot confirm own payment (403)
 ```
 
@@ -1916,6 +2251,11 @@ backend/src/__tests__/integration/settlement/settlement.test.ts
 3. GET /settlement/summary returns positive number when others owe you, negative when you owe
 4. GET /settlement/i-owe returns empty array for a user with no outstanding debts
 5. Payer payment handles in i-owe response are decrypted (showing `@venmo-handle` not encrypted blob)
+6. `GET /api/v1/users/me/balance` endpoint returns `{ net_balance_minor_units, currency, owed_to_you, you_owe }` where:
+   - `owed_to_you` = sum of `amount_owed` for all pending/self_reported participants in events where user is creator
+   - `you_owe` = sum of `amount_owed` for all events where user is a participant (not creator) with status not confirmed/settled
+   - `net_balance_minor_units` = owed_to_you - you_owe
+   - `currency` = the currency of the user's most recently created event (or 'USD' if no events)
 
 **Tests required:**
 ```
@@ -1939,7 +2279,7 @@ backend/src/__tests__/integration/settlement/ledger.test.ts
 **Description:** Build the SettlementTab with four sub-views (Owed to me, I owe, History, Person detail) and PayNowScreen. This is a bottom tab, not inside EventsStack.
 
 **Prompt:**
-*"Build the SettlementTab screens. Refer to prototype/ledger.html IDs 'settlement', 'owed_to_me', 'i_owe', 'pay_now'. SettlementScreen is a bottom tab navigator screen — NOT nested inside EventsStack. It contains four tab-switched views (segmented control at top, NOT bottom tabs): (1) 'Owed to me' tab: FlatList grouped by event, each participant row shows display_name, amount_owed, payment_status chip (amber 'Waiting' for pending, blue 'Reported' for self_reported), two action buttons: Confirm (POST /settlement/:id/confirm, only visible on self_reported) and Nudge (POST /settlement/:id/nudge, visible on both pending and self_reported, shows 'Nudged Xh ago' and is disabled within 24 hours). (2) 'I owe' tab: FlatList of events where user owes money. Each row shows event name, creator name, amount as large number, 'Pay now' button → PayNowScreen. (3) 'History' tab: settled events list. (4) PersonDetailScreen pushed as a stack screen when tapping a participant in 'Owed to me' — shows all transactions with that person. PayNowScreen: payment handle cards (tappable — use Linking.openURL() for deep links), 'I paid cash' button → POST /settlement/:id/self-report. EventDetailScreen (settlement phase): add per-event settlement view reusing the same Confirm/Dispute/Nudge buttons, summary bar at top (total/collected/outstanding), segmented progress bar (green confirmed, amber self_reported, grey pending). Store all settlement data in Zustand settlementStore. Use absolute API URLs from process.env.EXPO_PUBLIC_API_URL."*
+*"Build the SettlementTab screens. Refer to prototype/ledger.html IDs 'settlement', 'owed_to_me', 'i_owe', 'pay_now'. SettlementScreen is a bottom tab navigator screen — NOT nested inside EventsStack. It contains four tab-switched views (segmented control at top, NOT bottom tabs): (1) 'Owed to me' tab: FlatList grouped by event, each participant row shows display_name, amount_owed, payment_status chip (amber 'Waiting' for pending, blue 'Reported' for self_reported), two action buttons: Confirm (POST /events/:eventId/settlement/:id/confirm, only visible on self_reported) and Nudge (POST /events/:eventId/messages/nudge/:id, visible on both pending and self_reported, shows 'Nudged Xh ago' and is disabled within 48 hours). (2) 'I owe' tab: FlatList of events where user owes money. Each row shows event name, creator name, amount as large number, 'Pay now' button → PayNowScreen. (3) 'History' tab: settled events list. (4) PersonDetailScreen pushed as a stack screen when tapping a participant in 'Owed to me' — shows all transactions with that person. PayNowScreen: payment handle cards (tappable — use Linking.openURL() for deep links), 'I paid cash' button → POST /events/:eventId/settlement/:id/self-report. EventDetailScreen (settlement phase): add per-event settlement view reusing the same Confirm/Dispute/Nudge buttons, summary bar at top (total/collected/outstanding), segmented progress bar (green confirmed, amber self_reported, grey pending). Store all settlement data in Zustand settlementStore. Use absolute API URLs from process.env.EXPO_PUBLIC_API_URL."*
 
 **Files created:**
 - `mobile/src/screens/settlement/SettlementScreen.tsx`
@@ -1965,7 +2305,7 @@ mobile/src/__tests__/unit/store/settlementStore.test.ts
 
 mobile/src/__tests__/components/settlement/SettlementScreen.test.tsx
   - renders four tab views
-  - Nudge button disabled within 24h cooldown
+  - Nudge button disabled within 48h cooldown
   - Confirm button only visible on self_reported participants
 
 mobile/src/__tests__/components/settlement/PayNowScreen.test.tsx
@@ -1999,6 +2339,7 @@ mobile/src/__tests__/components/settlement/PayNowScreen.test.tsx
 3. POST /jobs/purge-guest-pii → `SELECT count(*) FROM guest_pii WHERE purge_after < NOW()` returns 0 after job runs
 4. POST /jobs/create-analytics-partition → `SELECT tablename FROM pg_tables WHERE tablename LIKE 'analytics_events_%'` shows the new partition
 5. Nudge job does NOT process participants nudged less than 48 hours ago
+6. Import `resolveParticipantPhone` from `backend/src/infrastructure/security/sanitize.ts`. Call it to decrypt the participant's phone before calling Twilio. The decrypted phone MUST NOT be logged or stored in any intermediate variable that could escape the function scope.
 
 **Tests required:**
 ```
@@ -2042,6 +2383,10 @@ backend/src/__tests__/unit/jobs/partition.job.test.ts
 3. Tap the push notification with app closed → app opens directly to EventDetailScreen for that event
 4. Receive push notification while app is open (foreground) → in-app toast appears at top of screen
 5. Device with no push permission → backend silently skips (no error thrown)
+6. Wire push notifications to the following triggers (add these to settlement.service.ts in this story):
+   a. Participant self-reports payment → push to event creator: '{Name} says they've paid {amount}. Tap to confirm.' (deep-links to event settlement screen)
+   b. Creator confirms participant payment → push to participant: 'Your payment for {event} has been confirmed!'
+   c. Event settles fully (all participants confirmed or opted out) → push to creator: '{event} is fully settled!'
 
 **Tests required:**
 ```
@@ -2202,7 +2547,7 @@ backend/src/__tests__/unit/health/health.test.ts (supertest)
 **Files created:**
 - Updates to `backend/src/server.ts`, `backend/src/app.ts`, `backend/src/infrastructure/logger.ts`
 - Updates to `mobile/App.tsx`
-- `backend/src/middleware/requestId.ts`
+- Note: `backend/src/middleware/requestId.ts` was created in E01-S02 — this story only needs to update `logger.ts` to read from `req.requestId`.
 
 **Acceptance Criteria:**
 1. Throw a deliberate error in a test route → error appears in Sentry dashboard within 30 seconds
@@ -2294,23 +2639,23 @@ backend/src/__tests__/unit/infrastructure/logger.test.ts
 
 ## Build Sequence Summary
 
-**Total stories: 37 stories across 12 epics**
+**Total stories: 46 stories across 12 epics**
 
 | Epic | Stories | Duration estimate |
 |---|---|---|
 | E01: Infra & Security | 6 | 3-4 days |
-| E02: Database | 2 | 1-2 days |
-| E03: Authentication | 3 | 2-3 days |
+| E02: Database | 4 | 2-3 days |
+| E03: Authentication | 4 | 2-3 days |
 | E04: Profile & Handles | 2 | 1-2 days |
 | E05: Events & QR | 3 | 3-4 days |
-| E06: Join Flows | 2 | 2-3 days |
-| E07: AI Receipt Pipeline | 5 | 4-5 days |
-| E08: Message System | 3 | 3-4 days |
+| E06: Join Flows | 3 | 2-3 days |
+| E07: AI Receipt Pipeline | 6 | 5-6 days |
+| E08: Message System | 7 | 5-6 days |
 | E09: Settlement | 3 | 3-4 days |
 | E10: Background Jobs & Push | 2 | 2-3 days |
 | E11: Account Management | 2 | 2-3 days |
 | E12: Launch Readiness | 4 | 3-4 days |
-| **Total** | **37** | **~30-41 Cursor sessions** |
+| **Total** | **46** | **~38-50 Cursor sessions** |
 
 ---
 
@@ -2327,7 +2672,7 @@ backend/src/__tests__/unit/infrastructure/logger.test.ts
 | RLS policies | Every table covered | Every table covered |
 
 **Non-negotiable 100% coverage modules:**
-- `backend/src/modules/splits/splitCalculator.ts` — financial arithmetic
+- `shared/utils/splitCalculator.ts` — financial arithmetic
 - `backend/src/infrastructure/security/crypto.ts` — encryption/decryption
 - `backend/src/infrastructure/security/sanitize.ts` — AI prompt safety
 

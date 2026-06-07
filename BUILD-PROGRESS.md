@@ -19,13 +19,16 @@
 - [ ] E01-S06 — Security Utilities (encrypt, hashPhone, sanitizePromptInput, formatCurrency, getCurrencyMinorUnits)
 
 ### Epic 2: Database Schema & RLS
-- [ ] E02-S01 — Database Migrations (all tables, triggers, RLS, indexes, functions)
-- [ ] E02-S02 — Seed Data (3 test users, 2 events, all payment states)
+- [ ] E02-S01 — Core Tables + Indexes
+- [ ] E02-S02 — Triggers + Functions
+- [ ] E02-S03 — RLS Policies
+- [ ] E02-S04 — Seed Data
 
 ### Epic 3: Authentication
 - [ ] E03-S01 — OTP Request Endpoint (POST /auth/otp/request)
 - [ ] E03-S02 — OTP Verify + Session Creation (POST /auth/otp/verify)
-- [ ] E03-S03 — Mobile Auth Screens (Welcome, PhoneEntry, OTPVerify + authStore)
+- [ ] E03-S03 — Welcome + PhoneEntry Screens + authStore
+- [ ] E03-S04 — OTPVerify Screen + initAuthListener + Token Refresh
 
 ### Epic 4: Profile & Payment Handles
 - [ ] E04-S01 — Profile API Endpoints (GET/PATCH /users/me, CRUD /handles)
@@ -40,22 +43,27 @@
 - [ ] E05-S02 — Add Participant API + Manual Add
 - [ ] E05-S03 — Mobile Event Screens (Home, Events, CreateEvent, QR, EventDetail + Realtime)
 
-### Epic 6: Join Flows
+### Epic 6: Join Flows (3 stories)
 - [ ] E06-S01 — Web Join Page (server-rendered HTML — works without JavaScript)
 - [ ] E06-S02 — In-App Join + Deep Link Handler (Universal Links, AppJoinScreen)
+- [ ] E06-S03 — Deep Link Infrastructure (AASA, App Links, Expo Config)
 
 ### Epic 7: AI Receipt Pipeline
 - [ ] E07-S01 — Receipt Image Upload (mobile compress → Supabase Storage signed URL)
 - [ ] E07-S02 — A1 Receipt Parsing (AI Agent — atomic idempotency, Zod validation)
 - [ ] E07-S03 — Item Review Screen (mobile — editable items, low-confidence highlight)
-- [ ] E07-S04 — Split Calculator + A2 NLP (splitCalculator.ts — getCurrencyMinorUnits)
-- [ ] E07-S05 — Split Entry + Review Screens (4 tabs, drag-drop, NLP input)
+- [ ] E07-S04 — Split Calculator (getCurrencyMinorUnits, largest-remainder, 100% coverage)
+- [ ] E07-S05 — A2 NLP Assignment Agent (sanitizePromptInput, delegates math to calculator)
+- [ ] E07-S06 — Split Entry + Review Screens (4 tabs, drag-drop, NLP input)
 
-### Epic 8: Message System
+### Epic 8: Message System (7 stories)
 - [ ] E08-S01 — A3 Message Generation + Preview API
 - [ ] E08-S02 — Send Messages + Twilio Delivery (+ STOP webhook)
 - [ ] E08-S03 — Split Image Generator (@napi-rs/canvas, upload to Storage, Twilio mediaUrl)
-- [ ] E08-S04 — Message Preview + Sending Screens (carousel, Realtime delivery tracking)
+- [ ] E08-S04 — Message Preview Screen (carousel, per-participant split image)
+- [ ] E08-S05 — Send + Realtime Delivery Tracking (Supabase Realtime, status badges)
+- [ ] E08-S06 — Twilio STOP Webhook Handler
+- [ ] E08-S07 — Post-Send Split Edit (P20a)
 
 ### Epic 9: Settlement Tracking
 - [ ] E09-S01 — Settlement API (self-report, confirm, dispute, nudge with 24h cooldown)
@@ -86,10 +94,10 @@
 
 | Tier | Epics | Stories | Done | Remaining |
 |---|---|---|---|---|
-| Tier 1 — Foundation | 4 | 13 | 0 | 13 |
-| Tier 2 — Core Flow | 5 | 20 | 0 | 20 |
+| Tier 1 — Foundation | 4 | 16 | 0 | 16 |
+| Tier 2 — Core Flow | 5 | 22 | 0 | 22 |
 | Tier 3 — Operations | 3 | 8 | 0 | 8 |
-| **Total** | **12** | **38** | **0** | **38** |
+| **Total** | **12** | **46** | **0** | **46** |
 
 ---
 

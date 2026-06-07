@@ -407,6 +407,9 @@ CORS is configured per environment. Wildcard (`*`) origins are never permitted i
 
 import cors from 'cors';
 
+// Do NOT use NODE_ENV for environment detection — Railway sets NODE_ENV=production
+// on ALL deployments including staging. Use APP_ENV (set by Doppler) which correctly
+// reflects development | staging | production.
 const ALLOWED_ORIGINS: Record<string, string[]> = {
   development: [
     'http://localhost:3000',
@@ -414,16 +417,18 @@ const ALLOWED_ORIGINS: Record<string, string[]> = {
     'https://expo.dev',
   ],
   staging: [
-    'https://letssplyt-staging.up.railway.app',
+    'https://staging.letssplyt.app',
   ],
   production: [
-    'https://tryletssplyt.com',
+    'https://letssplyt.app',
   ],
 };
 
 export const corsMiddleware = cors({
   origin: (origin, callback) => {
-    const env = process.env.NODE_ENV ?? 'development';
+    // Use APP_ENV, NOT NODE_ENV — Railway sets NODE_ENV=production on ALL deployments
+    // including staging. APP_ENV is set by Doppler per environment.
+    const env = process.env.APP_ENV ?? 'development';
     const allowed = ALLOWED_ORIGINS[env] ?? [];
     // Allow requests with no origin (mobile app native requests, server-to-server)
     if (!origin || allowed.includes(origin)) {

@@ -50,7 +50,8 @@ RootNavigator (NativeStack)
 ├── AuthStack          ← shown when no valid session
 │   ├── WelcomeScreen
 │   ├── PhoneEntryScreen
-│   └── OTPVerifyScreen
+│   ├── OTPVerifyScreen
+│   └── PushPermissionScreen  ← shown once after first OTP verify (is_new_user === true)
 │
 ├── MainTabs           ← shown when session is valid (BottomTabNavigator)
 │   ├── HomeTab         (icon: home)
@@ -93,7 +94,7 @@ RootNavigator (NativeStack)
     └── EditSplitModal          ← post-send split edit
 ```
 
-AppJoinScreen receives `token` as a route param from the deep link. It calls `POST /join/:token/check` and `POST /join/:token/verify` to join the event, then navigates to AppJoinedScreen on success.
+AppJoinScreen receives `token` as a route param from the deep link. It calls `POST /api/v1/join/:token` (the combined mobile join endpoint) with body `{ user_id: supabase_uid }` to join the event, then navigates to AppJoinedScreen on success.
 
 Also in ProfileStack (accessed from ProfileScreen → "Delete account"):
 ```
@@ -264,14 +265,35 @@ import { Session, User } from '@supabase/supabase-js';
 // session or token data — it is unencrypted on-disk storage. AsyncStorage is only
 // acceptable for non-sensitive user preferences (theme, language, last viewed tab).
 
-interface AuthState {
-  user: User | null;
-  session: Session | null;
-  isLoading: boolean;
-  login: (phone: string, otp: string) => Promise<void>;
-  logout: () => Promise<void>;
-  setSession: (session: Session | null) => void; // REQUIRED — updated by initAuthListener on token refresh
+interface AuthUser {
+  id: string;
+  display_name: string;
+  avatar_colour: string;
 }
+
+interface AuthState {
+  user: AuthUser | null;
+  session: { access_token: string; refresh_token: string } | null;
+  isLoading: boolean;
+  login: (phone: string, otp: string) => Promise<{ is_new_user: boolean }>;
+  logout: () => Promise<void>;
+  setSession: (session: { access_token: string; refresh_token: string } | null) => void; // REQUIRED — updated by initAuthListener on token refresh
+}
+
+// NOTE: LetsSplyt has NO separate registration step. The first OTP verify auto-creates
+// the user; subsequent OTP verifies log in the existing user. The mobile app can check
+// if the user is 'new' from `response.data.is_new_user: boolean` in the response.
+//
+// Navigation flow:
+//   OTP Verify → [if is_new_user] → PushPermissionScreen → HomeScreen
+//   OTP Verify → [if !is_new_user] → HomeScreen
+//
+// IMPORTANT: The mobile app MUST NEVER call supabase.auth.verifyOtp() directly.
+// The backend's /auth/otp/verify endpoint handles:
+//   (1) Supabase OTP verification
+//   (2) user creation if first login
+//   (3) phone PII storage (hashed + encrypted)
+//   (4) JWT token return
 
 export const useAuthStore = create<AuthState>()((set) => ({
   user: null,
@@ -281,14 +303,15 @@ export const useAuthStore = create<AuthState>()((set) => ({
   login: async (phone: string, otp: string) => {
     set({ isLoading: true });
     try {
-      const { data, error } = await supabase.auth.verifyOtp({
-        phone,
-        token: otp,
-        type: 'sms',
-      });
-      if (error) throw error;
-      // Session is automatically persisted by the Supabase client via SecureStore
-      set({ user: data.user, session: data.session, isLoading: false });
+      // CORRECT — calls backend which handles user creation + PII storage:
+      const response = await api.post('/auth/otp/verify', { phone, code: otp });
+      // response.data: { access_token, refresh_token, user: { id, display_name, avatar_colour }, is_new_user }
+      const { access_token, refresh_token, user, is_new_user } = response.data;
+      // Store tokens via expo-secure-store
+      await SecureStore.setItemAsync('letssplyt_access_token', access_token);
+      await SecureStore.setItemAsync('letssplyt_refresh_token', refresh_token);
+      set({ user, session: { access_token, refresh_token }, isLoading: false });
+      return { is_new_user };
     } catch (err) {
       set({ isLoading: false });
       throw err;
@@ -385,57 +408,106 @@ import { create } from 'zustand';
 
 interface Participant {
   id: string;
-  displayName: string;
-  phone: string | null;
-  joinMethod: 'qr' | 'manual_phone' | 'manual_name_only' | 'deep_link';
+  display_name: string;
+  // Phone data is never returned by the API. If the creator needs to contact a participant, they use the nudge endpoint.
+  join_method: 'qr_app' | 'qr_web' | 'manual_phone' | 'manual_name_only';
+  joined_at: string;
+  payment_status: 'pending' | 'self_reported' | 'payer_marked' | 'confirmed' | 'disputed' | 'opted_out' | 'settled';
   amountOwed: number | null;
-  status: 'pending' | 'self_reported' | 'confirmed' | 'opted_out';
+}
+
+interface ReceiptItem {
+  id: string;
+  name: string;
+  price: number;
+  confidence: 'high' | 'low';
+  assignedTo: string[]; // participantIds
 }
 
 interface SplitDraft {
-  mode: 'even' | 'amount' | 'percent' | 'portions';
+  // Note: The UI shows 4 tabs (Even, Amount, Percent, Portions) but only 3 modes are stored in the DB.
+  // 'Equal' and 'Portion' cover all 4 UI tabs:
+  //   Tab 'Even'       → mode: 'equal'
+  //   Tab 'Amount ($)' → mode: 'portion' (custom absolute amounts)
+  //   Tab 'Percent (%)' → mode: 'portion' (percentages converted to amounts before submit)
+  //   Tab 'Portions'   → mode: 'portion' (proportional portions)
+  // The UI handles the conversion; the API only receives 'equal', 'portion', or 'itemised'.
+  mode: 'equal' | 'portion' | 'itemised';
   allocations: Record<string, number>; // participantId → value
   total: number;
 }
 
 interface Event {
   id: string;
-  name: string;
-  date: string | null;
-  status: 'open' | 'locked' | 'calculating' | 'sent' | 'settled';
-  creatorId: string;
+  title: string;  // DB column is `title`, not `name`
+  event_date: string | null;
+  status: 'open' | 'locked' | 'settled' | 'cancelled';
+  split_mode: 'equal' | 'portion' | 'itemised' | null;  // null until creator chooses
+  payer: {
+    id: string;
+    display_name: string;
+    avatar_colour: string;
+  };
   total: number | null;
   currency: string;
+  locale: string;
+  tax_amount: number | null;
+  tip_amount: number | null;
+  ai_stage: 'none' | 'parsing' | 'parsed' | 'calculating' | 'calculated' | 'messaging' | 'complete' | 'failed';
 }
 
 interface EventState {
   currentEvent: Event | null;
   currentEventParticipants: Participant[];
+  receiptItems: ReceiptItem[];
   splitDraft: SplitDraft | null;
-  realtimeChannel: RealtimeChannel | null;  // store reference for cleanup — see REALTIME LIFECYCLE below
+  realtimeChannel: RealtimeChannel | null;          // for joining phase — see REALTIME LIFECYCLE below
+  realtimeSettlementChannel: RealtimeChannel | null; // for settlement phase
   setCurrentEvent: (event: Event) => void;
   updateSplit: (draft: SplitDraft) => void;
   clearCurrentEvent: () => void;
-  subscribeToEvent: (eventId: string) => void;   // called on EventDetailScreen mount
-  unsubscribeFromEvent: () => void;              // called on EventDetailScreen unmount — prevents memory leaks
+  // Fetch a single event by ID (used by notification deep-link handler)
+  fetchEvent: (eventId: string) => Promise<void>;
+  // Calls GET /api/v1/events/:eventId and sets currentEvent in store
+  // Add a participant to currentEvent.participants (called by Realtime subscription)
+  addParticipant: (participant: Participant) => void;
+  // Updates in-memory list without API call
+  // Store receipt items after A1 completes
+  setReceiptItems: (items: ReceiptItem[]) => void;
+  // Clear the draft split state (after split is confirmed or event is reset)
+  clearSplitDraft: () => void;
+  subscribeToEvent: (eventId: string) => void;   // called on EventDetailScreen mount (joining phase)
+  unsubscribeFromEvent: () => void;              // called when Creator locks the event — prevents memory leaks
+  subscribeToSettlement: (eventId: string) => void;   // called during settlement phase
+  unsubscribeFromSettlement: () => void;              // called when event settles
 }
 
 // NOTE: RealtimeChannel is imported from '@supabase/supabase-js'.
-// eventStore must track the active Realtime subscription so EventDetailScreen
-// can reliably clean it up on unmount regardless of how the user navigates away.
+// eventStore must track both Realtime subscriptions so screens can reliably
+// clean them up on unmount regardless of how the user navigates away.
 //
 // REALTIME LIFECYCLE (enforced via store):
-//   subscribeToEvent(eventId) — sets up supabase.channel(...) and stores the reference
-//   unsubscribeFromEvent()    — calls channel.unsubscribe() + supabase.removeChannel(channel),
-//                               then sets realtimeChannel: null
+//   subscribeToEvent(eventId)      — subscribes to `event-members:{eventId}`, stores reference
+//   unsubscribeFromEvent()         — calls channel.unsubscribe() + supabase.removeChannel(channel),
+//                                    then sets realtimeChannel: null
+//                                    Unsubscribe when Creator locks the event.
+//   subscribeToSettlement(eventId) — subscribes to `event-settlement:{eventId}`, stores reference
+//   unsubscribeFromSettlement()    — calls channel.unsubscribe() + supabase.removeChannel(channel),
+//                                    then sets realtimeSettlementChannel: null
+//                                    Unsubscribe when event settles.
+//
+// Subscribe to `event-members:{eventId}` during the QR/join phase (Creator watching participants join).
+// Subscribe to `event-settlement:{eventId}` during the settlement phase (watching payment_status changes).
 //
 // Test: mount EventDetailScreen → navigate away → supabase.getChannels() returns [].
 
 export const useEventStore = create<EventState>()((set) => ({
   currentEvent: null,
   currentEventParticipants: [],
+  receiptItems: [],
   splitDraft: null,
   realtimeChannel: null,
+  realtimeSettlementChannel: null,
 
   setCurrentEvent: (event: Event) =>
     set({ currentEvent: event, splitDraft: null }),
@@ -444,11 +516,27 @@ export const useEventStore = create<EventState>()((set) => ({
     set({ splitDraft: draft }),
 
   clearCurrentEvent: () =>
-    set({ currentEvent: null, currentEventParticipants: [], splitDraft: null }),
+    set({ currentEvent: null, currentEventParticipants: [], receiptItems: [], splitDraft: null }),
+
+  fetchEvent: async (eventId: string) => {
+    const data = await apiRequest(`/events/${eventId}`, { method: 'GET', session });
+    set({ currentEvent: data });
+  },
+
+  addParticipant: (participant: Participant) =>
+    set((state) => ({
+      currentEventParticipants: [...state.currentEventParticipants, participant],
+    })),
+
+  setReceiptItems: (items: ReceiptItem[]) =>
+    set({ receiptItems: items }),
+
+  clearSplitDraft: () =>
+    set({ splitDraft: null }),
 
   subscribeToEvent: (eventId: string) => {
     const channel = supabase
-      .channel(`event-participants-${eventId}`)
+      .channel(`event-members:${eventId}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -470,6 +558,30 @@ export const useEventStore = create<EventState>()((set) => ({
     }
     set({ realtimeChannel: null });
   },
+
+  subscribeToSettlement: (eventId: string) => {
+    const channel = supabase
+      .channel(`event-settlement:${eventId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'participants',
+        filter: `event_id=eq.${eventId}`,
+      }, (payload) => {
+        // update payment_status in currentEventParticipants from payload
+      })
+      .subscribe();
+    set({ realtimeSettlementChannel: channel });
+  },
+
+  unsubscribeFromSettlement: () => {
+    const channel = useEventStore.getState().realtimeSettlementChannel;
+    if (channel) {
+      channel.unsubscribe();
+      supabase.removeChannel(channel);
+    }
+    set({ realtimeSettlementChannel: null });
+  },
 }));
 ```
 
@@ -484,7 +596,14 @@ interface SettlementEntry {
   eventName: string;
   amountOwed: number;
   currency: string;
-  status: 'pending' | 'self_reported' | 'confirmed';
+  payment_status:
+    | 'pending'
+    | 'self_reported'
+    | 'payer_marked'    // creator has marked this participant as paid
+    | 'confirmed'
+    | 'disputed'
+    | 'opted_out'       // participant replied STOP to SMS
+    | 'settled';        // fully reconciled
   lastNudgedAt: string | null;
 }
 
@@ -500,7 +619,7 @@ interface IOwedEntry {
 
 interface PaymentHandle {
   provider: 'venmo' | 'paypal' | 'cashapp' | 'zelle' | 'wise' | 'other';
-  handle: string;
+  handle_display: string;  // decrypted handle string for display; API returns handle_display (not handle)
   deepLinkUrl: string;
 }
 
@@ -510,6 +629,26 @@ interface SettlementState {
   isLoading: boolean;
   error: string | null;
   refresh: () => Promise<void>;
+
+  // selfReport() — called by participant to report they've paid
+  selfReport: (eventId: string, participantId: string) => Promise<void>;
+  // Calls: POST /api/v1/events/:eventId/settlement/:participantId/self-report
+  // (no body required)
+
+  // confirm() — called by creator to confirm participant's payment
+  confirm: (eventId: string, participantId: string) => Promise<void>;
+  // Calls: POST /api/v1/events/:eventId/settlement/:participantId/confirm
+  // (no body required)
+
+  // dispute() — called by creator to dispute participant's self-report
+  dispute: (eventId: string, participantId: string, note?: string) => Promise<void>;
+  // Calls: POST /api/v1/events/:eventId/settlement/:participantId/dispute
+  // Body: { note?: string }
+
+  // nudge() — called by creator to remind participant
+  nudge: (eventId: string, participantId: string) => Promise<void>;
+  // Calls: POST /api/v1/events/:eventId/messages/nudge/:participantId
+  // Returns 429 with next_nudge_available_at if within 48-hour cooldown
 }
 
 export const useSettlementStore = create<SettlementState>()((set) => ({
@@ -642,9 +781,12 @@ Implement using `@react-native-community/netinfo`. The banner is rendered at the
 - Shows last 4 digits of phone number at top
 - 6 `TextInput` boxes side by side (one digit each), auto-focus, auto-advance
 - "Resend code" link (disabled for 60 seconds after initial send, shows countdown)
-- On complete entry (6 digits filled): auto-submit POST `/auth/otp/verify`
-- On success (first login): navigate to PushPermissionScreen
-- On success (subsequent login): biometric prompt first (see Section 7), then navigate to MainTabs
+- On complete entry (6 digits filled): auto-submit `POST /api/v1/auth/otp/verify` (backend endpoint — NOT supabase.auth.verifyOtp())
+  - Request body: `{ phone, code }`
+  - Response: `{ access_token, refresh_token, user: { id, display_name, avatar_colour }, is_new_user: boolean }`
+  - Store tokens in expo-secure-store; set authStore.user
+- On success (first login, `is_new_user === true`): navigate to PushPermissionScreen
+- On success (subsequent login, `is_new_user === false`): biometric prompt first (see Section 7), then navigate to MainTabs
 - Back button → PhoneEntryScreen
 
 **Error state:** If OTP is incorrect, show red text below the input boxes: "Incorrect code. Try again." and clear all boxes. If expired: "That code has expired. Tap Resend to get a new one."
@@ -668,7 +810,7 @@ This screen appears in the AuthStack **only once** — after the very first succ
 
 **"Allow" behaviour:**
 1. Call `Notifications.requestPermissionsAsync()`
-2. If `status === 'granted'`: call `Notifications.getExpoPushTokenAsync()` → POST `/users/me/push-token` with the token → navigate to MainTabs
+2. If `status === 'granted'`: call `Notifications.getExpoPushTokenAsync()` → POST `/api/v1/users/me/push-token` with body `{ device_id, token, platform }` → navigate to MainTabs
 3. If `status === 'denied'` (user denied the system prompt): navigate to MainTabs (do not show an error — the user made a valid choice)
 
 **"Maybe later" behaviour:**
@@ -685,6 +827,10 @@ This screen appears in the AuthStack **only once** — after the very first succ
 #### HomeScreen
 
 - Net balance hero card: large number, green if net positive ("You're owed $X"), red if negative ("You owe $X"), grey if zero
+  - Calls `GET /api/v1/users/me/balance` which returns `{ net_balance_minor_units, currency, owed_to_you, you_owe }`
+  - Shows a skeleton/loading state while fetching
+  - If the endpoint returns 404 or 501 (not yet available), shows "Balance unavailable" placeholder — does NOT crash
+  - Note: `GET /users/me/balance` is built in Epic 9. During Epic 5 development, the balance card gracefully degrades.
 - "Needs attention" section: pending confirmations from your events. **If empty, hide this entire section including its heading** — do not show an empty section header.
 - "Your recent events" quick list (last 3 events)
 - FAB (floating action button) bottom right: "＋ New event" → opens CreateEventModal
@@ -763,7 +909,7 @@ Back button: pops to EventsScreen.
 - Test: mount EventDetailScreen → navigate away → verify no active Realtime subscriptions remain
   (check with `supabase.getChannels()` — should return empty array after unmount)
 
-This applies to both the joining phase (subscribed to `participants` table by `event_id`) and the settlement phase (subscribed to `participants.message_delivered_at`). In both phases, the channel must be unsubscribed when the screen unmounts.
+This applies to both the joining phase (channel `event-members:{eventId}`, subscribed to `participants` table by `event_id`) and the settlement phase (channel `event-settlement:{eventId}`, subscribed to `participants` payment_status changes). In both phases, the channel must be unsubscribed when the screen unmounts. Unsubscribe from `event-members:{eventId}` when Creator locks the event; unsubscribe from `event-settlement:{eventId}` when the event settles.
 
 ---
 
@@ -793,7 +939,7 @@ This applies to both the joining phase (subscribed to `participants` table by `e
 - Tax field + Tip field (pre-filled from parse, editable)
 - Total (computed live from items + tax + tip)
 - Low-confidence items shown with amber highlight and a small warning icon
-- CTA: "Confirm items →" → POST `/receipt/confirm` → navigate to SplitEntryScreen
+- CTA: "Confirm items →" → POST `/api/v1/events/:eventId/receipt/confirm` (with `parse_attempt_id` from the scan response stored in eventStore) → navigate to SplitEntryScreen
 
 **Error state:** If the POST fails: "Couldn't save items. Check your connection and try again." The user's edits are preserved locally.
 
@@ -1064,7 +1210,7 @@ When a guest or participant scans the QR code or taps a join link, a **web page*
 - "You've been invited to join [Event Name]" header
 - Creator name and avatar
 - Phone number pre-filled (from user's logged-in account)
-- "Join as [Name] →" CTA → POST `/join/:token`
+- "Join as [Name] →" CTA → POST `/api/v1/join/:token` with body `{ user_id: supabase_uid }` (the combined mobile join endpoint — NOT the multi-step web flow)
 - If user not logged in → redirect to PhoneEntryScreen first, then return here
 - On success → AppJoinedScreen
 
@@ -1533,8 +1679,8 @@ Described in Section 3 (PushPermissionScreen). The screen appears once — after
 
 ### Token Lifecycle
 
-- **Registration:** On permission grant, call `Notifications.getExpoPushTokenAsync()` → PATCH `/users/me` with `expo_push_token` → store token server-side linked to the user record
-- **Refresh:** Expo push tokens can change. On each app launch, call `getExpoPushTokenAsync()` and PATCH `/users/me` if the token has changed (compare against the token last stored server-side, not AsyncStorage)
+- **Registration:** On permission grant, call `Notifications.getExpoPushTokenAsync()` → POST `/users/me/push-token` with body `{ device_id, token, platform }` → store token server-side linked to the user record
+- **Refresh:** Expo push tokens can change. On each app launch, call `getExpoPushTokenAsync()` and POST `/users/me/push-token` if the token has changed (compare against the token last stored server-side, not AsyncStorage)
 - **Revocation:** If the user revokes notification permission in device settings, future pushes will silently fail. No special handling needed — the server will receive a delivery failure and can flag the token as stale
 
 ### Push Notification Handlers (foreground, background, and killed state)
@@ -1602,8 +1748,13 @@ export async function registerPushToken(userId: string): Promise<void> {
     projectId: Constants.expoConfig?.extra?.eas?.projectId,
   })).data;
 
-  // Store token via API (PATCH /users/me with expo_push_token)
-  await api.patch('/users/me', { expo_push_token: token });
+  // Store token via API — POST /users/me/push-token (NOT PATCH /users/me)
+  // PATCH /users/me does NOT accept expo_push_token
+  await api.post('/users/me/push-token', {
+    device_id: await Device.getDeviceIdAsync(), // from expo-device
+    token,
+    platform: Platform.OS as 'ios' | 'android',
+  });
 }
 ```
 
@@ -1622,7 +1773,15 @@ export async function registerPushToken(userId: string): Promise<void> {
 After a user's first successful login and OTP verification:
 
 1. Prompt to enable biometric: "Use Face ID / fingerprint to log in faster?" with "Enable" and "Not now" options
-2. Store preference in AsyncStorage (`biometric_enabled: true | false`) — this is a UX preference, not a secret
+2. Store preference in AsyncStorage (`biometric_enabled: true | false`) — this is a UX preference, not a secret. Use AsyncStorage (not SecureStore). SecureStore is reserved for Supabase auth tokens only.
+   ```typescript
+   // CORRECT
+   await AsyncStorage.setItem('biometric_enabled', 'true');
+   const val = await AsyncStorage.getItem('biometric_enabled');
+   await AsyncStorage.removeItem('biometric_enabled');
+   // WRONG — do NOT use SecureStore for this preference
+   // await SecureStore.setItemAsync('biometric_enabled', ...)
+   ```
 3. On subsequent app launches, if `biometric_enabled === true`:
 
 ```typescript
@@ -1638,8 +1797,8 @@ if (!isAvailable) {
 if (!isEnrolled) {
   // User previously enrolled but has since removed their biometrics from device settings
   // (e.g. removed all fingerprints). The biometric session token is now invalid.
-  // Action: clear stored biometric preference, fall back to OTP login
-  await SecureStore.deleteItemAsync('biometric_enabled');
+  // Action: clear stored biometric preference (AsyncStorage), fall back to OTP login
+  await AsyncStorage.removeItem('biometric_enabled'); // biometric_enabled is a UX preference — AsyncStorage only
   await SecureStore.deleteItemAsync('supabase_session');
   // Navigate to PhoneEntryScreen with a toast: "Please re-verify your phone number"
   navigation.replace('PhoneEntry', { reason: 'biometric_unenrolled' });
@@ -1807,7 +1966,11 @@ const handleCapture = async (photo: CameraPhoto) => {
       type: 'image/jpeg',
       name: 'receipt.jpg',
     } as any);
-    const result = await fetch('/api/receipt/parse', { method: 'POST', body: formData });
+    // CORRECT endpoint: POST /api/v1/events/:eventId/receipt/scan
+    // Response includes parse_attempt_id — store in eventStore for use in the confirm call
+    const result = await fetch(`${BASE_URL}/events/${eventId}/receipt/scan`, { method: 'POST', body: formData });
+    const data = await result.json();
+    // data.parse_attempt_id (NOT data.parse_id) — store this for the subsequent confirm call
     // ... handle result
   } catch (err) {
     // ... handle error
@@ -2221,11 +2384,13 @@ The web join pages are **not** React Native — they are server-rendered or Reac
 | Route | Page |
 |-------|------|
 | `GET /join/:token` | WebJoinScreen (new visitor or returning visitor, determined server-side) |
-| `POST /join/:token` | Processes join form submission, returns OTP trigger |
-| `GET /join/:token/verify` | WebOTPScreen |
-| `POST /join/:token/verify` | Processes OTP entry, returns session |
+| `POST /join/:token/otp/request` | Processes join form submission, triggers OTP send |
+| `POST /join/:token/otp/verify` | Processes OTP entry, returns session |
+| `GET /join/:token/status` | Returns current join/lock status of the event |
 | `GET /join/:token/joined` | WebJoinedScreen |
 | `GET /join/:token/locked` | WebLockedScreen |
+
+**CSRF protection:** The web join page fetches a CSRF token on page load from the `csrf_token` cookie set by `GET /join/:token`. Subsequent POST requests (`/otp/request`, `/otp/verify`) include an `X-CSRF-Token` header.
 
 ### Token Validation
 

@@ -124,7 +124,7 @@ The backend is organised into 7 logical services (modules), each with a defined 
 
 **Calls:** `infrastructure/llm/factory.ts` (resolves the correct AI provider from environment), Supabase Storage (upload receipt image, generate S3 URL), `receipt_items` table (write A1 output), `item_assignments` table (write A2 output), Profile Service (fetch payer's payment handles for A3 input).
 
-**Key constraint:** Agents run in a linear synchronous pipeline — A1 output feeds A2 input, A2 output feeds A3 input. The `events.ai_stage` column (`none → parsing → parsed → calculating → calculated → messaging → complete → failed`) is the idempotency guard: if the process crashes mid-pipeline, resuming will check `ai_stage` and skip already-completed stages rather than re-invoking expensive AI calls or double-writing database records.
+**Key constraint:** Agents run in a linear synchronous pipeline — A1 output feeds A2 input, A2 output feeds A3 input. The `events.ai_stage` column (`none → parsing → parsed → calculating → calculated → messaging → complete → failed`) is the idempotency guard: if the process crashes mid-pipeline, resuming will check `ai_stage` and skip already-completed stages rather than re-invoking expensive AI calls or double-writing database records. Application code uses atomic `UPDATE ... WHERE ai_stage='X'` to transition states — never read-then-write. Only the admin script `backend/scripts/reset-ai-stage.ts` can reset `failed → none`.
 
 ---
 
@@ -293,7 +293,7 @@ This section traces a single complete event from the creator opening the app to 
 | Auth | Supabase Auth (Phone OTP) | Phone-native authentication with no email friction. Supabase Auth handles JWT issuance, refresh token management, and OTP delivery (via Twilio Verify integration). The mobile app stores the refresh token in Expo SecureStore — never in AsyncStorage or localStorage. | Twilio test numbers (no real SMS) | Live Twilio credentials (real OTP delivery) | Live Twilio credentials + A2P 10DLC registered |
 | AI (dev + staging) | Google Gemini 2.5 Flash | Free tier via Google AI Studio covers all development and staging at zero cost. Fast, accurate for receipt parsing and text generation. Used for A1 (vision), A2 (NLP assignment if used), and A3 (personalised greeting). | ✓ | ✓ | — |
 | AI (production) | Anthropic Claude Haiku 4.5 | Chosen for production based on the lowest hallucination rate on financial documents — benchmarked at 94–97% accuracy on restaurant receipts. It will not invent prices not on the bill. Cost: ~$1/$5 per 1M tokens input/output; approximately $0.004–$0.006 per complete event across all three agents. | — | — | ✓ |
-| LLM Abstraction | `infrastructure/llm/factory.ts` | A single `resolveProvider()` function returns the correct LLM adapter based on `NODE_ENV`. Agents call `resolveProvider()` — they never import Gemini or Anthropic SDKs directly. Swapping the production model requires changing one line in `factory.ts`, not modifying any agent. | Gemini adapter | Gemini adapter | Anthropic adapter |
+| LLM Abstraction | `infrastructure/llm/factory.ts` | A single `createLLMProvider()` function returns the correct LLM adapter based on `NODE_ENV`. Agents call `createLLMProvider()` — they never import Gemini or Anthropic SDKs directly. Swapping the production model requires changing one line in `factory.ts`, not modifying any agent. | Gemini adapter | Gemini adapter | Anthropic adapter |
 | Messaging | Twilio Programmable Messaging + Twilio Verify | Verify handles OTP with automatic WhatsApp/SMS channel selection. Programmable Messaging delivers payment request messages using `channel=auto` (WhatsApp first, SMS fallback) — fully TCPA-compliant, no WhatsApp number detection required. A2P 10DLC registration is required for US SMS delivery without carrier filtering. | Test credentials (no real SMS, magic test numbers) | Live credentials (real SMS to real phones) | Live credentials + A2P 10DLC approved |
 | Push Notifications | Expo Push Notifications (FCM + APNs) | Free. Expo wraps both Firebase Cloud Messaging (Android) and Apple Push Notification service (iOS) behind a single API. Push tokens are stored in `device_sessions.push_token`. Used for: participant joined, payment self-reported, payment confirmed, payment disputed, nudge prompt, all-settled. | ✓ | ✓ | ✓ |
 | Hosting | Railway | $5/month Hobby tier handles MVP. One-click deploy from GitHub. Separate Railway services for staging and production environments. Environment variables are set in the Railway dashboard — never in code or files. | — | Railway staging service | Railway production service |
@@ -448,12 +448,13 @@ letssplyt/
         redis.ts                   ← Upstash Redis client singleton
         twilio.ts                  ← Twilio client singleton
         llm/
-          factory.ts               ← resolveProvider(): returns Gemini (dev) or Anthropic (prod)
+          factory.ts               ← createLLMProvider(): returns Gemini (dev) or Anthropic (prod)
+          ai-audit.ts              ← writeAuditLog() — fire-and-forget, never throws, called with .catch(console.error)
           providers/
             gemini.adapter.ts      ← Gemini 2.5 Flash adapter (dev/staging)
             anthropic.adapter.ts   ← Claude Haiku 4.5 adapter (production)
         encryption.ts              ← AES-256-GCM encrypt/decrypt for payment handles
-        errors.ts                  ← typed error classes (OptOutError, RateLimitError, etc.)
+        errors.ts                  ← AppError base class (code, message, statusCode, isOperational) + Errors convenience constructors; caught by global error handler which converts isOperational errors to their statusCode and non-operational errors to 500
         logger.ts                  ← structured JSON logger, PII scrubbing
       middleware/
         authenticate.ts            ← JWT validation (runs on all authenticated routes)
@@ -496,11 +497,12 @@ letssplyt/
 
   prototype/                       ← HTML prototypes (visual reference only — not deployed)
 
-  supabase/
-    migrations/
+  supabase/                          ← at repo root (Supabase CLI requires migrations here)
+    migrations/                      ← run `supabase migration up` from the repo root
       20260601000000_initial_schema.sql
       20260615000000_[next change].sql
     config.toml
+    seed.sql
 
   .github/
     workflows/
@@ -533,13 +535,16 @@ The `backend/src/modules/` structure is organised by feature domain, not by file
 Every call to an external service (Twilio, Gemini, Anthropic, Supabase Storage, QStash) is wrapped in a typed error handler. The system never lets unhandled promise rejections or uncaught exceptions propagate to the HTTP response layer — they are caught, classified, and returned as structured error objects.
 
 Typed error classes live in `backend/src/infrastructure/errors.ts`:
+- `AppError` — base class for all custom errors: `code` (machine-readable string), `message`, `statusCode`, `isOperational`. The global error handler middleware converts `isOperational` errors to their `statusCode` and non-operational errors to 500.
+- `Errors` — convenience constructors (static factory methods) for all standard error types
 - `OptOutError` — thrown when a Twilio message is attempted to an opted-out number; caught by the Notification Service and recorded without crashing
 - `RateLimitError` — thrown by rate-limiting middleware; returns HTTP 429 with `Retry-After` header
 - `ValidationError` — thrown by Zod validation middleware; returns HTTP 400 with field-level error details
 - `NotFoundError` — returns HTTP 404 with resource type
 - `UnauthorizedError` — returns HTTP 401; triggers token refresh flow on mobile
 - `AIParseError` — thrown by A1 when validation of the JSON response fails; triggers retry up to 3 times before surfacing a parse failure to the creator
-- `AppError` — base class for all custom errors, includes a machine-readable code string for client-side handling
+
+`backend/src/infrastructure/llm/ai-audit.ts` exports `writeAuditLog()` — a fire-and-forget audit log writer that uses the service-role Supabase client. It never throws. All call sites use the `.catch(console.error)` pattern to prevent unhandled rejections without blocking the main flow.
 
 API responses always follow a consistent shape: `{ data, error: { code, message } }`. Stack traces are never included in API responses. In production, errors are captured by Sentry with PII scrubbed from the breadcrumb trail.
 
