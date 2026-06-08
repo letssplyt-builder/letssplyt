@@ -11,8 +11,8 @@ describe('WelcomeScreen', () => {
       />,
     );
     expect(screen.getByText('LetsSplyt')).toBeTruthy();
-    expect(screen.getByText('Split bills. No chasing. No drama.')).toBeTruthy();
-    expect(screen.getByText('Get Started →')).toBeTruthy();
+    expect(screen.getByText('Split Bills, Not Friendships')).toBeTruthy();
+    expect(screen.getByText('Get Started')).toBeTruthy();
   });
 
   it('navigates to PhoneEntry in register mode when Get Started is pressed', () => {
@@ -24,7 +24,7 @@ describe('WelcomeScreen', () => {
       />,
     );
 
-    fireEvent.press(screen.getByText('Get Started →'));
+    fireEvent.press(screen.getByText('Get Started'));
     expect(navigate).toHaveBeenCalledWith('PhoneEntry', { mode: 'register' });
   });
 });

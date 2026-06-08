@@ -9,6 +9,8 @@ const config: Config = {
   moduleNameMapper: {
     '@letssplyt/shared/(.*)': '<rootDir>/../shared/types/$1',
     '^expo-constants$': '<rootDir>/src/__tests__/mocks/expo-constants.ts',
+    '^expo-linear-gradient$': '<rootDir>/src/__tests__/mocks/expo-linear-gradient.tsx',
+    '^expo-status-bar$': '<rootDir>/src/__tests__/mocks/expo-status-bar.tsx',
     '\\.(jpg|jpeg|png|gif|svg)$': '<rootDir>/src/__tests__/mocks/fileMock.ts',
   },
   collectCoverageFrom: [

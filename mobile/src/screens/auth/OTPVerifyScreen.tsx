@@ -9,13 +9,15 @@ import {
   type NativeSyntheticEvent,
   type TextInputKeyPressEventData,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import type { AuthSession } from '@letssplyt/shared/auth.types';
+import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
+import { FadeSlideIn } from '../../components/auth/FadeSlideIn';
+import { OtpDigitBox } from '../../components/auth/OtpDigitBox';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import type { RootStackParamList } from '../../navigation/types';
 import { apiPost, getApiErrorCode, isApiRequestError } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
-import { colors } from '../../theme/colors';
+import { authColors } from '../../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OTPVerify'>;
 
@@ -153,84 +155,19 @@ export function OTPVerifyScreen({ navigation, route }: Props) {
   const codeComplete = digits.every((d) => d.length === 1);
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.container}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          onPress={() =>
-            navigation.navigate('PhoneEntry', { mode, initialPhone: phoneE164 })
-          }
-          style={styles.backButton}
-        >
-          <Text style={styles.backText}>‹ Back</Text>
-        </Pressable>
-
-        <View style={styles.content}>
-          <View style={styles.iconWrap}>
-            <Text style={styles.icon}>📱</Text>
-          </View>
-          <Text style={styles.title}>Check your texts</Text>
-          <Text style={styles.subtitle}>
-            Sent to <Text style={styles.phoneHighlight}>{maskPhoneLastFour(phoneE164)}</Text>
-          </Text>
-
-          {accountExists && mode === 'register' ? (
-            <View style={styles.infoBox}>
-              <Text style={styles.infoText}>
-                You&apos;re already registered. Enter the OTP to sign in.
-              </Text>
-            </View>
-          ) : null}
-
-          {mode === 'register' && !isExistingAccount ? (
-            <TextInput
-              accessibilityLabel="Your name"
-              accessibilityHint="Required only when creating a new account"
-              placeholder="Your name (new accounts only)"
-              placeholderTextColor={colors.textFaint}
-              value={displayName}
-              onChangeText={setDisplayName}
-              style={styles.nameInput}
-              autoCapitalize="words"
-              autoCorrect={false}
-            />
-          ) : null}
-
-          <View style={styles.digitRow}>
-            {digits.map((digit, index) => (
-              <TextInput
-                key={index}
-                ref={(ref) => {
-                  inputRefs.current[index] = ref;
-                }}
-                accessibilityLabel={`Digit ${index + 1}`}
-                keyboardType="number-pad"
-                maxLength={1}
-                value={digit}
-                onChangeText={(value) => handleDigitChange(index, value)}
-                onKeyPress={(event) => handleKeyPress(index, event)}
-                style={[styles.digitBox, digit ? styles.digitBoxFilled : null]}
-                selectTextOnFocus
-              />
-            ))}
-          </View>
-
-          {error ? (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          ) : null}
-
+    <AuthGradientLayout
+      contentStyle={styles.content}
+      footer={
+        <FadeSlideIn delay={200}>
+          <View style={styles.footer}>
           <PrimaryButton
             accessibilityLabel="Verify code"
-            label="Verify →"
+            label="Verify"
+            variant="inverse"
             loading={isLoading}
             disabled={!codeComplete}
             onPress={() => void handleVerify()}
-            style={styles.verifyButton}
           />
-
           <Pressable
             accessibilityRole="button"
             accessibilityHint="Sends a new verification code to your phone"
@@ -241,146 +178,229 @@ export function OTPVerifyScreen({ navigation, route }: Props) {
             <Text style={styles.resendText}>
               Didn&apos;t get it?{' '}
               {resendSeconds > 0 ? (
-                <Text style={styles.resendLink}>Resend in {resendSeconds}s</Text>
+                <Text style={styles.resendMuted}>Resend in {resendSeconds}s</Text>
               ) : (
-                <Text style={styles.resendLinkActive}>Resend code</Text>
+                <Text style={styles.resendActive}>Resend code</Text>
               )}
             </Text>
           </Pressable>
+          </View>
+        </FadeSlideIn>
+      }
+    >
+      <FadeSlideIn delay={0} distance={8}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Go back"
+        onPress={() =>
+          navigation.navigate('PhoneEntry', { mode, initialPhone: phoneE164 })
+        }
+        style={styles.backButton}
+      >
+        <Text style={styles.backText}>‹ Back</Text>
+      </Pressable>
+      </FadeSlideIn>
+
+      <View style={styles.centerStage}>
+        <FadeSlideIn delay={40}>
+          <Text style={styles.eyebrow}>Verification</Text>
+          <Text style={styles.title}>Enter your code</Text>
+          <Text style={styles.subtitle}>
+            Sent to{' '}
+            <Text style={styles.phoneHighlight}>{maskPhoneLastFour(phoneE164)}</Text>
+          </Text>
+        </FadeSlideIn>
+
+        {accountExists && mode === 'register' ? (
+          <FadeSlideIn delay={100} style={styles.infoWrap}>
+            <View style={styles.infoBox}>
+              <Text style={styles.infoText}>
+                You&apos;re already registered — just enter the code to sign in.
+              </Text>
+            </View>
+          </FadeSlideIn>
+        ) : null}
+
+        {mode === 'register' && !isExistingAccount ? (
+          <FadeSlideIn delay={100} style={styles.nameWrap}>
+            <TextInput
+              accessibilityLabel="Your name"
+              accessibilityHint="Required only when creating a new account"
+              placeholder="Your name"
+              placeholderTextColor={authColors.textOnDarkFaint}
+              value={displayName}
+              onChangeText={setDisplayName}
+              style={styles.nameInput}
+              autoCapitalize="words"
+              autoCorrect={false}
+            />
+          </FadeSlideIn>
+        ) : null}
+
+        <View style={styles.digitRow}>
+          {digits.map((digit, index) => (
+            <OtpDigitBox
+              key={index}
+              ref={(ref) => {
+                inputRefs.current[index] = ref;
+              }}
+              index={index}
+              filled={digit.length === 1}
+              accessibilityLabel={`Digit ${index + 1}`}
+              keyboardType="number-pad"
+              maxLength={1}
+              value={digit}
+              onChangeText={(value) => handleDigitChange(index, value)}
+              onKeyPress={(event) => handleKeyPress(index, event)}
+              selectTextOnFocus
+            />
+          ))}
         </View>
+
+        {error ? (
+          <FadeSlideIn delay={0} style={styles.feedbackWrap}>
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{error}</Text>
+            </View>
+          </FadeSlideIn>
+        ) : (
+          <FadeSlideIn delay={320}>
+            <Text style={styles.hint}>6-digit code from your text message</Text>
+          </FadeSlideIn>
+        )}
       </View>
-    </SafeAreaView>
+    </AuthGradientLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
+  content: {
     flex: 1,
-    backgroundColor: colors.background,
-  },
-  container: {
-    flex: 1,
-    paddingHorizontal: 22,
   },
   backButton: {
-    paddingTop: 8,
-    paddingBottom: 12,
+    paddingTop: 4,
+    paddingBottom: 8,
     alignSelf: 'flex-start',
   },
   backText: {
     fontSize: 17,
-    color: colors.primary,
+    color: authColors.textOnDark,
     fontWeight: '600',
   },
-  content: {
+  centerStage: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
-    paddingBottom: 48,
-  },
-  iconWrap: {
-    width: 60,
-    height: 60,
-    borderRadius: 18,
-    backgroundColor: colors.primaryLight,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 18,
+    paddingBottom: 16,
   },
-  icon: {
-    fontSize: 28,
+  eyebrow: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 1.2,
+    textTransform: 'uppercase',
+    color: authColors.textOnDarkFaint,
+    marginBottom: 8,
   },
   title: {
-    fontSize: 22,
+    fontSize: 32,
     fontWeight: '800',
-    color: colors.text,
-    marginBottom: 6,
+    color: authColors.textOnDark,
+    marginBottom: 8,
+    letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 13,
-    color: colors.textMuted,
-    marginBottom: 26,
+    fontSize: 15,
+    color: authColors.textOnDarkMuted,
+    marginBottom: 28,
+    textAlign: 'center',
   },
   phoneHighlight: {
-    color: colors.text,
+    color: authColors.textOnDark,
     fontWeight: '700',
+  },
+  nameWrap: {
+    width: '100%',
+    maxWidth: 340,
+    marginBottom: 22,
   },
   nameInput: {
     width: '100%',
-    height: 48,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceMuted,
-    paddingHorizontal: 14,
-    fontSize: 16,
-    color: colors.text,
+    height: 52,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: authColors.glassBorder,
+    backgroundColor: authColors.glass,
+    paddingHorizontal: 18,
+    fontSize: 17,
+    color: authColors.textOnDark,
+  },
+  infoWrap: {
+    width: '100%',
+    maxWidth: 340,
     marginBottom: 20,
   },
   digitRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 28,
+    gap: 10,
+    marginBottom: 20,
   },
-  digitBox: {
-    width: 44,
-    height: 52,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    textAlign: 'center',
-    fontSize: 22,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  digitBoxFilled: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
+  feedbackWrap: {
+    width: '100%',
+    maxWidth: 340,
   },
   errorBox: {
     width: '100%',
-    backgroundColor: colors.errorBg,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
+    maxWidth: 340,
+    backgroundColor: authColors.errorBgOnDark,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(252, 165, 165, 0.25)',
   },
   errorText: {
-    color: colors.error,
-    fontSize: 13,
+    color: authColors.errorOnDark,
+    fontSize: 14,
     textAlign: 'center',
   },
-  verifyButton: {
-    width: '100%',
+  hint: {
+    fontSize: 13,
+    color: authColors.textOnDarkFaint,
+    textAlign: 'center',
+  },
+  footer: {
+    gap: 12,
   },
   resendWrap: {
-    marginTop: 14,
-    padding: 8,
+    alignItems: 'center',
+    paddingVertical: 8,
   },
   resendText: {
-    fontSize: 12,
-    color: colors.textMuted,
+    fontSize: 14,
+    color: authColors.textOnDarkMuted,
   },
-  resendLink: {
-    color: colors.textFaint,
+  resendMuted: {
+    color: authColors.textOnDarkFaint,
     fontWeight: '600',
   },
-  resendLinkActive: {
-    color: colors.primary,
-    fontWeight: '600',
+  resendActive: {
+    color: authColors.textOnDark,
+    fontWeight: '700',
   },
   infoBox: {
     width: '100%',
-    backgroundColor: colors.primaryLight,
-    borderRadius: 12,
-    padding: 12,
+    maxWidth: 340,
+    backgroundColor: authColors.infoBgOnDark,
+    borderRadius: 14,
+    padding: 14,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: authColors.glassBorder,
   },
   infoText: {
-    color: colors.primary,
-    fontSize: 13,
-    lineHeight: 18,
+    color: authColors.infoOnDark,
+    fontSize: 14,
+    lineHeight: 20,
     textAlign: 'center',
-    fontWeight: '600',
+    fontWeight: '500',
   },
 });

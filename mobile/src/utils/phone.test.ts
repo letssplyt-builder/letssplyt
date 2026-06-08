@@ -1,9 +1,30 @@
 import { describe, expect, it } from '@jest/globals';
-import { nationalFromE164, toE164FromPhoneInput } from './phone';
+import {
+  countryFromE164,
+  DEFAULT_AUTH_REGION,
+  nationalFromE164,
+  SUPPORTED_AUTH_REGIONS,
+  toE164FromNational,
+  toE164FromPhoneInput,
+} from './phone';
 
 describe('phone utils', () => {
-  it('extracts national digits from E.164 for the phone input field', () => {
+  it('MVP supports US region only', () => {
+    expect(SUPPORTED_AUTH_REGIONS).toEqual(['US']);
+    expect(DEFAULT_AUTH_REGION).toBe('US');
+  });
+
+  it('maps unknown international numbers to default US region in MVP', () => {
+    expect(countryFromE164('+919876543210')).toBe('US');
+    expect(countryFromE164('+15005550006')).toBe('US');
+  });
+
+  it('extracts national digits from US E.164', () => {
     expect(nationalFromE164('+15005550006')).toBe('5005550006');
+  });
+
+  it('builds E.164 from US national digits', () => {
+    expect(toE164FromNational('5005550006')).toBe('+15005550006');
   });
 
   it('normalises formatted output to E.164', () => {

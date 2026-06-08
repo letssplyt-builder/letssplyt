@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuthStore } from '../../store/authStore';
@@ -21,6 +22,7 @@ export function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
+      <StatusBar style="dark" />
       <View style={styles.container}>
         <Text style={styles.greeting}>Welcome{user ? `, ${user.display_name}` : ''}</Text>
         <Text style={styles.subtitle}>Home screen — built in E05-S03</Text>

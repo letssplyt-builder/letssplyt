@@ -67,7 +67,7 @@ describe('OTPVerifyScreen', () => {
       />,
     );
 
-    expect(screen.getByText('Check your texts')).toBeTruthy();
+    expect(screen.getByText('Enter your code')).toBeTruthy();
     expect(screen.getByLabelText('Digit 1')).toBeTruthy();
     expect(screen.getByLabelText('Digit 6')).toBeTruthy();
   });
@@ -207,7 +207,9 @@ describe('OTPVerifyScreen', () => {
       />,
     );
 
-    expect(screen.getByText("You're already registered. Enter the OTP to sign in.")).toBeTruthy();
+    expect(
+      screen.getByText("You're already registered — just enter the code to sign in."),
+    ).toBeTruthy();
     expect(screen.queryByLabelText('Your name')).toBeNull();
   });
 

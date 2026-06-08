@@ -5,7 +5,7 @@ export default function App() {
   return (
     <>
       <RootNavigator />
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
     </>
   );
 }

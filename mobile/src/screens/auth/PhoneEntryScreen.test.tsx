@@ -42,32 +42,6 @@ jest.mock('../../services/api', () => {
   };
 });
 
-jest.mock('react-native-phone-number-input', () => {
-  const React = require('react');
-  const { TextInput, View } = require('react-native');
-  return React.forwardRef(function MockPhoneInput(
-    { value, onChangeText }: { value: string; onChangeText: (v: string) => void },
-    ref: React.Ref<{ isValidNumber: () => boolean; getNumberAfterPossiblyEliminatingZero: () => { formattedNumber: string } }>,
-  ) {
-    React.useImperativeHandle(ref, () => ({
-      isValidNumber: () => value.length >= 10,
-      getNumberAfterPossiblyEliminatingZero: () => ({
-        number: value.replace(/\D/g, ''),
-        formattedNumber: `+1${value.replace(/\D/g, '')}`,
-      }),
-    }));
-    return (
-      <View>
-        <TextInput
-          accessibilityLabel="Phone number"
-          value={value}
-          onChangeText={onChangeText}
-        />
-      </View>
-    );
-  });
-});
-
 describe('PhoneEntryScreen', () => {
   const navigation = { navigate: jest.fn() };
 
@@ -95,13 +69,13 @@ describe('PhoneEntryScreen', () => {
       />,
     );
 
-    fireEvent.changeText(screen.getByLabelText('Phone number'), '5559999999');
-    fireEvent.press(screen.getByText('Send Code →'));
+    fireEvent.changeText(screen.getByLabelText('Phone number'), '2025550100');
+    fireEvent.press(screen.getByText('Send Code'));
 
     await waitFor(() => {
       expect(screen.getByText('No account found. Check number and try again.')).toBeTruthy();
-      expect(screen.getByText('If you are new here')).toBeTruthy();
-      expect(screen.getByText('Register')).toBeTruthy();
+      expect(screen.getByText('New here?')).toBeTruthy();
+      expect(screen.getByText('Create an account')).toBeTruthy();
     });
   });
 
@@ -124,18 +98,18 @@ describe('PhoneEntryScreen', () => {
       />,
     );
 
-    fireEvent.changeText(screen.getByLabelText('Phone number'), '5559999999');
-    fireEvent.press(screen.getByText('Send Code →'));
+    fireEvent.changeText(screen.getByLabelText('Phone number'), '2025550100');
+    fireEvent.press(screen.getByText('Send Code'));
 
     await waitFor(() => {
-      expect(screen.getByText('Register')).toBeTruthy();
+      expect(screen.getByText('Create an account')).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText('Register'));
+    fireEvent.press(screen.getByText('Create an account'));
 
     expect(navigation.navigate).toHaveBeenCalledWith('PhoneEntry', {
       mode: 'register',
-      initialPhone: '+15559999999',
+      initialPhone: '+12025550100',
     });
   });
 
@@ -159,7 +133,7 @@ describe('PhoneEntryScreen', () => {
     );
 
     fireEvent.changeText(screen.getByLabelText('Phone number'), '5005550006');
-    fireEvent.press(screen.getByText('Send Code →'));
+    fireEvent.press(screen.getByText('Send Code'));
 
     await waitFor(() => {
       expect(navigation.navigate).toHaveBeenCalledWith('OTPVerify', {

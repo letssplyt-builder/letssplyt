@@ -1,23 +1,27 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import PhoneInput from 'react-native-phone-number-input';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import type { OtpRequestResponse } from '@letssplyt/shared/auth.types';
+import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
+import { FadeSlideIn } from '../../components/auth/FadeSlideIn';
+import { RegionPhoneField } from '../../components/auth/RegionPhoneField';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import type { RootStackParamList } from '../../navigation/types';
 import { apiPost, getApiErrorCode, isApiRequestError } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
-import { colors } from '../../theme/colors';
-import { nationalFromE164, toE164FromPhoneInput } from '../../utils/phone';
+import { authColors } from '../../theme/colors';
+import {
+  DEFAULT_AUTH_REGION,
+  isValidNationalNumber,
+  nationalFromE164,
+  toE164FromNational,
+} from '../../utils/phone';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PhoneEntry'>;
 
 export function PhoneEntryScreen({ navigation, route }: Props) {
-  const phoneRef = useRef<PhoneInput>(null);
-  const [phoneValue, setPhoneValue] = useState(() =>
-    nationalFromE164(route.params.initialPhone ?? ''),
-  );
+  const initialPhone = route.params.initialPhone ?? '';
+  const [phoneValue, setPhoneValue] = useState(() => nationalFromE164(initialPhone));
   const [error, setError] = useState<string | null>(null);
   const [showRegisterCta, setShowRegisterCta] = useState(false);
   const [lastPhoneE164, setLastPhoneE164] = useState<string | null>(null);
@@ -34,17 +38,13 @@ export function PhoneEntryScreen({ navigation, route }: Props) {
   const handleSendCode = async () => {
     setError(null);
     setShowRegisterCta(false);
-    const phoneInput = phoneRef.current;
-    if (!phoneInput) return;
 
-    const parsed = phoneInput.getNumberAfterPossiblyEliminatingZero();
-    const nationalNumber = parsed?.number ?? '';
-    if (!nationalNumber || !phoneInput.isValidNumber(nationalNumber)) {
+    if (!isValidNationalNumber(phoneValue, DEFAULT_AUTH_REGION)) {
       setError("Couldn't send code. Check your number and try again.");
       return;
     }
 
-    const phoneE164 = toE164FromPhoneInput(parsed?.formattedNumber ?? '', 'US');
+    const phoneE164 = toE164FromNational(phoneValue, DEFAULT_AUTH_REGION);
     if (!phoneE164) {
       setError("Couldn't send code. Check your number and try again.");
       return;
@@ -95,182 +95,182 @@ export function PhoneEntryScreen({ navigation, route }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <View style={styles.pill}>
-            <Text style={styles.pillText}>{mode === 'login' ? 'Welcome back' : 'New account'}</Text>
+    <AuthGradientLayout
+      contentStyle={styles.content}
+      footer={
+        <FadeSlideIn delay={220}>
+          <View style={styles.footer}>
+            <PrimaryButton
+              accessibilityRole="button"
+              label="Send Code"
+              variant="inverse"
+              loading={isLoading}
+              onPress={() => void handleSendCode()}
+            />
+            <Text style={styles.legal}>By continuing you agree to our Terms & Privacy</Text>
           </View>
-          <Text style={styles.title}>Your phone{'\n'}number</Text>
-          <Text style={styles.subtitle}>We'll verify with a one-time code.</Text>
+        </FadeSlideIn>
+      }
+    >
+      <FadeSlideIn delay={0} distance={10}>
+        <View style={styles.topRow}>
+          <View style={styles.modePill}>
+            <Text style={styles.modePillText}>
+              {mode === 'login' ? 'Welcome back' : 'New account'}
+            </Text>
+          </View>
         </View>
+      </FadeSlideIn>
 
-        <View style={styles.inputWrap}>
-          <PhoneInput
-            ref={phoneRef}
-            defaultCode="US"
-            layout="first"
+      <View style={styles.centerStage}>
+        <FadeSlideIn delay={60}>
+          <Text style={styles.title}>
+            {mode === 'login' ? "What's your\nnumber?" : "Your phone\nnumber"}
+          </Text>
+        </FadeSlideIn>
+        <FadeSlideIn delay={120}>
+          <Text style={styles.subtitle}>We&apos;ll text you a one-time code.</Text>
+        </FadeSlideIn>
+
+        <FadeSlideIn delay={180} style={styles.phoneBlock}>
+          <RegionPhoneField
+            region={DEFAULT_AUTH_REGION}
             value={phoneValue}
             onChangeText={(text) => {
               setPhoneValue(text);
               setShowRegisterCta(false);
             }}
-            containerStyle={styles.phoneContainer}
-            textContainerStyle={styles.phoneTextContainer}
-            textInputStyle={styles.phoneInput}
-            codeTextStyle={styles.phoneCode}
-            flagButtonStyle={styles.phoneFlag}
-            placeholder="(555) 000-0000"
-            textInputProps={{
-              accessibilityLabel: 'Phone number',
-              accessibilityHint: 'Enter your phone number including country code',
-            }}
           />
-          {error ? (
+        </FadeSlideIn>
+
+        {error ? (
+          <FadeSlideIn delay={0} style={styles.feedbackWrap}>
             <View style={styles.errorBox}>
               <Text style={styles.errorText}>{error}</Text>
               {showRegisterCta ? (
                 <View style={styles.registerCta}>
-                  <Text style={styles.registerHint}>If you are new here</Text>
+                  <Text style={styles.registerHint}>New here?</Text>
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel="Register a new account"
                     onPress={handleRegister}
                     style={styles.registerButton}
                   >
-                    <Text style={styles.registerButtonText}>Register</Text>
+                    <Text style={styles.registerButtonText}>Create an account</Text>
                   </Pressable>
                 </View>
               ) : null}
             </View>
-          ) : null}
-        </View>
-
-        <View style={styles.footer}>
-          <PrimaryButton
-            accessibilityRole="button"
-            label="Send Code →"
-            loading={isLoading}
-            onPress={() => void handleSendCode()}
-          />
-          <Text style={styles.legal}>
-            By continuing you agree to our Terms & Privacy
-          </Text>
-        </View>
+          </FadeSlideIn>
+        ) : (
+          <FadeSlideIn delay={240}>
+            <Text style={styles.hint}>US & Canadian numbers (+1)</Text>
+          </FadeSlideIn>
+        )}
       </View>
-    </SafeAreaView>
+    </AuthGradientLayout>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
+  content: {
     flex: 1,
-    backgroundColor: colors.background,
   },
-  container: {
-    flex: 1,
-    paddingHorizontal: 22,
-    paddingBottom: 28,
+  topRow: {
+    paddingTop: 8,
+    marginBottom: 8,
   },
-  header: {
-    paddingTop: 48,
-    marginBottom: 28,
-  },
-  pill: {
+  modePill: {
     alignSelf: 'flex-start',
-    backgroundColor: colors.primaryLight,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
+    backgroundColor: authColors.pillOnDark,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 100,
-    marginBottom: 14,
+    borderWidth: 1,
+    borderColor: authColors.glassBorder,
   },
-  pillText: {
-    color: colors.primary,
-    fontSize: 11,
+  modePillText: {
+    color: authColors.textOnDarkMuted,
+    fontSize: 12,
     fontWeight: '700',
+    letterSpacing: 0.3,
+  },
+  centerStage: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingBottom: 24,
   },
   title: {
-    fontSize: 30,
+    fontSize: 34,
     fontWeight: '800',
-    color: colors.text,
-    lineHeight: 34,
-    letterSpacing: -0.5,
-    marginBottom: 6,
+    color: authColors.textOnDark,
+    textAlign: 'center',
+    lineHeight: 40,
+    letterSpacing: -0.6,
+    marginBottom: 10,
   },
   subtitle: {
-    fontSize: 13,
-    color: colors.textMuted,
+    fontSize: 15,
+    color: authColors.textOnDarkMuted,
+    textAlign: 'center',
+    marginBottom: 36,
   },
-  inputWrap: {
-    flex: 1,
-  },
-  phoneContainer: {
+  phoneBlock: {
     width: '100%',
-    backgroundColor: colors.surfaceMuted,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    borderRadius: 16,
-    height: 56,
+    maxWidth: 360,
   },
-  phoneTextContainer: {
-    backgroundColor: 'transparent',
-    borderTopRightRadius: 16,
-    borderBottomRightRadius: 16,
-    paddingVertical: 0,
+  feedbackWrap: {
+    width: '100%',
+    maxWidth: 360,
+    marginTop: 20,
   },
-  phoneInput: {
-    fontSize: 17,
-    color: colors.text,
-    height: 54,
-  },
-  phoneCode: {
-    fontSize: 14,
-    color: colors.text,
-    fontWeight: '600',
-  },
-  phoneFlag: {
-    backgroundColor: 'transparent',
+  hint: {
+    marginTop: 20,
+    fontSize: 13,
+    color: authColors.textOnDarkFaint,
+    textAlign: 'center',
   },
   errorBox: {
-    marginTop: 12,
-    backgroundColor: colors.errorBg,
-    borderRadius: 12,
-    padding: 12,
+    width: '100%',
+    backgroundColor: authColors.errorBgOnDark,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(252, 165, 165, 0.25)',
   },
   errorText: {
-    color: colors.error,
-    fontSize: 13,
-    lineHeight: 18,
+    color: authColors.errorOnDark,
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'center',
   },
   registerCta: {
-    marginTop: 12,
+    marginTop: 14,
     alignItems: 'center',
     gap: 8,
   },
   registerHint: {
     fontSize: 13,
-    color: colors.textMuted,
+    color: authColors.textOnDarkMuted,
   },
   registerButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 14,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    minWidth: 160,
-    alignItems: 'center',
+    backgroundColor: authColors.ctaSurface,
+    borderRadius: 20,
+    paddingHorizontal: 22,
+    paddingVertical: 10,
   },
   registerButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
+    color: authColors.ctaText,
+    fontSize: 14,
     fontWeight: '700',
   },
   footer: {
-    gap: 10,
+    gap: 12,
   },
   legal: {
     textAlign: 'center',
     fontSize: 11,
-    color: colors.textFaint,
-    marginTop: 4,
+    color: authColors.textOnDarkFaint,
   },
 });

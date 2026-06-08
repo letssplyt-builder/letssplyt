@@ -1,3 +1,31 @@
+/** Dark premium palette for auth flow */
+export const authColors = {
+  gradientTop: '#0B3D45',
+  gradientMid: '#0E5C66',
+  gradientBottom: '#1A8F9E',
+  glowTeal: 'rgba(45, 212, 191, 0.18)',
+  glowCyan: 'rgba(34, 211, 238, 0.12)',
+  textOnDark: '#FFFFFF',
+  textOnDarkMuted: 'rgba(255, 255, 255, 0.72)',
+  textOnDarkFaint: 'rgba(255, 255, 255, 0.45)',
+  glass: 'rgba(255, 255, 255, 0.1)',
+  glassBorder: 'rgba(255, 255, 255, 0.22)',
+  glassStrong: 'rgba(255, 255, 255, 0.16)',
+  pillOnDark: 'rgba(255, 255, 255, 0.14)',
+  ctaSurface: '#FFFFFF',
+  ctaText: '#0E5C66',
+  ctaTextPressed: '#0B3D45',
+  segmentActive: 'rgba(255, 255, 255, 0.95)',
+  segmentInactive: 'rgba(255, 255, 255, 0.08)',
+  segmentActiveText: '#0B3D45',
+  segmentInactiveText: 'rgba(255, 255, 255, 0.85)',
+  errorOnDark: '#FCA5A5',
+  errorBgOnDark: 'rgba(220, 38, 38, 0.18)',
+  infoOnDark: 'rgba(255, 255, 255, 0.9)',
+  infoBgOnDark: 'rgba(255, 255, 255, 0.12)',
+} as const;
+
+/** Light palette for post-auth app screens (E05+) */
 export const colors = {
   background: '#F8F7FF',
   backgroundGradientEnd: '#EEF2FF',
@@ -8,10 +36,10 @@ export const colors = {
   text: '#1E1B3A',
   textMuted: '#9CA3AF',
   textFaint: '#C4C0D8',
-  primary: '#6366F1',
-  primaryDark: '#7C3AED',
-  primaryLight: '#EEF2FF',
-  primaryBorder: '#C7D2FE',
+  primary: '#0E5C66',
+  primaryDark: '#0B3D45',
+  primaryLight: '#E6F6F8',
+  primaryBorder: '#A5D8E0',
   error: '#DC2626',
   errorBg: '#FEF2F2',
 } as const;

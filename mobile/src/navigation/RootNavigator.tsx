@@ -30,7 +30,11 @@ export function RootNavigator() {
     <NavigationContainer>
       <RootStack.Navigator
         key={isAuthenticated ? 'authenticated' : 'guest'}
-        screenOptions={{ headerShown: false }}
+        screenOptions={{
+          headerShown: false,
+          animation: 'fade',
+          animationDuration: 280,
+        }}
         initialRouteName={isAuthenticated ? 'Home' : 'Welcome'}
       >
         {isAuthenticated ? (
