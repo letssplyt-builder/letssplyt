@@ -59,7 +59,7 @@ export function decodeEventCursor(cursor: string): EventCursor {
   }
 }
 
-async function fetchEventRow(eventId: string): Promise<EventRow> {
+export async function fetchEventRow(eventId: string): Promise<EventRow> {
   const { data, error } = await supabaseAdmin
     .from('events')
     .select(
@@ -76,7 +76,7 @@ async function fetchEventRow(eventId: string): Promise<EventRow> {
   return data as EventRow;
 }
 
-async function assertEventOwner(event: EventRow, userId: string): Promise<void> {
+export async function assertEventOwner(event: EventRow, userId: string): Promise<void> {
   if (event.payer_id !== userId) {
     throw Errors.forbidden('You do not have permission to modify this event');
   }

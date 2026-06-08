@@ -26,3 +26,10 @@ export interface Participant {
   created_at: string;
   updated_at: string;
 }
+
+export interface ManualParticipantResponse {
+  id: string;
+  display_name: string;
+  join_method: JoinMethod;
+  payment_status: PaymentStatus;
+}

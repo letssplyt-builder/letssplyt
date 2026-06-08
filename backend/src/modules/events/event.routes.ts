@@ -8,6 +8,10 @@ import {
   handleRegenerateJoinToken,
   handleReopenEvent,
 } from './event.controller';
+import {
+  handleAddManualParticipant,
+  handleDeleteParticipant,
+} from './participant.controller';
 
 const router = Router();
 
@@ -16,6 +20,8 @@ router.use(authenticate);
 router.get('/', handleListEvents);
 router.post('/', handleCreateEvent);
 router.get('/:id', handleGetEvent);
+router.post('/:id/participants/manual', handleAddManualParticipant);
+router.delete('/:id/participants/:participantId', handleDeleteParticipant);
 router.post('/:id/lock', handleLockEvent);
 router.post('/:id/reopen', handleReopenEvent);
 router.post('/:id/join-token/regenerate', handleRegenerateJoinToken);

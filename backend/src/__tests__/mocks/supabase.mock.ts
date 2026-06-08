@@ -28,6 +28,7 @@ function createChainable(table: string): ChainableMock {
     neq: jest.fn<ChainMethod>().mockReturnThis(),
     in: jest.fn<ChainMethod>().mockReturnThis(),
     is: jest.fn<ChainMethod>().mockReturnThis(),
+    not: jest.fn<ChainMethod>().mockReturnThis(),
     order: jest.fn<ChainMethod>().mockReturnThis(),
     limit: jest.fn<ChainMethod>().mockReturnThis(),
     maybeSingle: jest
@@ -66,6 +67,7 @@ export interface ChainableMock {
   neq: jest.Mock<ChainMethod>;
   in: jest.Mock<ChainMethod>;
   is: jest.Mock<ChainMethod>;
+  not: jest.Mock<ChainMethod>;
   order: jest.Mock<ChainMethod>;
   limit: jest.Mock<ChainMethod>;
   maybeSingle: jest.Mock<() => MockResult>;
