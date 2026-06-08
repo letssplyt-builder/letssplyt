@@ -31,6 +31,8 @@ Actions marked **Critical Path** are the minimum required for the app to be usab
 | P05 | Edit / remove a payment handle | Update or delete an existing handle | People change Venmo accounts, close PayPal, switch providers. Profile must stay current or payment links break. **MVP** |
 | P06 | Edit display name or avatar | Update name shown to participants on split messages | Participants see the payer's name in their message ("Pay Rohan via..."). Must be correct and recognisable. **MVP** |
 
+> **Mobile auth UX:** P01 and P02 are separate product actions but share one UI path — **Get Started** → phone → OTP. The app always calls `POST /auth/otp/request` with `context: 'register'`; returning users are detected via `account_exists` and skip the name field. See docs/08-Mobile-App-Specification.md (*Unified phone auth*).
+
 ### Event & Group Creation
 
 | ID | Action | Description | Why This Exists |

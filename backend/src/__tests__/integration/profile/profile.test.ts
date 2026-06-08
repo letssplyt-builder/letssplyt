@@ -47,6 +47,7 @@ describe('Profile API integration', () => {
     jest.spyOn(security, 'decryptHandle').mockReturnValue('@myhandle');
 
     mockAuth();
+    mockSupabase.__pushMockResultForTable('user_payment_handles', { data: null, error: null });
     mockSupabase.__pushMockResultForTable('user_payment_handles', { data: [], error: null });
     mockSupabase.__pushMockResultForTable('user_payment_handles', {
       data: { id: 'handle-crud-1', provider: 'venmo', display_order: 0 },

@@ -53,6 +53,10 @@ describe('profile.service', () => {
       const encryptSpy = jest.spyOn(security, 'encryptHandle').mockReturnValue('iv:tag:cipher');
 
       mockSupabase.__pushMockResultForTable('user_payment_handles', {
+        data: null,
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('user_payment_handles', {
         data: [],
         error: null,
       });

@@ -31,8 +31,8 @@ function maskPhoneLastFour(phoneE164: string): string {
 }
 
 export function OTPVerifyScreen({ navigation, route }: Props) {
-  const { phoneE164, mode, accountExists = false } = route.params;
-  const isExistingAccount = accountExists || mode === 'login';
+  const { phoneE164, accountExists = false } = route.params;
+  const isExistingAccount = accountExists;
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -66,9 +66,9 @@ export function OTPVerifyScreen({ navigation, route }: Props) {
         const body: Record<string, string> = {
           phone_e164: phoneE164,
           code,
-          context: mode === 'login' ? 'login' : 'register',
+          context: 'register',
         };
-        if (mode === 'register' && displayName.trim()) {
+        if (!isExistingAccount && displayName.trim()) {
           body.display_name = displayName.trim();
         }
 
@@ -99,7 +99,7 @@ export function OTPVerifyScreen({ navigation, route }: Props) {
       clearDigits,
       digits,
       displayName,
-      mode,
+      isExistingAccount,
       phoneE164,
       setLoading,
     ],
@@ -137,7 +137,7 @@ export function OTPVerifyScreen({ navigation, route }: Props) {
     try {
       await apiPost('/auth/otp/request', {
         phone_e164: phoneE164,
-        context: mode === 'login' ? 'login' : 'register',
+        context: 'register',
       });
       setResendSeconds(RESEND_COOLDOWN_SECONDS);
       clearDigits();
@@ -193,7 +193,7 @@ export function OTPVerifyScreen({ navigation, route }: Props) {
         accessibilityRole="button"
         accessibilityLabel="Go back"
         onPress={() =>
-          navigation.navigate('PhoneEntry', { mode, initialPhone: phoneE164 })
+          navigation.navigate('PhoneEntry', { initialPhone: phoneE164 })
         }
         style={styles.backButton}
       >
@@ -211,7 +211,7 @@ export function OTPVerifyScreen({ navigation, route }: Props) {
           </Text>
         </FadeSlideIn>
 
-        {accountExists && mode === 'register' ? (
+        {accountExists ? (
           <FadeSlideIn delay={100} style={styles.infoWrap}>
             <View style={styles.infoBox}>
               <Text style={styles.infoText}>
@@ -221,7 +221,7 @@ export function OTPVerifyScreen({ navigation, route }: Props) {
           </FadeSlideIn>
         ) : null}
 
-        {mode === 'register' && !isExistingAccount ? (
+        {!isExistingAccount ? (
           <FadeSlideIn delay={100} style={styles.nameWrap}>
             <TextInput
               accessibilityLabel="Your name"

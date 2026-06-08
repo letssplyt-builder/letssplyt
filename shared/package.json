@@ -11,7 +11,8 @@
     "./participant.types": "./types/participant.types.ts",
     "./profile.types": "./types/profile.types.ts",
     "./receipt.types": "./types/receipt.types.ts",
-    "./settlement.types": "./types/settlement.types.ts"
+    "./settlement.types": "./types/settlement.types.ts",
+    "./paymentHandleValidation": "./utils/paymentHandleValidation.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

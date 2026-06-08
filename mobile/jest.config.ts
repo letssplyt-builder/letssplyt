@@ -7,6 +7,7 @@ const config: Config = {
     'node_modules/(?!(react-native|@react-native|expo|@expo|expo-modules-core|@unimodules|unimodules|sentry-expo|native-base|@react-navigation|react-navigation|react-native-phone-number-input|@letssplyt)/)',
   ],
   moduleNameMapper: {
+    '@letssplyt/shared/paymentHandleValidation': '<rootDir>/../shared/utils/paymentHandleValidation.ts',
     '@letssplyt/shared/(.*)': '<rootDir>/../shared/types/$1',
     '^expo-constants$': '<rootDir>/src/__tests__/mocks/expo-constants.ts',
     '^expo-linear-gradient$': '<rootDir>/src/__tests__/mocks/expo-linear-gradient.tsx',

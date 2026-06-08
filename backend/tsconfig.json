@@ -4,7 +4,8 @@
     "outDir": "dist",
     "baseUrl": ".",
     "paths": {
-      "@letssplyt/shared/*": ["../shared/types/*"]
+      "@letssplyt/shared/*": ["../shared/types/*"],
+      "@letssplyt/shared/paymentHandleValidation": ["../shared/utils/paymentHandleValidation.ts"]
     }
   },
   "include": ["src/**/*"]

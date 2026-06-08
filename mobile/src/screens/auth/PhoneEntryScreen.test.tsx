@@ -50,70 +50,46 @@ describe('PhoneEntryScreen', () => {
     mockApiPost.mockReset();
   });
 
-  it('shows register CTA when login send-code returns ACCOUNT_NOT_FOUND', async () => {
-    const { ApiRequestError: MockApiRequestError } = jest.requireMock('../../services/api') as {
-      ApiRequestError: typeof ApiRequestError;
-    };
-    mockApiPost.mockRejectedValue(
-      new MockApiRequestError('ACCOUNT_NOT_FOUND', 'No account found. Check number and try again.', 404),
+  it('renders unified phone entry copy', () => {
+    render(
+      <PhoneEntryScreen
+        navigation={navigation as never}
+        route={{ key: 'PhoneEntry', name: 'PhoneEntry', params: {} }}
+      />,
     );
+
+    expect(screen.getByText('Enter your\nphone number')).toBeTruthy();
+    expect(screen.getByText("We'll text you a\none-time code.")).toBeTruthy();
+    expect(screen.queryByText('Welcome back')).toBeNull();
+    expect(screen.queryByText('New account')).toBeNull();
+  });
+
+  it('always requests OTP with register context', async () => {
+    mockApiPost.mockResolvedValue({
+      sent: true,
+      channel: 'sms',
+      expires_in_seconds: 600,
+    });
 
     render(
       <PhoneEntryScreen
         navigation={navigation as never}
-        route={{
-          key: 'PhoneEntry',
-          name: 'PhoneEntry',
-          params: { mode: 'login' },
-        }}
+        route={{ key: 'PhoneEntry', name: 'PhoneEntry', params: {} }}
       />,
     );
 
-    fireEvent.changeText(screen.getByLabelText('Phone number'), '2025550100');
+    fireEvent.changeText(screen.getByLabelText('Phone number'), '5005550006');
     fireEvent.press(screen.getByText('Send Code'));
 
     await waitFor(() => {
-      expect(screen.getByText('No account found. Check number and try again.')).toBeTruthy();
-      expect(screen.getByText('New here?')).toBeTruthy();
-      expect(screen.getByText('Create an account')).toBeTruthy();
+      expect(mockApiPost).toHaveBeenCalledWith('/auth/otp/request', {
+        phone_e164: '+15005550006',
+        context: 'register',
+      });
     });
   });
 
-  it('navigates to register mode with initialPhone when Register CTA is pressed', async () => {
-    const { ApiRequestError: MockApiRequestError } = jest.requireMock('../../services/api') as {
-      ApiRequestError: typeof ApiRequestError;
-    };
-    mockApiPost.mockRejectedValue(
-      new MockApiRequestError('ACCOUNT_NOT_FOUND', 'No account found. Check number and try again.', 404),
-    );
-
-    render(
-      <PhoneEntryScreen
-        navigation={navigation as never}
-        route={{
-          key: 'PhoneEntry',
-          name: 'PhoneEntry',
-          params: { mode: 'login' },
-        }}
-      />,
-    );
-
-    fireEvent.changeText(screen.getByLabelText('Phone number'), '2025550100');
-    fireEvent.press(screen.getByText('Send Code'));
-
-    await waitFor(() => {
-      expect(screen.getByText('Create an account')).toBeTruthy();
-    });
-
-    fireEvent.press(screen.getByText('Create an account'));
-
-    expect(navigation.navigate).toHaveBeenCalledWith('PhoneEntry', {
-      mode: 'register',
-      initialPhone: '+12025550100',
-    });
-  });
-
-  it('navigates to OTP with accountExists when register send-code finds existing account', async () => {
+  it('navigates to OTP with accountExists when send-code finds existing account', async () => {
     mockApiPost.mockResolvedValue({
       sent: true,
       channel: 'sms',
@@ -124,11 +100,7 @@ describe('PhoneEntryScreen', () => {
     render(
       <PhoneEntryScreen
         navigation={navigation as never}
-        route={{
-          key: 'PhoneEntry',
-          name: 'PhoneEntry',
-          params: { mode: 'register' },
-        }}
+        route={{ key: 'PhoneEntry', name: 'PhoneEntry', params: {} }}
       />,
     );
 
@@ -138,9 +110,31 @@ describe('PhoneEntryScreen', () => {
     await waitFor(() => {
       expect(navigation.navigate).toHaveBeenCalledWith('OTPVerify', {
         phoneE164: '+15005550006',
-        mode: 'register',
         accountExists: true,
       });
+    });
+  });
+
+  it('shows inline error when send-code fails', async () => {
+    const { ApiRequestError: MockApiRequestError } = jest.requireMock('../../services/api') as {
+      ApiRequestError: typeof ApiRequestError;
+    };
+    mockApiPost.mockRejectedValue(
+      new MockApiRequestError('OTP_RATE_LIMITED', 'Too many attempts. Wait a minute and try again.', 429),
+    );
+
+    render(
+      <PhoneEntryScreen
+        navigation={navigation as never}
+        route={{ key: 'PhoneEntry', name: 'PhoneEntry', params: {} }}
+      />,
+    );
+
+    fireEvent.changeText(screen.getByLabelText('Phone number'), '5005550006');
+    fireEvent.press(screen.getByText('Send Code'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Too many attempts. Wait a minute and try again.')).toBeTruthy();
     });
   });
 });

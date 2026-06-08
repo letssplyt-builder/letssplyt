@@ -1260,8 +1260,8 @@ cd backend && doppler run -- npm run cleanup:phone -- +1XXXXXXXXXX
 **Prompt:**
 Read docs/08-Mobile-App-Specification.md for screen specs and the authStore spec. Build:
 
-1. `mobile/src/screens/auth/WelcomeScreen.tsx` — app logo/name, tagline, "Get Started" (register) and "I already have an account" (login) buttons
-2. `mobile/src/screens/auth/PhoneEntryScreen.tsx` — phone input with country code (+1 default), "Send Code" calls `POST /auth/otp/request` with `context: 'login' | 'register'`. **Login + unknown number:** show Register CTA (backend returns `ACCOUNT_NOT_FOUND` 404). **Register + existing number:** navigate to OTP with `accountExists: true`. Use `mobile/src/utils/phone.ts` (`toE164FromPhoneInput`, `nationalFromE164`) — never pass E.164 through libphonenumber twice (causes double-prefix `+1+1...`). Use `isApiRequestError()` / `getApiErrorCode()` from `api.ts` — **never `instanceof ApiRequestError`** (Metro breaks across module boundaries).
+1. `mobile/src/screens/auth/WelcomeScreen.tsx` — app logo/name, tagline, single **"Get Started"** CTA (unified phone auth — no separate login link; see docs/08-Mobile-App-Specification.md *Unified phone auth*)
+2. `mobile/src/screens/auth/PhoneEntryScreen.tsx` — phone input (US MVP), "Send Code" calls `POST /auth/otp/request` with `context: 'register'` always. **Existing number:** navigate to OTP with `accountExists: true`. **New number:** OTP shows name field. Use `mobile/src/utils/phone.ts` — never pass E.164 through libphonenumber twice. Use `isApiRequestError()` / `getApiErrorCode()` from `api.ts` — **never `instanceof ApiRequestError`** (Metro breaks across module boundaries).
 3. `mobile/src/store/authStore.ts` — Zustand store with:
    - State: `session: Session | null`, `user: User | null`, `isLoading: boolean`
    - Actions: `setSession(session)`, `clearSession()`, `setLoading(bool)`, `applyAuthResponse()`
@@ -1293,7 +1293,7 @@ cd mobile && npm test src/utils/phone.test.ts
 cd mobile && npm test src/store/authStore.test.ts
 ```
 
-**Expected output:** Register CTA on login+unknown number; register navigates with `accountExists`; duck-typed API errors work.
+**Expected output:** Unified flow navigates with `accountExists` for returning users; new users see name field on OTP; duck-typed API errors work.
 
 ---
 

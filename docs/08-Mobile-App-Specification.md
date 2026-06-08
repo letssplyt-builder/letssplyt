@@ -757,44 +757,55 @@ Implement using `@react-native-community/netinfo`. The banner is rendered at the
 #### WelcomeScreen (root of AuthStack)
 
 - App logo centred, "LetsSplyt" wordmark below
-- Tagline: "Split bills. No chasing. No drama."
-- Three value prop rows (icon + one-liner):
-  - 📸 Scan any receipt instantly
-  - 💸 Everyone pays their exact share
-  - 🔗 Guests pay without the app
-- Primary CTA: "Get Started →" → navigates to PhoneEntryScreen (registration mode)
-- Secondary link: "I already have an account" → PhoneEntryScreen (login mode)
+- Tagline: "Split Bills, Not Friendships"
+- Primary CTA: **"Get Started"** → navigates to PhoneEntryScreen
+- No secondary login link — phone OTP auth uses a **single unified flow** for new and returning users (see *Unified phone auth* below)
 - No back button (this is the root screen)
-- Pass `mode: 'register' | 'login'` as a route param to PhoneEntryScreen
 
-**Accessibility:** "Get Started" button: `accessibilityRole="button"`, `accessibilityLabel="Get started with LetsSplyt"`. Value prop rows: `accessibilityRole="text"`.
+**Accessibility:** "Get Started" button: `accessibilityRole="button"`, `accessibilityLabel="Get started with LetsSplyt"`.
 
 ---
 
-#### PhoneEntryScreen (route param: `mode: 'register' | 'login'`)
+#### Unified phone auth (mobile app)
 
-- Input: phone number with country code picker (`react-native-phone-number-input`)
-- CTA: "Continue →"
-- On submit: POST `/auth/otp/request` → navigate to OTPVerifyScreen
-- No back button (this is the root)
+LetsSplyt does **not** split "Sign up" vs "Log in" in the UI. The phone number is the identity:
 
-**Error state:** If the POST fails, show an inline error message below the input: "Couldn't send code. Check your number and try again." with a retry button. If the network is down, show: "No connection. Connect to the internet and try again."
+1. User taps **Get Started** → enters phone → `POST /auth/otp/request` with `context: 'register'`
+2. Backend returns `account_exists: true` when the number already has a profile
+3. **Returning user:** OTP screen shows "You're already registered — just enter the code to sign in." No name field. Verify with `context: 'register'` → session created, `is_new_user: false`
+4. **New user:** OTP screen shows name field. Verify with `context: 'register'` + `display_name` → account created, `is_new_user: true`
 
-**Accessibility:** Phone input: `accessibilityLabel="Phone number"`, `accessibilityHint="Enter your phone number including country code"`. Continue button: `accessibilityRole="button"`.
+The backend still supports `context: 'login'` for other entry points (e.g. web join); the mobile Welcome → Phone → OTP path always uses `register`.
+
+---
+
+#### PhoneEntryScreen
+
+- Title: "Enter your phone number"
+- Input: US phone field (`RegionPhoneField`, MVP US-only)
+- CTA: "Send Code"
+- On submit: `POST /auth/otp/request` with `context: 'register'` → navigate to OTPVerifyScreen with `accountExists` when applicable
+- Optional route param: `initialPhone` (E.164) to pre-fill after errors elsewhere
+
+**Error state:** Inline error below the input. Network errors use the shared API error copy.
+
+**Accessibility:** Phone input: `accessibilityLabel="Phone number"`. Send Code button: `accessibilityRole="button"`.
 
 ---
 
 #### OTPVerifyScreen
 
 - Shows last 4 digits of phone number at top
+- If `accountExists === true`: info banner — "You're already registered — just enter the code to sign in." (no name field)
+- If new user (`accountExists` false/absent): name `TextInput` before digit boxes
 - 6 `TextInput` boxes side by side (one digit each), auto-focus, auto-advance
-- "Resend code" link (disabled for 60 seconds after initial send, shows countdown)
-- On complete entry (6 digits filled): auto-submit `POST /api/v1/auth/otp/verify` (backend endpoint — NOT supabase.auth.verifyOtp())
-  - Request body: `{ phone, code }`
-  - Response: `{ access_token, refresh_token, user: { id, display_name, avatar_colour }, is_new_user: boolean }`
+- "Resend code" link (disabled for 30 seconds after initial send, shows countdown); resend uses `context: 'register'`
+- On complete entry (6 digits filled): auto-submit `POST /api/v1/auth/otp/verify` with `context: 'register'` (backend endpoint — NOT supabase.auth.verifyOtp())
+  - Request body: `{ phone_e164, code, context: 'register', display_name? }`
+  - Response: `{ access_token, refresh_token, user: { id, display_name, avatar_colour, is_new_user }, ... }`
   - Store tokens in expo-secure-store; set authStore.user
-- On success (first login, `is_new_user === true`): navigate to PushPermissionScreen
-- On success (subsequent login, `is_new_user === false`): biometric prompt first (see Section 7), then navigate to MainTabs
+- On success (`is_new_user === true`): navigate to PushPermissionScreen
+- On success (`is_new_user === false`): navigate to Home (biometric prompt deferred)
 - Back button → PhoneEntryScreen
 
 **Error state:** If OTP is incorrect, show red text below the input boxes: "Incorrect code. Try again." and clear all boxes. If expired: "That code has expired. Tap Resend to get a new one."

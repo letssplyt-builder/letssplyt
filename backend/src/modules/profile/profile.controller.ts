@@ -6,6 +6,9 @@ import {
   deleteHandle,
   getHandles,
   getMe,
+  registerPushToken,
+  reorderHandles,
+  updateHandle,
   updateMe,
 } from './profile.service';
 
@@ -17,6 +20,20 @@ const patchMeSchema = z.object({
 
 const createHandleSchema = z.object({
   provider: z.enum(PAYMENT_PROVIDERS),
+  handle_value: z.string().min(1).max(100),
+});
+
+const pushTokenSchema = z.object({
+  device_id: z.string().min(1).max(200),
+  token: z.string().min(1).max(200),
+  platform: z.enum(['ios', 'android']),
+});
+
+const reorderHandlesSchema = z.object({
+  orderedIds: z.array(z.string().uuid()).min(1),
+});
+
+const updateHandleSchema = z.object({
   handle_value: z.string().min(1).max(100),
 });
 
@@ -101,6 +118,77 @@ export async function handleCreateHandle(
       parsed.data.handle_value,
     );
     res.status(201).json(handle);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handlePostPushToken(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const parsed = pushTokenSchema.safeParse(req.body);
+    if (!parsed.success) {
+      validationError(res, parsed.error.issues);
+      return;
+    }
+
+    await registerPushToken(
+      req.user!.id,
+      extractJwt(req),
+      parsed.data.device_id,
+      parsed.data.token,
+      parsed.data.platform,
+    );
+    res.status(200).json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleReorderHandles(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const parsed = reorderHandlesSchema.safeParse(req.body);
+    if (!parsed.success) {
+      validationError(res, parsed.error.issues);
+      return;
+    }
+
+    await reorderHandles(req.user!.id, parsed.data.orderedIds);
+    res.status(200).json({ ok: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleUpdateHandle(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const handleId = req.params.id;
+    if (!handleId) {
+      res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'Handle id is required' },
+      });
+      return;
+    }
+
+    const parsed = updateHandleSchema.safeParse(req.body);
+    if (!parsed.success) {
+      validationError(res, parsed.error.issues);
+      return;
+    }
+
+    const handle = await updateHandle(req.user!.id, handleId, parsed.data.handle_value);
+    res.status(200).json(handle);
   } catch (err) {
     next(err);
   }

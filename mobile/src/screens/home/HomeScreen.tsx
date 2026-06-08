@@ -1,11 +1,15 @@
 import { useState } from 'react';
+import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import type { RootStackParamList } from '../../navigation/types';
 import { useAuthStore } from '../../store/authStore';
 import { colors } from '../../theme/colors';
 
-export function HomeScreen() {
+type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
+
+export function HomeScreen({ navigation }: Props) {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -26,6 +30,15 @@ export function HomeScreen() {
       <View style={styles.container}>
         <Text style={styles.greeting}>Welcome{user ? `, ${user.display_name}` : ''}</Text>
         <Text style={styles.subtitle}>Home screen — built in E05-S03</Text>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open profile"
+          onPress={() => navigation.navigate('Profile')}
+          style={({ pressed }) => [styles.profileButton, pressed && styles.profileButtonPressed]}
+        >
+          <Text style={styles.profileText}>Profile</Text>
+        </Pressable>
 
         <Pressable
           accessibilityRole="button"
@@ -66,7 +79,22 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textMuted,
     textAlign: 'center',
-    marginBottom: 32,
+    marginBottom: 24,
+  },
+  profileButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    marginBottom: 16,
+  },
+  profileButtonPressed: {
+    opacity: 0.9,
+  },
+  profileText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   logoutButton: {
     paddingHorizontal: 20,

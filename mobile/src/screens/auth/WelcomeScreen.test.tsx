@@ -3,7 +3,7 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import { WelcomeScreen } from './WelcomeScreen';
 
 describe('WelcomeScreen', () => {
-  it('renders with Get Started button', () => {
+  it('renders with Get Started button only', () => {
     render(
       <WelcomeScreen
         navigation={{ navigate: jest.fn() } as never}
@@ -13,9 +13,10 @@ describe('WelcomeScreen', () => {
     expect(screen.getByText('LetsSplyt')).toBeTruthy();
     expect(screen.getByText('Split Bills, Not Friendships')).toBeTruthy();
     expect(screen.getByText('Get Started')).toBeTruthy();
+    expect(screen.queryByText('I already have an account')).toBeNull();
   });
 
-  it('navigates to PhoneEntry in register mode when Get Started is pressed', () => {
+  it('navigates to PhoneEntry when Get Started is pressed', () => {
     const navigate = jest.fn();
     render(
       <WelcomeScreen
@@ -25,6 +26,6 @@ describe('WelcomeScreen', () => {
     );
 
     fireEvent.press(screen.getByText('Get Started'));
-    expect(navigate).toHaveBeenCalledWith('PhoneEntry', { mode: 'register' });
+    expect(navigate).toHaveBeenCalledWith('PhoneEntry', {});
   });
 });

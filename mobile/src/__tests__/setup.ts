@@ -26,9 +26,26 @@ jest.mock('expo-local-authentication', () => ({
 
 jest.mock('expo-notifications', () => ({
   requestPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+  getPermissionsAsync: jest.fn().mockResolvedValue({ status: 'undetermined' }),
   getExpoPushTokenAsync: jest.fn().mockResolvedValue({ data: 'ExponentPushToken[test]' }),
   setNotificationHandler: jest.fn(),
 }));
+
+jest.mock('expo-device', () => ({
+  modelId: 'test-device-id',
+  osBuildId: 'test-build-id',
+  osName: 'iOS',
+}));
+
+jest.mock('react-native-draggable-flatlist', () => {
+  const React = require('react');
+  const { FlatList } = require('react-native');
+  return {
+    __esModule: true,
+    default: (props: Record<string, unknown>) => React.createElement(FlatList, props),
+    ScaleDecorator: ({ children }: { children: React.ReactNode }) => children,
+  };
+});
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn(() => Promise.resolve(null)),

@@ -14,7 +14,7 @@ import {
 
 describe('authStore', () => {
   beforeEach(() => {
-    useAuthStore.setState({ session: null, user: null, isLoading: false });
+    useAuthStore.setState({ session: null, user: null, isLoading: false, needsPushPermission: false });
     jest.clearAllMocks();
   });
 
@@ -140,8 +140,25 @@ describe('authStore', () => {
       display_name: 'Sam',
       avatar_colour: '#7C3AED',
     });
+    expect(useAuthStore.getState().needsPushPermission).toBe(true);
     expect(useAuthStore.getState().session?.access_token).toBe('access-1');
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY, 'access-1');
+  });
+
+  it('applyAuthResponse clears push permission prompt for returning users', async () => {
+    await useAuthStore.getState().applyAuthResponse({
+      access_token: 'access-2',
+      refresh_token: 'refresh-2',
+      expires_in: 3600,
+      user: {
+        id: 'user-2',
+        display_name: 'Pat',
+        avatar_colour: '#4F46E5',
+        is_new_user: false,
+      },
+    });
+
+    expect(useAuthStore.getState().needsPushPermission).toBe(false);
   });
 
   it('initAuthListener wires TOKEN_REFRESHED to setSession', async () => {

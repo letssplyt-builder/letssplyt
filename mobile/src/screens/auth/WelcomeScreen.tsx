@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { FadeSlideIn } from '../../components/auth/FadeSlideIn';
 import { PrimaryButton } from '../../components/PrimaryButton';
@@ -14,21 +14,12 @@ export function WelcomeScreen({ navigation }: Props) {
       contentStyle={styles.content}
       footer={
         <FadeSlideIn delay={280}>
-          <View style={styles.actions}>
-            <PrimaryButton
-              accessibilityLabel="Get started with LetsSplyt"
-              label="Get Started"
-              variant="inverse"
-              onPress={() => navigation.navigate('PhoneEntry', { mode: 'register' })}
-            />
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => navigation.navigate('PhoneEntry', { mode: 'login' })}
-              style={styles.secondaryLink}
-            >
-              <Text style={styles.secondaryText}>I already have an account</Text>
-            </Pressable>
-          </View>
+          <PrimaryButton
+            accessibilityLabel="Get started with LetsSplyt"
+            label="Get Started"
+            variant="inverse"
+            onPress={() => navigation.navigate('PhoneEntry', {})}
+          />
         </FadeSlideIn>
       }
     >
@@ -81,18 +72,5 @@ const styles = StyleSheet.create({
     color: authColors.textOnDarkMuted,
     textAlign: 'center',
     lineHeight: 22,
-  },
-  actions: {
-    gap: 14,
-    width: '100%',
-  },
-  secondaryLink: {
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  secondaryText: {
-    fontSize: 15,
-    color: authColors.textOnDark,
-    fontWeight: '600',
   },
 });

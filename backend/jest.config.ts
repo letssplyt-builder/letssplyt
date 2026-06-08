@@ -22,6 +22,8 @@ const config: Config = {
   coverageReporters: ['text', 'lcov', 'html'],
   setupFilesAfterEnv: ['./src/__tests__/setup.ts'],
   moduleNameMapper: {
+    '@letssplyt/shared/paymentHandleValidation':
+      '<rootDir>/../shared/utils/paymentHandleValidation.ts',
     '@letssplyt/shared/(.*)': '<rootDir>/../shared/types/$1',
   },
 };

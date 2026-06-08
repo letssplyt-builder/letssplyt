@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
 **Last updated:** 2026-06-08
-**Current story:** E04-S02 — Profile Mobile Screens (ProfileScreen, AddHandleScreen)
+**Current story:** E05-S01 — Event CRUD API
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -32,7 +32,7 @@
 
 ### Epic 4: Profile & Payment Handles
 - [x] E04-S01 — Profile API Endpoints (GET/PATCH /users/me, CRUD /handles) (2026-06-08)
-- [ ] E04-S02 — Profile Mobile Screens (ProfileScreen, AddHandleScreen)
+- [x] E04-S02 — Profile Mobile Screens (ProfileScreen, AddHandleScreen) (2026-06-08)
 
 ---
 

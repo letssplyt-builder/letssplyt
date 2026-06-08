@@ -1,12 +1,20 @@
+import type { PaymentProvider } from '@letssplyt/shared/profile.types';
+
 export type RootStackParamList = {
   Welcome: undefined;
-  PhoneEntry: { mode: 'register' | 'login'; initialPhone?: string };
+  PhoneEntry: { initialPhone?: string };
   OTPVerify: {
     phoneE164: string;
-    mode: 'register' | 'login';
     accountExists?: boolean;
   };
+  PushPermission: undefined;
   Home: undefined;
+  Profile: { toastMessage?: string } | undefined;
+  AddHandle: {
+    handleId?: string;
+    provider?: PaymentProvider;
+    handleValue?: string;
+  };
 };
 
 /** @deprecated Use RootStackParamList */

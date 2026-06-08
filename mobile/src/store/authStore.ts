@@ -17,11 +17,13 @@ interface AuthState {
   session: Session | null;
   user: AppUser | null;
   isLoading: boolean;
+  needsPushPermission: boolean;
   setSession: (session: Session | null) => Promise<void>;
   applyAuthResponse: (auth: AuthSession) => Promise<void>;
   restoreFromSecureStore: () => Promise<void>;
   clearSession: () => Promise<void>;
   logout: () => Promise<void>;
+  dismissPushPermission: () => void;
   setLoading: (loading: boolean) => void;
   initAuthListener: () => { unsubscribe: () => void };
 }
@@ -66,6 +68,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   session: null,
   user: null,
   isLoading: false,
+  needsPushPermission: false,
 
   setSession: async (session) => {
     if (session?.access_token) {
@@ -80,6 +83,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set((state) => ({
       session,
       user: session ? state.user : null,
+      needsPushPermission: session ? state.needsPushPermission : false,
     }));
   },
 
@@ -94,8 +98,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     };
     const localSession = buildLocalSession(auth);
 
-    // Commit session immediately so navigation can switch to Home.
-    set({ session: localSession, user: appUser });
+    // Commit session immediately so navigation can switch stacks.
+    set({
+      session: localSession,
+      user: appUser,
+      needsPushPermission: auth.user.is_new_user,
+    });
 
     const supabase = getSupabase();
     if (!supabase) return;
@@ -145,8 +153,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   clearSession: async () => {
     await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
     await SecureStore.deleteItemAsync(AUTH_REFRESH_TOKEN_KEY);
-    set({ session: null, user: null });
+    set({ session: null, user: null, needsPushPermission: false });
   },
+
+  dismissPushPermission: () => set({ needsPushPermission: false }),
 
   logout: async () => {
     const supabase = getSupabase();

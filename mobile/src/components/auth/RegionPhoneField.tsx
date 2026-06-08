@@ -24,7 +24,6 @@ export function RegionPhoneField({
   const showRegionPicker = SUPPORTED_AUTH_REGIONS.length > 1 && onRegionChange;
   const [focused, setFocused] = useState(false);
   const focusAnim = useRef(new Animated.Value(0)).current;
-  const breathe = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.timing(focusAnim, {
@@ -34,30 +33,14 @@ export function RegionPhoneField({
     }).start();
   }, [focused, focusAnim]);
 
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(breathe, { toValue: 1, duration: 2400, useNativeDriver: true }),
-        Animated.timing(breathe, { toValue: 0, duration: 2400, useNativeDriver: true }),
-      ]),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [breathe]);
-
-  const cardScale = breathe.interpolate({
-    inputRange: [0, 1],
-    outputRange: [1, 1.008],
-  });
-
   const borderColor = focusAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [authColors.glassBorder, 'rgba(255, 255, 255, 0.55)'],
+    outputRange: [authColors.glassBorder, 'rgba(255, 255, 255, 0.5)'],
   });
 
   const cardBg = focusAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [authColors.glassStrong, 'rgba(255, 255, 255, 0.2)'],
+    outputRange: [authColors.glass, 'rgba(255, 255, 255, 0.14)'],
   });
 
   return (
@@ -87,38 +70,35 @@ export function RegionPhoneField({
       ) : (
         <View style={styles.regionBadge}>
           <Text style={styles.regionBadgeFlag}>{meta.flag}</Text>
-          <Text style={styles.regionBadgeText}>United States · {meta.dial}</Text>
+          <Text style={styles.regionBadgeText}>US {meta.dial}</Text>
         </View>
       )}
 
-      {/* Outer: transform (native driver). Inner: colors (JS driver). Never mix on one node. */}
-      <Animated.View style={{ transform: [{ scale: cardScale }] }}>
-        <Animated.View
-          style={[
-            styles.inputCard,
-            {
-              borderColor,
-              backgroundColor: cardBg,
-            },
-          ]}
-        >
-          <Text style={styles.dialCode}>{meta.dial}</Text>
-          <View style={styles.divider} />
-          <TextInput
-            accessibilityLabel="Phone number"
-            accessibilityHint={`Enter your ${meta.label} mobile number`}
-            keyboardType="phone-pad"
-            placeholder={meta.placeholder}
-            placeholderTextColor={authColors.textOnDarkFaint}
-            value={value}
-            onChangeText={(text) => onChangeText(text.replace(/[^\d\s()-]/g, ''))}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            style={styles.input}
-            autoFocus
-            maxLength={16}
-          />
-        </Animated.View>
+      <Animated.View
+        style={[
+          styles.inputCard,
+          {
+            borderColor,
+            backgroundColor: cardBg,
+          },
+        ]}
+      >
+        <Text style={styles.dialCode}>{meta.dial}</Text>
+        <View style={styles.divider} />
+        <TextInput
+          accessibilityLabel="Phone number"
+          accessibilityHint={`Enter your ${meta.label} mobile number`}
+          keyboardType="phone-pad"
+          placeholder="555 000 0000"
+          placeholderTextColor="rgba(255, 255, 255, 0.38)"
+          value={value}
+          onChangeText={(text) => onChangeText(text.replace(/[^\d\s()-]/g, ''))}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          style={styles.input}
+          autoFocus
+          maxLength={16}
+        />
       </Animated.View>
     </View>
   );
@@ -127,29 +107,29 @@ export function RegionPhoneField({
 const styles = StyleSheet.create({
   wrap: {
     width: '100%',
-    gap: 16,
+    gap: 12,
   },
   regionBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 6,
     alignSelf: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 100,
     backgroundColor: authColors.pillOnDark,
     borderWidth: 1,
     borderColor: authColors.glassBorder,
   },
   regionBadgeFlag: {
-    fontSize: 16,
+    fontSize: 14,
   },
   regionBadgeText: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: authColors.textOnDarkMuted,
-    letterSpacing: 0.2,
+    letterSpacing: 0.3,
   },
   segmentRow: {
     flexDirection: 'row',
@@ -161,8 +141,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 14,
-    borderRadius: 16,
+    paddingVertical: 12,
+    borderRadius: 14,
     backgroundColor: authColors.segmentInactive,
     borderWidth: 1,
     borderColor: authColors.glassBorder,
@@ -172,10 +152,10 @@ const styles = StyleSheet.create({
     borderColor: authColors.segmentActive,
   },
   segmentFlag: {
-    fontSize: 18,
+    fontSize: 16,
   },
   segmentLabel: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
     color: authColors.segmentInactiveText,
   },
@@ -185,29 +165,31 @@ const styles = StyleSheet.create({
   inputCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    minHeight: 88,
-    paddingHorizontal: 22,
-    borderRadius: 24,
-    borderWidth: 1,
+    minHeight: 54,
+    paddingHorizontal: 16,
+    borderRadius: 16,
+    borderWidth: 1.5,
   },
   dialCode: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: authColors.textOnDark,
-    letterSpacing: -0.5,
+    fontSize: 17,
+    fontWeight: '600',
+    color: authColors.textOnDarkMuted,
+    letterSpacing: 0.2,
+    minWidth: 28,
   },
   divider: {
     width: 1,
-    height: 40,
+    height: 22,
     backgroundColor: authColors.glassBorder,
-    marginHorizontal: 18,
+    marginHorizontal: 12,
   },
   input: {
     flex: 1,
-    fontSize: 32,
-    fontWeight: '600',
+    fontSize: 18,
+    fontWeight: '500',
     color: authColors.textOnDark,
-    letterSpacing: 0.5,
-    paddingVertical: 8,
+    letterSpacing: 0.4,
+    paddingVertical: 0,
+    minHeight: 24,
   },
 });

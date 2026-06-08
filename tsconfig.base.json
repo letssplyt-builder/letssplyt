@@ -10,7 +10,8 @@
     "declarationMap": true,
     "sourceMap": true,
     "paths": {
-      "@letssplyt/shared/*": ["./shared/types/*"]
+      "@letssplyt/shared/*": ["./shared/types/*"],
+      "@letssplyt/shared/paymentHandleValidation": ["./shared/utils/paymentHandleValidation.ts"]
     }
   }
 }

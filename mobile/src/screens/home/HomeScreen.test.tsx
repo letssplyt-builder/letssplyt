@@ -6,6 +6,7 @@ import { useAuthStore } from '../../store/authStore';
 describe('HomeScreen', () => {
   beforeEach(() => {
     useAuthStore.setState({
+      needsPushPermission: false,
       session: {
         access_token: 'token',
         refresh_token: 'refresh',
@@ -25,15 +26,17 @@ describe('HomeScreen', () => {
     jest.clearAllMocks();
   });
 
+  const navigation = { navigate: jest.fn() } as never;
+
   it('shows welcome message with display name', () => {
-    render(<HomeScreen />);
+    render(<HomeScreen navigation={navigation} route={{ key: 'Home', name: 'Home' } as never} />);
     expect(screen.getByText('Welcome, Alex')).toBeTruthy();
   });
 
   it('logs out when Log out is pressed', async () => {
     const logoutSpy = jest.spyOn(useAuthStore.getState(), 'logout').mockResolvedValue();
 
-    render(<HomeScreen />);
+    render(<HomeScreen navigation={navigation} route={{ key: 'Home', name: 'Home' } as never} />);
     fireEvent.press(screen.getByLabelText('Log out'));
 
     await waitFor(() => {

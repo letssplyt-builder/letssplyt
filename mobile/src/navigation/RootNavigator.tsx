@@ -5,6 +5,9 @@ import { OTPVerifyScreen } from '../screens/auth/OTPVerifyScreen';
 import { PhoneEntryScreen } from '../screens/auth/PhoneEntryScreen';
 import { WelcomeScreen } from '../screens/auth/WelcomeScreen';
 import { HomeScreen } from '../screens/home/HomeScreen';
+import { AddHandleScreen } from '../screens/profile/AddHandleScreen';
+import { ProfileScreen } from '../screens/profile/ProfileScreen';
+import { PushPermissionScreen } from '../screens/profile/PushPermissionScreen';
 import { useAuthStore } from '../store/authStore';
 import type { RootStackParamList } from './types';
 
@@ -12,6 +15,7 @@ const RootStack = createNativeStackNavigator<RootStackParamList>();
 
 export function RootNavigator() {
   const session = useAuthStore((state) => state.session);
+  const needsPushPermission = useAuthStore((state) => state.needsPushPermission);
   const initAuthListener = useAuthStore((state) => state.initAuthListener);
   const restoreFromSecureStore = useAuthStore((state) => state.restoreFromSecureStore);
 
@@ -35,10 +39,17 @@ export function RootNavigator() {
           animation: 'fade',
           animationDuration: 280,
         }}
-        initialRouteName={isAuthenticated ? 'Home' : 'Welcome'}
+        initialRouteName={
+          isAuthenticated ? (needsPushPermission ? 'PushPermission' : 'Home') : 'Welcome'
+        }
       >
         {isAuthenticated ? (
-          <RootStack.Screen name="Home" component={HomeScreen} />
+          <>
+            <RootStack.Screen name="PushPermission" component={PushPermissionScreen} />
+            <RootStack.Screen name="Home" component={HomeScreen} />
+            <RootStack.Screen name="Profile" component={ProfileScreen} />
+            <RootStack.Screen name="AddHandle" component={AddHandleScreen} />
+          </>
         ) : (
           <>
             <RootStack.Screen name="Welcome" component={WelcomeScreen} />

@@ -62,7 +62,7 @@ describe('OTPVerifyScreen', () => {
         route={{
           key: 'OTPVerify',
           name: 'OTPVerify',
-          params: { phoneE164: '+15551234567', mode: 'login' },
+          params: { phoneE164: '+15551234567' },
         }}
       />,
     );
@@ -79,7 +79,7 @@ describe('OTPVerifyScreen', () => {
         route={{
           key: 'OTPVerify',
           name: 'OTPVerify',
-          params: { phoneE164: '+15551234567', mode: 'login' },
+          params: { phoneE164: '+15551234567' },
         }}
       />,
     );
@@ -106,7 +106,7 @@ describe('OTPVerifyScreen', () => {
         route={{
           key: 'OTPVerify',
           name: 'OTPVerify',
-          params: { phoneE164: '+15551234567', mode: 'login' },
+          params: { phoneE164: '+15551234567', accountExists: true },
         }}
       />,
     );
@@ -119,7 +119,7 @@ describe('OTPVerifyScreen', () => {
       expect(mockApiPost).toHaveBeenCalledWith('/auth/otp/verify', {
         phone_e164: '+15551234567',
         code: '123456',
-        context: 'login',
+        context: 'register',
       });
     });
 
@@ -143,7 +143,7 @@ describe('OTPVerifyScreen', () => {
         route={{
           key: 'OTPVerify',
           name: 'OTPVerify',
-          params: { phoneE164: '+15551234567', mode: 'login' },
+          params: { phoneE164: '+15551234567' },
         }}
       />,
     );
@@ -177,7 +177,7 @@ describe('OTPVerifyScreen', () => {
         route={{
           key: 'OTPVerify',
           name: 'OTPVerify',
-          params: { phoneE164: '+15005550006', mode: 'register' },
+          params: { phoneE164: '+15005550006', accountExists: true },
         }}
       />,
     );
@@ -195,14 +195,14 @@ describe('OTPVerifyScreen', () => {
     });
   });
 
-  it('hides name field and shows already-registered banner for existing register flow', () => {
+  it('hides name field and shows already-registered banner for existing users', () => {
     render(
       <OTPVerifyScreen
         navigation={navigation as never}
         route={{
           key: 'OTPVerify',
           name: 'OTPVerify',
-          params: { phoneE164: '+15005550006', mode: 'register', accountExists: true },
+          params: { phoneE164: '+15005550006', accountExists: true },
         }}
       />,
     );
@@ -213,16 +213,12 @@ describe('OTPVerifyScreen', () => {
     expect(screen.queryByLabelText('Your name')).toBeNull();
   });
 
-  it('shows account-not-found message on login for unknown numbers', async () => {
+  it('shows name-required message for new users who verify without a name', async () => {
     const { ApiRequestError: MockApiRequestError } = jest.requireMock('../../services/api') as {
       ApiRequestError: typeof ApiRequestError;
     };
     mockApiPost.mockRejectedValue(
-      new MockApiRequestError(
-        'ACCOUNT_NOT_FOUND',
-        'No account found. Check number and try again.',
-        404,
-      ),
+      new MockApiRequestError('NAME_REQUIRED', 'display_name is required for new users', 400),
     );
 
     render(
@@ -231,7 +227,7 @@ describe('OTPVerifyScreen', () => {
         route={{
           key: 'OTPVerify',
           name: 'OTPVerify',
-          params: { phoneE164: '+15559999999', mode: 'login' },
+          params: { phoneE164: '+15559999999' },
         }}
       />,
     );
@@ -241,9 +237,7 @@ describe('OTPVerifyScreen', () => {
     }
 
     await waitFor(() => {
-      expect(
-        screen.getByText('No account found. Check number and try again.'),
-      ).toBeTruthy();
+      expect(screen.getByText('Enter your name to create an account.')).toBeTruthy();
     });
   });
 });
