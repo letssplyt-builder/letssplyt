@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
 **Last updated:** June 2026
-**Current story:** E01-S01 — Not started yet
+**Current story:** E01-S05 — Test Infrastructure Setup
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -11,22 +11,22 @@
 ## TIER 1 — Foundation
 
 ### Epic 1: Infrastructure & Security
-- [ ] E01-S01 — Monorepo Scaffold + TypeScript Config
-- [ ] E01-S02 — Express Application + All Middleware
-- [ ] E01-S03 — Supabase Client Singletons
-- [ ] E01-S04 — LLM Provider Factory
+- [x] E01-S01 — Monorepo Scaffold + TypeScript Config (2026-06-07)
+- [x] E01-S02 — Express Application + All Middleware (2026-06-07)
+- [x] E01-S03 — Supabase Client Singletons (2026-06-07)
+- [x] E01-S04 — LLM Provider Factory (2026-06-07)
 - [ ] E01-S05 — Test Infrastructure Setup
 - [ ] E01-S06 — Security Utilities (encrypt, hashPhone, sanitizePromptInput, formatCurrency, getCurrencyMinorUnits)
 
 ### Epic 2: Database Schema & RLS
-- [ ] E02-S01 — Core Tables + Indexes
-- [ ] E02-S02 — Triggers + Functions
-- [ ] E02-S03 — RLS Policies
-- [ ] E02-S04 — Seed Data
+- [x] E02-S01 — Core Tables + Indexes (2026-06-07)
+- [x] E02-S02 — Triggers + Functions (2026-06-07)
+- [x] E02-S03 — RLS Policies (2026-06-07)
+- [x] E02-S04 — Seed Data (2026-06-07)
 
 ### Epic 3: Authentication
-- [ ] E03-S01 — OTP Request Endpoint (POST /auth/otp/request)
-- [ ] E03-S02 — OTP Verify + Session Creation (POST /auth/otp/verify)
+- [x] E03-S01 — OTP Request Endpoint (POST /auth/otp/request) (2026-06-07)
+- [x] E03-S02 — OTP Verify + Session Creation (POST /auth/otp/verify) (2026-06-07)
 - [ ] E03-S03 — Welcome + PhoneEntry Screens + authStore
 - [ ] E03-S04 — OTPVerify Screen + initAuthListener + Token Refresh
 
@@ -94,13 +94,14 @@
 
 | Tier | Epics | Stories | Done | Remaining |
 |---|---|---|---|---|
-| Tier 1 — Foundation | 4 | 16 | 0 | 16 |
+| Tier 1 — Foundation | 4 | 16 | 4 | 12 |
 | Tier 2 — Core Flow | 5 | 22 | 0 | 22 |
 | Tier 3 — Operations | 3 | 8 | 0 | 8 |
-| **Total** | **12** | **46** | **0** | **46** |
+| **Total** | **12** | **46** | **10** | **36** |
 
 ---
 
 ## Notes
 <!-- AI: add session notes here when useful -->
 <!-- Format: [Date] — [Story ID] — [What was built] — [Any decisions made] -->
+- [2026-06-07] — E01-S01–E03-S02 — Monorepo scaffold, full DB migration+seed, Express middleware, Supabase clients, LLM factory, OTP auth endpoints. Session creation via Admin REST API (`/auth/v1/admin/users/{id}/sessions`) because `createSession()` is not in @supabase/supabase-js@2.49. Mobile bumped to Expo SDK 52 for React Navigation v7 compat.
