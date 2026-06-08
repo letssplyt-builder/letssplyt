@@ -1,0 +1,3 @@
+# Test fixtures — fake credentials in Jest setup only
+backend/src/__tests__/setup\.ts:.*SUPABASE_SECRET_KEY.*test-service-role-key
+backend/src/__tests__/setup\.ts:.*TWILIO_AUTH_TOKEN.*test-auth-token

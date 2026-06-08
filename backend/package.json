@@ -9,7 +9,12 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
-    "test": "jest --passWithNoTests"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:unit": "jest --testPathPattern=unit",
+    "test:integration": "jest --testPathPattern=integration",
+    "test:rls": "jest --testPathPattern=rls"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",
