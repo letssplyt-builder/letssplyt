@@ -3,6 +3,10 @@ import type { Session } from '@supabase/supabase-js';
 
 export const mockAuthStateCallback = jest.fn();
 export const mockUnsubscribe = jest.fn();
+export const mockChannelSubscribe = jest.fn();
+export const mockChannelUnsubscribe = jest.fn();
+export const mockRemoveChannel = jest.fn();
+export const mockChannelOn = jest.fn();
 
 const defaultSession: Session = {
   access_token: 'refreshed-access-token',
@@ -33,6 +37,23 @@ export const mockOnAuthStateChange = jest.fn((callback: (event: string, session:
   return { data: { subscription: { unsubscribe: mockUnsubscribe } } };
 });
 
+function createChannelMock() {
+  const channel = {
+    on: (...args: unknown[]) => {
+      mockChannelOn(...args);
+      return channel;
+    },
+    subscribe: () => {
+      mockChannelSubscribe();
+      return channel;
+    },
+    unsubscribe: mockChannelUnsubscribe,
+  };
+  return channel;
+}
+
+export const mockChannel = jest.fn(() => createChannelMock());
+
 export const supabaseMock = {
   auth: {
     onAuthStateChange: mockOnAuthStateChange,
@@ -40,4 +61,7 @@ export const supabaseMock = {
     getSession: mockGetSession,
     signOut: mockSignOut,
   },
+  channel: mockChannel,
+  removeChannel: mockRemoveChannel,
+  getChannels: jest.fn(() => []),
 };

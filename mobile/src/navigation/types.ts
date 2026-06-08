@@ -1,4 +1,15 @@
+import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { PaymentProvider } from '@letssplyt/shared/profile.types';
+
+export type EventsStackParamList = {
+  Events: undefined;
+  EventDetail: { eventId: string };
+};
+
+export type MainTabParamList = {
+  HomeTab: undefined;
+  EventsTab: NavigatorScreenParams<EventsStackParamList> | undefined;
+};
 
 export type RootStackParamList = {
   Welcome: undefined;
@@ -8,7 +19,7 @@ export type RootStackParamList = {
     accountExists?: boolean;
   };
   PushPermission: undefined;
-  Home: undefined;
+  MainTabs: undefined;
   Profile: { toastMessage?: string } | undefined;
   AddHandle: {
     handleId?: string;

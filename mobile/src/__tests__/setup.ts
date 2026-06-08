@@ -2,6 +2,17 @@ import { jest, beforeEach } from '@jest/globals';
 
 const mockSecureStoreMap = new Map<string, string>();
 
+jest.mock('react-native-safe-area-context', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const insets = { top: 0, right: 0, bottom: 0, left: 0 };
+  return {
+    SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
+    SafeAreaView: View,
+    useSafeAreaInsets: () => insets,
+  };
+});
+
 jest.mock('expo-camera', () => ({
   useCameraPermissions: jest.fn().mockReturnValue([{ granted: true }, jest.fn()]),
   CameraView: 'CameraView',
@@ -60,6 +71,20 @@ jest.mock('../lib/supabase', () => {
     isSupabaseConfigured: () => true,
   };
 });
+
+jest.mock('react-native-qrcode-svg', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    __esModule: true,
+    default: ({ value }: { value: string }) =>
+      React.createElement(View, { accessibilityLabel: `QR code ${value}` }),
+  };
+});
+
+jest.mock('expo-clipboard', () => ({
+  setStringAsync: jest.fn(() => Promise.resolve()),
+}));
 
 global.fetch = jest.fn() as unknown as typeof fetch;
 

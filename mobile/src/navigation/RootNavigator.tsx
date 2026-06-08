@@ -4,7 +4,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { OTPVerifyScreen } from '../screens/auth/OTPVerifyScreen';
 import { PhoneEntryScreen } from '../screens/auth/PhoneEntryScreen';
 import { WelcomeScreen } from '../screens/auth/WelcomeScreen';
-import { HomeScreen } from '../screens/home/HomeScreen';
+import { MainTabNavigator } from './MainTabNavigator';
 import { AddHandleScreen } from '../screens/profile/AddHandleScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { PushPermissionScreen } from '../screens/profile/PushPermissionScreen';
@@ -40,13 +40,13 @@ export function RootNavigator() {
           animationDuration: 280,
         }}
         initialRouteName={
-          isAuthenticated ? (needsPushPermission ? 'PushPermission' : 'Home') : 'Welcome'
+          isAuthenticated ? (needsPushPermission ? 'PushPermission' : 'MainTabs') : 'Welcome'
         }
       >
         {isAuthenticated ? (
           <>
             <RootStack.Screen name="PushPermission" component={PushPermissionScreen} />
-            <RootStack.Screen name="Home" component={HomeScreen} />
+            <RootStack.Screen name="MainTabs" component={MainTabNavigator} />
             <RootStack.Screen name="Profile" component={ProfileScreen} />
             <RootStack.Screen name="AddHandle" component={AddHandleScreen} />
           </>

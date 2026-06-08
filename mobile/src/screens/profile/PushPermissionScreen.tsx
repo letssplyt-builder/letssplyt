@@ -22,7 +22,7 @@ export function PushPermissionScreen({ navigation }: Props) {
 
   const goHome = () => {
     dismissPushPermission();
-    navigation.replace('Home');
+    navigation.replace('MainTabs');
   };
 
   const handleAllow = async () => {
