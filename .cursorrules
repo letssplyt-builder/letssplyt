@@ -1,6 +1,8 @@
 At the start of every conversation, read CLAUDE.md and BUILD-PROGRESS.md before writing any code.
 
-Find the first unchecked [ ] story in BUILD-PROGRESS.md, read that story in docs/12-Build-Sequence.md, then build it. Follow all session rules in CLAUDE.md exactly.
+Find the first unchecked [ ] story in BUILD-PROGRESS.md, read that story in files/12-Build-Sequence.md, then build it. Follow all session rules in CLAUDE.md exactly.
+
+CRITICAL: If you encounter any situation that is ambiguous, unclear, not covered by the referenced documentation, or where instructions seem to conflict — STOP immediately and ask Pawan for clarification before writing any code. Do not invent solutions to fill gaps. Do not proceed past the ambiguity. This applies especially to financial arithmetic, PII handling, and security code.
 
 After Pawan confirms a story is done, change [ ] to [x] with today's date in BUILD-PROGRESS.md.
 

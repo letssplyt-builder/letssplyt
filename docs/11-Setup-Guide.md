@@ -195,8 +195,9 @@ Copy the following into your `letssplyt/` folder (these are the docs and setup f
 - `BUILD-PROGRESS.md`
 - `.cursorrules`
 - `setup.sh`
-- `docs/` folder (all 13 markdown files)
+- `files/` folder (all 11 markdown files — keep the folder named `files/`, do not rename it)
 - `prototype/` folder (all HTML mockups)
+- `LetsSplyt-Antigravity.html` (Cursor Build Guide)
 
 **Step 4 — Create your `.gitignore` file:**
 
@@ -273,9 +274,9 @@ Open Cursor → File → Open Folder → select the `letssplyt/` folder. This is
 
 #### Branching during the build phase
 
-During the 38-story build (Tier 1–3), commit everything directly to **`main`**. Cursor handles this automatically after each confirmed story.
+During the 46-story build (Tier 1–3), commit everything directly to **`main`**. Cursor handles this automatically after each confirmed story.
 
-The three-branch workflow (`main` / `staging` / `develop`) described in `docs/10-Engineering-Operations.md` kicks in at **Epic 12** (Launch Readiness) when CI/CD is wired up and Railway deployments are active. You do not need branches, pull requests, or merge workflows until then.
+The three-branch workflow (`main` / `staging` / `develop`) described in `files/10-Engineering-Operations.md` kicks in at **Epic 12** (Launch Readiness) when CI/CD is wired up and Railway deployments are active. You do not need branches, pull requests, or merge workflows until then.
 
 **Commit message format Cursor uses:** `E##-S##: brief description`
 Examples: `E01-S01: monorepo scaffold`, `E03-S02: OTP verify and session creation`
@@ -424,11 +425,18 @@ openssl rand -hex 32   # → PII_HMAC_SALT (hashes phones for lookups)
 
 **App URLs:**
 
+> `APP_URL` is the full URL including scheme (e.g. `https://letssplyt.app`) — used by the backend for Twilio webhook URLs.
+> `APP_DOMAIN` is the domain only without scheme (e.g. `letssplyt.app`) — used for CORS and deep link config.
+> For local development both point to localhost.
+
 | Secret | Development | Staging | Production |
 |---|---|---|---|
-| `APP_DOMAIN` | `http://localhost:3000` | Fill in after Railway deploy | Your production domain |
-| `EXPO_PUBLIC_API_URL` | `http://localhost:3000/api/v1` | Fill in after Railway deploy | Your domain + `/api/v1` |
-| `EXPO_PUBLIC_APP_DOMAIN` | `http://localhost:3000` | Fill in after Railway deploy | Your production domain |
+| `APP_URL` | `http://localhost:3000` | `https://letssplyt.up.railway.app` | `https://your-domain.com` |
+| `APP_DOMAIN` | `localhost:3000` | `letssplyt.up.railway.app` | `your-domain.com` |
+| `EXPO_PUBLIC_API_URL` | `http://localhost:3000/api/v1` | `https://letssplyt.up.railway.app/api/v1` | `https://your-domain.com/api/v1` |
+| `EXPO_PUBLIC_APP_DOMAIN` | `http://localhost:3000` | `https://letssplyt.up.railway.app` | `https://your-domain.com` |
+
+> ⚠️ Fill in staging/production values after you have a Railway URL (Part 3) and domain (Part 4). Leave as shown for development now.
 
 ✅ **Part 1 complete when:** All development secrets are green in Doppler. Run `./setup.sh check` to confirm.
 
@@ -448,12 +456,14 @@ Or follow the manual steps below.
 
 ### 2.1 — Connect GitHub to Cursor
 
-1. Open **Cursor** → File → Open Folder → select your letssplyt project folder
+1. Open **Cursor** → File → Open Folder → select your `letssplyt/` project folder
 2. Sign in to Cursor with GitHub if prompted (Settings → Sign In)
 3. In Cursor Settings → Features → enable Composer and Codebase Indexing
-4. Copy two folders into the project (`~/letssplyt/`):
-   - `SplitEasy/files/` → rename to `docs/` inside the project
-   - `SplitEasy/Prototype/` → place as `prototype/` inside the project
+4. Confirm these files are in the project root (`~/letssplyt/`):
+   - `CLAUDE.md`, `BUILD-PROGRESS.md`, `.cursorrules`, `setup.sh`
+   - `files/` folder (all 11 markdown docs — **keep the name `files/`**)
+   - `prototype/` folder (HTML mockups)
+   - `LetsSplyt-Antigravity.html` (Cursor Build Guide)
 
 Then connect Doppler:
 ```bash
@@ -464,43 +474,58 @@ doppler setup      # select project: letssplyt, environment: development
 
 ---
 
-### 2.1A — Set Up EAS and Get Your Project ID
+### 2.2 — Build E01-S01 (Monorepo Scaffold) with Cursor
 
-Before Cursor scaffolds the project, you need an Expo/EAS project ID. This is required for push notifications to work in all builds.
+Open `LetsSplyt-Antigravity.html` in your browser. Follow the **Session 1** prompt exactly — paste it into Cursor Composer and let Cursor build the complete monorepo skeleton.
 
-1. Make sure you have an Expo account (created in Part 1, Section 1.3)
-2. Log in to EAS:
+E01-S01 is the only story you build in the first session. After Cursor finishes and you confirm it's done:
+- The `mobile/` directory exists with `app.config.js`
+- The `backend/` and `shared/` directories exist with correct TypeScript config
+- All package.json workspace files are in place
+
+Verify all E01-S01 acceptance criteria before continuing to step 2.2A.
+
+---
+
+### 2.2A — EAS Init (run after E01-S01 is complete)
+
+Now that `mobile/` exists, you can register your app with Expo and get a Project ID. This is required for push notifications to work in all builds.
+
+> ⚠️ This step must come after E01-S01 — `eas init` requires an Expo project directory to already exist. Running it before E01-S01 will fail with "Run this command inside a project directory."
+
+1. Make sure you are logged in to EAS:
    ```bash
    eas login
    ```
-3. In your project folder, run:
+2. Move into the mobile directory and run `eas init`:
    ```bash
+   cd ~/letssplyt/mobile
    eas init
    ```
-4. Select "Create a new project" → name it `letssplyt`
-5. EAS shows you a project ID like: `a1b2c3d4-e5f6-7890-abcd-ef1234567890`
-6. Open `mobile/app.config.js` (Cursor creates this in Step 2.2)
-7. Replace `YOUR_EAS_PROJECT_ID` with your real project ID
-8. Add the project ID to Doppler:
+3. Select **"Create a new project"** → name it `letssplyt`
+4. EAS shows you a project ID like: `a1b2c3d4-e5f6-7890-abcd-ef1234567890` — copy it
+5. Open `mobile/app.config.js` and replace `YOUR_EAS_PROJECT_ID` with your real project ID
+6. Add the project ID to Doppler (all three environments):
    - Secret name: `EXPO_PROJECT_ID`
-   - Value: your project ID
+   - Value: your project ID (same value in development, staging, and production)
+7. Commit the updated `app.config.js`:
+   ```bash
+   git add mobile/app.config.js
+   git commit -m "config: add EAS project ID"
+   git push origin main
+   ```
 
-✅ **Done when:** `app.config.js` has a real UUID for `extra.eas.projectId` and it is also in Doppler.
+✅ **Done when:** `mobile/app.config.js` has a real UUID for `extra.eas.projectId` and `EXPO_PROJECT_ID` is in Doppler.
 
 > ⚠️ Without this step, push notifications fail silently in all builds. There is no error message — notifications simply never arrive.
 
 ---
 
-### 2.2 — Start Building with Cursor
+### 2.3 — Continue Building (E01-S02 onwards)
 
-See **docs/13-Cursor-Guide.md** for the complete Cursor starting prompt and session workflow.
+From session 2 onwards, use the one-line continuation prompt from `LetsSplyt-Antigravity.html`. Cursor reads CLAUDE.md and BUILD-PROGRESS.md, finds the next unchecked story, and builds it.
 
----
-
-### 2.3 — Apply the Database Schema
-
-After Cursor scaffolds the project:
-
+**After E02-S01 (database migrations are created), apply the schema:**
 ```bash
 cd ~/letssplyt/backend
 doppler run -- npx supabase login            # first time only
@@ -548,13 +573,15 @@ ngrok config add-authtoken YOUR_TOKEN  # get your token at ngrok.com (free accou
    ngrok http 3000
    ```
 3. ngrok shows a URL like `https://abc123.ngrok.io`
-4. Update Doppler development: `APP_DOMAIN` = `https://abc123.ngrok.io`
+4. Update Doppler development — set both URL secrets to the ngrok URL:
+   - `APP_URL` = `https://abc123.ngrok.io` (used by the backend for Twilio callback URLs)
+   - `APP_DOMAIN` = `abc123.ngrok.io` (domain only, no scheme)
 5. In Twilio Console → Messaging → Settings → Webhook URL, set to:
    `https://abc123.ngrok.io/api/v1/webhooks/twilio/delivery`
 6. For opt-out webhooks: Twilio Console → Phone Numbers → your number → Messaging → set STOP webhook to:
    `https://abc123.ngrok.io/api/v1/webhooks/twilio/opt-out`
 
-> Note: The ngrok URL changes every time you restart ngrok (free tier). Update Doppler and Twilio when it changes.
+> Note: The ngrok URL changes every time you restart ngrok (free tier). Update both `APP_URL` and `APP_DOMAIN` in Doppler and the Twilio webhook URLs when it changes.
 
 > You only need ngrok when testing: (a) message delivery status (MessageSendingScreen green checkmarks) or (b) STOP opt-out processing. All other development works without ngrok.
 
@@ -562,7 +589,7 @@ ngrok config add-authtoken YOUR_TOKEN  # get your token at ngrok.com (free accou
 
 ### 2.5 — Feature Build Instructions
 
-All feature prompts, prototype references, and build instructions are in **docs/13-Cursor-Guide.md**.
+All feature prompts, prototype references, and build instructions are in **`LetsSplyt-Antigravity.html`** (open in your browser).
 
 ---
 
@@ -581,7 +608,8 @@ All feature prompts, prototype references, and build instructions are in **docs/
 2. Railway detects Node.js and deploys → gives you a URL like `letssplyt.up.railway.app`
 3. Connect Doppler to Railway: doppler.com → letssplyt → staging → Integrations → Railway → Authorise
 4. Update Doppler staging secrets with your Railway URL:
-   - `APP_DOMAIN` = `https://letssplyt.up.railway.app`
+   - `APP_URL` = `https://letssplyt.up.railway.app`
+   - `APP_DOMAIN` = `letssplyt.up.railway.app`
    - `EXPO_PUBLIC_API_URL` = `https://letssplyt.up.railway.app/api/v1`
    - `EXPO_PUBLIC_APP_DOMAIN` = `https://letssplyt.up.railway.app`
 
@@ -591,9 +619,11 @@ All feature prompts, prototype references, and build instructions are in **docs/
 
 When a user with the LetsSplyt app taps a QR join link, their phone should open the app directly (not the browser). This requires two files hosted at specific URLs on your domain.
 
+> **Note:** Story E06-S03 (Deep Link Infrastructure) in the build sequence handles creating the AASA and assetlinks.json files. This section covers hosting them and verifying they are accessible after deploying to Railway.
+
 **Step 1 — Add the files to your backend**
 Tell Cursor:
-*"Add static file serving to Express. In app.ts, add: app.use('/.well-known', express.static('public/.well-known', { setHeaders: (res) => { res.set('Content-Type', 'application/json'); } })). Create backend/public/.well-known/apple-app-site-association.json and backend/public/.well-known/assetlinks.json using the templates in docs/08-Mobile-App-Specification.md Section 9 (Deep Links). Fill in your Apple Team ID (from developer.apple.com → Account), your iOS bundle identifier (from app.config.js), your Android package name, and your Android SHA-256 fingerprint (from Google Play Console → Setup → App Integrity)."*
+*"Add static file serving to Express. In app.ts, add: app.use('/.well-known', express.static('public/.well-known', { setHeaders: (res) => { res.set('Content-Type', 'application/json'); } })). Create backend/public/.well-known/apple-app-site-association.json and backend/public/.well-known/assetlinks.json using the templates in files/08-Mobile-App-Specification.md Section 9 (Deep Links). Fill in your Apple Team ID (from developer.apple.com → Account), your iOS bundle identifier (from app.config.js), your Android package name, and your Android SHA-256 fingerprint (from Google Play Console → Setup → App Integrity)."*
 
 **Step 2 — Verify the files are accessible**
 After deploying to Railway staging:
@@ -695,11 +725,11 @@ eas submit --platform ios
 
 ### 4.0 — Host Privacy Policy and Terms of Service
 
-Both app stores require these pages to be live at public URLs before accepting your app submission. The content is already written in docs/09-Security-And-Privacy.md Section 6.
+Both app stores require these pages to be live at public URLs before accepting your app submission. The content is already written in files/09-Security-And-Privacy.md Section 6.
 
 **Option A — Serve from your backend (simplest)**
 Tell Cursor:
-*"Add static HTML pages for Privacy Policy and Terms of Service. Create backend/public/privacy.html and backend/public/terms.html. In app.ts, add: app.use(express.static('public')). The Privacy Policy content is in docs/09-Security-And-Privacy.md Section 6 — translate the six policy statement blocks into a readable HTML page. Do the same for Terms of Service."*
+*"Add static HTML pages for Privacy Policy and Terms of Service. Create backend/public/privacy.html and backend/public/terms.html. In app.ts, add: app.use(express.static('public')). The Privacy Policy content is in files/09-Security-And-Privacy.md Section 6 — translate the six policy statement blocks into a readable HTML page. Do the same for Terms of Service."*
 
 Then verify after deploying to production:
 ```bash
