@@ -138,7 +138,7 @@ After sharing the QR, the payer can navigate away freely. When they return — b
   - *Name only — no phone* — for cash payers and in-person guests. No message is ever sent to this person. The payer tells them their share verbally and marks their payment in the app on their behalf.
 
 **Step 5 — Payer locks the group.**
-When the payer is satisfied that everyone who needs to be in the group is in, they tap "Everyone's here — Lock & split" from Event Detail. This closes the join window — no new members can join and no one can leave. Locking is the explicit gate before splitting begins. (Payer can reopen for 1 hour if someone was missed.)
+When the payer is satisfied that everyone who needs to be in the group is in, they tap "Everyone's here — Lock & split" from Event Detail. This closes the join window — no new members can join and no one can leave. Locking is the explicit gate before splitting begins. (Payer can reopen for 24 hours if someone was missed.)
 
 **Step 6 — Receipt scanning and split.**
 Payer photographs the receipt. AI (A1) reads every line item. Payer assigns items to people via drag-and-drop or natural language ("Rohan had the pasta and two beers"). AI (A2) calculates each person's exact share including proportional tax and tip.
@@ -389,7 +389,7 @@ The payer doesn't know these people personally. OTP guarantees the phone number 
 Existing members registered their phone at account creation. Re-verify is a lightweight re-authentication step, not a re-registration. The phone lookup finds the existing account — no duplicate accounts created.
 
 **Token expiry and regeneration:**
-QR / URL token expires on payer lock OR 24-hour TTL, whichever comes first. When the token expires before the payer locks, the Event Detail (joining view) transitions: the QR/link section collapses and is replaced by an amber "QR code & invite link expired" banner with a single "Regenerate QR & link" button. Tapping issues a fresh 24-hour token and the new QR and link immediately appear at the top of Event Detail. Payer can also reopen the join window for 1 hour after locking to accommodate latecomers. Permanent tokens are a security risk — a screenshot shared days later could add unintended people to a closed event.
+QR / URL token expires on payer lock OR 24-hour TTL, whichever comes first. When the token expires before the payer locks, the Event Detail (joining view) transitions: the QR/link section collapses and is replaced by an amber "QR code & invite link expired" banner with a single "Regenerate QR & link" button. Tapping issues a fresh 24-hour token and the new QR and link immediately appear at the top of Event Detail. Payer can also reopen the join window for 24 hours after locking to accommodate latecomers. Permanent tokens are a security risk — a screenshot shared days later could add unintended people to a closed event.
 
 ### Group Lock as a Hard Gate
 
@@ -403,7 +403,7 @@ QR / URL token expires on payer lock OR 24-hour TTL, whichever comes first. When
 
 **Rationale:** Starting the split before everyone is in creates a consistency problem — if someone joins after items are assigned, their share is undefined. The explicit lock step makes the group membership a deliberate, payer-confirmed state before any financial calculations begin. It also creates a clear social signal to the group: "We're starting now."
 
-**Reopen:** After locking, payer can reopen the join window for 1 hour via "Reopen join window." This generates a fresh short-lived token for a specific latecomer. Once they join, payer locks again.
+**Reopen:** After locking, payer can reopen the join window for 24 hours via "Reopen join window." This generates a fresh short-lived token for a specific latecomer. Once they join, payer locks again.
 
 ### OTP Verification on QR Join
 **Decision:** Mandatory OTP for self-registration via QR. Optional (payer vouches) for manually-added participants.

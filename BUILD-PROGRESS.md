@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
 **Last updated:** 2026-06-08
-**Current story:** E06-S01 — Web Join Page
+**Current story:** E05-S04 — Event Member Management UI (contacts, remove, reopen)
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -42,9 +42,10 @@
 - [x] E05-S01 — Event CRUD API (create, list, get, lock, reopen, regenerate token) (2026-06-08)
 - [x] E05-S02 — Add Participant API + Manual Add (2026-06-08)
 - [x] E05-S03 — Mobile Event Screens (Home, Events, CreateEvent, QR, EventDetail + Realtime) (2026-06-08)
+- [ ] E05-S04 — Event Member Management UI (contact picker, remove before lock, reopen after lock)
 
 ### Epic 6: Join Flows (3 stories)
-- [ ] E06-S01 — Web Join Page (server-rendered HTML — works without JavaScript)
+- [x] E06-S01 — Web Join Page (server-rendered HTML — works without JavaScript) (2026-06-08)
 - [ ] E06-S02 — In-App Join + Deep Link Handler (Universal Links, AppJoinScreen)
 - [ ] E06-S03 — Deep Link Infrastructure (AASA, App Links, Expo Config)
 
@@ -95,9 +96,9 @@
 | Tier | Epics | Stories | Done | Remaining |
 |---|---|---|---|---|
 | Tier 1 — Foundation | 4 | 16 | 16 | 0 |
-| Tier 2 — Core Flow | 5 | 22 | 3 | 19 |
+| Tier 2 — Core Flow | 5 | 23 | 4 | 19 |
 | Tier 3 — Operations | 3 | 8 | 0 | 8 |
-| **Total** | **12** | **46** | **16** | **30** |
+| **Total** | **12** | **47** | **17** | **30** |
 
 ---
 
@@ -108,4 +109,7 @@
 - [2026-06-07] — E01-S05 — Jest (backend+mobile), mocks (supabase/twilio/llm), CI workflow, ESLint root config, git-secrets hooks. Per-table `__setMockResultForTable` added for independent table mock config.
 - [2026-06-07] — E01-S06 — crypto/sanitize utilities with 100% test coverage target, formatCurrency, resolveParticipantPhone. Hex IV format per docs/09 (not base64 from build-sequence prompt).
 - [2026-06-08] — Mobile upgraded Expo SDK 52 → 54 to match App Store Expo Go (SDK 54). React 19.1, RN 0.81. Docs updated in CLAUDE.md, 08, 10, 12-Build-Sequence.
+- [2026-06-08] — E06-S01 — Server-rendered web join at /join/:token (HTML form, OTP, participant create, funnel checkpoints). Schema repair migrations for funnel_checkpoints and participants. 134 backend tests passing.
+- [2026-06-08] — Product — Reopen join window TTL changed from 1 hour to 24 hours (matches initial join link). Updated event.service.ts JOIN_TOKEN_TTL_HOURS and PRD/API/User Flows/E05-S04 docs.
+- [2026-06-08] — Docs — Added E05-S04 to build sequence (contact picker, remove participant before lock, reopen join window after lock). MVP items from PRD/User Flows P09/P11/P13a were spec'd but missing from 12-Build-Sequence; E05-S03 note points to S04. Build E05-S04 before continuing Epic 6.
 - [2026-06-08] — E03-S04 + auth hardening. Session creation via `backend/src/infrastructure/supabase-auth.ts` (`generateLink` + `verifyOtp` + internal email `{userId}@letssplyt.internal`) — NOT `createSession()` or REST `/admin/users/{id}/sessions` (404). Registration writes `public.users` via `upsert_user_profile_on_auth` SECURITY DEFINER RPC + `users_service_role_all` policy — migration `20260608000000_users_auth_registration.sql`. Login OTP requires `public.users` row (orphan `auth.users` → `ACCOUNT_NOT_FOUND`). Mobile: duck-typed `isApiRequestError()` in `api.ts` (Metro breaks `instanceof`); E.164 normalization in `phone.ts`; Register CTA + logout on Home. Dev cleanup: `cd backend && doppler run -- npm run cleanup:phone -- +1XXXXXXXXXX`. If schema already applied: `npx supabase migration repair 20260601000000 --status applied` before `db push`.

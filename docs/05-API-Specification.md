@@ -567,7 +567,7 @@ Lock the group. Expires the active join token. No new participants can join afte
 ### POST `/events/:eventId/reopen`
 **Auth:** `[AUTH]` | `[PAYER]` | Event must be in "locked" status
 
-Reopen the join window for 1 hour. Generates a new join token.
+Reopen the join window for 24 hours. Generates a new join token.
 
 **Request body:** none
 
@@ -576,7 +576,7 @@ Reopen the join window for 1 hour. Generates a new join token.
 {
   join_token: string;
   join_url: string;
-  expires_at: string;    // 1 hour from now
+  expires_at: string;    // 24 hours from now
 }
 ```
 

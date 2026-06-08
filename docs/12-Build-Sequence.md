@@ -6,7 +6,7 @@
 
 ## How to Use This Document
 
-This document is your daily build companion. Each of the 46 stories in this document maps to a single Cursor session. Here is the exact workflow for every story, without exception.
+This document is your daily build companion. Each of the 47 stories in this document maps to a single Cursor session. Here is the exact workflow for every story, without exception.
 
 First, confirm that all dependencies listed at the top of the epic are fully complete — meaning you have verified every acceptance criterion in those stories on your phone or in your terminal. Do not skip this check. A broken foundation cascades into hours of debugging later.
 
@@ -1451,14 +1451,14 @@ mobile/src/__tests__/components/profile/AddHandleScreen.test.tsx
 
 ## EPIC 5 — Event Creation, QR & Live Member List
 **Depends on:** E04 complete
-**Delivers:** Creator can create an event, display a QR code, see participants join in real time, add manually, lock the group
+**Delivers:** Creator can create an event, display a QR code, see participants join in real time, add manually (contacts or typed), remove mistaken members before lock, reopen the join window after lock, and lock the group
 
 ### E05-S01 — Event CRUD API
 
 **Description:** Build all event endpoints: create, list (paginated), get by ID, lock, reopen, regenerate expired token. These endpoints are the backbone of the entire event lifecycle and must handle token generation, ownership verification, and state transitions correctly before any UI is built.
 
 **Prompt:**
-*"Build the complete event CRUD API for LetsSplyt. (1) POST /api/v1/events: body { title: string, date?: string }, creates event with payer_id=req.user.id, status='open', ai_stage='none', generates join token using crypto.randomBytes(18).toString('base64url') stored in event_join_tokens with expires_at=NOW()+24h, returns { id, title, status, join_url: process.env.APP_DOMAIN+'/join/'+token, token_expires_at }. (2) GET /api/v1/events: cursor pagination (cursor + limit query params, default limit 20), returns { events: [...], next_cursor, has_more }, each event includes { id, title, status, participant_count, total_amount, created_at }. (3) GET /api/v1/events/:id: returns full event including participant list (display_name only, no phone), join_url if status='open', settlement summary if status!='open'. (4) POST /api/v1/events/:id/lock: verifies payer_id=req.user.id, checks participant count >= 2, sets status='locked' and locked_at=NOW(), returns updated event. (5) POST /api/v1/events/:id/reopen: verifies payer_id, sets status='open', generates new join token (old one deactivated via is_active=false), returns new join_url. (6) POST /api/v1/events/:id/join-token/regenerate: for expired tokens with status='open', generates new token and deactivates the old one. All routes require authenticate middleware. Use `events.title` (not `events.name`) for the event title column in all SQL queries and TypeScript types. Place shared types in shared/types/event.types.ts."*
+*"Build the complete event CRUD API for LetsSplyt. (1) POST /api/v1/events: body { title: string, date?: string }, creates event with payer_id=req.user.id, status='open', ai_stage='none', generates join token using crypto.randomBytes(18).toString('base64url') stored in event_join_tokens with expires_at=NOW()+24h, returns { id, title, status, join_url: process.env.APP_DOMAIN+'/join/'+token, token_expires_at }. (2) GET /api/v1/events: cursor pagination (cursor + limit query params, default limit 20), returns { events: [...], next_cursor, has_more }, each event includes { id, title, status, participant_count, total_amount, created_at }. (3) GET /api/v1/events/:id: returns full event including participant list (display_name only, no phone), join_url if status='open', settlement summary if status!='open'. (4) POST /api/v1/events/:id/lock: verifies payer_id=req.user.id, checks participant count >= 2, sets status='locked' and locked_at=NOW(), returns updated event. (5) POST /api/v1/events/:id/reopen: verifies payer_id, sets status='open', generates new join token with expires_at=NOW()+24h (old one deactivated via is_active=false), returns new join_url. (6) POST /api/v1/events/:id/join-token/regenerate: for expired tokens with status='open', generates new token and deactivates the old one. All routes require authenticate middleware. Use `events.title` (not `events.name`) for the event title column in all SQL queries and TypeScript types. Place shared types in shared/types/event.types.ts."*
 
 **Files created:**
 - `backend/src/modules/events/event.controller.ts`
@@ -1562,6 +1562,8 @@ backend/src/__tests__/integration/events/participants.test.ts
 7. Balance card calls `GET /api/v1/users/me/balance` but gracefully degrades: if the endpoint returns 404 or the call fails, show 'Balance unavailable' placeholder. Do NOT hard-fail. The endpoint is built in E09-S02.
 8. Do NOT call any settlement endpoint that isn't built yet. Use a stub response shape for the balance card.
 
+> **Deferred to E05-S04:** Native contact picker ("From contacts"), remove-participant UI (before lock), and "Reopen join window" UI (after lock). E05-S03 shipped manual entry only; APIs for delete/reopen already exist from E05-S01/E05-S02.
+
 **Tests required:**
 ```
 mobile/src/__tests__/unit/store/eventStore.test.ts
@@ -1585,8 +1587,56 @@ mobile/src/__tests__/components/events/EventDetailScreen.test.tsx
 
 ---
 
+### E05-S04 — Event Member Management UI (Contacts, Remove, Reopen)
+
+**Description:** Complete the MVP member-management flows deferred from E05-S03. Covers User Flows P09 (contact picker), P11 (remove before lock), and P13a (reopen join window after lock). Backend APIs already exist — this story is mobile UI + `eventStore`/`event.service` wiring only.
+
+**Prompt:**
+*"Complete MVP event member management on LetsSplyt mobile. Refer to prototype/participant.html and docs/08-Mobile-App-Specification.md (AddParticipantModal + EventDetailScreen joining/settlement phases). (1) AddParticipantModal — add a two-choice entry step: 'From contacts' | 'Enter manually'. 'Enter manually' keeps the existing E05-S03 form (name, phone with country picker, 'Name only' toggle). 'From contacts' uses expo-contacts: request permission once (handle denied → show inline message with link to Settings), open the native contact picker (Contacts.presentContactPickerAsync or equivalent), pre-fill display_name and phone from the selected contact, normalize to E.164 via existing phone utils, then POST /api/v1/events/:id/participants/manual with join_method='manual_phone'. Payer vouches — no OTP. Add NSContactsUsageDescription (iOS) and READ_CONTACTS (Android) to mobile/app.config.js. (2) EventDetailScreen — joining phase (status='open'): each participant row (except the payer themselves) shows a remove control (swipe-to-delete or explicit remove button). Tap → confirm Alert 'Remove [name] from this event?' → DELETE /api/v1/events/:id/participants/:participantId via event.service.deleteParticipant. On success, optimistically remove from list then re-fetch. Hide remove for locked events. Show toast on 400 CANNOT_REMOVE_ACTIVE_PARTICIPANT or GROUP_IS_LOCKED. (3) EventDetailScreen — locked phase: when status='locked' and user is payer, show 'Reopen join window' button (docs/08 spec). Calls POST /api/v1/events/:id/reopen via new event.service.reopenEvent(). On success: event status returns to 'open', new join_url/token shown, screen returns to joining phase with QR/link visible. Show helper text: 'Reopens QR and link for 24 hours for latecomers.' (4) eventStore: add removeParticipant(eventId, participantId) and reopenEvent(eventId) actions. (5) event.service.ts: add reopenEvent() calling POST /events/:id/reopen (regenerateJoinToken already exists for expired open-event tokens — do not conflate). Do NOT add new backend routes."*
+
+**Files created/updated:**
+- `mobile/src/components/events/AddParticipantModal.tsx` (contact picker path)
+- `mobile/src/screens/events/EventDetailScreen.tsx` (remove + reopen)
+- `mobile/src/services/event.service.ts` (`reopenEvent`)
+- `mobile/src/store/eventStore.ts` (`removeParticipant`, `reopenEvent`)
+- `mobile/app.config.js` (contacts permission strings)
+- `mobile/src/__tests__/components/events/AddParticipantModal.test.tsx`
+- `mobile/src/__tests__/components/events/EventDetailScreen.test.tsx` (extended)
+- `mobile/src/__tests__/unit/store/eventStore.test.ts` (extended)
+
+**Acceptance Criteria:**
+1. Tap '+ Add manually' → choose 'From contacts' → pick a contact with a phone → participant appears in member list without OTP
+2. Tap '+ Add manually' → 'Enter manually' → existing name/phone/name-only flow still works
+3. Contacts permission denied → user sees a clear message (not a crash); can still use 'Enter manually'
+4. On open event, payer can remove a pending participant → member disappears from list; DELETE API called
+5. Remove is hidden (or disabled with explanation) when event is locked
+6. Attempting to remove a participant who is not `payment_status='pending'` shows an error (API 400) — not a silent failure
+7. After locking, payer sees 'Reopen join window' → tap → event returns to open status, new QR/link visible, token expires in ~24 hours
+8. Non-payer cannot see remove or reopen controls (creator-only)
+
+**Tests required:**
+```
+mobile/src/__tests__/components/events/AddParticipantModal.test.tsx
+  - shows From contacts / Enter manually choice
+  - Enter manually path renders existing form
+  - contact picker success calls addManualParticipant with E.164 phone
+
+mobile/src/__tests__/components/events/EventDetailScreen.test.tsx
+  - shows remove control on participant rows when event open
+  - remove calls deleteParticipant and updates list
+  - hides remove when event locked
+  - shows Reopen join window when event locked (payer)
+  - reopen calls reopenEvent and transitions to joining phase
+
+mobile/src/__tests__/unit/store/eventStore.test.ts
+  - removeParticipant removes from local participants list
+  - reopenEvent updates event status to open and refreshes join_url
+```
+
+---
+
 ## EPIC 6 — Join Flows (Web + App)
-**Depends on:** E05 complete (events must exist before joining)
+**Depends on:** E05 complete including E05-S04 (events and member management must exist before joining)
 **Delivers:** Guests join via browser, App Members join via deep link, both appear in creator's real-time member list
 
 ### E06-S01 — Web Join Page (Server-Rendered HTML)
@@ -2672,7 +2722,7 @@ backend/src/__tests__/unit/infrastructure/logger.test.ts
 
 ## Build Sequence Summary
 
-**Total stories: 46 stories across 12 epics**
+**Total stories: 47 stories across 12 epics**
 
 | Epic | Stories | Duration estimate |
 |---|---|---|
@@ -2680,7 +2730,7 @@ backend/src/__tests__/unit/infrastructure/logger.test.ts
 | E02: Database | 4 | 2-3 days |
 | E03: Authentication | 4 | 2-3 days |
 | E04: Profile & Handles | 2 | 1-2 days |
-| E05: Events & QR | 3 | 3-4 days |
+| E05: Events & QR | 4 | 3-4 days |
 | E06: Join Flows | 3 | 2-3 days |
 | E07: AI Receipt Pipeline | 6 | 5-6 days |
 | E08: Message System | 7 | 5-6 days |
@@ -2688,7 +2738,7 @@ backend/src/__tests__/unit/infrastructure/logger.test.ts
 | E10: Background Jobs & Push | 2 | 2-3 days |
 | E11: Account Management | 2 | 2-3 days |
 | E12: Launch Readiness | 4 | 3-4 days |
-| **Total** | **46** | **~38-50 Cursor sessions** |
+| **Total** | **47** | **~39-51 Cursor sessions** |
 
 ---
 

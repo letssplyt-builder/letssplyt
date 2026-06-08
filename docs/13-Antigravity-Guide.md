@@ -112,6 +112,7 @@ All 38 stories are in `docs/12-Build-Sequence.md`. Each story has:
 | E05-S01 | Event CRUD API | Events |
 | E05-S02 | Add Participant API | Events |
 | E05-S03 | Mobile Event Screens | Events |
+| E05-S04 | Event Member Management UI | Events |
 | E06-S01 | Web Join Page | Join Flows |
 | E06-S02 | In-App Join + Deep Link | Join Flows |
 | E07-S01 | Receipt Image Upload | AI Pipeline |

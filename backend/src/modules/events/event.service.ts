@@ -15,8 +15,8 @@ import type {
 
 const DEFAULT_LIST_LIMIT = 20;
 const MAX_LIST_LIMIT = 50;
-const CREATE_TOKEN_TTL_HOURS = 24;
-const REOPEN_TOKEN_TTL_HOURS = 1;
+/** Initial join links and reopen-after-lock tokens share the same 24-hour TTL. */
+const JOIN_TOKEN_TTL_HOURS = 24;
 
 type EventRow = EventRecord & { deleted_at?: string | null };
 
@@ -240,7 +240,7 @@ export async function createEvent(
     throw new AppError('EVENT_CREATE_FAILED', 'Could not create event', 500);
   }
 
-  const { token, expires_at } = await createJoinToken(eventRow.id as string, CREATE_TOKEN_TTL_HOURS);
+  const { token, expires_at } = await createJoinToken(eventRow.id as string, JOIN_TOKEN_TTL_HOURS);
 
   return {
     id: eventRow.id as string,
@@ -419,7 +419,7 @@ export async function reopenEvent(userId: string, eventId: string): Promise<Reop
   }
 
   await deactivateActiveTokens(eventId);
-  const { token, expires_at } = await createJoinToken(eventId, REOPEN_TOKEN_TTL_HOURS);
+  const { token, expires_at } = await createJoinToken(eventId, JOIN_TOKEN_TTL_HOURS);
 
   return {
     join_token: token,
@@ -445,7 +445,7 @@ export async function regenerateJoinToken(
   }
 
   await deactivateActiveTokens(eventId);
-  const { token, expires_at } = await createJoinToken(eventId, CREATE_TOKEN_TTL_HOURS);
+  const { token, expires_at } = await createJoinToken(eventId, JOIN_TOKEN_TTL_HOURS);
 
   return {
     join_token: token,

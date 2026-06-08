@@ -8,6 +8,7 @@ import { piiScrubberMiddleware } from './middleware/piiScrubber';
 import authRoutes from './modules/auth/auth.routes';
 import profileRoutes from './modules/profile/profile.routes';
 import eventRoutes from './modules/events/event.routes';
+import joinWebRoutes from './modules/join/join-web.routes';
 import { errorHandler } from './modules/auth/auth.controller';
 
 const app = express();
@@ -25,6 +26,7 @@ app.use(
 );
 
 app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: false }));
 app.use(requestIdMiddleware);
 app.use(
   pinoHttp({
@@ -38,6 +40,8 @@ app.use(piiScrubberMiddleware);
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+app.use('/join', joinWebRoutes);
 
 app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', profileRoutes);
