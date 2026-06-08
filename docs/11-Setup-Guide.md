@@ -385,7 +385,12 @@ Open doppler.com → letssplyt → **development** environment first. Add each s
 | `TWILIO_ACCOUNT_SID` | Test Account SID | Live Account SID |
 | `TWILIO_AUTH_TOKEN` | Test Auth Token | Live Auth Token |
 | `TWILIO_PHONE_NUMBER` | `+15005550006` | Your Twilio number |
-| `TWILIO_VERIFY_SERVICE_SID` | Your Verify SID | Your Verify SID |
+| `TWILIO_VERIFY_SERVICE_SID` | Not used in dev (see below) | Your live Verify SID |
+| `OTP_DEV_BYPASS` | omit (defaults to bypass) or `true` | — (omit or `false`) |
+
+**OTP in development:** Twilio **Verify does not support test credentials** (error `20008`). With `APP_ENV=development`, the backend **defaults to OTP dev bypass** — no SMS, any 6-digit code works. Check backend logs for `otpMode: dev-bypass` on startup. Use your real phone number in the app. To test real SMS locally, set `TWILIO_USE_LIVE_VERIFY=true`, `OTP_DEV_BYPASS=false`, and use **live** Twilio credentials in Doppler.
+
+**OTP on your physical phone during local dev:** Expo Go auto-detects your Mac's LAN IP for API calls. OTP verify screen is complete (E03-S04). Dev bypass accepts any 6-digit code when `APP_ENV=development`. New user registration requires migration `20260608000000_users_auth_registration.sql` applied to Supabase.
 
 **AI (different providers per environment):**
 
@@ -526,12 +531,34 @@ Now that `mobile/` exists, you can register your app with Expo and get a Project
 From session 2 onwards, use the one-line continuation prompt from `LetsSplyt-Antigravity.html`. Cursor reads CLAUDE.md and BUILD-PROGRESS.md, finds the next unchecked story, and builds it.
 
 **After E02-S01 (database migrations are created), apply the schema:**
+
+From the **repo root** (not `backend/`):
+
+```bash
+cd ~/letssplyt
+
+# One-time: link CLI to your Supabase project
+npx supabase login
+npx supabase link --project-ref <ref>   # ref = subdomain of SUPABASE_URL (e.g. abcdef from https://abcdef.supabase.co)
+
+# If tables already exist but CLI shows BOTH migrations pending, mark initial as applied first:
+npx supabase migration repair 20260601000000 --status applied
+
+# Push pending migrations (e.g. 20260608000000_users_auth_registration.sql)
+npx supabase db push
+```
+
+> **Do not** use `--db-url $SUPABASE_URL` — that is the REST API URL, not a Postgres connection string. Use `supabase link` + `db push`, or paste migration SQL into Supabase Dashboard → SQL Editor.
+
+**Seed data (optional, local or fresh remote):**
+```bash
+npx supabase db reset   # applies migrations + seed.sql — destructive, dev only
+```
+
+**Re-register a phone after a failed sign-up (dev only):**
 ```bash
 cd ~/letssplyt/backend
-doppler run -- npx supabase login            # first time only
-doppler run -- npx supabase db push --db-url $(doppler secrets get SUPABASE_URL --plain)
-doppler run -- npx supabase db reset --db-url $(doppler secrets get SUPABASE_URL --plain)
-# The reset command applies migrations + seeds test data
+doppler run -- npm run cleanup:phone -- +1XXXXXXXXXX
 ```
 
 ---
@@ -647,8 +674,13 @@ After both files return correct JSON:
 
 ### 3.2 — Run Staging Migrations
 
+From repo root (linked project or Postgres URI from Supabase Dashboard → Database → Connection string):
+
 ```bash
-doppler run --config stg -- npx supabase db push --db-url $(doppler secrets get SUPABASE_URL --config stg --plain)
+cd ~/letssplyt
+npx supabase link --project-ref <staging-ref>   # one-time
+npx supabase db push
+# Or CI: npx supabase db push --db-url "$SUPABASE_DB_URL_STAGING"
 ```
 
 ---
@@ -706,7 +738,10 @@ console.anthropic.com → Billing → Usage limits → set **$100/month**
 ### 4.4 — Run Production Migrations
 
 ```bash
-doppler run --config prd -- npx supabase db push --db-url $(doppler secrets get SUPABASE_URL --config prd --plain)
+cd ~/letssplyt
+npx supabase link --project-ref <production-ref>   # one-time
+npx supabase db push
+# Or CI: npx supabase db push --db-url "$SUPABASE_DB_URL_PRODUCTION"
 ```
 
 ---
@@ -785,8 +820,11 @@ ios: {
 cd backend && doppler run -- npm run dev       # Terminal 1
 cd mobile && npx expo start                    # Terminal 2
 
-# Apply schema changes (development)
-cd backend && doppler run -- npx supabase db push --db-url $(doppler secrets get SUPABASE_URL --plain)
+# Apply schema changes (development — from repo root)
+cd ~/letssplyt && npx supabase db push
+
+# Clean up failed registration by phone (dev only)
+cd backend && doppler run -- npm run cleanup:phone -- +1XXXXXXXXXX
 
 # Build staging app
 eas build --profile staging --platform android

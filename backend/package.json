@@ -14,7 +14,8 @@
     "test:coverage": "jest --coverage",
     "test:unit": "jest --testPathPattern=unit",
     "test:integration": "jest --testPathPattern=integration",
-    "test:rls": "jest --testPathPattern=rls"
+    "test:rls": "jest --testPathPattern=rls",
+    "cleanup:phone": "ts-node scripts/cleanup-auth-by-phone.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.0",

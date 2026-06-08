@@ -43,8 +43,8 @@ TWILIO_AUTH_TOKEN=your_auth_token_here
 TWILIO_VERIFY_SERVICE_SID=VAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-- In **development**, `TWILIO_ACCOUNT_SID` is the test SID (`ACtest...`). The Verify service SID is also a test service SID.
-- In **staging/production**, these are real LIVE credentials from the Twilio console.
+- In **development**, OTP uses **dev bypass by default** (`otpMode: dev-bypass` in backend startup logs). Twilio **test credentials cannot call the Verify API** (error `20008`). The backend skips Twilio: `POST /auth/otp/request` returns `{ sent: true }` and `POST /auth/otp/verify` accepts any 6-digit code. Use your real phone number on a physical device — no SMS is sent. Set `OTP_DEV_BYPASS=false` and `TWILIO_USE_LIVE_VERIFY=true` only if you intentionally test with **live** Twilio credentials and a real Verify Service SID.
+- In **staging/production**, use real LIVE credentials and your real `TWILIO_VERIFY_SERVICE_SID` from the Twilio console.
 - Never commit these values. Never hardcode them. They live only in Doppler.
 
 ### SDK / Library
@@ -132,17 +132,15 @@ client.verify.v2
 
 ### Environment Behaviour
 
-**Development — magic test numbers:**
+**Development — OTP dev bypass (default):**
 
-Twilio test credentials work with magic test numbers only. Use these in your seed data and dev testing:
+When `APP_ENV=development` (or unset locally), the backend **defaults to OTP dev bypass** unless `OTP_DEV_BYPASS=false` or `TWILIO_USE_LIVE_VERIFY=true`. No Twilio call is made; any 6-digit code verifies. Use any valid E.164 phone (including your real number on a physical device). No SMS is sent; no Twilio credits are consumed.
 
-| Phone | Behaviour |
-|-------|-----------|
-| `+15005550001` | Blacklisted — returns error |
-| `+15005550006` | Valid sender (use as `TWILIO_PHONE_NUMBER` in dev) |
-| `+15005550009` | Cannot receive SMS |
+Twilio magic test numbers (`+15005550006`, etc.) apply only to **SMS/Messages** endpoints with test credentials — **not** to Verify. Do not expect Verify + test credentials to work.
 
-Any 6-digit code verifies successfully when using test credentials. No SMS is ever sent. No Twilio credits are consumed.
+**Live Verify in local dev (optional):**
+
+Set `TWILIO_USE_LIVE_VERIFY=true`, `OTP_DEV_BYPASS=false`, and use **live** `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_VERIFY_SERVICE_SID` from Doppler. Real SMS will be sent and billed.
 
 **Staging/Production:**
 
@@ -709,64 +707,30 @@ const { data, error } = await supabaseAdmin.auth.admin.createUser({
 
 #### Call 2: Generate Session (get tokens for existing user)
 
-When a returning user verifies OTP, create a session using `supabaseAdmin.auth.admin.createSession()`. This method IS available in `@supabase/supabase-js >= 2.39.0`. Run `npm install @supabase/supabase-js@latest` in the backend to ensure you have a compatible version.
+Phone-only LetsSplyt users have no real email. Session creation uses an **internal email** (`{userId}@letssplyt.internal`) plus `generateLink` + `verifyOtp`. **Do not use `createSession()`** — it is not available in `@supabase/supabase-js@2.49` and the REST `/auth/v1/admin/users/{id}/sessions` endpoint returns 404.
+
+**Canonical implementation:** `backend/src/infrastructure/supabase-auth.ts` → `createAdminSession(userId)`.
 
 ```typescript
-// Step 1: After Twilio OTP verification succeeds, find or create the user
-async function findOrCreateUser(phoneE164: string): Promise<{ user: User; isNew: boolean }> {
-  const phoneHash = hashPhone(phoneE164); // HMAC-SHA256
-  
-  // Look up existing user by phone hash
-  const { data: existing } = await supabaseAdmin
-    .from('users')
-    .select('id')
-    .eq('phone_hash', phoneHash)
-    .single();
-  
-  if (existing) {
-    const { data: user } = await supabaseAdmin
-      .from('users').select('*').eq('id', existing.id).single();
-    return { user: user!, isNew: false };
-  }
-  
-  // Create new Supabase Auth user
-  const { data: authData, error } = await supabaseAdmin.auth.admin.createUser({
-    phone: phoneE164,
-    phone_confirm: true,   // Mark phone as verified
-    user_metadata: { phone_hash: phoneHash },
-  });
-  if (error) throw error;
-  
-  // Insert into public.users table
-  const { data: user } = await supabaseAdmin
-    .from('users')
-    .insert({ id: authData.user.id, phone_hash: phoneHash, display_name: '' })
-    .select().single();
-  
-  return { user: user!, isNew: true };
-}
+// 1. Ensure auth user has internal email (set on createUser for new users)
+const email = await ensureInternalEmail(userId); // e.g. "uuid@letssplyt.internal"
 
-// Step 2: Create a session for the user
-// supabaseAdmin.auth.admin.createSession() IS available in @supabase/supabase-js >= 2.39.0
-async function createUserSession(userId: string): Promise<Session> {
-  const { data, error } = await supabaseAdmin.auth.admin.createSession({
-    user_id: userId,
-  });
-  if (error) throw error;
-  return data.session;
-}
-```
-
-**Version requirement:** Requires `@supabase/supabase-js >= 2.39.0`. Run `npm install @supabase/supabase-js@latest` in the backend.
-
-```typescript
-// Get existing user by phone hash lookup in your users table, then create a session
-const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.createSession({
-  userId: existingUser.id,   // UUID from your users table
+// 2. Admin generateLink → hashed_token
+const { data: linkData } = await supabaseAdmin.auth.admin.generateLink({
+  type: 'magiclink',
+  email,
 });
-// sessionData.session.access_token → return to mobile
-// sessionData.session.refresh_token → return to mobile, store in SecureStore
+
+// 3. Exchange token for session
+const { data: verifyData } = await supabaseAdmin.auth.verifyOtp({
+  token_hash: linkData.properties.hashed_token,
+  type: 'email',
+});
+
+// verifyData.session.access_token / refresh_token → return to mobile
 ```
+
+**New user profile write:** After `createUser`, insert into `public.users` via RPC `upsert_user_profile_on_auth` (migration `20260608000000_users_auth_registration.sql`). Direct INSERT via service role can fail RLS (`42501`) without the migration.
 
 #### Call 3: Get User by ID
 
@@ -810,80 +774,20 @@ const { data, error } = await supabaseAdmin.auth.admin.deleteUser(userId);
 ### TypeScript Code Example
 
 ```typescript
-// backend/src/modules/auth/auth.service.ts — session creation after OTP verify
+// backend/src/modules/auth/auth.service.ts — after OTP verify resolves userId:
 
-import { supabaseAdmin } from '../../infrastructure/supabase';
-import { AppError } from '../../infrastructure/errors';
+import { createAdminSession } from '../../infrastructure/supabase-auth';
 
-export interface SessionResult {
-  accessToken: string;
-  refreshToken: string;
-  userId: string;
-  isNewUser: boolean;
-}
-
-export async function createOrGetSession(
-  phoneE164: string,
-  displayName?: string,
-): Promise<SessionResult> {
-  // Look up phone_hash in your users table first
-  const existingUser = await getUserByPhoneHash(hashPhone(phoneE164));
-
-  if (existingUser) {
-    // Returning user — create new session
-    const { data, error } = await supabaseAdmin.auth.admin.createSession({
-      userId: existingUser.id,
-    });
-    if (error || !data.session) {
-      throw new AppError('SESSION_CREATE_FAILED', error?.message ?? 'Could not create session');
-    }
-    return {
-      accessToken: data.session.access_token,
-      refreshToken: data.session.refresh_token,
-      userId: existingUser.id,
-      isNewUser: false,
-    };
-  }
-
-  // New user — create auth user + users table row in one go
-  if (!displayName) {
-    throw new AppError('NAME_REQUIRED', 'display_name is required for new users');
-  }
-
-  const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-    phone: phoneE164,
-    phone_confirm: true,
-    user_metadata: { display_name: displayName },
-  });
-
-  if (authError || !authData.user) {
-    throw new AppError('USER_CREATE_FAILED', authError?.message ?? 'Could not create user');
-  }
-
-  // Insert row in your users table
-  await insertUser({
-    id: authData.user.id,
-    phoneE164,
-    displayName,
-  });
-
-  // Create initial session
-  const { data: sessionData, error: sessionError } = await supabaseAdmin.auth.admin.createSession({
-    userId: authData.user.id,
-  });
-
-  if (sessionError || !sessionData.session) {
-    throw new AppError('SESSION_CREATE_FAILED', sessionError?.message ?? 'Could not create session');
-  }
-
-  return {
-    accessToken: sessionData.session.access_token,
-    refreshToken: sessionData.session.refresh_token,
-    userId: authData.user.id,
-    isNewUser: true,
-  };
-}
+const session = await createAdminSession(resolved.userId);
+return {
+  access_token: session.access_token,
+  refresh_token: session.refresh_token,
+  expires_in: session.expires_in,
+  user: { id: resolved.userId, display_name: resolved.userDisplayName, ... },
+};
 ```
+
+See `auth.service.ts` (`verifyOtpAndCreateSession`, `upsertPublicUserProfile`) and `supabase-auth.ts` for the full flow.
 
 ---
 

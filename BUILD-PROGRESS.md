@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
-**Last updated:** June 2026
-**Current story:** E03-S03 — Welcome + PhoneEntry Screens + authStore
+**Last updated:** 2026-06-08
+**Current story:** E04-S01 — Profile API Endpoints (GET/PATCH /users/me, CRUD /handles)
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -27,8 +27,8 @@
 ### Epic 3: Authentication
 - [x] E03-S01 — OTP Request Endpoint (POST /auth/otp/request) (2026-06-07)
 - [x] E03-S02 — OTP Verify + Session Creation (POST /auth/otp/verify) (2026-06-07)
-- [ ] E03-S03 — Welcome + PhoneEntry Screens + authStore
-- [ ] E03-S04 — OTPVerify Screen + initAuthListener + Token Refresh
+- [x] E03-S03 — Welcome + PhoneEntry Screens + authStore (2026-06-07)
+- [x] E03-S04 — OTPVerify Screen + initAuthListener + Token Refresh (2026-06-08)
 
 ### Epic 4: Profile & Payment Handles
 - [ ] E04-S01 — Profile API Endpoints (GET/PATCH /users/me, CRUD /handles)
@@ -94,10 +94,10 @@
 
 | Tier | Epics | Stories | Done | Remaining |
 |---|---|---|---|---|
-| Tier 1 — Foundation | 4 | 16 | 12 | 4 |
+| Tier 1 — Foundation | 4 | 16 | 13 | 3 |
 | Tier 2 — Core Flow | 5 | 22 | 0 | 22 |
 | Tier 3 — Operations | 3 | 8 | 0 | 8 |
-| **Total** | **12** | **46** | **12** | **34** |
+| **Total** | **12** | **46** | **13** | **33** |
 
 ---
 
@@ -107,3 +107,5 @@
 - [2026-06-07] — E01-S01–E03-S02 — Monorepo scaffold, full DB migration+seed, Express middleware, Supabase clients, LLM factory, OTP auth endpoints. Session creation via Admin REST API (`/auth/v1/admin/users/{id}/sessions`) because `createSession()` is not in @supabase/supabase-js@2.49. Mobile bumped to Expo SDK 52 for React Navigation v7 compat.
 - [2026-06-07] — E01-S05 — Jest (backend+mobile), mocks (supabase/twilio/llm), CI workflow, ESLint root config, git-secrets hooks. Per-table `__setMockResultForTable` added for independent table mock config.
 - [2026-06-07] — E01-S06 — crypto/sanitize utilities with 100% test coverage target, formatCurrency, resolveParticipantPhone. Hex IV format per docs/09 (not base64 from build-sequence prompt).
+- [2026-06-08] — Mobile upgraded Expo SDK 52 → 54 to match App Store Expo Go (SDK 54). React 19.1, RN 0.81. Docs updated in CLAUDE.md, 08, 10, 12-Build-Sequence.
+- [2026-06-08] — E03-S04 + auth hardening. Session creation via `backend/src/infrastructure/supabase-auth.ts` (`generateLink` + `verifyOtp` + internal email `{userId}@letssplyt.internal`) — NOT `createSession()` or REST `/admin/users/{id}/sessions` (404). Registration writes `public.users` via `upsert_user_profile_on_auth` SECURITY DEFINER RPC + `users_service_role_all` policy — migration `20260608000000_users_auth_registration.sql`. Login OTP requires `public.users` row (orphan `auth.users` → `ACCOUNT_NOT_FOUND`). Mobile: duck-typed `isApiRequestError()` in `api.ts` (Metro breaks `instanceof`); E.164 normalization in `phone.ts`; Register CTA + logout on Home. Dev cleanup: `cd backend && doppler run -- npm run cleanup:phone -- +1XXXXXXXXXX`. If schema already applied: `npx supabase migration repair 20260601000000 --status applied` before `db push`.

@@ -6,13 +6,14 @@ import { AppError } from '../../infrastructure/errors';
 const otpRequestSchema = z.object({
   phone_e164: z.string().regex(/^\+[1-9]\d{7,14}$/, 'Must be a valid E.164 phone number'),
   channel: z.enum(['sms', 'whatsapp']).optional(),
+  context: z.enum(['login', 'register']).optional(),
 });
 
 const otpVerifySchema = z.object({
   phone_e164: z.string().regex(/^\+[1-9]\d{7,14}$/, 'Must be a valid E.164 phone number'),
   code: z.string().regex(/^[0-9]{6}$/, 'Code must be exactly 6 digits'),
   display_name: z.string().max(50).optional(),
-  context: z.enum(['login', 'join_event']).optional(),
+  context: z.enum(['login', 'register', 'join_event']).optional(),
   join_token: z.string().optional(),
 });
 
@@ -34,7 +35,11 @@ export async function handleOtpRequest(
       return;
     }
 
-    const result = await sendOtp(parsed.data.phone_e164, parsed.data.channel ?? 'sms');
+    const result = await sendOtp(
+      parsed.data.phone_e164,
+      parsed.data.channel ?? 'sms',
+      parsed.data.context,
+    );
     res.status(200).json(result);
   } catch (err) {
     next(err);
@@ -63,6 +68,7 @@ export async function handleOtpVerify(
       parsed.data.phone_e164,
       parsed.data.code,
       parsed.data.display_name,
+      parsed.data.context ?? 'register',
     );
 
     res.status(200).json(session);

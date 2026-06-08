@@ -2,9 +2,12 @@
 
 export type OtpChannel = 'sms' | 'whatsapp';
 
+export type OtpRequestContext = 'login' | 'register';
+
 export interface OtpRequestBody {
   phone_e164: string;
   channel?: OtpChannel;
+  context?: OtpRequestContext;
 }
 
 export interface OtpRequestResponse {
@@ -12,13 +15,15 @@ export interface OtpRequestResponse {
   channel?: OtpChannel;
   expires_in_seconds?: number;
   reason?: string;
+  /** Present on register flow — true when phone already has an account */
+  account_exists?: boolean;
 }
 
 export interface OtpVerifyBody {
   phone_e164: string;
   code: string;
   display_name?: string;
-  context?: 'login' | 'join_event';
+  context?: 'login' | 'register' | 'join_event';
   join_token?: string;
 }
 

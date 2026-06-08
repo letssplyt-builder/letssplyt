@@ -4,10 +4,11 @@ const config: Config = {
   preset: 'jest-expo',
   setupFilesAfterEnv: ['./src/__tests__/setup.ts'],
   transformIgnorePatterns: [
-    'node_modules/(?!(react-native|@react-native|expo|@expo|@unimodules|unimodules|sentry-expo|native-base|@react-navigation|react-navigation|@letssplyt)/)',
+    'node_modules/(?!(react-native|@react-native|expo|@expo|expo-modules-core|@unimodules|unimodules|sentry-expo|native-base|@react-navigation|react-navigation|react-native-phone-number-input|@letssplyt)/)',
   ],
   moduleNameMapper: {
     '@letssplyt/shared/(.*)': '<rootDir>/../shared/types/$1',
+    '^expo-constants$': '<rootDir>/src/__tests__/mocks/expo-constants.ts',
     '\\.(jpg|jpeg|png|gif|svg)$': '<rootDir>/src/__tests__/mocks/fileMock.ts',
   },
   collectCoverageFrom: [
@@ -22,7 +23,7 @@ const config: Config = {
       branches: 60,
     },
   },
-  testMatch: ['**/__tests__/**/*.test.{ts,tsx}'],
+  testMatch: ['**/__tests__/**/*.test.{ts,tsx}', '**/*.test.{ts,tsx}'],
 };
 
 export default config;

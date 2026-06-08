@@ -1,5 +1,6 @@
 import rateLimit from 'express-rate-limit';
 import { RateLimitError } from '../infrastructure/errors';
+import { isOtpDevBypassEnabled } from '../modules/auth/otp-dev-bypass';
 
 export const globalRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -21,6 +22,7 @@ export const authRateLimiter = rateLimit({
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => isOtpDevBypassEnabled(),
   handler: (_req, res) => {
     res.status(429).json({
       error: {
@@ -36,6 +38,7 @@ const otpRequestCounts = new Map<string, { count: number; resetAt: number }>();
 const otpVerifyAttempts = new Map<string, { count: number; resetAt: number }>();
 
 export function checkOtpRequestRate(phoneHash: string, maxPerHour = 5): void {
+  if (isOtpDevBypassEnabled()) return;
   const now = Date.now();
   const entry = otpRequestCounts.get(phoneHash);
   if (!entry || entry.resetAt < now) {
@@ -48,7 +51,15 @@ export function checkOtpRequestRate(phoneHash: string, maxPerHour = 5): void {
   }
 }
 
-export function checkOtpVerifyRate(phoneHash: string, maxPer10Min = 5): void {
+/** Clears in-memory OTP counters — for integration tests only. */
+export function resetOtpRateLimitState(): void {
+  otpRequestCounts.clear();
+  otpVerifyAttempts.clear();
+}
+
+/** Counts only failed verification attempts (wrong code), per API spec. */
+export function recordFailedOtpVerify(phoneHash: string, maxPer10Min = 5): void {
+  if (isOtpDevBypassEnabled()) return;
   const now = Date.now();
   const entry = otpVerifyAttempts.get(phoneHash);
   if (!entry || entry.resetAt < now) {

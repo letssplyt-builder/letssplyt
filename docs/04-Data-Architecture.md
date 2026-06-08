@@ -1198,7 +1198,18 @@ CREATE POLICY "users_update_own" ON users
   WITH CHECK (auth.uid() = id);
 
 -- Soft deletes are performed by the backend service role — no client DELETE policy
+
+-- Backend registration (E03-S02b): service role must write public.users before the user has a JWT.
+-- users_insert_own requires auth.uid() = id — NULL for server-side registration writes.
+CREATE POLICY "users_service_role_all" ON users
+  AS PERMISSIVE
+  FOR ALL
+  TO service_role
+  USING (true)
+  WITH CHECK (true);
 ```
+
+**Registration RPC (E03-S02b):** `upsert_user_profile_on_auth` — SECURITY DEFINER function called by the backend during OTP verify for new users. Defined in `supabase/migrations/20260608000000_users_auth_registration.sql`. Grants `service_role` EXECUTE only; revokes PUBLIC.
 
 ### 6.3 `user_payment_handles` Policies
 
@@ -1705,8 +1716,9 @@ All schema changes are versioned migration files under `supabase/migrations/` at
 ```
 supabase/
   migrations/
-    20260601000000_initial_schema.sql      ← all tables, triggers, indexes, RLS, seed data
-    20260615000000_add_ai_audit_log.sql    ← if adding separately from initial
+    20260601000000_initial_schema.sql           ← all tables, triggers, indexes, RLS, seed data
+    20260608000000_users_auth_registration.sql ← service_role users policy + upsert_user_profile_on_auth RPC
+    20260615000000_add_ai_audit_log.sql         ← if adding separately from initial
     20260620000000_[description].sql       ← each subsequent change
   config.toml
 ```

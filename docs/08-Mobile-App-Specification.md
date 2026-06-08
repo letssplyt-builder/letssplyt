@@ -14,6 +14,10 @@ Getting navigation wrong early causes cascading refactors. State management patt
 
 ## 1. Navigation Architecture
 
+### Expo SDK
+
+The mobile app targets **Expo SDK 54** (React Native 0.81, React 19). The installed **Expo Go** app on your device must match this SDK version — Expo Go only runs projects on the same SDK it was built for. After changing the SDK, run `npx expo install --fix` in `mobile/` to align all `expo-*` package versions.
+
 ### Library
 
 Use **React Navigation v7** (`@react-navigation/native`, `@react-navigation/bottom-tabs`, `@react-navigation/native-stack`).
@@ -681,24 +685,28 @@ export const useSettlementStore = create<SettlementState>()((set) => ({
 
 ### API Helper — Absolute URLs Required
 
-React Native has no browser context. `fetch('/api/v1/...')` throws a network error. Every store must use the full base URL via the `api` helper from `src/lib/api.ts`, which prepends `EXPO_PUBLIC_API_URL` automatically.
+React Native has no browser context. `fetch('/api/v1/...')` throws a network error. Every store must use the full base URL via the `api` helper from `src/services/api.ts`, which resolves the backend host via `getApiBaseUrl()`:
+
+1. **`EXPO_PUBLIC_API_URL`** if set to a non-localhost URL (staging/production or manual override)
+2. **Expo Go debugger host** — your Mac's LAN IP from Metro (e.g. `http://192.168.1.42:3000`) — used automatically on physical devices
+3. **`http://localhost:3000`** — iOS Simulator / Android emulator only
+
+On a **physical phone**, `localhost` is the phone itself, not your Mac. The app must use your Mac's LAN IP (auto-detected in Expo Go) or an explicit `EXPO_PUBLIC_API_URL`.
 
 ```typescript
 // WRONG — relative URL crashes in React Native
 const response = await fetch('/api/v1/settlement/summary');
 
-// CORRECT — always use absolute URL from env
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL; // e.g. http://localhost:3000/api/v1
-const response = await fetch(`${BASE_URL}/settlement/summary`, {
-  headers: { Authorization: `Bearer ${session.access_token}` },
-});
+// CORRECT — use apiPost / apiRequest from src/services/api.ts
+import { apiPost } from '../services/api';
+await apiPost('/auth/otp/request', { phone_e164: '+15005550006' });
 ```
 
 ```typescript
-// src/lib/api.ts
-import { Session } from '@supabase/supabase-js';
+// src/services/api.ts (implementation reference)
+import { getApiBaseUrl } from './getApiBaseUrl';
 
-const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000/api/v1';
+const BASE_URL = `${getApiBaseUrl()}/api/v1`;
 
 class ApiError extends Error {
   constructor(public status: number, message: string, public code?: string) {

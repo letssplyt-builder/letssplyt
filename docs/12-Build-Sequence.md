@@ -424,21 +424,17 @@ export const TEST_USER_C = '00000000-0000-0000-0000-000000000003'; // Sam (not i
 export const TEST_EVENT_ACTIVE = '20000000-0000-0000-0000-000000000002';
 export const TEST_EVENT_SETTLED = '20000000-0000-0000-0000-000000000001';
 
-// generateLink requires email — LetsSplyt users are phone-only. createSession works with just userId.
+// Phone-only users need an internal email for session creation.
+// Use createAdminSession() from backend/src/infrastructure/supabase-auth.ts
+// (generateLink + verifyOtp). Do NOT use createSession() — not available in @supabase/supabase-js@2.49.
 
 /**
  * Creates a Supabase client authenticated as a specific user.
- * Uses a signed JWT generated for the test user via the service role.
+ * Uses createAdminSession() to obtain tokens, then setSession on an anon client.
  */
 // rls-test-helpers.ts — correct pattern for phone-only users
 async function createClientAsUser(userId: string): Promise<SupabaseClient> {
-  // Use createSession (available in supabase-js v2) to get a session for a user by ID
-  const { data: { session }, error } = await supabaseAdmin.auth.admin.createSession({
-    userId,           // The user's UUID from auth.users
-    expiresIn: 3600,  // 1 hour — plenty for tests
-  });
-  if (error || !session) throw new Error(`Could not create test session: ${error?.message}`);
-  
+  const session = await createAdminSession(userId);
   const client = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_PUBLISHABLE_KEY!);
   await client.auth.setSession({
     access_token: session.access_token,
@@ -645,7 +641,7 @@ TIER 3 — OPERATIONS (build after core flow is working)
 **Description:** Create the complete monorepo structure with correct package.json workspaces, tsconfig path aliases, and shared types package. This is the foundation everything imports from. No application code is written in this story — only the project structure.
 
 **Prompt:**
-*"Scaffold the complete LetsSplyt monorepo. Create: (1) Root package.json with name: 'letssplyt-monorepo', workspaces: ['mobile', 'backend', 'shared'], and scripts: { 'test': 'npm run test --workspaces', 'lint': 'npm run lint --workspaces --if-present', 'typecheck': 'npm run typecheck --workspaces --if-present' }. (2) Root tsconfig.base.json with compilerOptions: { strict: true, esModuleInterop: true, skipLibCheck: true, resolveJsonModule: true, target: 'ES2022', module: 'commonjs' } and paths: { '@letssplyt/shared/*': ['./shared/types/*'] }. (3) shared/package.json with name: '@letssplyt/shared', version: '1.0.0', main: './types/index.ts', types: './types/index.ts'. (4) shared/types/index.ts that re-exports everything from all type files. (5) shared/types/ directory with empty but correctly typed files: auth.types.ts (export type placeholder), event.types.ts, participant.types.ts, receipt.types.ts, settlement.types.ts, api.types.ts — each with a comment placeholder and one empty export type to avoid TypeScript empty module errors. (6) backend/package.json with name: 'letssplyt-backend', dependencies: { express: '^4.18', '@supabase/supabase-js': '^2', twilio: '^5', '@upstash/qstash': '^2', zod: '^3', bcryptjs: '^2', libphonenumber-js: '^1', sharp: '^0.33', pino: '^9' }, devDependencies: { jest: '^29', 'ts-jest': '^29', '@types/jest': '^29', supertest: '^7', '@types/supertest': '^6', typescript: '^5', 'ts-node-dev': '^2', '@types/express': '^4', '@types/bcryptjs': '^2', '@types/node': '^22' }. (7) backend/tsconfig.json extending '../../tsconfig.base.json' with outDir: 'dist', rootDir: 'src', references: [{ path: '../../shared' }]. (8) mobile/package.json with name: 'letssplyt-mobile', dependencies matching a standard Expo SDK 51 project plus: zustand, @react-navigation/native, @react-navigation/native-stack, @react-navigation/bottom-tabs, react-native-phone-number-input. devDependencies: { jest: '^29', '@testing-library/react-native': '^12', '@testing-library/jest-native': '^5', typescript: '^5', '@types/react': '^18', '@types/react-native': '^0.72' }. (9) mobile/tsconfig.json extending '../../tsconfig.base.json' with jsx: 'react-native'. Do not write any application logic — only the project scaffold. Also create `.gitignore` at the project root with exactly this content:
+*"Scaffold the complete LetsSplyt monorepo. Create: (1) Root package.json with name: 'letssplyt-monorepo', workspaces: ['mobile', 'backend', 'shared'], and scripts: { 'test': 'npm run test --workspaces', 'lint': 'npm run lint --workspaces --if-present', 'typecheck': 'npm run typecheck --workspaces --if-present' }. (2) Root tsconfig.base.json with compilerOptions: { strict: true, esModuleInterop: true, skipLibCheck: true, resolveJsonModule: true, target: 'ES2022', module: 'commonjs' } and paths: { '@letssplyt/shared/*': ['./shared/types/*'] }. (3) shared/package.json with name: '@letssplyt/shared', version: '1.0.0', main: './types/index.ts', types: './types/index.ts'. (4) shared/types/index.ts that re-exports everything from all type files. (5) shared/types/ directory with empty but correctly typed files: auth.types.ts (export type placeholder), event.types.ts, participant.types.ts, receipt.types.ts, settlement.types.ts, api.types.ts — each with a comment placeholder and one empty export type to avoid TypeScript empty module errors. (6) backend/package.json with name: 'letssplyt-backend', dependencies: { express: '^4.18', '@supabase/supabase-js': '^2', twilio: '^5', '@upstash/qstash': '^2', zod: '^3', bcryptjs: '^2', libphonenumber-js: '^1', sharp: '^0.33', pino: '^9' }, devDependencies: { jest: '^29', 'ts-jest': '^29', '@types/jest': '^29', supertest: '^7', '@types/supertest': '^6', typescript: '^5', 'ts-node-dev': '^2', '@types/express': '^4', '@types/bcryptjs': '^2', '@types/node': '^22' }. (7) backend/tsconfig.json extending '../../tsconfig.base.json' with outDir: 'dist', rootDir: 'src', references: [{ path: '../../shared' }]. (8) mobile/package.json with name: 'letssplyt-mobile', dependencies matching a standard **Expo SDK 54** project (expo: '^54.0.0', react: 19.1.0, react-native: 0.81.5) plus: zustand, @react-navigation/native, @react-navigation/native-stack, @react-navigation/bottom-tabs, react-native-phone-number-input, expo-build-properties. devDependencies: { jest: '^29', '@testing-library/react-native': '^12', typescript: '^5', '@types/react': '~19.1', jest-expo: '~54.0' }. Do NOT add @types/react-native — types ship with react-native. Do NOT add @testing-library/jest-native (deprecated). After scaffold, run `cd mobile && npx expo install --fix` to verify all expo-* versions match SDK 54. (9) mobile/tsconfig.json extending '../../tsconfig.base.json' with jsx: 'react-native'. Do not write any application logic — only the project scaffold. Also create `.gitignore` at the project root with exactly this content:
 
 ```gitignore
 # Dependencies
@@ -1057,7 +1053,7 @@ Read docs/04-Data-Architecture.md for the exact RLS policy specifications. Creat
 3. Note: payer is identified via `events.payer_id`, NOT `events.creator_id`
 
 Also create `backend/src/tests/rls.test.ts` using the test helper pattern:
-- Use `supabaseAdmin.auth.admin.createSession({ userId })` to create test sessions (NOT generateLink — LetsSplyt users have no email)
+- Use `createAdminSession(userId)` from `supabase-auth.ts` for test sessions (generateLink + verifyOtp + internal email)
 - Test that each policy allows what it should and blocks what it should
 - At minimum: test that user A cannot read user B's payment handles, and that a participant can read event details
 
@@ -1165,7 +1161,7 @@ backend/src/__tests__/integration/auth/otp-request.test.ts  (supertest)
 **Description:** Build `POST /api/v1/auth/otp/verify`. Verifies the code with Twilio, creates or upserts the user in both Supabase Auth and the public users table, and returns a JWT. The user ID in `auth.users` must match the ID in `public.users`.
 
 **Prompt:**
-*"Build POST /api/v1/auth/otp/verify in auth.service.ts and auth.controller.ts. Request body (Zod): { phone_e164: string (E.164), code: string (exactly 6 digits: z.string().regex(/^[0-9]{6}$/)) }. Service logic: (1) Validate with Zod. (2) Normalise phone with libphonenumber-js. (3) Call twilioClient.verify.v2.services(TWILIO_VERIFY_SERVICE_SID).verificationChecks.create({ to: normalisedPhone, code }). If result.status !== 'approved', return { verified: false, error: 'INVALID_CODE' } with status 400. (4) Compute phone_hash = hashPhone(normalised) and phone_encrypted = encrypt(normalised, process.env.PHONE_ENCRYPTION_KEY). (5) Check if user exists: SELECT id FROM users WHERE phone_hash = hash via supabaseAdmin. (6) If user does not exist: generate a new UUID with crypto.randomUUID(). Insert into public.users: { id: newUuid, phone_hash, phone_encrypted, display_name: '' } via supabaseAdmin. Then create a Supabase Auth user: supabaseAdmin.auth.admin.createUser({ id: newUuid, phone: normalisedPhone, phone_confirm: true, user_metadata: { letssplyt_user: true } }). IMPORTANT: The id passed to createUser must be the same UUID inserted into public.users so the two rows share the same primary key. (7) If user exists: retrieve their id from public.users. (8) Generate a session token: use supabaseAdmin.auth.admin.generateLink({ type: 'magiclink', email: userId + '@letssplyt.internal' }) to get an access token. Alternatively, if your supabase-js version supports it, use supabaseAdmin.auth.admin.createSession({ user_id: userId }). Return the access_token and refresh_token from whichever method works. (9) Return: { verified: true, access_token: string, refresh_token: string, user: { id: string, display_name: string } }. Add OtpVerifyBody and AuthSession to shared/types/auth.types.ts."*
+*"Build POST /api/v1/auth/otp/verify in auth.service.ts and auth.controller.ts. Request body (Zod): { phone_e164: string (E.164), code: string (exactly 6 digits), display_name?: string (max 50), context?: 'login' | 'register' | 'join_event' }. Service logic: (1) Validate with Zod. (2) Normalise phone with libphonenumber-js. (3) Call twilioClient.verify.v2.services(TWILIO_VERIFY_SERVICE_SID).verificationChecks.create({ to, code }) — skip in dev when OTP dev bypass is enabled (any 6-digit code). If not approved, throw INVALID_CODE 400. (4) Compute phone_hash = hashPhone() and phone_encrypted = encryptPhone(). (5) resolveUserAfterOtp(): if public.users row exists for phone_hash → login. If auth.users exists but no public row → repair profile. If context=login and neither exists → ACCOUNT_NOT_FOUND 404. If context=register and neither exists → require display_name, pre-generate UUID, createUser with phone + internal email {uuid}@letssplyt.internal, then upsert public.users via RPC upsert_user_profile_on_auth (see E03-S02b migration — direct INSERT hits RLS 42501). (6) Session: call createAdminSession(userId) from backend/src/infrastructure/supabase-auth.ts — ensureInternalEmail, generateLink magiclink, verifyOtp with hashed_token. Do NOT use createSession() or REST /admin/users/{id}/sessions (404 in @supabase/supabase-js@2.49). (7) Return AuthSession with access_token, refresh_token, expires_in, user { id, display_name, avatar_colour, is_new_user }. Never return phone_e164 or phone_hash. Add types to shared/types/auth.types.ts."*
 
 **Files created:**
 - `backend/src/modules/auth/auth.service.ts` (updated)
@@ -1201,33 +1197,59 @@ On new user creation, randomly assign `avatar_colour` from a predefined palette 
 
 **Tests required:**
 ```
-backend/src/__tests__/unit/auth/auth.service.test.ts  (extend existing file)
-  - calls Twilio verificationChecks.create with correct phone and code
-  - returns { verified: false, error: 'INVALID_CODE' } when Twilio status is not 'approved'
-  - encrypts phone with PHONE_ENCRYPTION_KEY before inserting into users
-  - hashes phone with PII_HMAC_SALT before inserting into users
-  - inserts into public.users with the same UUID used for auth.users
-  - returns the same user.id on second call for the same phone (idempotent)
-  - response object never contains phone_e164 or phone_hash
-  - creates public.users row using the same ID as auth.users
-  - if public.users upsert returns 0 rows: retries once
-  - returns AUTH_PROFILE_CREATION_FAILED after two failures
-  - second login for same phone: returns existing user ID (idempotent)
+backend/src/__tests__/unit/auth/auth.service.test.ts
+  - calls Twilio verificationChecks.create when dev bypass disabled
+  - throws INVALID_CODE when Twilio does not approve
+  - hashes and encrypts phone before profile creation
+  - calls upsert_user_profile_on_auth RPC for new registrations
+  - returns AUTH_PROFILE_CREATION_FAILED when RPC and direct upsert both fail
+  - returns same user.id on second verify (idempotent)
+  - response never contains phone_e164 or phone_hash
+  - login rejects orphan auth.users (no public.users) with ACCOUNT_NOT_FOUND
+  - register returns account_exists when public profile exists
+
+backend/src/__tests__/unit/infrastructure/supabase-auth.test.ts
+  - createAdminSession uses generateLink + verifyOtp (not REST sessions)
 
 backend/src/__tests__/integration/auth/otp-verify.test.ts  (supertest)
-  - POST with Twilio magic code 000000 for valid test number returns 200 with access_token
+  - POST with valid dev-bypass code returns 200 with access_token
   - POST with wrong code returns 400 INVALID_CODE
-  - POST twice for same phone returns same user.id both times
+  - POST twice for same phone returns same user.id
+
+Run: cd backend && npm test
 ```
 
-**Service logic for user creation (step 4):** Use a retry loop with idempotent upsert to handle partial failures:
-(1) Check if a public.users row exists for this phone_hash. If yes, get the user_id.
-(2) If no public.users row exists: call supabaseAdmin.auth.admin.createUser({ phone: phone_e164, phone_confirm: true, user_metadata: { phone_hash } }). Get the returned user.id.
-(3) Upsert into public.users: INSERT INTO users (id, phone_hash, phone_encrypted) VALUES (user.id, phoneHash, phoneEncrypted) ON CONFLICT (id) DO NOTHING.
-(4) If the upsert returns 0 rows AND no users row exists with this id: retry once (handles the race where auth.users was created but public.users write failed).
-(5) If after retry the public.users row still doesn't exist: return 500 AUTH_PROFILE_CREATION_FAILED.
+**Service logic for user creation:** Pre-generate UUID with `crypto.randomUUID()`. Create auth user with that id, internal email, and phone_confirm. Write `public.users` via `upsert_user_profile_on_auth` RPC (SECURITY DEFINER). Fall back to direct upsert only if RPC unavailable. If both fail → 500 `AUTH_PROFILE_CREATION_FAILED` with log hint to apply migration `20260608000000_users_auth_registration.sql`.
 
-Important: The user.id from auth.users must equal the id in public.users. They are the same UUID. This is enforced by using the auth user's returned ID as the primary key in public.users.
+**Session creation:** Always use `createAdminSession()` in `supabase-auth.ts`. Never `createSession()` — not in supabase-js@2.49.
+
+---
+
+### E03-S02b — Auth Registration Migration (required for new sign-ups)
+
+**Description:** RLS on `public.users` blocks service-role direct INSERT during registration (`users_insert_own` requires `auth.uid() = id`, which is NULL for server-side writes). This migration adds explicit service-role access and a SECURITY DEFINER RPC.
+
+**Files:**
+- `supabase/migrations/20260608000000_users_auth_registration.sql`
+
+**Apply to remote Supabase:**
+```bash
+# From repo root, after supabase link (one-time):
+npx supabase login
+npx supabase link --project-ref <your-project-ref>
+
+# If initial_schema tables already exist but CLI shows both migrations pending:
+npx supabase migration repair 20260601000000 --status applied
+
+npx supabase db push   # applies only 20260608000000
+```
+
+Alternative: paste migration SQL into Supabase Dashboard → SQL Editor.
+
+**Dev cleanup after failed registrations:**
+```bash
+cd backend && doppler run -- npm run cleanup:phone -- +1XXXXXXXXXX
+```
 
 ---
 
@@ -1238,13 +1260,13 @@ Important: The user.id from auth.users must equal the id in public.users. They a
 **Prompt:**
 Read docs/08-Mobile-App-Specification.md for screen specs and the authStore spec. Build:
 
-1. `mobile/src/screens/auth/WelcomeScreen.tsx` — app logo/name, tagline, single "Get Started" button that navigates to PhoneEntry
-2. `mobile/src/screens/auth/PhoneEntryScreen.tsx` — phone number text input (E.164 format helper), country code picker defaulting to +1, "Send Code" button that calls `POST /auth/otp/request`, loading state, error display
+1. `mobile/src/screens/auth/WelcomeScreen.tsx` — app logo/name, tagline, "Get Started" (register) and "I already have an account" (login) buttons
+2. `mobile/src/screens/auth/PhoneEntryScreen.tsx` — phone input with country code (+1 default), "Send Code" calls `POST /auth/otp/request` with `context: 'login' | 'register'`. **Login + unknown number:** show Register CTA (backend returns `ACCOUNT_NOT_FOUND` 404). **Register + existing number:** navigate to OTP with `accountExists: true`. Use `mobile/src/utils/phone.ts` (`toE164FromPhoneInput`, `nationalFromE164`) — never pass E.164 through libphonenumber twice (causes double-prefix `+1+1...`). Use `isApiRequestError()` / `getApiErrorCode()` from `api.ts` — **never `instanceof ApiRequestError`** (Metro breaks across module boundaries).
 3. `mobile/src/store/authStore.ts` — Zustand store with:
    - State: `session: Session | null`, `user: User | null`, `isLoading: boolean`
-   - Actions: `setSession(session)`, `clearSession()`, `setLoading(bool)`
-   - Uses `expo-secure-store` to persist the access token (key: `auth_token`) — NEVER AsyncStorage
-4. Wire WelcomeScreen and PhoneEntryScreen into `mobile/src/navigation/RootNavigator.tsx` auth stack
+   - Actions: `setSession(session)`, `clearSession()`, `setLoading(bool)`, `applyAuthResponse()`
+   - Uses `expo-secure-store` to persist tokens — NEVER AsyncStorage
+4. Wire screens into `mobile/src/navigation/RootNavigator.tsx` auth stack
 
 Match the visual design in `prototype/dusk-auth.html`.
 
@@ -1265,10 +1287,13 @@ Match the visual design in `prototype/dusk-auth.html`.
 **Tests to run:**
 ```bash
 cd mobile && npm test src/screens/auth/WelcomeScreen.test.tsx
+cd mobile && npm test src/screens/auth/PhoneEntryScreen.test.tsx
+cd mobile && npm test src/services/api.test.ts
+cd mobile && npm test src/utils/phone.test.ts
 cd mobile && npm test src/store/authStore.test.ts
 ```
 
-**Expected output:** Screens render without errors. Store initialises with null session.
+**Expected output:** Register CTA on login+unknown number; register navigates with `accountExists`; duck-typed API errors work.
 
 ---
 
@@ -1281,25 +1306,29 @@ Read docs/08-Mobile-App-Specification.md for the OTPVerify screen spec and the `
 
 1. `mobile/src/screens/auth/OTPVerifyScreen.tsx`:
    - 6-digit OTP input (individual digit boxes per prototype)
-   - "Verify" button calls `POST /auth/otp/verify` with phone + OTP
-   - On success: calls `authStore.setSession()`, stores token in expo-secure-store, navigates to Home
+   - "Verify" calls `POST /auth/otp/verify` with phone, code, context, and display_name (register only)
+   - On success: `authStore.applyAuthResponse()` — sets local session **before** Supabase `setSession` (backend JWT may 404 on client verify endpoint; local store must still work)
+   - Register + `accountExists`: hide name field, show "already registered" banner
    - "Resend" link (cooldown 30 seconds)
-   - Error display for wrong OTP
+   - Error display via `isApiRequestError()` duck-typing
 
-2. Complete `mobile/src/store/authStore.ts` with `initAuthListener()`:
+2. `mobile/src/screens/home/HomeScreen.tsx` — placeholder with **Log out** button calling `authStore.logout()`
+
+3. Complete `mobile/src/store/authStore.ts` with `initAuthListener()`:
    - Calls `supabase.auth.onAuthStateChange((event, session) => ...)`
    - On `TOKEN_REFRESHED`: calls `setSession(session)`, updates expo-secure-store
    - On `SIGNED_OUT`: calls `clearSession()`, removes from expo-secure-store
    - This must be called once in the app root (RootNavigator) on mount
    - Biometric re-enrolment edge case: if `event === 'USER_UPDATED'` and biometric was previously enrolled, prompt re-enrolment
 
-3. Call `authStore.getState().initAuthListener()` in RootNavigator on mount
+4. Call `authStore.getState().initAuthListener()` in RootNavigator on mount
 
 Match the OTP screen design in `prototype/dusk-auth.html`.
 
 **Files created:**
 - `mobile/src/screens/auth/OTPVerifyScreen.tsx`
-- Updates to `mobile/src/store/authStore.ts` (add initAuthListener)
+- `mobile/src/screens/home/HomeScreen.tsx`
+- Updates to `mobile/src/store/authStore.ts` (add initAuthListener, applyAuthResponse, logout)
 - Updates to `mobile/src/navigation/RootNavigator.tsx` (call initAuthListener on mount)
 
 **Acceptance criteria:**
@@ -1317,10 +1346,14 @@ Match the OTP screen design in `prototype/dusk-auth.html`.
 **Tests to run:**
 ```bash
 cd mobile && npm test src/screens/auth/OTPVerifyScreen.test.tsx
+cd mobile && npm test src/screens/home/HomeScreen.test.tsx
 cd mobile && npm test src/store/authStore.test.ts
+cd backend && npm test
 ```
 
-**Expected output:** OTP flow tests pass, token refresh path covered.
+**Expected output:** OTP flow, logout, token refresh, and backend auth integration tests pass.
+
+**Prerequisite:** E03-S02b migration applied to Supabase before testing new user registration end-to-end.
 
 ---
 

@@ -1,70 +1,52 @@
 import { jest, beforeEach } from '@jest/globals';
 
-const secureStoreMap = new Map<string, string>();
+const mockSecureStoreMap = new Map<string, string>();
 
 jest.mock('expo-camera', () => ({
-  useCameraPermissions: jest
-    .fn<() => [{ granted: boolean }, jest.Mock]>()
-    .mockReturnValue([{ granted: true }, jest.fn()]),
+  useCameraPermissions: jest.fn().mockReturnValue([{ granted: true }, jest.fn()]),
   CameraView: 'CameraView',
 }));
 
 jest.mock('expo-secure-store', () => ({
-  getItemAsync: jest.fn<(key: string) => Promise<string | null>>((key: string) =>
-    Promise.resolve(secureStoreMap.get(key) ?? null),
-  ),
-  setItemAsync: jest.fn<(key: string, value: string) => Promise<void>>((key: string, value: string) => {
-    secureStoreMap.set(key, value);
+  getItemAsync: jest.fn((k: string) => Promise.resolve(mockSecureStoreMap.get(k) ?? null)),
+  setItemAsync: jest.fn((k: string, value: string) => {
+    mockSecureStoreMap.set(k, value);
     return Promise.resolve();
   }),
-  deleteItemAsync: jest.fn<(key: string) => Promise<void>>((key: string) => {
-    secureStoreMap.delete(key);
+  deleteItemAsync: jest.fn((k: string) => {
+    mockSecureStoreMap.delete(k);
     return Promise.resolve();
   }),
 }));
 
 jest.mock('expo-local-authentication', () => ({
-  isEnrolledAsync: jest.fn<() => Promise<boolean>>().mockResolvedValue(true),
-  authenticateAsync: jest.fn<() => Promise<{ success: boolean }>>().mockResolvedValue({ success: true }),
+  isEnrolledAsync: jest.fn().mockResolvedValue(true),
+  authenticateAsync: jest.fn().mockResolvedValue({ success: true }),
 }));
 
 jest.mock('expo-notifications', () => ({
-  requestPermissionsAsync: jest
-    .fn<() => Promise<{ status: string }>>()
-    .mockResolvedValue({ status: 'granted' }),
-  getExpoPushTokenAsync: jest
-    .fn<() => Promise<{ data: string }>>()
-    .mockResolvedValue({ data: 'ExponentPushToken[test]' }),
-  setNotificationHandler: jest.fn<() => void>(),
+  requestPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+  getExpoPushTokenAsync: jest.fn().mockResolvedValue({ data: 'ExponentPushToken[test]' }),
+  setNotificationHandler: jest.fn(),
 }));
 
-jest.mock('@supabase/supabase-js', () => ({
-  createClient: jest.fn<() => {
-    auth: {
-      getSession: jest.Mock<() => Promise<{ data: { session: null }; error: null }>>;
-      signOut: jest.Mock<() => Promise<{ error: null }>>;
-    };
-    from: jest.Mock;
-  }>().mockReturnValue({
-    auth: {
-      getSession: jest
-        .fn<() => Promise<{ data: { session: null }; error: null }>>()
-        .mockResolvedValue({ data: { session: null }, error: null }),
-      signOut: jest.fn<() => Promise<{ error: null }>>().mockResolvedValue({ error: null }),
-    },
-    from: jest.fn().mockReturnValue({
-      select: jest.fn().mockReturnThis(),
-      eq: jest.fn().mockReturnThis(),
-      single: jest
-        .fn<() => Promise<{ data: null; error: null }>>()
-        .mockResolvedValue({ data: null, error: null }),
-    }),
-  }),
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(() => Promise.resolve(null)),
+  setItem: jest.fn(() => Promise.resolve()),
+  removeItem: jest.fn(() => Promise.resolve()),
 }));
+
+jest.mock('../lib/supabase', () => {
+  const { supabaseMock } = require('./mocks/supabase');
+  return {
+    getSupabase: () => supabaseMock,
+    isSupabaseConfigured: () => true,
+  };
+});
 
 global.fetch = jest.fn() as unknown as typeof fetch;
 
 beforeEach(() => {
-  secureStoreMap.clear();
+  mockSecureStoreMap.clear();
   jest.clearAllMocks();
 });

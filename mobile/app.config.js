@@ -33,5 +33,11 @@ module.exports = {
   },
   extra: {
     apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000',
+    supabaseUrl:
+      process.env.EXPO_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '',
+    supabasePublishableKey:
+      process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+      process.env.SUPABASE_PUBLISHABLE_KEY ??
+      '',
   },
 };

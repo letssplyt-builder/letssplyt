@@ -8,10 +8,15 @@ export type MockResult = {
 const defaultResult: MockResult = { data: null, error: null };
 let mockResult: MockResult = { ...defaultResult };
 const tableResults = new Map<string, MockResult>();
+const tableResultQueues = new Map<string, MockResult[]>();
 
 type ChainMethod = (...args: unknown[]) => ChainableMock;
 
 function getResultForTable(table: string): MockResult {
+  const queue = tableResultQueues.get(table);
+  if (queue && queue.length > 0) {
+    return queue.shift()!;
+  }
   return tableResults.get(table) ?? mockResult;
 }
 
@@ -61,23 +66,87 @@ export interface ChainableMock {
 
 export const mockSupabase = {
   from: jest.fn<(table: string) => ChainableMock>().mockImplementation((table) => createChainable(table)),
+  rpc: jest
+    .fn<
+      (fn: string) => Promise<{ data: unknown; error: null | { code: string; message: string } }>
+    >()
+    .mockImplementation((fn) => {
+      if (fn === 'upsert_user_profile_on_auth') {
+        return Promise.resolve({
+          data: [{ display_name: 'New User', avatar_colour: '#4F46E5' }],
+          error: null,
+        });
+      }
+      return Promise.resolve({ data: null, error: null });
+    }),
   auth: {
     getUser: jest
       .fn<() => Promise<{ data: { user: null }; error: null }>>()
       .mockResolvedValue({ data: { user: null }, error: null }),
     admin: {
+      listUsers: jest
+        .fn<
+          () => Promise<{
+            data: { users: Array<{ id: string; phone?: string }> };
+            error: null;
+          }>
+        >()
+        .mockResolvedValue({ data: { users: [] }, error: null }),
+      getUserById: jest
+        .fn<
+          () => Promise<{
+            data: {
+              user: {
+                id: string;
+                email?: string;
+                user_metadata?: Record<string, unknown>;
+              } | null;
+            };
+            error: null;
+          }>
+        >()
+        .mockResolvedValue({ data: { user: null }, error: null }),
+      updateUserById: jest
+        .fn<() => Promise<{ data: { user: { id: string } }; error: null }>>()
+        .mockResolvedValue({ data: { user: { id: 'test-user-id' } }, error: null }),
       createUser: jest
         .fn<() => Promise<{ data: { user: { id: string } }; error: null }>>()
         .mockResolvedValue({ data: { user: { id: 'test-user-id' } }, error: null }),
       generateLink: jest
         .fn<
           () => Promise<{
-            data: { properties: { action_link: string } };
+            data: { properties: { hashed_token: string; action_link?: string } };
             error: null;
           }>
         >()
-        .mockResolvedValue({ data: { properties: { action_link: 'http://test' } }, error: null }),
+        .mockResolvedValue({
+          data: { properties: { hashed_token: 'test-token-hash', action_link: 'http://test' } },
+          error: null,
+        }),
     },
+    verifyOtp: jest
+      .fn<
+        () => Promise<{
+          data: {
+            session: {
+              access_token: string;
+              refresh_token: string;
+              expires_in: number;
+            };
+          };
+          error: null;
+        }>
+      >()
+      .mockResolvedValue({
+        data: {
+          session: {
+            access_token: 'mock-access-token',
+            refresh_token: 'mock-refresh-token',
+            expires_in: 3600,
+          },
+        },
+        error: null,
+      }),
     setSession: jest
       .fn<() => Promise<{ data: Record<string, never>; error: null }>>()
       .mockResolvedValue({ data: {}, error: null }),
@@ -92,9 +161,15 @@ export const mockSupabase = {
   __setMockResultForTable: (table: string, result: MockResult) => {
     tableResults.set(table, result);
   },
+  __pushMockResultForTable: (table: string, result: MockResult) => {
+    const queue = tableResultQueues.get(table) ?? [];
+    queue.push(result);
+    tableResultQueues.set(table, queue);
+  },
   __resetMock: () => {
     mockResult = { ...defaultResult };
     tableResults.clear();
+    tableResultQueues.clear();
   },
   __mockRLSError: () => {
     mockResult = {

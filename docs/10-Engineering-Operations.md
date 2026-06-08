@@ -526,6 +526,26 @@ doppler run -- npm run dev  # starts on port 3000
 # Start mobile (in another terminal):
 cd mobile
 npx expo start          # shows QR code for Expo Go
+
+# Expo Go compatibility: the project uses Expo SDK 54. Your phone's Expo Go app
+# must be SDK 54 as well (App Store / Play Store always ships the latest).
+# If you see "Project is incompatible with this version of Expo Go", upgrade the
+# project: cd mobile && npx expo install expo@^54.0.0 --fix
+# Do NOT downgrade Expo Go — install the matching SDK in the project instead.
+
+# Physical device + local backend: localhost on the phone is NOT your Mac.
+# The app auto-uses your Mac's LAN IP from the Expo Metro bundler (e.g. http://192.168.x.x:3000).
+# Requirements: backend running, phone and Mac on the same Wi‑Fi, Mac firewall allows port 3000.
+# If auto-detection fails, set your Mac's IP explicitly before starting Expo:
+#   EXPO_PUBLIC_API_URL=http://192.168.x.x:3000 npx expo start
+# Find your Mac IP: System Settings → Network, or run: ipconfig getifaddr en0
+
+# OTP on a physical device (Send Code returns 503 / "Unable to send OTP"):
+# Twilio is called on every OTP request unless dev bypass is active.
+# OTP in development defaults to dev bypass (otpMode: dev-bypass in startup logs).
+# Twilio Verify does NOT support test credentials — twilioCode 20008 means you hit live Verify with test creds.
+# Any 6-digit code passes verify; no SMS sent. Use your real phone in the app.
+# For real SMS locally: TWILIO_USE_LIVE_VERIFY=true, OTP_DEV_BYPASS=false, live Twilio creds in Doppler.
 ```
 
 ### `app.config.js`
