@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
 **Last updated:** 2026-06-08
-**Current story:** E05-S01 — Event CRUD API
+**Current story:** E05-S02 — Add Participant API + Manual Add
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -39,7 +39,7 @@
 ## TIER 2 — Core Creator Flow
 
 ### Epic 5: Event Creation, QR & Live Member List
-- [ ] E05-S01 — Event CRUD API (create, list, get, lock, reopen, regenerate token)
+- [x] E05-S01 — Event CRUD API (create, list, get, lock, reopen, regenerate token) (2026-06-08)
 - [ ] E05-S02 — Add Participant API + Manual Add
 - [ ] E05-S03 — Mobile Event Screens (Home, Events, CreateEvent, QR, EventDetail + Realtime)
 

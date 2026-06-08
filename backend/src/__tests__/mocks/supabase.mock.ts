@@ -24,6 +24,7 @@ function createChainable(table: string): ChainableMock {
   const chain: ChainableMock = {
     select: jest.fn<ChainMethod>().mockReturnThis(),
     eq: jest.fn<ChainMethod>().mockReturnThis(),
+    lt: jest.fn<ChainMethod>().mockReturnThis(),
     neq: jest.fn<ChainMethod>().mockReturnThis(),
     in: jest.fn<ChainMethod>().mockReturnThis(),
     is: jest.fn<ChainMethod>().mockReturnThis(),
@@ -61,6 +62,7 @@ const defaultChainable = createChainable('__default__');
 export interface ChainableMock {
   select: jest.Mock<ChainMethod>;
   eq: jest.Mock<ChainMethod>;
+  lt: jest.Mock<ChainMethod>;
   neq: jest.Mock<ChainMethod>;
   in: jest.Mock<ChainMethod>;
   is: jest.Mock<ChainMethod>;
@@ -172,6 +174,9 @@ export const mockSupabase = {
     setSession: jest
       .fn<() => Promise<{ data: Record<string, never>; error: null }>>()
       .mockResolvedValue({ data: {}, error: null }),
+    signOut: jest
+      .fn<() => Promise<{ error: null }>>()
+      .mockResolvedValue({ error: null }),
   },
   channel: jest.fn<() => ChainableMock>().mockReturnValue(defaultChainable),
   on: jest.fn<ChainMethod>().mockReturnThis(),

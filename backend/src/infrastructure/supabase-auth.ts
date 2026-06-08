@@ -1,5 +1,13 @@
+import { createClient } from '@supabase/supabase-js';
 import { AppError } from './errors';
 import { supabaseAdmin } from './supabase';
+
+/** Isolated client for verifyOtp — must not share state with supabaseAdmin (service-role DB). */
+const supabaseAuthHelper = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SECRET_KEY!,
+  { auth: { persistSession: false, autoRefreshToken: false } },
+);
 
 interface AdminSession {
   access_token: string;
@@ -62,7 +70,7 @@ export async function createAdminSession(userId: string): Promise<AdminSession> 
     );
   }
 
-  const { data: verifyData, error: verifyError } = await supabaseAdmin.auth.verifyOtp({
+  const { data: verifyData, error: verifyError } = await supabaseAuthHelper.auth.verifyOtp({
     token_hash: hashedToken,
     type: 'email',
   });
