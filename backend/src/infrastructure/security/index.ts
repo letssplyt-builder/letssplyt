@@ -8,4 +8,9 @@ export {
   EncryptionError,
   HashError,
 } from './crypto';
-export { sanitizePromptInput } from './sanitize';
+export {
+  sanitizePromptInput,
+  formatCurrency,
+  resolveParticipantPhone,
+  CurrencyFormatError,
+} from './sanitize';

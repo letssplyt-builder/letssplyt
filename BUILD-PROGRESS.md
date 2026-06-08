@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
 **Last updated:** June 2026
-**Current story:** E01-S06 — Security Utilities
+**Current story:** E03-S03 — Welcome + PhoneEntry Screens + authStore
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -16,7 +16,7 @@
 - [x] E01-S03 — Supabase Client Singletons (2026-06-07)
 - [x] E01-S04 — LLM Provider Factory (2026-06-07)
 - [x] E01-S05 — Test Infrastructure Setup (2026-06-07)
-- [ ] E01-S06 — Security Utilities (encrypt, hashPhone, sanitizePromptInput, formatCurrency, getCurrencyMinorUnits)
+- [x] E01-S06 — Security Utilities (encrypt, hashPhone, sanitizePromptInput, formatCurrency, getCurrencyMinorUnits) (2026-06-07)
 
 ### Epic 2: Database Schema & RLS
 - [x] E02-S01 — Core Tables + Indexes (2026-06-07)
@@ -94,10 +94,10 @@
 
 | Tier | Epics | Stories | Done | Remaining |
 |---|---|---|---|---|
-| Tier 1 — Foundation | 4 | 16 | 11 | 5 |
+| Tier 1 — Foundation | 4 | 16 | 12 | 4 |
 | Tier 2 — Core Flow | 5 | 22 | 0 | 22 |
 | Tier 3 — Operations | 3 | 8 | 0 | 8 |
-| **Total** | **12** | **46** | **11** | **35** |
+| **Total** | **12** | **46** | **12** | **34** |
 
 ---
 
@@ -106,3 +106,4 @@
 <!-- Format: [Date] — [Story ID] — [What was built] — [Any decisions made] -->
 - [2026-06-07] — E01-S01–E03-S02 — Monorepo scaffold, full DB migration+seed, Express middleware, Supabase clients, LLM factory, OTP auth endpoints. Session creation via Admin REST API (`/auth/v1/admin/users/{id}/sessions`) because `createSession()` is not in @supabase/supabase-js@2.49. Mobile bumped to Expo SDK 52 for React Navigation v7 compat.
 - [2026-06-07] — E01-S05 — Jest (backend+mobile), mocks (supabase/twilio/llm), CI workflow, ESLint root config, git-secrets hooks. Per-table `__setMockResultForTable` added for independent table mock config.
+- [2026-06-07] — E01-S06 — crypto/sanitize utilities with 100% test coverage target, formatCurrency, resolveParticipantPhone. Hex IV format per docs/09 (not base64 from build-sequence prompt).
