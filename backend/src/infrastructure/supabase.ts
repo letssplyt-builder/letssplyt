@@ -39,11 +39,12 @@ export const supabaseAdmin: SupabaseClient = createClient(
 
 /** Creates a per-request client scoped to the user's JWT — RLS applies correctly. */
 export function getSupabaseForUser(jwt: string): SupabaseClient {
-  const client = createClient(
-    supabaseUrl,
-    requireEnv('SUPABASE_PUBLISHABLE_KEY'),
-    { auth: authConfig },
-  );
-  void client.auth.setSession({ access_token: jwt, refresh_token: jwt });
-  return client;
+  return createClient(supabaseUrl, requireEnv('SUPABASE_PUBLISHABLE_KEY'), {
+    auth: authConfig,
+    global: {
+      headers: {
+        Authorization: `Bearer ${jwt}`,
+      },
+    },
+  });
 }

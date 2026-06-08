@@ -3,6 +3,16 @@
   "version": "1.0.0",
   "main": "./types/index.ts",
   "types": "./types/index.ts",
+  "exports": {
+    ".": "./types/index.ts",
+    "./api.types": "./types/api.types.ts",
+    "./auth.types": "./types/auth.types.ts",
+    "./event.types": "./types/event.types.ts",
+    "./participant.types": "./types/participant.types.ts",
+    "./profile.types": "./types/profile.types.ts",
+    "./receipt.types": "./types/receipt.types.ts",
+    "./settlement.types": "./types/settlement.types.ts"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsc"

@@ -18,6 +18,7 @@
     "cleanup:phone": "ts-node scripts/cleanup-auth-by-phone.ts"
   },
   "dependencies": {
+    "@letssplyt/shared": "1.0.0",
     "@anthropic-ai/sdk": "^0.30.0",
     "@google/generative-ai": "^0.21.0",
     "@supabase/supabase-js": "^2.49.0",

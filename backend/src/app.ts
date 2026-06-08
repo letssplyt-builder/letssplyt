@@ -6,6 +6,7 @@ import { requestIdMiddleware } from './middleware/requestId';
 import { globalRateLimiter } from './middleware/rateLimiter';
 import { piiScrubberMiddleware } from './middleware/piiScrubber';
 import authRoutes from './modules/auth/auth.routes';
+import profileRoutes from './modules/profile/profile.routes';
 import { errorHandler } from './modules/auth/auth.controller';
 
 const app = express();
@@ -38,6 +39,7 @@ app.get('/health', (_req, res) => {
 });
 
 app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/users', profileRoutes);
 
 app.use(errorHandler);
 

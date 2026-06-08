@@ -21,7 +21,7 @@ function getResultForTable(table: string): MockResult {
 }
 
 function createChainable(table: string): ChainableMock {
-  return {
+  const chain: ChainableMock = {
     select: jest.fn<ChainMethod>().mockReturnThis(),
     eq: jest.fn<ChainMethod>().mockReturnThis(),
     neq: jest.fn<ChainMethod>().mockReturnThis(),
@@ -42,7 +42,18 @@ function createChainable(table: string): ChainableMock {
     rpc: jest
       .fn<() => MockResult>()
       .mockImplementation(() => ({ ...getResultForTable(table) })),
+    then: jest
+      .fn<
+        (
+          onFulfilled: (value: MockResult) => unknown,
+          onRejected?: (reason: unknown) => unknown,
+        ) => Promise<unknown>
+      >()
+      .mockImplementation((onFulfilled, onRejected) =>
+        Promise.resolve(getResultForTable(table)).then(onFulfilled, onRejected),
+      ),
   };
+  return chain;
 }
 
 const defaultChainable = createChainable('__default__');
@@ -62,6 +73,12 @@ export interface ChainableMock {
   upsert: jest.Mock<ChainMethod>;
   delete: jest.Mock<ChainMethod>;
   rpc: jest.Mock<() => MockResult>;
+  then: jest.Mock<
+    (
+      onFulfilled: (value: MockResult) => unknown,
+      onRejected?: (reason: unknown) => unknown,
+    ) => Promise<unknown>
+  >;
 }
 
 export const mockSupabase = {
@@ -81,7 +98,12 @@ export const mockSupabase = {
     }),
   auth: {
     getUser: jest
-      .fn<() => Promise<{ data: { user: null }; error: null }>>()
+      .fn<
+        () => Promise<{
+          data: { user: { id: string; email?: string } | null };
+          error: null | { message: string };
+        }>
+      >()
       .mockResolvedValue({ data: { user: null }, error: null }),
     admin: {
       listUsers: jest
