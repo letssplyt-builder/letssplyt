@@ -13,13 +13,17 @@ export type MainTabParamList = {
 
 export type RootStackParamList = {
   Welcome: undefined;
-  PhoneEntry: { initialPhone?: string };
+  PhoneEntry: { initialPhone?: string; joinToken?: string };
   OTPVerify: {
     phoneE164: string;
     accountExists?: boolean;
+    joinToken?: string;
   };
   PushPermission: undefined;
   MainTabs: undefined;
+  AppJoin: { token: string };
+  AppJoined: { eventId: string; eventName: string };
+  AppLocked: { creatorName?: string; eventName?: string };
   Profile: { toastMessage?: string } | undefined;
   AddHandle: {
     handleId?: string;

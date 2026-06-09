@@ -23,6 +23,7 @@ import type { MainTabParamList, RootStackParamList } from '../../navigation/type
 import { fetchBalance, regenerateJoinToken, type BalanceSummary } from '../../services/event.service';
 import { useAuthStore } from '../../store/authStore';
 import { useEventStore } from '../../store/eventStore';
+import { DevJoinTestPanel } from '../../components/dev/DevJoinTestPanel';
 import { glassStyles } from '../../theme/glassStyles';
 import { authColors } from '../../theme/colors';
 
@@ -197,6 +198,8 @@ export function HomeScreen({ navigation }: Props) {
           error={balanceError}
           onRetry={() => void loadBalance()}
         />
+
+        <DevJoinTestPanel navigation={navigation} />
 
         {listError ? (
           <Text style={glassStyles.errorText}>Couldn&apos;t load events. Pull to retry.</Text>

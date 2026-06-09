@@ -17,6 +17,7 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import type { RootStackParamList } from '../../navigation/types';
 import { apiPost, getApiErrorCode, isApiRequestError } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
+import { useJoinStore } from '../../store/joinStore';
 import { authColors } from '../../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OTPVerify'>;
@@ -31,7 +32,7 @@ function maskPhoneLastFour(phoneE164: string): string {
 }
 
 export function OTPVerifyScreen({ navigation, route }: Props) {
-  const { phoneE164, accountExists = false } = route.params;
+  const { phoneE164, accountExists = false, joinToken } = route.params;
   const isExistingAccount = accountExists;
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
   const [displayName, setDisplayName] = useState('');
@@ -73,6 +74,9 @@ export function OTPVerifyScreen({ navigation, route }: Props) {
         }
 
         const result = await apiPost<AuthSession>('/auth/otp/verify', body);
+        if (joinToken) {
+          useJoinStore.getState().setPendingJoinToken(joinToken);
+        }
         await applyAuthResponse(result);
       } catch (err) {
         clearDigits();

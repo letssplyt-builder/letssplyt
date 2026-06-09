@@ -9,6 +9,7 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import type { RootStackParamList } from '../../navigation/types';
 import { apiPost, isApiRequestError } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
+import { useJoinStore } from '../../store/joinStore';
 import { authColors } from '../../theme/colors';
 import {
   DEFAULT_AUTH_REGION,
@@ -21,6 +22,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'PhoneEntry'>;
 
 export function PhoneEntryScreen({ navigation, route }: Props) {
   const initialPhone = route.params?.initialPhone ?? '';
+  const joinToken = route.params?.joinToken;
   const [phoneValue, setPhoneValue] = useState(() => nationalFromE164(initialPhone));
   const [error, setError] = useState<string | null>(null);
   const isLoading = useAuthStore((state) => state.isLoading);
@@ -31,6 +33,12 @@ export function PhoneEntryScreen({ navigation, route }: Props) {
       setPhoneValue(nationalFromE164(route.params.initialPhone));
     }
   }, [route.params?.initialPhone]);
+
+  useEffect(() => {
+    if (joinToken) {
+      useJoinStore.getState().setPendingJoinToken(joinToken);
+    }
+  }, [joinToken]);
 
   const handleSendCode = async () => {
     setError(null);
@@ -59,6 +67,7 @@ export function PhoneEntryScreen({ navigation, route }: Props) {
       navigation.navigate('OTPVerify', {
         phoneE164,
         accountExists: result.account_exists === true,
+        joinToken,
       });
     } catch (err) {
       if (isApiRequestError(err)) {
