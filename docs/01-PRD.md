@@ -314,6 +314,8 @@ All phone numbers stored as E.164 (`+15550001234`). `libphonenumber` runs at the
 **Nullable `user_id` on PARTICIPANTS:**
 A participant may or may not be a registered user. `user_id = null` means **pure guest** — payer manual add when the phone is not registered (no OTP). `user_id = <uuid>` means registered user — OTP-verified web join, app join, or payer manual add when phone matches `users.phone_hash`. **OTP anywhere creates or resolves a `users` row**; legacy guest rows are upgraded to `user_id` on next OTP login. This nullable FK enables the dual dashboard.
 
+**Display names for registered members:** `users.display_name` is the live profile name. `participants.display_name` is stored per event (join snapshot) but stays in sync when the user edits their profile; event APIs resolve the current profile name for any row with `user_id` set. Pure guests keep only the stored participant name.
+
 **Encrypted payment handles:**
 `handle_encrypted` column uses AES-256 encryption at rest. Decrypted only at message composition time, in memory, never logged. Payment identifiers are PII — treating them as such from day one avoids a security retrofit later.
 

@@ -29,7 +29,7 @@ Actions marked **Critical Path** are the minimum required for the app to be usab
 | P03 | Log in via biometric | Face ID / fingerprint opens app after first login — no OTP re-entry | OTP every time = friction. After first verification, device biometrics provide equivalent security (you have the device + your face/finger) with zero user effort. **MVP** |
 | P04 | Add payment handles to profile | Enter Venmo username, PayPal.me URL, Cash App $tag, Zelle handle. Encrypted at rest. Set display order. | A3 fetches these automatically at message composition time. Storing once removes the biggest UX friction point — payer never has to re-enter payment details. AES-256 encryption because these are sensitive PII. **Critical Path** |
 | P05 | Edit / remove a payment handle | Update or delete an existing handle | People change Venmo accounts, close PayPal, switch providers. Profile must stay current or payment links break. **MVP** |
-| P06 | Edit display name or avatar | Update name shown to participants on split messages | Participants see the payer's name in their message ("Pay Rohan via..."). Must be correct and recognisable. **MVP** |
+| P06 | Edit display name or avatar | Profile → edit name inline → `PATCH /users/me`. Updates `users.display_name` and syncs all linked `participants` rows; event APIs resolve live profile name for registered members. | Participants see the payer's name in their message ("Pay Rohan via..."). Creators and other members also see **current** names in live member lists — not the name someone typed only at join time. **MVP** |
 
 > **Mobile auth UX:** P01 and P02 are separate product actions but share one UI path — **Get Started** → phone → OTP. The app always calls `POST /auth/otp/request` with `context: 'register'`; returning users are detected via `account_exists` and skip the name field. See docs/08-Mobile-App-Specification.md (*Unified phone auth*).
 
@@ -130,6 +130,7 @@ The join flow splits into two distinct paths based on whether the person has Let
 | ID | Action | Description | Why This Exists |
 |----|--------|-------------|-----------------|
 | R09 | Add own payment handles to profile | Set up Venmo/PayPal/etc for when they become a payer in a future event. | Registered participants will eventually pay for a group themselves. Handles set up once → ready to use immediately when they create their first event. **MVP** |
+| R09a | Edit display name in profile | Profile → edit name inline → same `PATCH /users/me` sync as P06. Name shown to event creators and other members updates everywhere (member list, Realtime). | Join name (e.g. nickname at QR scan) may differ from preferred profile name later; creators must not be stuck seeing an outdated label. **MVP** |
 | R10 | Opt out / delete account | Reply STOP to message (stops future messages) OR delete account in app. | Legally required. Someone added to a split without their prior consent (manually added by payer) must have an easy opt-out path. STOP keyword is the messaging industry standard. **Legally Required** |
 
 ---

@@ -217,6 +217,8 @@ Update display name or avatar colour. Push token registration is a separate conc
 
 **Response `200`:** updated user object (same shape as GET /users/me)
 
+**Display name side effects:** When `display_name` is provided, the backend updates `users.display_name` then syncs **all** `participants` rows where `user_id = req.user.id` to the same value (service role). This keeps stored participant names aligned for SMS, split images, and Supabase Realtime member-list updates. Event detail APIs also resolve live `users.display_name` for linked participants on read — see canonical participant shape below.
+
 ---
 
 ### POST `/users/me/push-token`
@@ -548,6 +550,8 @@ Full event detail with participants and settlement status.
   // participants array includes the organiser (payer) as the first row on new events.
   // POST /events auto-inserts the payer as a participant (join_method='qr_app', user_id=payer_id).
   // is_organiser is true when participants.user_id === event.payer_id.
+  // display_name: for rows with user_id set, resolved from users.display_name (live profile);
+  // for pure guests (user_id null), from participants.display_name (join/add snapshot).
   participants: Array<{
     id: string;
     display_name: string;
@@ -653,7 +657,7 @@ All participant list responses across every endpoint use this schema. Never devi
 interface ParticipantResponse {
   id: string;                // participants.id (not user_id)
   user_id: string | null;    // null for guests
-  display_name: string;      // from users.display_name or guest_pii (decrypted guest name)
+  display_name: string;      // registered (user_id set): live users.display_name; guest: participants.display_name snapshot
   join_method: 'qr_app' | 'qr_web' | 'manual_phone' | 'manual_name_only';
   payment_status: 'pending' | 'self_reported' | 'payer_marked' | 'confirmed' | 'disputed' | 'opted_out' | 'settled';
   // All 7 payment_status values:
@@ -858,9 +862,49 @@ Verify OTP, **create or resolve a `users` account** (same as app registration), 
 
 ---
 
-## App Member Join Endpoint
+## App Member Join Endpoints
 
-### POST `/join/:token`
+### GET `/join/:token/preview`
+**Auth:** `[NO AUTH]` | **Built in:** E06-S02
+
+Lightweight preview for `AppJoinScreen` before the user taps Join.
+
+**Response `200`:**
+```typescript
+{
+  eventName: string;
+  creatorName: string;
+  joinable: boolean;   // true when token valid and event status is open
+  pageKind: "form" | "expired" | "locked" | "not_found";
+}
+```
+
+---
+
+### POST `/join/:token/app-join`
+**Auth:** `[AUTH]` | **Built in:** E06-S02
+
+In-app join when Universal Link opens LetsSplyt. Creates participant with `join_method = 'qr_app'` and `user_id = req.user.id`. Writes funnel checkpoint `join_confirmed`.
+
+**Response `201`:**
+```typescript
+{
+  eventId: string;
+  eventName: string;
+  amount_owed: null;
+  participantId: string;
+}
+```
+
+**Error codes:**
+- `GROUP_IS_LOCKED` 400 — event not accepting new members
+- `ALREADY_JOINED` 409 — user already a participant
+- `TOKEN_EXPIRED` 410 — join link expired
+- `TOKEN_NOT_FOUND` 404 — invalid token
+
+---
+
+### POST `/join/:token` (legacy alias)
 **Auth:** `[NO AUTH]` (public endpoint)
 
 Used by App Members who scan a QR code and the Universal Link opens the app. The app resolves the `join_token` from the URL and calls this endpoint with the user's authenticated uid. Sets `join_method = 'qr_app'`.
@@ -1586,6 +1630,8 @@ Android Digital Asset Links JSON. Required for App Links (Android). The backend 
 | POST | /join/:token/check | NO AUTH | 10/IP/min |
 | POST | /join/:token/otp/request | NO AUTH | 3/phone/10min, 20/IP/hr |
 | POST | /join/:token/otp/verify | NO AUTH | 3/phone/10min |
+| GET | /join/:token/preview | NO AUTH | — |
+| POST | /join/:token/app-join | AUTH | — |
 | POST | /events/:id/receipt/scan | AUTH PAYER | 5/event/hr |
 | POST | /events/:id/receipt/confirm | AUTH PAYER | — |
 | POST | /events/:id/split/calculate | AUTH PAYER | — |

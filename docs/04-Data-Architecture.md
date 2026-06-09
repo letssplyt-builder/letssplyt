@@ -410,7 +410,11 @@ CREATE TABLE participants (
   guest_pii_token UUID        REFERENCES guest_pii(id) ON DELETE SET NULL
                   CONSTRAINT fk_guest_pii,
 
-  -- display_name: non-sensitive name shown in the event member list and split table
+  -- display_name: non-sensitive name shown in the event member list, split table, and SMS
+  -- For registered members (user_id set): snapshot at join/manual-add time; kept in sync when
+  -- the user updates users.display_name via PATCH /users/me. API reads also resolve live
+  -- users.display_name for linked rows (see "Display name resolution" below).
+  -- For pure guests (user_id NULL): payer- or browser-supplied name; not tied to users table.
   display_name    TEXT        NOT NULL,
 
   -- Correction 10: join_method column
@@ -479,6 +483,23 @@ CREATE TABLE participants (
   UNIQUE (event_id, user_id)
 );
 ```
+
+#### Display name resolution (registered members vs guests)
+
+LetsSplyt stores names in two places: `users.display_name` (profile, source of truth for registered members) and `participants.display_name` (per-event row used in member lists, split images, and outbound SMS).
+
+| Participant type | `user_id` | Name source at join | What others see after profile edit |
+|------------------|-----------|---------------------|-------------------------------------|
+| App member / OTP-verified web join | set | Copied from `users.display_name` at join (or join-form name on first registration) | **Live profile name** — `GET /events/:id` resolves `users.display_name` for linked rows; `PATCH /users/me` also updates all `participants` rows for that `user_id` |
+| Payer manual add (phone matches registered user) | set | Payer-supplied `display_name` at add time | Same as above — profile update wins |
+| Pure guest (`manual_phone`, no OTP) | NULL | Payer-supplied or decrypted guest name | **Stored participant name only** — no `users` row to sync |
+| Name-only (cash) | NULL | Payer-supplied name | **Stored participant name only** |
+
+**Write path:** `PATCH /api/v1/users/me` with `display_name` updates `users.display_name` then `UPDATE participants SET display_name = $1 WHERE user_id = $userId` (service role). Participant `UPDATE` triggers Supabase Realtime on open events so creators see the new name without manual refresh.
+
+**Read path:** Event detail (`getEventById`) batch-loads `users.display_name` for all participant `user_id` values and returns that value in API responses when present; falls back to `participants.display_name` if the user row is missing.
+
+**Guests:** Pure guests never call `PATCH /users/me` for name — their label is whatever the payer or browser form supplied until manually edited (no client path today).
 
 ---
 

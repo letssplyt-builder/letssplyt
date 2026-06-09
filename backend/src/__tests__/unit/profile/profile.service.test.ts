@@ -162,5 +162,26 @@ describe('profile.service', () => {
         statusCode: 400,
       });
     });
+
+    it('syncs display_name to all participant rows for the user', async () => {
+      mockAuthenticatedUser();
+      mockSupabase.__pushMockResultForTable('users', { data: null, error: null });
+      mockSupabase.__pushMockResultForTable('participants', { data: null, error: null });
+      mockSupabase.__setMockResultForTable('users', {
+        data: { ...PUBLIC_USER, display_name: 'PQR' },
+        error: null,
+      });
+
+      await updateMe(USER_ID, JWT, { display_name: 'PQR' }, {});
+
+      const participantUpdateIndex = mockSupabase.from.mock.calls.findIndex(
+        ([table], i) =>
+          table === 'participants' &&
+          (mockSupabase.from.mock.results[i]?.value as ChainableMock).update.mock.calls.length > 0,
+      );
+      const participantChain = mockSupabase.from.mock.results[participantUpdateIndex]?.value as ChainableMock;
+      expect(participantChain.update).toHaveBeenCalledWith({ display_name: 'PQR' });
+      expect(participantChain.eq).toHaveBeenCalledWith('user_id', USER_ID);
+    });
   });
 });

@@ -152,6 +152,17 @@ export async function updateMe(
     if (updateError) {
       throw new AppError('PROFILE_UPDATE_FAILED', 'Could not update profile', 500);
     }
+
+    if (input.display_name !== undefined) {
+      const { error: participantSyncError } = await supabaseAdmin
+        .from('participants')
+        .update({ display_name: input.display_name })
+        .eq('user_id', userId);
+
+      if (participantSyncError) {
+        throw new AppError('PROFILE_UPDATE_FAILED', 'Could not sync participant names', 500);
+      }
+    }
   }
 
   return getMe(userId, jwt);

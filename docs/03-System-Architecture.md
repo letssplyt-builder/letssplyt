@@ -115,6 +115,8 @@ The backend is organised into 7 logical services (modules), each with a defined 
 
 **Calls:** Supabase Realtime (publishes participant changes so the mobile member list updates live), Redis (join token TTL, lock state), Auth Service (verify payer JWT on all mutating operations).
 
+**Display names:** Registered members (`participants.user_id` set) show their **live** `users.display_name` in event member lists — `getEventById` resolves from `users` on read. `PATCH /users/me` also writes the new name to all linked `participants` rows so SMS, split images, and Realtime subscriptions stay consistent. Pure guests keep the payer- or browser-supplied `participants.display_name` snapshot.
+
 **Key constraint:** The "Scan receipt & split" action is disabled at the API level — `POST /events/:id/scan` returns 409 unless `events.status = 'locked'`. Group lock is the hard gate. Locking immediately expires the current join token and sets `event_join_tokens.is_active = false`.
 
 ---

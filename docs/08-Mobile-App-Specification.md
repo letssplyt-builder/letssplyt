@@ -1151,7 +1151,7 @@ This applies to both the joining phase (channel `event-members:{eventId}`, subsc
 - User avatar (coloured circle with initials) + display name + phone
 - Payment handles section: list of handles with provider icons, drag to reorder, swipe to delete
 - "+ Add payment method" → AddHandleScreen
-- "Edit name" inline
+- "Edit name" inline — on save, `PATCH /users/me` updates `users.display_name` and the backend syncs all linked `participants.display_name` rows. Other users' event member lists show the new name (Realtime on participant `UPDATE` + live resolution on `GET /events/:id`). No per-event rename UI.
 - "Enable notifications" link → triggers `Notifications.requestPermissionsAsync()` (only shown if permission is not yet granted)
 - "Delete account" link (destructive, at bottom, requires confirmation) → DeleteWarnScreen
 

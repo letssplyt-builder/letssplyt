@@ -128,6 +128,45 @@ describe('Events API integration', () => {
     expect(response.body.join_token.join_url).toContain('join-token-abc');
   });
 
+  it('GET /events/:id returns live profile display_name for linked participants', async () => {
+    mockAuth(USER_A);
+    mockSupabase.__setMockResultForTable('events', { data: EVENT_ROW, error: null });
+    mockSupabase.__pushMockResultForTable('users', {
+      data: { id: USER_A, display_name: 'Alex', avatar_colour: '#6366F1' },
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('users', {
+      data: [{ id: USER_B, display_name: 'PQR' }],
+      error: null,
+    });
+    mockSupabase.__setMockResultForTable('participants', {
+      data: [
+        {
+          id: 'participant-1',
+          user_id: USER_B,
+          display_name: 'xyz',
+          join_method: 'qr_app',
+          payment_status: 'pending',
+          amount_owed: null,
+        },
+      ],
+      error: null,
+    });
+    mockSupabase.__setMockResultForTable('event_join_tokens', {
+      data: {
+        token: 'join-token-abc',
+        expires_at: '2026-01-02T00:00:00.000Z',
+        is_active: true,
+      },
+      error: null,
+    });
+
+    const response = await request(app).get(`/api/v1/events/${EVENT_ID}`).set(AUTH_A);
+
+    expect(response.status).toBe(200);
+    expect(response.body.participants[0].display_name).toBe('PQR');
+  });
+
   it('POST /events/:id/lock returns 400 when fewer than 2 participants', async () => {
     mockAuth(USER_A);
     mockSupabase.__setMockResultForTable('events', { data: EVENT_ROW, error: null });

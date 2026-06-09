@@ -112,8 +112,8 @@ In this system, PII is any datum that can identify a natural person directly, in
 
 1. **Plaintext phone numbers are transient.** They exist only in the memory of a running Node.js process while an operation is in flight. They are never written to a database column, log file, Sentry event, or any other persistent store.
 2. **Decrypted payment handles are single-use in memory.** The A3 message composer decrypts a handle, builds the payment link, uses the link, and discards the decrypted value. The handle is never stored in a variable that persists beyond the message composition function.
-3. **`display_name` is the only name shown across users.** All cross-user name visibility in the app uses `display_name`. Full name (`name_encrypted`) is used only in outbound SMS composition and is not surfaced in the mobile UI for other users to see.
-4. **Guest PII never crosses the API boundary to the mobile client.** The mobile app receives `display_name` from the `participants` table. It never receives the decrypted contents of `guest_pii`.
+3. **`display_name` is the only name shown across users.** All cross-user name visibility in the app uses `display_name`. Full name (`name_encrypted`) is used only in outbound SMS composition and is not surfaced in the mobile UI for other users to see. For registered members, APIs resolve the live `users.display_name`; `participants.display_name` is a per-event snapshot kept in sync on profile edit.
+4. **Guest PII never crosses the API boundary to the mobile client.** The mobile app receives `display_name` in API responses (resolved from `users` for linked members, from `participants` for pure guests). It never receives the decrypted contents of `guest_pii`.
 
 ---
 
@@ -1146,7 +1146,8 @@ doppler secrets set JWT_SECRET=$(openssl rand -hex 64) --project letssplyt --con
 # 1d. If SUPABASE_SECRET_KEY (service role key) may be compromised:
 #     Go to Supabase Dashboard → Project Settings → API → Service role key → Regenerate
 #     Then update in Doppler:
-doppler secrets set SUPABASE_SECRET_KEY=[new-key-from-supabase] --project letssplyt --config production
+# Update SUPABASE_SECRET_KEY in Doppler with the regenerated service role key:
+doppler secrets set --project letssplyt --config production SUPABASE_SECRET_KEY "<regenerated-key>"
 
 # 1e. Force a Railway redeploy to pick up the new secrets:
 npx @railway/cli@latest redeploy --service letssplyt-production

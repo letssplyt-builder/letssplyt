@@ -1,6 +1,11 @@
 import { randomBytes } from 'crypto';
 import { AppError, Errors, NotFoundError } from '../../infrastructure/errors';
 import { supabaseAdmin } from '../../infrastructure/supabase';
+import {
+  collectLinkedUserIds,
+  loadLinkedUserDisplayNames,
+  resolveLinkedDisplayName,
+} from '../participants/participant-display-name';
 import type {
   CreateEventResponse,
   EventDetailResponse,
@@ -474,9 +479,21 @@ export async function getEventById(userId: string, eventId: string): Promise<Eve
     throw new AppError('PARTICIPANTS_FETCH_FAILED', 'Could not load participants', 500);
   }
 
-  const participants = (participantRows ?? []).map((row) => ({
+  const rows = participantRows ?? [];
+  const linkedUserIds = collectLinkedUserIds(
+    rows.map((row) => ({ user_id: row.user_id as string | null })),
+  );
+  const linkedNames = await loadLinkedUserDisplayNames(linkedUserIds);
+
+  const participants = rows.map((row) => ({
     id: row.id as string,
-    display_name: row.display_name as string,
+    display_name: resolveLinkedDisplayName(
+      {
+        user_id: row.user_id as string | null,
+        display_name: row.display_name as string,
+      },
+      linkedNames,
+    ),
     join_method: row.join_method as string,
     payment_status: row.payment_status as string,
     amount_owed: row.amount_owed as number | null,
