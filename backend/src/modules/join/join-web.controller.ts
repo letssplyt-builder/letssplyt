@@ -214,18 +214,6 @@ async function handleOtpVerifyError(
   setJoinCookies(res, csrfToken, sessionIdFromRequest(req));
 
   if (err instanceof JoinServiceError) {
-    if (err.code === 'APP_USER_REDIRECT' && err.deepLinkUrl) {
-      sendHtml(
-        res,
-        renderAppUserRedirectPage({
-          eventTitle: context?.eventTitle ?? 'Event',
-          deepLinkUrl: err.deepLinkUrl,
-        }),
-        err.status,
-      );
-      return;
-    }
-
     if (err.code === 'EVENT_LOCKED') {
       sendHtml(
         res,

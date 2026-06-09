@@ -57,29 +57,23 @@ RootNavigator (NativeStack)
 │   ├── OTPVerifyScreen
 │   └── PushPermissionScreen  ← shown once after first OTP verify (is_new_user === true)
 │
-├── MainTabs           ← shown when session is valid (BottomTabNavigator)
+├── MainTabs           ← shown when session is valid (BottomTabNavigator) — **3 tabs** (Home, Events, Profile)
 │   ├── HomeTab         (icon: home)
-│   │   └── HomeScreen
+│   │   └── HomeStack (NativeStack)
+│   │       ├── HomeScreen               ← net balance + Members|Guests toggle + counterparty lists
+│   │       ├── MemberDetailScreen       ← registered counterparty drill-down (P32)
+│   │       ├── GuestDetailScreen        ← phone-guest drill-down (P33); name-only guests skip this
+│   │       └── PayNowScreen             ← optional: payer payment handles when viewer owes (from Member detail)
 │   │
 │   ├── EventsTab       (icon: list)
 │   │   └── EventsStack (NativeStack)
-│   │       ├── EventsScreen             ← list of all events
-│   │       ├── EventDetailScreen        ← event detail (joining phase OR settlement phase)
+│   │       ├── EventsScreen             ← Events you created | Events you joined (settled collapsed)
+│   │       ├── EventDetailScreen        ← payer or participant view (joining / settlement)
 │   │       ├── ReceiptScanScreen        ← camera
 │   │       ├── ItemReviewScreen         ← review/edit parsed items
 │   │       ├── SplitEntryScreen         ← 4-tab split mode picker
 │   │       ├── SplitReviewScreen        ← final per-person amounts
 │   │       └── MessageSendingScreen     ← sending progress + green checks
-│   │
-│   ├── SettlementTab   (icon: 💳 Balance)
-│   │   └── SettlementStack (NativeStack)
-│   │       ├── SettlementScreen         ← four sub-views (tab-switched, NOT separate nav screens):
-│   │       │     Tab "Owed to me" — all pending amounts across events where user is creator
-│   │       │     Tab "I owe"      — all pending amounts across events where user is participant
-│   │       │     Tab "History"    — settled events, all parties
-│   │       │     Tab "Person"     — drill-down on a specific person (pushed onto stack)
-│   │       ├── PersonDetailScreen       ← pushed when tapping a person in "Owed to me" or "History"
-│   │       └── PayNowScreen             ← pushed from "I owe" when tapping "Pay now"
 │   │
 │   └── ProfileTab      (icon: person)
 │       └── ProfileStack (NativeStack)
@@ -627,12 +621,48 @@ interface PaymentHandle {
   deepLinkUrl: string;
 }
 
+interface MemberCounterparty {
+  userId: string;
+  displayName: string;
+  avatarColour: string;
+  netAmountMinorUnits: number;
+}
+
+interface GuestCounterparty {
+  guestKey: string;
+  kind: 'phone' | 'name_only';
+  displayName: string;
+  amountMinorUnits: number;
+  eventId?: string;
+  participantId?: string;
+}
+
+interface MemberDetailPayload {
+  userId: string;
+  displayName: string;
+  netAmountMinorUnits: number;
+  outstanding: Array<{ eventId: string; eventTitle: string; amountMinorUnits: number; direction: 'they_owe_you' | 'you_owe_them'; paymentStatus: string }>;
+  history: Array<{ eventId: string; eventTitle: string; amountMinorUnits: number; status: 'settled' | 'zero' }>;
+}
+
 interface SettlementState {
+  // Home dashboard (E09-S03)
+  membersOweYou: MemberCounterparty[];
+  membersYouOwe: MemberCounterparty[];
+  guests: GuestCounterparty[];
+  memberDetail: MemberDetailPayload | null;
+  guestDetail: MemberDetailPayload | null;
+
+  // Event Detail settlement phase
   owedToMe: SettlementEntry[];
   iOwe: IOwedEntry[];
+
   isLoading: boolean;
   error: string | null;
-  refresh: () => Promise<void>;
+  loadCounterparties: (kind: 'members' | 'guests') => Promise<void>;
+  loadMemberDetail: (userId: string) => Promise<void>;
+  loadGuestDetail: (phoneHash: string) => Promise<void>;
+  refreshEventSettlement: (eventId: string) => Promise<void>;
 
   // selfReport() — called by participant to report they've paid
   selfReport: (eventId: string, participantId: string) => Promise<void>;
@@ -656,27 +686,46 @@ interface SettlementState {
 }
 
 export const useSettlementStore = create<SettlementState>()((set) => ({
+  membersOweYou: [],
+  membersYouOwe: [],
+  guests: [],
+  memberDetail: null,
+  guestDetail: null,
   owedToMe: [],
   iOwe: [],
   isLoading: false,
   error: null,
 
-  refresh: async () => {
+  loadCounterparties: async (kind) => {
     set({ isLoading: true, error: null });
     try {
-      // IMPORTANT: React Native has no browser context — relative URLs like
-      // fetch('/api/v1/...') throw a network error. Always use the api helper
-      // from src/lib/api.ts which prepends EXPO_PUBLIC_API_URL automatically.
-      // All API calls in every store must use the api helper, never raw fetch
-      // with a relative path.
-      const [owedToMe, iOwe] = await Promise.all([
-        apiRequest('/settlement/owed-to-me', { method: 'GET', session }),
-        apiRequest('/settlement/i-owe', { method: 'GET', session }),
-      ]);
-      set({ owedToMe, iOwe, isLoading: false });
+      const data = await apiRequest(`/users/me/counterparties?kind=${kind}`, { method: 'GET', session });
+      if (kind === 'members') {
+        set({ membersOweYou: data.owe_you, membersYouOwe: data.you_owe, isLoading: false });
+      } else {
+        set({ guests: data.guests, isLoading: false });
+      }
     } catch {
-      set({ error: 'Failed to load settlement data.', isLoading: false });
+      set({ error: 'Failed to load balances.', isLoading: false });
     }
+  },
+
+  loadMemberDetail: async (userId) => {
+    const data = await apiRequest(`/settlement/member/${userId}`, { method: 'GET', session });
+    set({ memberDetail: data });
+  },
+
+  loadGuestDetail: async (phoneHash) => {
+    const data = await apiRequest(`/settlement/guest/${phoneHash}`, { method: 'GET', session });
+    set({ guestDetail: data });
+  },
+
+  refreshEventSettlement: async (eventId) => {
+    const [owedToMe, iOwe] = await Promise.all([
+      apiRequest('/settlement/owed-to-me', { method: 'GET', session }),
+      apiRequest('/settlement/i-owe', { method: 'GET', session }),
+    ]);
+    set({ owedToMe, iOwe });
   },
 }));
 ```
@@ -841,29 +890,87 @@ This screen appears in the AuthStack **only once** — after the very first succ
 
 ---
 
-### HomeTab
+### HomeStack
+
+Refer to `prototype/home.html` (dashboard states). **MVP: USD only.**
 
 #### HomeScreen
 
-- Net balance hero card: large number, green if net positive ("You're owed $X"), red if negative ("You owe $X"), grey if zero
-  - Calls `GET /api/v1/users/me/balance` which returns `{ net_balance_minor_units, currency, owed_to_you, you_owe }`
-  - Shows a skeleton/loading state while fetching
-  - If the endpoint returns 404 or 501 (not yet available), shows "Balance unavailable" placeholder — does NOT crash
-  - Note: `GET /users/me/balance` is built in Epic 9. During Epic 5 development, the balance card gracefully degrades.
-- "Needs attention" section: pending confirmations from your events. **If empty, hide this entire section including its heading** — do not show an empty section header.
-- "Your recent events" quick list (last 3 events)
-- FAB (floating action button) bottom right: "＋ New event" → opens CreateEventModal
-- Pull to refresh
+**Layout (top → bottom):**
 
-**Loading state (skeleton):**
-- Hero card: grey placeholder rectangle, 100% width, 80px tall, rounded corners, pulsing animation
-- Below hero: three grey skeleton event card rows (each 72px tall, with a small circle placeholder for avatar and two line placeholders for text)
+1. **Net balance hero** (unchanged from E05-S03 placeholder)
+   - `GET /api/v1/users/me/balance` → `{ net_balance_minor_units, currency: "USD", owed_to_you, you_owe }`
+   - Green / red / grey by sign; skeleton while loading; graceful "Balance unavailable" if 404/501
+2. **Members | Guests** segmented toggle (below hero)
+3. **List area** (content depends on toggle)
+4. **FAB** bottom right: "＋ New event" → `CreateEventModal`
+5. Pull to refresh refreshes balance + active toggle list
 
-**Error state:** If the balance fetch fails, replace the hero card with: "Couldn't load your balance." with a "Retry" button. If the event list fetch fails, show below the hero: "Something went wrong. Pull to retry."
+**Members toggle** — `GET /api/v1/users/me/counterparties?kind=members`
 
-**Empty state ("Your recent events"):** "No events yet. Tap + to split your first bill." — shown in the event list area only when the user has zero events.
+| Section | Rows | Row content | Tap |
+|---|---|---|---|
+| **People who owe you** | `owe_you[]` (net > 0) | Avatar, name, **net amount only** | → `MemberDetailScreen` (`userId`) |
+| **People you owe** | `you_owe[]` (net < 0) | Avatar, name, **net amount only** | → `MemberDetailScreen` (`userId`) |
 
-**Accessibility:** Hero card: `accessibilityRole="text"`, `accessibilityLabel="You are owed forty-two dollars and fifty cents"` (spoken dollar amount, not "$42.50"). FAB: `accessibilityRole="button"`, `accessibilityLabel="Create a new event"`.
+- Hide each section (including heading) when empty.
+- Counterparties with **net = 0** never appear.
+
+**Guests toggle** — `GET /api/v1/users/me/counterparties?kind=guests`
+
+- Only pure guests who **still owe the logged-in user** (viewer is payer). Settled guests hidden.
+- Row: name + **outstanding amount only**.
+- **Phone guest** (`kind: phone`): tap → `GuestDetailScreen` (`phoneHash` / `guest_key`).
+- **Name-only guest** (`kind: name_only`): tap → **`EventDetailScreen` directly** (`event_id` from row) — no intermediate screen.
+
+**Empty states:**
+- Members / both sections empty: "No outstanding balances with members."
+- Guests empty: "No guests owe you right now."
+
+**Error state:** Banner below toggle: "Couldn't load balances. Pull to retry."
+
+**Accessibility:** Toggle: `accessibilityRole="tab"`. Counterparty row: `accessibilityLabel="[Name], [spoken amount], [owe you | you owe]"`.
+
+> **E05-S03 shipped a placeholder** (Needs attention + recent events). **E09-S03** replaces list area with Members/Guests toggle per this spec.
+
+---
+
+#### MemberDetailScreen
+
+- **Route params:** `userId: string`
+- **Data:** `GET /api/v1/settlement/member/:userId`
+- Header: counterparty avatar, name, signed net amount
+- **Outstanding** events (from `outstanding[]`): event title, per-event amount, direction chip (`They owe you` / `You owe`), payment status chip
+- **"See more events"** button at bottom → expands `history[]` (settled / $0 direct relationships only)
+- Tap event row → `EventDetailScreen` (`eventId`) — payer or participant view per role
+- **No inline Confirm/Nudge/Pay** on this screen — actions in Event Detail only
+- Optional: "Pay now" on `i_owe` outstanding rows → `PayNowScreen` with decrypted handles from event context
+
+**Back:** pops to `HomeScreen`.
+
+---
+
+#### GuestDetailScreen
+
+- **Route params:** `phoneHash: string` (or `guest_key`)
+- **Data:** `GET /api/v1/settlement/guest/:phoneHash`
+- Header: guest display name, total outstanding
+- Same outstanding / "See more events" / history pattern as Member detail
+- Tap event → `EventDetailScreen` (payer settlement view)
+
+**Not used for name-only guests** — those navigate straight from `HomeScreen`.
+
+---
+
+#### PayNowScreen
+
+- Pushed from `MemberDetailScreen` when viewer owes on an outstanding event (or from participant Event Detail)
+- Amount at top (large, bold); creator payment handle cards with deep links (`Linking.openURL`)
+- US MVP: Venmo, PayPal, Cash App, Zelle handles per payer profile
+- "I've paid" → self-report flow → returns to Event Detail
+- Refer to `prototype/ledger.html` `pay_now` ID for visual layout
+- If payment deep link fails (app not installed): show handle as copyable text
+- **Accessibility:** Each payment option: `accessibilityRole="button"`, `accessibilityLabel="Pay via [provider] — [handle]"`
 
 ---
 
@@ -871,36 +978,49 @@ This screen appears in the AuthStack **only once** — after the very first succ
 
 #### EventsScreen
 
-- Segmented control: "Active" | "Settled"
-- List of event cards (event name, date, participant count, status chip, outstanding amount)
-- FAB: "＋ New event" → CreateEventModal
-- Tap card → EventDetailScreen
+Two **sections** (not Active|Settled segmented control):
 
-**Loading state:** Three grey skeleton cards, each 80px tall, pulsing.
+1. **Events you created** — `GET /api/v1/events?role=creator` (paginated)
+2. **Events you joined** — `GET /api/v1/events?role=participant` (paginated)
 
-**Error state:** "Something went wrong. Pull to retry." with a retry button replacing the list.
+Within each section:
+- **Active** events (status not `settled` / `archived`) listed first
+- **Settled** events collapsed under tappable header **"Settled (N)"** — expands inline
+- Event card: title, date, participant count, status chip, optional outstanding amount
+- FAB: "＋ New event" → `CreateEventModal`
+- Tap card → `EventDetailScreen`
 
-**Empty state — Active tab:** "No events yet. Tap + to split your first bill."
+**Empty states:**
+- Created section empty: "You haven't created any events yet. Tap + to split your first bill."
+- Joined section empty: "You haven't joined any events yet."
 
-**Empty state — Settled tab:** "No settled events yet."
+**Loading / error:** Same skeleton and pull-to-retry patterns as prior spec.
 
-**Accessibility:** Each event card: `accessibilityRole="button"`, `accessibilityLabel="[Event name], [date], [participant count] people, [status], [outstanding amount] outstanding"`.
+**Accessibility:** Card: `accessibilityRole="button"`, `accessibilityLabel="[title], [role created|joined], [status]"`.
 
 ---
 
 #### EventDetailScreen (dual-phase — same screen, different content)
 
-**Joining phase** (event status = `"open"`):
+**Role split:** Creators (`auth.user.id === event.payer_id`) see the payer views below. Joined members see **Participant view** only — no QR, copy/share link, add-member, lock, reopen, or payer settlement summary. Participant view (refer to `prototype/participant.html` IDs `event_detail`, `event_detail_waiting`):
+
+- Header: event title, "Hosted by [creator] · [date]", status chip
+- **Your share** hero: calculated amount when `amount_owed` is set; otherwise professional pending copy (open group → waiting for creator to lock; locked → preparing receipt/split; calculating → share being calculated)
+- **How your share was calculated:** shown when `split_mode` is set — equal / portion / itemised description; itemised lists `my_items` from `GET /events/:id` when available
+- **Group roster:** all members with amounts when split is finalised; viewer's row labelled "You" and highlighted
+
+**Joining phase — payer only** (event status = `"open"`):
 - QR code at top (tap → QRDisplayModal fullscreen)
 - "Copy link" and "Share link" buttons
 - "Expired" amber state with "Regenerate" button if token lapsed
 - Live member list (Supabase Realtime subscription on `participants` table, filter by `event_id`)
-- Each member row: avatar | name | join method chip
-- "+ Add manually" button → AddParticipantModal
-- "Lock group →" CTA at bottom (disabled if < 2 participants)
-- "Reopen join window" button (shown after group is locked — POST `/events/:id/reopen` reverts to "open")
+- Organiser (event creator) appears as the first member automatically — `is_organiser: true`, chip label **Organiser**, no remove control
+- Each member row (`EventMemberRow`): compact 48px row — 32px avatar | name | join-method chip (`alignSelf: flex-start`, not full-width) | optional × remove icon (payer only, non-organiser rows)
+- "+ Add manually" button → `AddParticipantModal` with two choices: **From contacts** (`expo-contacts`) or **Enter manually** (name / phone / name-only)
+- "Lock group →" CTA at bottom (disabled if < 2 participants — organiser + at least one other). Hint when count is 1: *"Add at least one more member besides you to lock the group."*
+- "Reopen join window" button (shown when status is `locked` and user is payer — POST `/events/:id/reopen` reverts to `"open"`, new QR/link for 24h)
 
-**Settlement phase** (event status = `"locked"`, `"calculating"`, `"sent"`, `"settled"`):
+**Settlement phase — payer only** (event status = `"locked"`, `"calculating"`, `"sent"`, `"settled"`):
 - Summary bar: total | collected | outstanding + progress ring
 - Segmented progress bar: green (confirmed) | amber (self-reported) | grey (pending)
 - Per-member roster:
@@ -909,12 +1029,12 @@ This screen appears in the AuthStack **only once** — after the very first succ
   - Confirmed: name | amount | green check
   - Opted out: name | "opted out" chip | no action buttons
 
-Note: EventDetailScreen settlement phase shows per-event settlement only. Cross-event financial summary lives in the SettlementTab.
+Note: EventDetailScreen is where all settlement **actions** execute. Cross-event counterparty summary lives on **Home** (Members/Guests toggle + detail screens).
 
-Back button: pops to EventsScreen.
+Back button: pops to previous screen (`EventsScreen`, `HomeScreen`, or `MemberDetailScreen` / `GuestDetailScreen`).
 
 **Loading state (skeleton) — member list:**
-- Three rows, each 56px tall: grey circle (40×40) on the left, two grey lines (name + chip) on the right, pulsing animation.
+- Three rows, each ~48px tall: grey circle (32×32) on the left, two grey lines (name + chip) on the right, pulsing animation.
 
 **Error state:** If the Realtime subscription fails or the initial fetch errors, show a banner inside the screen (not replacing the whole screen): "Couldn't load member list. Pull to retry." If the error persists, the React error boundary (see Section 6) will catch it.
 
@@ -1020,68 +1140,7 @@ This applies to both the joining phase (channel `event-members:{eventId}`, subsc
 
 ---
 
-### SettlementStack
-
-#### SettlementScreen (four tab-switched views)
-
-**Tab 1 — "Owed to me"** (cross-event view):
-- Lists all participants across all your events who owe you money
-- Grouped by event
-- Each row: participant name | amount | status chip | "Nudge" or "Confirm" action
-- Tap a participant row → pushes PersonDetailScreen
-
-**Tab 2 — "I owe"** (cross-event view):
-- Lists all your unpaid shares across events where you are a participant (not creator)
-- Each row: creator name | event name | amount | "Pay now" button
-- Tap "Pay now" → pushes PayNowScreen
-
-**Tab 3 — "History"** (settled events):
-- Shows all fully settled events across both roles (creator and participant)
-- Each row: event name | date | total | your role
-- Read-only; no action buttons
-- Tap a row → pushes PersonDetailScreen (showing settled history)
-
-**Tab 4 — "Person"** (drill-down):
-- Not a tab in the traditional sense — this is accessed by tapping a participant in "Owed to me"
-- Pushes PersonDetailScreen onto the SettlementStack as a separate screen
-
-**Loading state (skeleton):** Three grey rows per tab, 64px tall each, pulsing.
-
-**Error state:** "Something went wrong. Pull to retry." with a retry button replacing the list.
-
-**Empty state — "Owed to me":** "Nothing owed to you right now 🎉"
-
-**Empty state — "I owe":** "You're all caught up! 💚"
-
-**Empty state — "History":** "No settled events yet."
-
-**Refresh:** Pull to refresh triggers `useSettlementStore.refresh()`.
-
-**Accessibility:** Each row: `accessibilityRole="button"`. Amount: announced as spoken dollars, not symbol + number.
-
----
-
-#### PersonDetailScreen (pushed from SettlementScreen)
-
-- Full history of this person's payments to you across all shared events
-- Per-event breakdown: event name | their share | status | date
-- "Nudge" button at top (if any pending, with cooldown enforcement)
-
-**Error state:** "Couldn't load details. Pull to retry."
-
----
-
-#### PayNowScreen (pushed from "I owe" tab when tapping "Pay now")
-
-- Amount prominently displayed at top (large, bold, indigo)
-- Shows payment handle options for the creator (Venmo, PayPal, Cash App, Zelle, Wise, Other)
-- Each handle is a tappable deep link card that opens the payment app with handle + amount pre-filled
-- "I paid via cash" button → self-report flow (opens ConfirmPaymentModal)
-- Country filtering: US handles only shown to US numbers; international handles (PayPal, Wise) shown to all
-
-**Error state:** If payment deep link fails to open (app not installed): "Looks like you don't have [app name] installed. You can pay directly: [handle]" with the handle displayed as copyable text.
-
-**Accessibility:** Each payment option: `accessibilityRole="button"`, `accessibilityLabel="Pay via [provider] — [handle]"`, `accessibilityHint="Opens [provider] app with amount pre-filled"`.
+> **Removed:** Separate **SettlementTab** / `SettlementScreen` (four-tab ledger). Cross-event balances and counterparty drill-down live on **HomeStack** per E09-S03. `settlementStore` caches counterparties and detail payloads.
 
 ---
 
@@ -1157,6 +1216,8 @@ This applies to both the joining phase (channel `event-members:{eventId}`, subsc
 - "Name only (no phone)" toggle — disables phone field
 - "Add to group" CTA
 
+Both phone paths call `POST /events/:id/participants/manual` with `join_method='manual_phone'`. Backend behaviour (E05-S04): if the phone matches an existing LetsSplyt user, that user is linked via `user_id` and will see the event under **Events you joined** on login — no OTP. If not registered, `guest_pii` stores the number for SMS only; no account is created until the person verifies via OTP elsewhere.
+
 **On success:** Toast at bottom: "✓ [Name] added". Participant appears immediately in member list (optimistic UI).
 
 **On failure:** Toast: "Failed to add [Name] — tap to retry."
@@ -1186,32 +1247,26 @@ This applies to both the joining phase (channel `event-members:{eventId}`, subsc
 
 ### Web Join Flow
 
-When a guest or participant scans the QR code or taps a join link, a **web page** opens at `[APP_DOMAIN]/join/:token`. This is a backend-rendered page (or React web page), not part of the React Native app.
+When someone scans the QR code or taps a join link, a **server-rendered web page** opens at `[APP_DOMAIN]/join/:token` (not part of the React Native app).
+
+**Registration rule:** OTP verification on web join **creates or resolves a `users` account** (same as app Get Started). The browser-entered `display_name` is persisted to `users.display_name` and `participants.display_name` (placeholder profiles are upgraded). The participant row uses `user_id`, not `guest_pii`. Installing the app later uses the same phone — no name re-entry; joined events appear on the dashboard. **Pure guests** (`guest_pii` only) exist only when the payer manually adds a phone without OTP.
 
 **App-installed decision branch:**
 - App installed → Universal Link / App Link intercepts URL → opens app to AppJoinScreen
 - App not installed → browser opens the web join page
-- This decision is automatic (handled by iOS/Android Universal Links)
 
-**WebJoinScreen — new visitor (phone not in system):**
-- Shows event name and creator name ("Pawan invited you to split...")
-- Phone number input with country code picker
-- Name input field
-- "Join →" CTA → POST `/join/:token` with phone + name → WebOTPScreen
+**Join form (browser):**
+- Event name and organiser
+- Name + phone + country code
+- "Join →" → OTP sent via Twilio
+- If already a registered user linked to this event → success page immediately (no OTP)
 
-**WebJoinScreen — returning visitor (phone already in system):**
-- Shows personalised greeting: "Welcome back, [Name]! Tap below to join."
-- Single CTA: "Join as [Name] →"
-- No name input shown
-- On tap → POST `/join/:token` → WebOTPScreen
+**OTP screen:**
+- 6-digit code entry
+- On verify → `resolveUserAfterOtp` + participant insert with `user_id`
+- Legacy guest rows for the same phone are upgraded automatically
 
-**WebOTPScreen:**
-- "We sent a code to [phone last 4 digits]"
-- 6-digit OTP input
-- "Resend" link (60 second cooldown)
-- On success → WebJoinedScreen
-
-**WebJoinedScreen — success:**
+**Joined success screen:**
 - "You're in! 🎉" header
 - Shows event name + creator name
 - Shows the participant's own share (if already calculated) OR "Your share will be sent once the bill is split"
@@ -1745,8 +1800,8 @@ function handleNotificationNavigation(data: Record<string, unknown>) {
     });
   } else if (data.type === 'payment_confirmed' && data.eventId) {
     navigationRef.current.navigate('MainTabs', {
-      screen: 'SettlementTab',
-      params: { screen: 'Settlement', params: { eventId: data.eventId as string } },
+      screen: 'EventsTab',
+      params: { screen: 'EventDetail', params: { eventId: data.eventId as string } },
     });
   }
 }

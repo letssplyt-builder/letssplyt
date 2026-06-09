@@ -10,6 +10,7 @@ import type {
   EventSettlementSummary,
   JoinTokenInfo,
   LockEventResponse,
+  ParticipantAssignedItem,
   ReopenEventResponse,
 } from '@letssplyt/shared/event.types';
 
@@ -220,6 +221,31 @@ function buildSettlementSummary(
   };
 }
 
+async function insertCreatorParticipant(userId: string, eventId: string): Promise<void> {
+  const { data: user, error: userError } = await supabaseAdmin
+    .from('users')
+    .select('id, display_name')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (userError || !user) {
+    throw new AppError('PAYER_FETCH_FAILED', 'Could not load creator profile', 500);
+  }
+
+  const { error: participantError } = await supabaseAdmin.from('participants').insert({
+    event_id: eventId,
+    user_id: userId,
+    guest_pii_token: null,
+    display_name: user.display_name as string,
+    join_method: 'qr_app',
+    payment_status: 'pending',
+  });
+
+  if (participantError) {
+    throw new AppError('PARTICIPANT_CREATE_FAILED', 'Could not add creator to event', 500);
+  }
+}
+
 export async function createEvent(
   userId: string,
   input: { title: string; event_date?: string },
@@ -240,7 +266,16 @@ export async function createEvent(
     throw new AppError('EVENT_CREATE_FAILED', 'Could not create event', 500);
   }
 
-  const { token, expires_at } = await createJoinToken(eventRow.id as string, JOIN_TOKEN_TTL_HOURS);
+  const eventId = eventRow.id as string;
+
+  try {
+    await insertCreatorParticipant(userId, eventId);
+  } catch (err) {
+    await supabaseAdmin.from('events').delete().eq('id', eventId);
+    throw err;
+  }
+
+  const { token, expires_at } = await createJoinToken(eventId, JOIN_TOKEN_TTL_HOURS);
 
   return {
     id: eventRow.id as string,
@@ -251,20 +286,83 @@ export async function createEvent(
   };
 }
 
+async function fetchParticipantEventIds(userId: string): Promise<string[]> {
+  const { data: participantRows, error: participantError } = await supabaseAdmin
+    .from('participants')
+    .select('event_id')
+    .eq('user_id', userId);
+
+  if (participantError) {
+    throw new AppError('EVENTS_LIST_FAILED', 'Could not list events', 500);
+  }
+
+  const eventIds = [...new Set((participantRows ?? []).map((row) => row.event_id as string))];
+  if (eventIds.length === 0) {
+    return [];
+  }
+
+  const { data: eventRows, error: eventError } = await supabaseAdmin
+    .from('events')
+    .select('id, payer_id')
+    .in('id', eventIds)
+    .is('deleted_at', null);
+
+  if (eventError) {
+    throw new AppError('EVENTS_LIST_FAILED', 'Could not list events', 500);
+  }
+
+  return (eventRows ?? [])
+    .filter((row) => (row.payer_id as string) !== userId)
+    .map((row) => row.id as string);
+}
+
+async function fetchCreatorNames(payerIds: string[]): Promise<Map<string, string>> {
+  if (payerIds.length === 0) {
+    return new Map();
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('users')
+    .select('id, display_name')
+    .in('id', payerIds);
+
+  if (error) {
+    throw new AppError('EVENTS_LIST_FAILED', 'Could not list events', 500);
+  }
+
+  return new Map(
+    (data ?? []).map((row) => [row.id as string, row.display_name as string]),
+  );
+}
+
 export async function listEvents(
   userId: string,
-  options: { cursor?: string; limit?: number },
+  options: { cursor?: string; limit?: number; role?: 'creator' | 'participant' | 'all' },
 ): Promise<EventListResponse> {
   const limit = Math.min(Math.max(options.limit ?? DEFAULT_LIST_LIMIT, 1), MAX_LIST_LIMIT);
+  const role = options.role ?? 'all';
+  const participantEventIds = role !== 'creator' ? await fetchParticipantEventIds(userId) : [];
 
   let query = supabaseAdmin
     .from('events')
-    .select('id, title, status, total_amount, created_at')
-    .eq('payer_id', userId)
+    .select('id, title, status, total_amount, created_at, payer_id')
     .is('deleted_at', null)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
     .limit(limit + 1);
+
+  if (role === 'creator') {
+    query = query.eq('payer_id', userId);
+  } else if (role === 'participant') {
+    if (participantEventIds.length === 0) {
+      return { events: [], next_cursor: null, has_more: false };
+    }
+    query = query.in('id', participantEventIds);
+  } else if (participantEventIds.length > 0) {
+    query = query.or(`payer_id.eq.${userId},id.in.(${participantEventIds.join(',')})`);
+  } else {
+    query = query.eq('payer_id', userId);
+  }
 
   if (options.cursor) {
     const decoded = decodeEventCursor(options.cursor);
@@ -283,20 +381,33 @@ export async function listEvents(
     status: EventListItem['status'];
     total_amount: number | null;
     created_at: string;
+    payer_id: string;
   }>;
 
   const has_more = rows.length > limit;
   const pageRows = has_more ? rows.slice(0, limit) : rows;
 
+  const creatorPayerIds = [
+    ...new Set(
+      pageRows.filter((row) => row.payer_id !== userId).map((row) => row.payer_id),
+    ),
+  ];
+  const creatorNames = await fetchCreatorNames(creatorPayerIds);
+
   const events: EventListItem[] = await Promise.all(
-    pageRows.map(async (row) => ({
-      id: row.id,
-      title: row.title,
-      status: row.status,
-      participant_count: await countParticipants(row.id),
-      total_amount: row.total_amount,
-      created_at: row.created_at,
-    })),
+    pageRows.map(async (row) => {
+      const isCreator = row.payer_id === userId;
+      return {
+        id: row.id,
+        title: row.title,
+        status: row.status,
+        participant_count: await countParticipants(row.id),
+        total_amount: row.total_amount,
+        created_at: row.created_at,
+        role: isCreator ? 'creator' : 'participant',
+        creator_name: isCreator ? null : (creatorNames.get(row.payer_id) ?? null),
+      };
+    }),
   );
 
   const last = pageRows[pageRows.length - 1];
@@ -306,9 +417,42 @@ export async function listEvents(
   return { events, next_cursor, has_more };
 }
 
+async function fetchMyAssignedItems(
+  eventId: string,
+  participantId: string,
+): Promise<ParticipantAssignedItem[]> {
+  const { data, error } = await supabaseAdmin
+    .from('item_assignments')
+    .select('share_amount, receipt_items!inner(id, name, is_shared, event_id)')
+    .eq('participant_id', participantId)
+    .eq('receipt_items.event_id', eventId);
+
+  if (error) {
+    throw new AppError('ITEM_ASSIGNMENTS_FETCH_FAILED', 'Could not load assigned items', 500);
+  }
+
+  return (data ?? []).flatMap((row) => {
+    const raw = row.receipt_items as
+      | { id: string; name: string; is_shared: boolean }
+      | Array<{ id: string; name: string; is_shared: boolean }>
+      | null;
+    const item = Array.isArray(raw) ? raw[0] : raw;
+    if (!item) return [];
+    return [
+      {
+        id: item.id,
+        name: item.name,
+        share_amount: row.share_amount as number,
+        is_shared: item.is_shared,
+      },
+    ];
+  });
+}
+
 export async function getEventById(userId: string, eventId: string): Promise<EventDetailResponse> {
   const eventRow = await fetchEventRow(eventId);
   await assertEventAccess(eventRow, userId);
+  const isPayer = eventRow.payer_id === userId;
 
   const { data: payer, error: payerError } = await supabaseAdmin
     .from('users')
@@ -322,7 +466,7 @@ export async function getEventById(userId: string, eventId: string): Promise<Eve
 
   const { data: participantRows, error: participantsError } = await supabaseAdmin
     .from('participants')
-    .select('id, display_name, join_method, payment_status, amount_owed')
+    .select('id, user_id, display_name, join_method, payment_status, amount_owed')
     .eq('event_id', eventId)
     .order('created_at', { ascending: true });
 
@@ -336,13 +480,27 @@ export async function getEventById(userId: string, eventId: string): Promise<Eve
     join_method: row.join_method as string,
     payment_status: row.payment_status as string,
     amount_owed: row.amount_owed as number | null,
+    is_organiser: (row.user_id as string | null) === eventRow.payer_id,
+    is_self: (row.user_id as string | null) === userId,
   }));
 
-  const join_token = eventRow.status === 'open' ? await fetchActiveJoinToken(eventId) : null;
+  const selfParticipant = participants.find((participant) => participant.is_self);
+
+  const join_token =
+    isPayer && eventRow.status === 'open' ? await fetchActiveJoinToken(eventId) : null;
   const summary =
-    eventRow.status !== 'open'
+    isPayer && eventRow.status !== 'open'
       ? buildSettlementSummary(participants, eventRow.total_amount)
       : null;
+
+  let my_items: ParticipantAssignedItem[] | undefined;
+  if (
+    selfParticipant &&
+    eventRow.split_mode === 'itemised' &&
+    selfParticipant.amount_owed !== null
+  ) {
+    my_items = await fetchMyAssignedItems(eventId, selfParticipant.id);
+  }
 
   return {
     event: {
@@ -356,6 +514,7 @@ export async function getEventById(userId: string, eventId: string): Promise<Eve
     participants,
     join_token,
     summary,
+    ...(my_items !== undefined ? { my_items } : {}),
   };
 }
 
@@ -378,17 +537,24 @@ export async function lockEvent(userId: string, eventId: string): Promise<LockEv
 
   const lockedAt = new Date().toISOString();
 
-  const { error: updateError } = await supabaseAdmin
+  const { data: lockedRow, error: updateError } = await supabaseAdmin
     .from('events')
     .update({
       status: 'locked',
       locked_at: lockedAt,
       participant_count_at_lock: participant_count,
     })
-    .eq('id', eventId);
+    .eq('id', eventId)
+    .eq('status', 'open')
+    .select('id')
+    .maybeSingle();
 
   if (updateError) {
     throw new AppError('EVENT_LOCK_FAILED', 'Could not lock event', 500);
+  }
+
+  if (!lockedRow) {
+    throw Errors.conflict('Event is not open', 'ALREADY_LOCKED');
   }
 
   await deactivateActiveTokens(eventId);
@@ -409,13 +575,20 @@ export async function reopenEvent(userId: string, eventId: string): Promise<Reop
     throw Errors.conflict('Event is not locked', 'NOT_LOCKED');
   }
 
-  const { error: updateError } = await supabaseAdmin
+  const { data: reopenedRow, error: updateError } = await supabaseAdmin
     .from('events')
     .update({ status: 'open', locked_at: null })
-    .eq('id', eventId);
+    .eq('id', eventId)
+    .eq('status', 'locked')
+    .select('id')
+    .maybeSingle();
 
   if (updateError) {
     throw new AppError('EVENT_REOPEN_FAILED', 'Could not reopen event', 500);
+  }
+
+  if (!reopenedRow) {
+    throw Errors.conflict('Event is not locked', 'NOT_LOCKED');
   }
 
   await deactivateActiveTokens(eventId);

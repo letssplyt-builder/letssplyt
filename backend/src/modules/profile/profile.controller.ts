@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { PAYMENT_PROVIDERS } from '@letssplyt/shared/profile.types';
+import { getUserBalance } from './balance.service';
 import {
   createHandle,
   deleteHandle,
@@ -210,6 +211,19 @@ export async function handleDeleteHandle(
 
     await deleteHandle(req.user!.id, handleId);
     res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleGetBalance(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const balance = await getUserBalance(req.user!.id);
+    res.status(200).json(balance);
   } catch (err) {
     next(err);
   }

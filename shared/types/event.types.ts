@@ -38,6 +38,8 @@ export interface EventRecord {
   updated_at: string;
 }
 
+export type EventListRole = 'creator' | 'participant';
+
 export interface EventListItem {
   id: string;
   title: string;
@@ -45,6 +47,9 @@ export interface EventListItem {
   participant_count: number;
   total_amount: number | null;
   created_at: string;
+  role: EventListRole;
+  /** Set when role is participant — who created the event. */
+  creator_name?: string | null;
 }
 
 export interface EventListResponse {
@@ -74,6 +79,17 @@ export interface EventParticipantSummary {
   join_method: string;
   payment_status: string;
   amount_owed: number | null;
+  /** True when this row is the event payer / organiser. */
+  is_organiser?: boolean;
+  /** True when this row belongs to the authenticated viewer. */
+  is_self?: boolean;
+}
+
+export interface ParticipantAssignedItem {
+  id: string;
+  name: string;
+  share_amount: number;
+  is_shared: boolean;
 }
 
 export interface EventSettlementSummary {
@@ -91,6 +107,8 @@ export interface EventDetailResponse {
   participants: EventParticipantSummary[];
   join_token: JoinTokenInfo | null;
   summary: EventSettlementSummary | null;
+  /** Itemised split — current viewer's assigned line items (participant view only). */
+  my_items?: ParticipantAssignedItem[];
 }
 
 export interface LockEventResponse {

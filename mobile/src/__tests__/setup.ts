@@ -86,6 +86,11 @@ jest.mock('expo-clipboard', () => ({
   setStringAsync: jest.fn(() => Promise.resolve()),
 }));
 
+jest.mock('expo-contacts', () => ({
+  requestPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted' })),
+  presentContactPickerAsync: jest.fn(() => Promise.resolve(null)),
+}));
+
 global.fetch = jest.fn() as unknown as typeof fetch;
 
 beforeEach(() => {

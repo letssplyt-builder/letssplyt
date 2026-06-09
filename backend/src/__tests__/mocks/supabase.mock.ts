@@ -27,6 +27,7 @@ function createChainable(table: string): ChainableMock {
     lt: jest.fn<ChainMethod>().mockReturnThis(),
     neq: jest.fn<ChainMethod>().mockReturnThis(),
     in: jest.fn<ChainMethod>().mockReturnThis(),
+    or: jest.fn<ChainMethod>().mockReturnThis(),
     is: jest.fn<ChainMethod>().mockReturnThis(),
     not: jest.fn<ChainMethod>().mockReturnThis(),
     order: jest.fn<ChainMethod>().mockReturnThis(),
@@ -66,6 +67,7 @@ export interface ChainableMock {
   lt: jest.Mock<ChainMethod>;
   neq: jest.Mock<ChainMethod>;
   in: jest.Mock<ChainMethod>;
+  or: jest.Mock<ChainMethod>;
   is: jest.Mock<ChainMethod>;
   not: jest.Mock<ChainMethod>;
   order: jest.Mock<ChainMethod>;

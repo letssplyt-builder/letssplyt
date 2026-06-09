@@ -1,6 +1,21 @@
-import type { EventListItem, EventStatus } from '@letssplyt/shared/event.types';
+import type {
+  EventListItem,
+  EventParticipantSummary,
+  EventStatus,
+} from '@letssplyt/shared/event.types';
 
-export function joinMethodLabel(method: string): string {
+/** Organiser row — cannot be removed from the member list. */
+export function isPayerParticipant(
+  participant: EventParticipantSummary,
+  payer?: { display_name: string },
+): boolean {
+  if (participant.is_organiser) return true;
+  if (!payer) return false;
+  return participant.join_method === 'qr_app' && participant.display_name === payer.display_name;
+}
+
+export function joinMethodLabel(method: string, isOrganiser = false): string {
+  if (isOrganiser) return 'Organiser';
   switch (method) {
     case 'qr_app':
       return 'App';

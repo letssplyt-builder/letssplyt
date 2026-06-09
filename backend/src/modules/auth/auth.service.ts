@@ -7,6 +7,7 @@ import { supabaseAdmin } from '../../infrastructure/supabase';
 import { createAdminSession, internalEmailForUserId } from '../../infrastructure/supabase-auth';
 import { twilioClient, getVerifyServiceSid } from '../../infrastructure/twilio';
 import { checkOtpRequestRate, recordFailedOtpVerify } from '../../middleware/rateLimiter';
+import { upgradeGuestParticipantsToUser } from '../participants/participant-link.service';
 import { isOtpDevBypassEnabled } from './otp-dev-bypass';
 import type { AuthSession, OtpRequestResponse } from '@letssplyt/shared/auth.types';
 
@@ -30,6 +31,44 @@ interface ResolvedUser {
   isNewUser: boolean;
   userDisplayName: string;
   avatarColour: string;
+}
+
+const PLACEHOLDER_DISPLAY_NAME = 'LetsSplyt User';
+
+function isDisplayNameMissing(name: string | null | undefined): boolean {
+  const trimmed = name?.trim();
+  return !trimmed || trimmed === PLACEHOLDER_DISPLAY_NAME;
+}
+
+async function applyRegistrationDisplayName(
+  userId: string,
+  displayName: string,
+): Promise<string> {
+  const trimmed = displayName.trim();
+  const { data, error } = await supabaseAdmin
+    .from('users')
+    .update({ display_name: trimmed })
+    .eq('id', userId)
+    .select('display_name')
+    .single();
+
+  if (error || !data?.display_name) {
+    logger.error({
+      msg: 'Failed to update display_name after registration',
+      userId,
+      supabaseCode: error?.code,
+      supabaseMessage: error?.message,
+    });
+    throw new AppError('PROFILE_UPDATE_FAILED', 'Could not save display name', 500);
+  }
+
+  void supabaseAdmin.auth.admin
+    .updateUserById(userId, { user_metadata: { display_name: trimmed } })
+    .catch((err: unknown) => {
+      logger.warn({ msg: 'Failed to sync display_name to auth metadata', userId, err });
+    });
+
+  return data.display_name;
 }
 
 function normalisePhone(input: string): string {
@@ -222,7 +261,9 @@ async function upsertPublicUserProfile(
   avatarColour: string,
 ): Promise<PublicUserProfile> {
   const existingById = await loadPublicUserProfileById(userId);
-  if (existingById) return existingById;
+  if (existingById && !isDisplayNameMissing(existingById.display_name)) {
+    return existingById;
+  }
 
   const { data: existingByPhone } = await supabaseAdmin
     .from('users')
@@ -232,17 +273,20 @@ async function upsertPublicUserProfile(
 
   if (existingByPhone) {
     if (existingByPhone.id === userId) {
-      return {
-        display_name: existingByPhone.display_name,
-        avatar_colour: existingByPhone.avatar_colour,
-      };
+      if (!isDisplayNameMissing(existingByPhone.display_name)) {
+        return {
+          display_name: existingByPhone.display_name,
+          avatar_colour: existingByPhone.avatar_colour,
+        };
+      }
+    } else {
+      logger.error({
+        msg: 'phone_hash already linked to a different user id',
+        authUserId: userId,
+        publicUserId: existingByPhone.id,
+      });
+      throw new AppError('AUTH_PROFILE_CREATION_FAILED', 'Could not create user profile', 500);
     }
-    logger.error({
-      msg: 'phone_hash already linked to a different user id',
-      authUserId: userId,
-      publicUserId: existingByPhone.id,
-    });
-    throw new AppError('AUTH_PROFILE_CREATION_FAILED', 'Could not create user profile', 500);
   }
 
   const { data: rpcRows, error: rpcError } = await supabaseAdmin.rpc(
@@ -339,7 +383,7 @@ async function resolveDisplayNameForAuthUser(
     return metadataName.trim();
   }
 
-  return 'LetsSplyt User';
+  return PLACEHOLDER_DISPLAY_NAME;
 }
 
 async function repairPublicProfile(
@@ -471,35 +515,46 @@ export async function resolveUserAfterOtp(
   displayName?: string,
   context: OtpVerifyContext = 'register',
 ): Promise<ResolvedUser> {
+  let resolved: ResolvedUser;
+
   const publicUser = await loadPublicUserByPhoneHash(phoneHash);
-  if (publicUser) {
-    return {
+  if (publicUser?.id) {
+    resolved = {
       userId: publicUser.id,
       isNewUser: false,
       userDisplayName: publicUser.display_name,
       avatarColour: publicUser.avatar_colour,
     };
+  } else {
+    const authUserId = await findAuthUserIdByPhone(phoneE164);
+    if (authUserId) {
+      resolved = await resolveExistingAuthUser(authUserId, phoneHash, phoneEncrypted, displayName);
+    } else if (context === 'login') {
+      throw new AppError(
+        'ACCOUNT_NOT_FOUND',
+        'No account found. Check number and try again.',
+        404,
+      );
+    } else {
+      const name = displayName?.trim();
+      if (!name) {
+        throw new AppError('NAME_REQUIRED', 'display_name is required for new users', 400);
+      }
+      resolved = await createNewUser(phoneE164, phoneHash, phoneEncrypted, name);
+    }
   }
 
-  const authUserId = await findAuthUserIdByPhone(phoneE164);
-  if (authUserId) {
-    return resolveExistingAuthUser(authUserId, phoneHash, phoneEncrypted, displayName);
+  if (
+    context === 'register' &&
+    displayName?.trim() &&
+    isDisplayNameMissing(resolved.userDisplayName)
+  ) {
+    const updatedName = await applyRegistrationDisplayName(resolved.userId, displayName);
+    resolved = { ...resolved, userDisplayName: updatedName };
   }
 
-  if (context === 'login') {
-    throw new AppError(
-      'ACCOUNT_NOT_FOUND',
-      'No account found. Check number and try again.',
-      404,
-    );
-  }
-
-  const name = displayName?.trim();
-  if (!name) {
-    throw new AppError('NAME_REQUIRED', 'display_name is required for new users', 400);
-  }
-
-  return createNewUser(phoneE164, phoneHash, phoneEncrypted, name);
+  await upgradeGuestParticipantsToUser(phoneHash, resolved.userId);
+  return resolved;
 }
 
 export async function verifyOtpAndCreateSession(

@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
-**Last updated:** 2026-06-08
-**Current story:** E05-S04 — Event Member Management UI (contacts, remove, reopen)
+**Last updated:** 2026-06-09
+**Current story:** E06-S02 — In-App Join + Deep Link Handler (Universal Links, AppJoinScreen)
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -42,7 +42,7 @@
 - [x] E05-S01 — Event CRUD API (create, list, get, lock, reopen, regenerate token) (2026-06-08)
 - [x] E05-S02 — Add Participant API + Manual Add (2026-06-08)
 - [x] E05-S03 — Mobile Event Screens (Home, Events, CreateEvent, QR, EventDetail + Realtime) (2026-06-08)
-- [ ] E05-S04 — Event Member Management UI (contact picker, remove before lock, reopen after lock)
+- [x] E05-S04 — Event Member Management UI (contact picker, remove before lock, reopen after lock) (2026-06-09)
 
 ### Epic 6: Join Flows (3 stories)
 - [x] E06-S01 — Web Join Page (server-rendered HTML — works without JavaScript) (2026-06-08)
@@ -68,8 +68,8 @@
 
 ### Epic 9: Settlement Tracking
 - [ ] E09-S01 — Settlement API (self-report, confirm, dispute, nudge with 24h cooldown)
-- [ ] E09-S02 — Settlement Ledger API (owed-to-me, i-owe, summary, person-detail)
-- [ ] E09-S03 — Settlement Mobile Screens (SettlementTab, PayNowScreen, PersonDetailScreen)
+- [ ] E09-S02 — Settlement Ledger API (balance, counterparties, member/guest detail, owed-to-me, i-owe)
+- [ ] E09-S03 — Dashboard & Settlement Mobile (Home Members/Guests, Member/Guest detail, Events Created/Joined, PayNow, Event Detail settlement — 3-tab nav)
 
 ---
 
@@ -96,9 +96,9 @@
 | Tier | Epics | Stories | Done | Remaining |
 |---|---|---|---|---|
 | Tier 1 — Foundation | 4 | 16 | 16 | 0 |
-| Tier 2 — Core Flow | 5 | 23 | 4 | 19 |
+| Tier 2 — Core Flow | 5 | 23 | 5 | 18 |
 | Tier 3 — Operations | 3 | 8 | 0 | 8 |
-| **Total** | **12** | **47** | **17** | **30** |
+| **Total** | **12** | **47** | **18** | **29** |
 
 ---
 
@@ -112,4 +112,9 @@
 - [2026-06-08] — E06-S01 — Server-rendered web join at /join/:token (HTML form, OTP, participant create, funnel checkpoints). Schema repair migrations for funnel_checkpoints and participants. 134 backend tests passing.
 - [2026-06-08] — Product — Reopen join window TTL changed from 1 hour to 24 hours (matches initial join link). Updated event.service.ts JOIN_TOKEN_TTL_HOURS and PRD/API/User Flows/E05-S04 docs.
 - [2026-06-08] — Docs — Added E05-S04 to build sequence (contact picker, remove participant before lock, reopen join window after lock). MVP items from PRD/User Flows P09/P11/P13a were spec'd but missing from 12-Build-Sequence; E05-S03 note points to S04. Build E05-S04 before continuing Epic 6.
+- [2026-06-08] — Fix: web join `display_name` now persisted to `users.display_name` and `participants.display_name`; placeholder profiles (`LetsSplyt User`) upgraded on register. Tests: auth placeholder-name unit test, join.service display_name assertions, web-join integration assertions. Docs: 01, 02, 05, 08, 12 (E03-S02/E06-S01 test lists + acceptance criterion 8).
+- [2026-06-08] — Product rule: **OTP = register** (web join + app); only payer manual add without OTP stays pure guest (`guest_pii`). Web join creates `users` + `participants.user_id`; `upgradeGuestParticipantsToUser` links legacy guests on OTP login. Participant Event Detail view for non-payers (E05-S04). Tests: participant-link, join-web (createUser), auth resolveUserAfterOtp + upgradeGuestParticipantsToUser, join.service (user_id insert), participant.service, EventDetailScreen, participantEventView. Docs: 01, 02, 03, 04, 05, 08, 12 (E03-S02/E05-S04/E06-S01 prompts + test lists aligned).
+- [2026-06-07] — E05-S04 (in progress, pending Pawan sign-off) — Mobile: AddParticipantModal contact picker + manual paths, EventDetailScreen remove/reopen, EventMemberRow compact UI, lock requires 2 members (organiser + 1); **participant Event Detail view** (no QR/lock/add for joined members — share hero, split breakdown, group roster). Backend: creator auto-inserted as participant on POST /events (`is_organiser` on GET detail), `is_self` + `my_items` on GET detail, `join_token`/`summary` payer-only; manual add links registered users by `user_id` or `guest_pii` for guests. Migration `20260610000000_backfill_creator_participants.sql`. Docs updated: 01-PRD, 02, 03, 04, 05, 08, 12.
+- [2026-06-08] — Product — **Dashboard redesign** (approved): Home = net balance hero + **Members | Guests** toggle (counterparty lists, no settlement actions); MemberDetailScreen / GuestDetailScreen drill-down; Events tab = **Created | Joined** with collapsed settled; **no Settlement bottom tab** (3-tab nav). USD-only MVP. Docs fully aligned: 01-PRD, 02-User-Flows (P28–P34), 03-System-Architecture (counterparty aggregation), 05-API (counterparties, member/guest detail), 08-Mobile-App-Spec, 12-Build-Sequence (E05-S03 placeholder note, E09-S02/S03 rewritten, E08-S07 → EventDetailScreen), prototype/home.html. Implementation deferred to E09-S02/E09-S03.
+- [2026-06-09] — E05-S04 — Event member management UI: contact picker + manual add, remove before lock, reopen after lock; participant Event Detail view; registered-user manual add by `user_id`; web join `display_name` fix; creator backfill migration; dashboard spec alignment. 142 backend + 89 mobile tests passing at sign-off.
 - [2026-06-08] — E03-S04 + auth hardening. Session creation via `backend/src/infrastructure/supabase-auth.ts` (`generateLink` + `verifyOtp` + internal email `{userId}@letssplyt.internal`) — NOT `createSession()` or REST `/admin/users/{id}/sessions` (404). Registration writes `public.users` via `upsert_user_profile_on_auth` SECURITY DEFINER RPC + `users_service_role_all` policy — migration `20260608000000_users_auth_registration.sql`. Login OTP requires `public.users` row (orphan `auth.users` → `ACCOUNT_NOT_FOUND`). Mobile: duck-typed `isApiRequestError()` in `api.ts` (Metro breaks `instanceof`); E.164 normalization in `phone.ts`; Register CTA + logout on Home. Dev cleanup: `cd backend && doppler run -- npm run cleanup:phone -- +1XXXXXXXXXX`. If schema already applied: `npx supabase migration repair 20260601000000 --status applied` before `db push`.

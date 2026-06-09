@@ -14,6 +14,8 @@ import { getApiBaseUrl } from './getApiBaseUrl';
 export interface BalanceSummary {
   net_balance: number;
   currency: string;
+  owed_to_you: number;
+  you_owe: number;
   unavailable?: boolean;
 }
 
@@ -21,9 +23,14 @@ export async function createEvent(title: string): Promise<CreateEventResponse> {
   return apiPostAuth<CreateEventResponse>('/events', { title });
 }
 
-export async function fetchEvents(cursor?: string): Promise<EventListResponse> {
-  const query = cursor ? `?cursor=${encodeURIComponent(cursor)}&limit=20` : '?limit=20';
-  return apiGet<EventListResponse>(`/events${query}`);
+export async function fetchEvents(
+  cursor?: string,
+  options?: { role?: 'creator' | 'participant' | 'all' },
+): Promise<EventListResponse> {
+  const params = new URLSearchParams({ limit: '20' });
+  if (cursor) params.set('cursor', cursor);
+  if (options?.role) params.set('role', options.role);
+  return apiGet<EventListResponse>(`/events?${params.toString()}`);
 }
 
 export async function fetchEventById(eventId: string): Promise<EventDetailResponse> {
@@ -36,6 +43,10 @@ export async function lockEvent(eventId: string): Promise<LockEventResponse> {
 
 export async function regenerateJoinToken(eventId: string): Promise<ReopenEventResponse> {
   return apiPostAuth<ReopenEventResponse>(`/events/${eventId}/join-token/regenerate`, {});
+}
+
+export async function reopenEvent(eventId: string): Promise<ReopenEventResponse> {
+  return apiPostAuth<ReopenEventResponse>(`/events/${eventId}/reopen`, {});
 }
 
 export async function addManualParticipant(
@@ -53,11 +64,16 @@ export async function deleteParticipant(eventId: string, participantId: string):
   await apiDelete(`/events/${eventId}/participants/${participantId}`);
 }
 
-/** Balance endpoint ships in E09-S02 — degrade gracefully until then. */
 export async function fetchBalance(): Promise<BalanceSummary> {
   const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
   if (!token) {
-    return { net_balance: 0, currency: 'USD', unavailable: true };
+    return {
+      net_balance: 0,
+      currency: 'USD',
+      owed_to_you: 0,
+      you_owe: 0,
+      unavailable: true,
+    };
   }
 
   const url = `${getApiBaseUrl()}/api/v1/users/me/balance`;
@@ -70,22 +86,39 @@ export async function fetchBalance(): Promise<BalanceSummary> {
       },
     });
 
-    if (response.status === 404) {
-      return { net_balance: 0, currency: 'USD', unavailable: true };
-    }
-
     if (!response.ok) {
-      return { net_balance: 0, currency: 'USD', unavailable: true };
+      return {
+        net_balance: 0,
+        currency: 'USD',
+        owed_to_you: 0,
+        you_owe: 0,
+        unavailable: true,
+      };
     }
 
-    const payload = (await response.json()) as { net_balance?: number; currency?: string };
+    const payload = (await response.json()) as {
+      net_balance?: number;
+      currency?: string;
+      owed_to_you?: number;
+      you_owe?: number;
+    };
+    const owedToYou = payload.owed_to_you ?? 0;
+    const youOwe = payload.you_owe ?? 0;
     return {
-      net_balance: payload.net_balance ?? 0,
+      net_balance: payload.net_balance ?? owedToYou - youOwe,
       currency: payload.currency ?? 'USD',
+      owed_to_you: owedToYou,
+      you_owe: youOwe,
       unavailable: false,
     };
   } catch {
-    return { net_balance: 0, currency: 'USD', unavailable: true };
+    return {
+      net_balance: 0,
+      currency: 'USD',
+      owed_to_you: 0,
+      you_owe: 0,
+      unavailable: true,
+    };
   }
 }
 

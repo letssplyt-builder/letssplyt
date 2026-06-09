@@ -1161,7 +1161,7 @@ backend/src/__tests__/integration/auth/otp-request.test.ts  (supertest)
 **Description:** Build `POST /api/v1/auth/otp/verify`. Verifies the code with Twilio, creates or upserts the user in both Supabase Auth and the public users table, and returns a JWT. The user ID in `auth.users` must match the ID in `public.users`.
 
 **Prompt:**
-*"Build POST /api/v1/auth/otp/verify in auth.service.ts and auth.controller.ts. Request body (Zod): { phone_e164: string (E.164), code: string (exactly 6 digits), display_name?: string (max 50), context?: 'login' | 'register' | 'join_event' }. Service logic: (1) Validate with Zod. (2) Normalise phone with libphonenumber-js. (3) Call twilioClient.verify.v2.services(TWILIO_VERIFY_SERVICE_SID).verificationChecks.create({ to, code }) — skip in dev when OTP dev bypass is enabled (any 6-digit code). If not approved, throw INVALID_CODE 400. (4) Compute phone_hash = hashPhone() and phone_encrypted = encryptPhone(). (5) resolveUserAfterOtp(): if public.users row exists for phone_hash → login. If auth.users exists but no public row → repair profile. If context=login and neither exists → ACCOUNT_NOT_FOUND 404. If context=register and neither exists → require display_name, pre-generate UUID, createUser with phone + internal email {uuid}@letssplyt.internal, then upsert public.users via RPC upsert_user_profile_on_auth (see E03-S02b migration — direct INSERT hits RLS 42501). (6) Session: call createAdminSession(userId) from backend/src/infrastructure/supabase-auth.ts — ensureInternalEmail, generateLink magiclink, verifyOtp with hashed_token. Do NOT use createSession() or REST /admin/users/{id}/sessions (404 in @supabase/supabase-js@2.49). (7) Return AuthSession with access_token, refresh_token, expires_in, user { id, display_name, avatar_colour, is_new_user }. Never return phone_e164 or phone_hash. Add types to shared/types/auth.types.ts."*
+*"Build POST /api/v1/auth/otp/verify in auth.service.ts and auth.controller.ts. Request body (Zod): { phone_e164: string (E.164), code: string (exactly 6 digits), display_name?: string (max 50), context?: 'login' | 'register' | 'join_event' }. Service logic: (1) Validate with Zod. (2) Normalise phone with libphonenumber-js. (3) Call twilioClient.verify.v2.services(TWILIO_VERIFY_SERVICE_SID).verificationChecks.create({ to, code }) — skip in dev when OTP dev bypass is enabled (any 6-digit code). If not approved, throw INVALID_CODE 400. (4) Compute phone_hash = hashPhone() and phone_encrypted = encryptPhone(). (5) resolveUserAfterOtp(): if public.users row exists for phone_hash → login. If auth.users exists but no public row → repair profile. If context=login and neither exists → ACCOUNT_NOT_FOUND 404. If context=register and neither exists → require display_name, pre-generate UUID, createUser with phone + internal email {uuid}@letssplyt.internal, then upsert public.users via RPC upsert_user_profile_on_auth (see E03-S02b migration — direct INSERT hits RLS 42501). After resolve, call upgradeGuestParticipantsToUser(phone_hash, user_id) to link legacy pure-guest participant rows. (6) Session: call createAdminSession(userId) from backend/src/infrastructure/supabase-auth.ts — ensureInternalEmail, generateLink magiclink, verifyOtp with hashed_token. Do NOT use createSession() or REST /admin/users/{id}/sessions (404 in @supabase/supabase-js@2.49). (7) Return AuthSession with access_token, refresh_token, expires_in, user { id, display_name, avatar_colour, is_new_user }. Never return phone_e164 or phone_hash. Add types to shared/types/auth.types.ts."*
 
 **Files created:**
 - `backend/src/modules/auth/auth.service.ts` (updated)
@@ -1207,6 +1207,8 @@ backend/src/__tests__/unit/auth/auth.service.test.ts
   - response never contains phone_e164 or phone_hash
   - login rejects orphan auth.users (no public.users) with ACCOUNT_NOT_FOUND
   - register returns account_exists when public profile exists
+  - resolveUserAfterOtp calls upgradeGuestParticipantsToUser(phone_hash, user_id)
+  - resolveUserAfterOtp applies web join display_name when public profile has placeholder name
 
 backend/src/__tests__/unit/infrastructure/supabase-auth.test.ts
   - createAdminSession uses generateLink + verifyOtp (not REST sessions)
@@ -1458,7 +1460,7 @@ mobile/src/__tests__/components/profile/AddHandleScreen.test.tsx
 **Description:** Build all event endpoints: create, list (paginated), get by ID, lock, reopen, regenerate expired token. These endpoints are the backbone of the entire event lifecycle and must handle token generation, ownership verification, and state transitions correctly before any UI is built.
 
 **Prompt:**
-*"Build the complete event CRUD API for LetsSplyt. (1) POST /api/v1/events: body { title: string, date?: string }, creates event with payer_id=req.user.id, status='open', ai_stage='none', generates join token using crypto.randomBytes(18).toString('base64url') stored in event_join_tokens with expires_at=NOW()+24h, returns { id, title, status, join_url: process.env.APP_DOMAIN+'/join/'+token, token_expires_at }. (2) GET /api/v1/events: cursor pagination (cursor + limit query params, default limit 20), returns { events: [...], next_cursor, has_more }, each event includes { id, title, status, participant_count, total_amount, created_at }. (3) GET /api/v1/events/:id: returns full event including participant list (display_name only, no phone), join_url if status='open', settlement summary if status!='open'. (4) POST /api/v1/events/:id/lock: verifies payer_id=req.user.id, checks participant count >= 2, sets status='locked' and locked_at=NOW(), returns updated event. (5) POST /api/v1/events/:id/reopen: verifies payer_id, sets status='open', generates new join token with expires_at=NOW()+24h (old one deactivated via is_active=false), returns new join_url. (6) POST /api/v1/events/:id/join-token/regenerate: for expired tokens with status='open', generates new token and deactivates the old one. All routes require authenticate middleware. Use `events.title` (not `events.name`) for the event title column in all SQL queries and TypeScript types. Place shared types in shared/types/event.types.ts."*
+*"Build the complete event CRUD API for LetsSplyt. (1) POST /api/v1/events: body { title: string, date?: string }, creates event with payer_id=req.user.id, status='open', ai_stage='none', **auto-inserts the payer as a participant row** (user_id=payer_id, display_name from users table, join_method='qr_app', payment_status='pending') — rollback event if participant insert fails, generates join token using crypto.randomBytes(18).toString('base64url') stored in event_join_tokens with expires_at=NOW()+24h, returns { id, title, status, join_url: process.env.APP_DOMAIN+'/join/'+token, token_expires_at }. (2) GET /api/v1/events: cursor pagination (cursor + limit query params, default limit 20), returns { events: [...], next_cursor, has_more }, each event includes { id, title, status, participant_count, total_amount, created_at }. (3) GET /api/v1/events/:id: returns full event including participant list (display_name only, no phone), join_url if status='open', settlement summary if status!='open'. (4) POST /api/v1/events/:id/lock: verifies payer_id=req.user.id, checks participant count >= 2, sets status='locked' and locked_at=NOW(), returns updated event. (5) POST /api/v1/events/:id/reopen: verifies payer_id, sets status='open', generates new join token with expires_at=NOW()+24h (old one deactivated via is_active=false), returns new join_url. (6) POST /api/v1/events/:id/join-token/regenerate: for expired tokens with status='open', generates new token and deactivates the old one. All routes require authenticate middleware. Use `events.title` (not `events.name`) for the event title column in all SQL queries and TypeScript types. Place shared types in shared/types/event.types.ts."*
 
 **Files created:**
 - `backend/src/modules/events/event.controller.ts`
@@ -1516,6 +1518,8 @@ backend/src/__tests__/integration/events/events.test.ts
 4. Add participant to locked event returns 400 GROUP_IS_LOCKED
 5. Another user adding to someone else's event returns 403
 
+> **Refined in E05-S04:** When `phone_e164` matches an existing `users.phone_hash`, the participant is linked via `user_id` (no `guest_pii`). Unregistered numbers use `guest_pii`. See E05-S04 acceptance criteria 3–4.
+
 **Tests required:**
 ```
 backend/src/__tests__/unit/events/participant.service.test.ts
@@ -1562,6 +1566,8 @@ backend/src/__tests__/integration/events/participants.test.ts
 7. Balance card calls `GET /api/v1/users/me/balance` but gracefully degrades: if the endpoint returns 404 or the call fails, show 'Balance unavailable' placeholder. Do NOT hard-fail. The endpoint is built in E09-S02.
 8. Do NOT call any settlement endpoint that isn't built yet. Use a stub response shape for the balance card.
 
+> **Placeholder UI (superseded in E09-S03):** E05-S03 shipped a **placeholder** HomeScreen (Needs attention + recent events) and EventsScreen (Active|Settled segmented control). The **final** dashboard design — Home **Members | Guests** toggle with counterparty lists, MemberDetailScreen, GuestDetailScreen, and Events **Created | Joined** sections with collapsed settled — is specified in `docs/01-PRD.md`, `docs/02-User-Flows.md` (P28–P34), `docs/08-Mobile-App-Specification.md`, and built in **E09-S03**. E05-S03 only needs the net balance hero + graceful degradation; list areas may remain placeholder until E09.
+
 > **Deferred to E05-S04:** Native contact picker ("From contacts"), remove-participant UI (before lock), and "Reopen join window" UI (after lock). E05-S03 shipped manual entry only; APIs for delete/reopen already exist from E05-S01/E05-S02.
 
 **Tests required:**
@@ -1589,10 +1595,10 @@ mobile/src/__tests__/components/events/EventDetailScreen.test.tsx
 
 ### E05-S04 — Event Member Management UI (Contacts, Remove, Reopen)
 
-**Description:** Complete the MVP member-management flows deferred from E05-S03. Covers User Flows P09 (contact picker), P11 (remove before lock), and P13a (reopen join window after lock). Backend APIs already exist — this story is mobile UI + `eventStore`/`event.service` wiring only.
+**Description:** Complete the MVP member-management flows deferred from E05-S03. Covers User Flows P09 (contact picker), P11 (remove before lock), and P13a (reopen join window after lock). Primarily mobile UI + `eventStore`/`event.service` wiring; also refines `POST /events/:id/participants/manual` so a phone number that matches an existing `users.phone_hash` links `participants.user_id` (registered user sees the event on login — no OTP, no new account). Unregistered numbers still use `guest_pii` for SMS only.
 
 **Prompt:**
-*"Complete MVP event member management on LetsSplyt mobile. Refer to prototype/participant.html and docs/08-Mobile-App-Specification.md (AddParticipantModal + EventDetailScreen joining/settlement phases). (1) AddParticipantModal — add a two-choice entry step: 'From contacts' | 'Enter manually'. 'Enter manually' keeps the existing E05-S03 form (name, phone with country picker, 'Name only' toggle). 'From contacts' uses expo-contacts: request permission once (handle denied → show inline message with link to Settings), open the native contact picker (Contacts.presentContactPickerAsync or equivalent), pre-fill display_name and phone from the selected contact, normalize to E.164 via existing phone utils, then POST /api/v1/events/:id/participants/manual with join_method='manual_phone'. Payer vouches — no OTP. Add NSContactsUsageDescription (iOS) and READ_CONTACTS (Android) to mobile/app.config.js. (2) EventDetailScreen — joining phase (status='open'): each participant row (except the payer themselves) shows a remove control (swipe-to-delete or explicit remove button). Tap → confirm Alert 'Remove [name] from this event?' → DELETE /api/v1/events/:id/participants/:participantId via event.service.deleteParticipant. On success, optimistically remove from list then re-fetch. Hide remove for locked events. Show toast on 400 CANNOT_REMOVE_ACTIVE_PARTICIPANT or GROUP_IS_LOCKED. (3) EventDetailScreen — locked phase: when status='locked' and user is payer, show 'Reopen join window' button (docs/08 spec). Calls POST /api/v1/events/:id/reopen via new event.service.reopenEvent(). On success: event status returns to 'open', new join_url/token shown, screen returns to joining phase with QR/link visible. Show helper text: 'Reopens QR and link for 24 hours for latecomers.' (4) eventStore: add removeParticipant(eventId, participantId) and reopenEvent(eventId) actions. (5) event.service.ts: add reopenEvent() calling POST /events/:id/reopen (regenerateJoinToken already exists for expired open-event tokens — do not conflate). Do NOT add new backend routes."*
+*"Complete MVP event member management on LetsSplyt mobile. Refer to prototype/participant.html and docs/08-Mobile-App-Specification.md (AddParticipantModal + EventDetailScreen joining/settlement phases). (1) AddParticipantModal — add a two-choice entry step: 'From contacts' | 'Enter manually'. 'Enter manually' keeps the existing E05-S03 form (name, phone with country picker, 'Name only' toggle). 'From contacts' uses expo-contacts: request permission once (handle denied → show inline message with link to Settings), open the native contact picker (Contacts.presentContactPickerAsync or equivalent), pre-fill display_name and phone from the selected contact, normalize to E.164 via existing phone utils, then POST /api/v1/events/:id/participants/manual with join_method='manual_phone'. Payer vouches — no OTP. Add NSContactsUsageDescription (iOS) and READ_CONTACTS (Android) to mobile/app.config.js. (2) EventDetailScreen — joining phase (status='open'): each participant row (except the payer themselves) shows a remove control (swipe-to-delete or explicit remove button). Tap → confirm Alert 'Remove [name] from this event?' → DELETE /api/v1/events/:id/participants/:participantId via event.service.deleteParticipant. On success, optimistically remove from list then re-fetch. Hide remove for locked events. Show toast on 400 CANNOT_REMOVE_ACTIVE_PARTICIPANT or GROUP_IS_LOCKED. (3) EventDetailScreen — locked phase: when status='locked' and user is payer, show 'Reopen join window' button (docs/08 spec). Calls POST /api/v1/events/:id/reopen via new event.service.reopenEvent(). On success: event status returns to 'open', new join_url/token shown, screen returns to joining phase with QR/link visible. Show helper text: 'Reopens QR and link for 24 hours for latecomers.' (4) eventStore: add removeParticipant(eventId, participantId) and reopenEvent(eventId) actions. (5) event.service.ts: add reopenEvent() calling POST /events/:id/reopen (regenerateJoinToken already exists for expired open-event tokens — do not conflate). (6) participant.service.ts — refine addManualParticipant for join_method='manual_phone': hash phone with hashPhone(), look up users by phone_hash. If a registered user exists: insert participant with user_id set, guest_pii_token=null, join_method='manual_phone' (payer-entered display_name); duplicate check by user_id and phone_hash. If no registered user: existing guest_pii flow (user_id=null). Never create a users row on manual add — account creation remains OTP-only (QR join / app registration). SMS delivery: registered participants via resolveParticipantPhone(user_id); guests via guest_pii.phone_encrypted."*
 
 **Files created/updated:**
 - `mobile/src/components/events/AddParticipantModal.tsx` (contact picker path)
@@ -1600,19 +1606,32 @@ mobile/src/__tests__/components/events/EventDetailScreen.test.tsx
 - `mobile/src/services/event.service.ts` (`reopenEvent`)
 - `mobile/src/store/eventStore.ts` (`removeParticipant`, `reopenEvent`)
 - `mobile/app.config.js` (contacts permission strings)
+- `backend/src/modules/events/participant.service.ts` (registered-user linking on manual add)
+- `backend/src/__tests__/unit/events/participant.service.test.ts` (registered vs guest paths)
+- `backend/src/__tests__/integration/events/participants.test.ts` (users lookup mock)
 - `mobile/src/__tests__/components/events/AddParticipantModal.test.tsx`
 - `mobile/src/__tests__/components/events/EventDetailScreen.test.tsx` (extended)
 - `mobile/src/__tests__/unit/store/eventStore.test.ts` (extended)
 
+**Implementation notes (2026-06-07):**
+- `EventMemberRow` component — compact member list UI, organiser chip, × remove icon
+- Lock enabled only when `participants.length >= 2` (organiser + one other); specific API error messages surfaced
+- `reopenEvent` / `lockEvent` use atomic status checks (`locked`→`open`, `open`→`locked`)
+- Migration `20260610000000_backfill_creator_participants.sql` backfills organiser rows on existing events
+- `addManualParticipant`: `findRegisteredUserByPhoneHash()` — registered → `user_id` set (event appears in `GET /events?role=all` for that user); unregistered → `guest_pii` only
+
 **Acceptance Criteria:**
 1. Tap '+ Add manually' → choose 'From contacts' → pick a contact with a phone → participant appears in member list without OTP
 2. Tap '+ Add manually' → 'Enter manually' → existing name/phone/name-only flow still works
-3. Contacts permission denied → user sees a clear message (not a crash); can still use 'Enter manually'
-4. On open event, payer can remove a pending participant → member disappears from list; DELETE API called
-5. Remove is hidden (or disabled with explanation) when event is locked
-6. Attempting to remove a participant who is not `payment_status='pending'` shows an error (API 400) — not a silent failure
-7. After locking, payer sees 'Reopen join window' → tap → event returns to open status, new QR/link visible, token expires in ~24 hours
-8. Non-payer cannot see remove or reopen controls (creator-only)
+3. Manual add with phone belonging to an existing LetsSplyt user → participant row has `user_id` set; that user sees the event under **Events you joined** on next login (no OTP, no new account created)
+4. Manual add with phone not registered → `guest_pii` created, `user_id=null`; SMS can still be sent later; user is not registered until they complete OTP elsewhere
+5. Contacts permission denied → user sees a clear message (not a crash); can still use 'Enter manually'
+6. On open event, payer can remove a pending participant → member disappears from list; DELETE API called
+7. Remove is hidden (or disabled with explanation) when event is locked
+8. Attempting to remove a participant who is not `payment_status='pending'` shows an error (API 400) — not a silent failure
+9. After locking, payer sees 'Reopen join window' → tap → event returns to open status, new QR/link visible, token expires in ~24 hours
+10. Non-payer cannot see remove or reopen controls (creator-only)
+11. Joined member (non-payer) opens Event Detail → participant view only: share hero with pending/calculated states, split breakdown when `split_mode` set, group roster — no QR, copy/share, add-member, lock, or payer settlement summary
 
 **Tests required:**
 ```
@@ -1631,6 +1650,18 @@ mobile/src/__tests__/components/events/EventDetailScreen.test.tsx
 mobile/src/__tests__/unit/store/eventStore.test.ts
   - removeParticipant removes from local participants list
   - reopenEvent updates event status to open and refreshes join_url
+
+backend/src/__tests__/unit/events/participant.service.test.ts
+  - manual add with phone + registered user: links user_id, no guest_pii insert
+  - manual add with phone + unregistered: guest_pii insert, user_id=null
+  - duplicate registered user in same event: DUPLICATE_PHONE
+
+mobile/src/__tests__/components/events/EventDetailScreen.test.tsx
+  - non-payer sees participant view (Your share hero) without QR, add-member, or lock controls
+  - participant view shows calculated share and split mode when amount_owed is set
+
+mobile/src/__tests__/unit/utils/participantEventView.test.ts
+  - pending vs calculated share copy for participant Event Detail hero
 ```
 
 ---
@@ -1644,7 +1675,7 @@ mobile/src/__tests__/unit/store/eventStore.test.ts
 **Description:** The web join page is a server-rendered Express route returning HTML — not React Native. Guests on any device open it in their browser and it must work without JavaScript enabled. OTP verification, opt-out checking, and participant creation all happen server-side. A successful join triggers a Supabase Realtime event that updates the creator's EventDetailScreen.
 
 **Prompt:**
-*"Build the server-rendered web join flow for LetsSplyt. All routes return HTML, not JSON. (1) GET /join/:token: Express route returning HTML. Validate token in event_join_tokens (is_active=true, expires_at>NOW()). If expired: return HTML page 'This QR code has expired. Ask the bill payer to regenerate the code.' If group locked: return HTML page 'This group is no longer accepting new members.' If valid: return HTML form with name field (required), phone field with <select> of E.164 country code prefixes for major countries (US +1, CA +1, GB +44, AU +61, IN +91, etc.), and submit button 'Join →'. Style all pages to match prototype/participant.html and prototype/guest.html (translate CSS to inline <style> tag in the HTML). (2) POST /join/:token: receives { name, phone_e164 } from form. Validate E.164 format. Check sms_opt_outs table by phone_hash. Check if phone_hash already in participants for this event — if so: redirect to success page (idempotent). Send OTP via Twilio Verify. Write funnel_checkpoint row { checkpoint: 'phone_entered', event_id }. Return OTP entry page HTML with a 6-digit code input form. (3) POST /join/:token/verify-otp: receives { code, phone_e164 }. Call Twilio verificationChecks.create. If approved: hash+encrypt phone, create participant row (join_method='qr_web', message_channel based on phone country). Write funnel_checkpoint 'join_confirmed'. Return success HTML page 'You're in! The bill payer will message you when the split is ready.' The participant INSERT triggers Supabase Realtime broadcast to 'event-members:[eventId]' channel."*
+*"Build the server-rendered web join flow for LetsSplyt. All routes return HTML, not JSON. (1) GET /join/:token: Express route returning HTML. Validate token in event_join_tokens (is_active=true, expires_at>NOW()). If expired: return HTML page 'This QR code has expired. Ask the bill payer to regenerate the code.' If group locked: return HTML page 'This group is no longer accepting new members.' If valid: return HTML form with name field (required), phone field with <select> of E.164 country code prefixes for major countries (US +1, CA +1, GB +44, AU +61, IN +91, etc.), and submit button 'Join →'. Style all pages to match prototype/participant.html and prototype/guest.html (translate CSS to inline <style> tag in the HTML). (2) POST /join/:token: receives { name, phone_e164 } from form. Validate E.164 format. Check sms_opt_outs table by phone_hash. Check if phone_hash already in participants for this event — if so: redirect to success page (idempotent). Send OTP via Twilio Verify. Write funnel_checkpoint row { checkpoint: 'phone_entered', event_id }. Return OTP entry page HTML with a 6-digit code input form. (3) POST /join/:token/verify-otp: receives { code, phone_e164, display_name }. Call Twilio verificationChecks.create. If approved: call resolveUserAfterOtp() (creates/resolves users row), upgradeGuestParticipantsToUser for legacy guest_pii rows, insert participant with user_id and join_method='qr_web' (no guest_pii). Write funnel_checkpoint 'join_confirmed'. Return success HTML. Pure guests exist only for payer manual add (no OTP)."*
 
 **Files created:**
 - `backend/src/modules/join/join-web.controller.ts`
@@ -1665,9 +1696,10 @@ mobile/src/__tests__/unit/store/eventStore.test.ts
 4. On creator's phone, the new member appears in EventDetailScreen within 2 seconds of OTP verification
 5. Visiting an expired token URL shows the expiry message page, not a 404 or crash
 6. Visiting a locked group's URL shows the locked message page
-7. **Existing user detection:** Before creating a guest participant, the server hashes the submitted phone and queries the `users` table. If a matching user exists (`phone_hash` match), return 409 with `{ error: { code: 'APP_USER_REDIRECT', deep_link_url: 'letssplyt://join/:token' } }`. The web page shows: 'You already have LetsSplyt! Open the app to join.' with a deep-link button.
-8. **Race condition with event lock:** If the event locks WHILE the guest is entering their phone/OTP (between `GET /join/:token` and `POST /join/:token/otp/verify`), the server returns 409 `EVENT_LOCKED`. The web page shows: 'This event has been locked. Ask the bill payer to unlock it or contact them directly.'
-9. **Wrong OTP code HTML response:** Invalid OTP code on `POST /join/:token/otp/verify` returns the web page (not JSON) with an error message inline. The phone input remains populated. The code input is cleared.
+7. **OTP registers the user:** On OTP verify, call `resolveUserAfterOtp` — create or resolve `users` row, set `participants.user_id`, upgrade legacy `guest_pii` rows for that phone. Pure guests exist only for payer manual add (no OTP).
+8. **Browser name persisted:** `display_name` from the join form is saved to `users.display_name` and `participants.display_name`. If an existing profile has only a placeholder name (`LetsSplyt User`), the web-entered name replaces it. App login with the same phone shows that name without re-entry.
+9. **Race condition with event lock:** If the event locks WHILE the guest is entering their phone/OTP (between `GET /join/:token` and `POST /join/:token/otp/verify`), the server returns 409 `EVENT_LOCKED`. The web page shows: 'This event has been locked. Ask the bill payer to unlock it or contact them directly.'
+10. **Wrong OTP code HTML response:** Invalid OTP code on `POST /join/:token/otp/verify` returns the web page (not JSON) with an error message inline. The phone input remains populated. The code input is cleared.
 
 **Tests required:**
 ```
@@ -1676,14 +1708,24 @@ backend/src/__tests__/integration/join/web-join.test.ts (supertest)
   - GET /join/:expiredToken → 200 HTML with expiry message (NOT 404)
   - GET /join/:lockedToken → 200 HTML with locked message
   - POST /join/:token with valid phone → OTP sent (Twilio mock called), funnel_checkpoint written
-  - POST /join/:token/verify-otp with '000000' → participant created in DB
-  - Second join attempt with same phone → redirected (idempotent)
+  - POST /join/:token/verify-otp with '000000' → users account created, participant with user_id (not guest_pii)
+  - POST /join/:token/verify-otp persists display_name to createUser metadata and participant insert
+  - Registered user already in event → idempotent without OTP
 
 backend/src/__tests__/unit/join/join.service.test.ts
   - phone hashed before participant creation
   - phone encrypted before participant creation
   - sms_opt_outs checked by hash before OTP send
   - funnel_checkpoint written at phone_entered and join_confirmed
+  - verifyJoinOtp calls resolveUserAfterOtp and creates participant with user_id and display_name
+  - verifyJoinOtp upgrades existing guest participant display_name from web form
+
+backend/src/__tests__/unit/participants/participant-link.service.test.ts
+  - upgradeGuestParticipantsToUser links guest_pii rows to user_id
+
+backend/src/__tests__/unit/auth/auth.service.test.ts
+  - resolveUserAfterOtp calls upgradeGuestParticipantsToUser(phone_hash, user_id)
+  - resolveUserAfterOtp applies web join display_name when public profile has placeholder name
 ```
 
 ---
@@ -2192,7 +2234,7 @@ Read docs/08-Mobile-App-Specification.md for the delivery tracking screen spec. 
    - Subscribe to Supabase Realtime on `participants` table filtered by `event_id` on mount
    - Update status badges in real time as `message_status` column changes
    - Unsubscribe on unmount (call `supabaseClient.removeChannel(channel)`)
-   - "Done" button navigates to Settlement tab when all statuses are terminal (not QUEUED)
+   - "Done" button navigates to EventDetailScreen (settlement phase) when all statuses are terminal (not QUEUED)
    - Failed entries show a "Retry" button that calls `POST /events/:id/messages/retry/:participantId`
 
 **Files created:**
@@ -2255,26 +2297,26 @@ Read CLAUDE.md, BUILD-PROGRESS.md, and this story. Read `docs/06-Integration-Con
 - After split update: marks affected participants' `payment_status` back to `pending`. Does NOT touch already-confirmed participants.
 - `POST /api/v1/events/:eventId/splits/resend` endpoint: re-sends messages ONLY to participants whose `payment_status` is `pending` AND who were affected by the correction. Does NOT resend to already-confirmed participants.
 - The re-sent message includes the updated amount and a note: "Your share has been updated."
-- Creator app: after the event is in `ai_stage = 'complete'`, the SettlementScreen shows an "Edit split" button. Tapping opens a modal allowing amount corrections per participant.
+- Creator app: after the event is in `ai_stage = 'complete'`, EventDetailScreen (settlement phase) shows an "Edit split" button. Tapping opens EditSplitModal allowing amount corrections per participant.
 - Test: update one participant's amount, verify sum invariant holds, verify only affected participant receives new SMS.
 - Test: attempt to over-correct (amounts don't sum to total) — returns 422.
 
 **Prompt:**
-Read CLAUDE.md, BUILD-PROGRESS.md, and this story. Read `docs/05-API-Specification.md` (splits section), `docs/07-AI-Agent-Specification.md` (largestRemainderRound, splitCalculator), and `docs/08-Mobile-App-Specification.md` (SettlementScreen). Then implement:
+Read CLAUDE.md, BUILD-PROGRESS.md, and this story. Read `docs/05-API-Specification.md` (splits section), `docs/07-AI-Agent-Specification.md` (largestRemainderRound, splitCalculator), and `docs/08-Mobile-App-Specification.md` (EventDetailScreen settlement phase + EditSplitModal). Then implement:
 
 1. `PATCH /events/:eventId/splits` with sum validation using `splitCalculator.ts`.
 2. `POST /events/:eventId/splits/resend` — builds new messages and sends via Twilio to affected participants only.
-3. Update SettlementScreen in mobile: add "Edit split" button (visible only to Creator when `ai_stage = 'complete'`).
+3. Update EventDetailScreen in mobile: add "Edit split" button (visible only to Creator when `ai_stage = 'complete'`) → EditSplitModal.
 
 **Files created:**
 - Updates to `backend/src/modules/splits/splits.router.ts` (add PATCH and resend endpoints)
-- Updates to `mobile/src/screens/settlement/SettlementScreen.tsx` (add "Edit split" button)
+- Updates to `mobile/src/screens/events/EventDetailScreen.tsx` and `mobile/src/components/events/EditSplitModal.tsx` (add "Edit split" button)
 
 ---
 
 ## EPIC 9 — Settlement Tracking
 **Depends on:** E08 complete (messages sent, participants have amounts)
-**Delivers:** Full payment lifecycle — self-report, confirm, dispute, nudge, cash payments, per-event and cross-event ledger views
+**Delivers:** Full payment lifecycle — self-report, confirm, dispute, nudge, cash payments, per-event settlement in Event Detail, and cross-event counterparty aggregation on Home (Members/Guests)
 
 ### E09-S01 — Settlement API (Self-Report, Confirm, Dispute, Nudge)
 
@@ -2317,84 +2359,104 @@ backend/src/__tests__/integration/settlement/settlement.test.ts
 
 ---
 
-### E09-S02 — Settlement Ledger API (Owed-to-Me, I-Owe, Summary)
+### E09-S02 — Settlement Ledger API (Balance, Counterparties, Member/Guest Detail)
 
-**Description:** Build the cross-event ledger endpoints that aggregate payment state across all events. These power the SettlementTab bottom navigation screen.
+**Description:** Build cross-event aggregation endpoints that power the Home dashboard (Members | Guests toggle) and drill-down screens. Also retains per-event ledger helpers (`owed-to-me`, `i-owe`) for Event Detail settlement phase. **No separate Settlement tab** — Home is the cross-event router; settlement actions stay in Event Detail.
 
 **Prompt:**
-*"Build settlement ledger endpoints in settlement.service.ts. (1) GET /api/v1/settlement/owed-to-me: returns all participants across events where req.user.id is payer_id, with payment_status IN ('pending','self_reported'), grouped by event. Response: { events: [{ event_id, event_name, participants: [{ participant_id, display_name, amount_owed, payment_status, last_nudged_at }] }] }. (2) GET /api/v1/settlement/i-owe: returns all participant rows where req.user.id matches participant.user_id and payment_status IN ('pending','self_reported'), with event name and payer display_name. Response: { events: [{ event_id, event_name, payer_display_name, payer_payment_handles: [decrypted], my_amount: number, my_status: string }] }. IMPORTANT: decrypt payer handles before returning — participant must know how to pay. (3) GET /api/v1/settlement/summary: returns { net_balance: number } — sum of owed-to-me amounts minus i-owe amounts. Positive means others owe you, negative means you owe. (4) GET /api/v1/settlement/person/:userId: returns all shared events between req.user.id and userId, with amounts and statuses. Used for the PersonDetailScreen."*
+*"Build settlement ledger endpoints in settlement.service.ts per docs/05-API-Specification.md. (1) GET /api/v1/users/me/balance — net balance hero: `{ net_balance_minor_units, currency: 'USD', owed_to_you, you_owe }`. MVP: always USD. (2) GET /api/v1/users/me/counterparties?kind=members|guests — powers Home toggle. Members: net aggregate per registered user across direct payer↔participant links; split into `owe_you[]` (net>0) and `you_owe[]` (net<0); omit net=0. Guests: only pure guests (`user_id` null) who still owe viewer (viewer is payer); phone guests aggregated by `phone_hash`; name-only one row per `participant_id` with `event_id` for direct Event Detail navigation. (3) GET /api/v1/settlement/member/:userId — MemberDetailScreen: `outstanding[]` + `history[]` (settled/$0 direct relationships). Alias GET /settlement/person/:userId. (4) GET /api/v1/settlement/guest/:phoneHash — GuestDetailScreen for phone guests only. (5) GET /api/v1/settlement/owed-to-me and GET /api/v1/settlement/i-owe — grouped-by-event helpers for Event Detail settlement UI; i-owe decrypts payer handles. All amounts in minor units via getCurrencyMinorUnits (USD MVP). Never return raw phone numbers."*
 
 **Files created:**
 - Updates to `backend/src/modules/settlement/settlement.service.ts` and `settlement.controller.ts`
+- Updates to `backend/src/modules/users/users.controller.ts` (balance + counterparties routes if not already present)
 - `shared/types/settlement.types.ts`
 
 **Acceptance Criteria:**
-1. GET /settlement/owed-to-me returns only events where the authenticated user is the creator
-2. GET /settlement/i-owe returns payer's decrypted payment handles so participant can pay
-3. GET /settlement/summary returns positive number when others owe you, negative when you owe
-4. GET /settlement/i-owe returns empty array for a user with no outstanding debts
-5. Payer payment handles in i-owe response are decrypted (showing `@venmo-handle` not encrypted blob)
-6. `GET /api/v1/users/me/balance` endpoint returns `{ net_balance_minor_units, currency, owed_to_you, you_owe }` where:
-   - `owed_to_you` = sum of `amount_owed` for all pending/self_reported participants in events where user is creator
-   - `you_owe` = sum of `amount_owed` for all events where user is a participant (not creator) with status not confirmed/settled
-   - `net_balance_minor_units` = owed_to_you - you_owe
-   - `currency` = the currency of the user's most recently created event (or 'USD' if no events)
+1. `GET /users/me/balance` returns correct net; `currency` is always `"USD"` for MVP
+2. `GET /users/me/counterparties?kind=members` nets amounts per registered counterparty; net=0 users omitted
+3. `GET /users/me/counterparties?kind=guests` excludes settled guests; phone rows aggregated by `phone_hash`; name-only rows include `event_id`
+4. `GET /settlement/member/:userId` returns only events with direct payer↔participant link between viewer and `:userId`
+5. `GET /settlement/guest/:phoneHash` returns only events where viewer is payer and guest shares that `phone_hash`
+6. `GET /settlement/owed-to-me` returns only events where authenticated user is payer; excludes confirmed/opted_out
+7. `GET /settlement/i-owe` decrypts payer payment handles for PayNowScreen
+8. No raw phone numbers in any response
 
 **Tests required:**
 ```
 backend/src/__tests__/unit/settlement/ledger.service.test.ts
-  - owed-to-me: only returns events where user is payer
-  - owed-to-me: excludes confirmed and opted_out participants
-  - i-owe: decrypts payer payment handles
-  - summary: net_balance = owed_to_me_total - i_owe_total
-  - person detail: only returns shared events
+  - balance: net = owed_to_you - you_owe
+  - counterparties members: net aggregation, net=0 omitted
+  - counterparties guests: phone aggregation, name-only per participant
+  - member detail: direct relationships only
+  - guest detail: payer-only, phone_hash match
+  - owed-to-me: payer filter, status filter
+  - i-owe: decrypts payer handles
 
 backend/src/__tests__/integration/settlement/ledger.test.ts
-  - owed-to-me correctly filters by payer_id
-  - i-owe shows decrypted handles
-  - summary positive when owed, negative when owing
+  - counterparties end-to-end across two events with same member
+  - guest phone aggregation across two events
+  - balance positive when owed, negative when owing
 ```
 
 ---
 
-### E09-S03 — Settlement Mobile Screens
+### E09-S03 — Dashboard & Settlement Mobile Screens (Home Members/Guests + Events Created/Joined)
 
-**Description:** Build the SettlementTab with four sub-views (Owed to me, I owe, History, Person detail) and PayNowScreen. This is a bottom tab, not inside EventsStack.
+**Description:** Replace E05-S03 placeholder Home/Events UI with the final dashboard design. **3-tab bottom nav** (Home, Events, Profile) — no Settlement tab. Home routes to counterparty drill-down; settlement **actions** (Confirm, Nudge, I've paid, Cash) remain in EventDetailScreen only.
 
 **Prompt:**
-*"Build the SettlementTab screens. Refer to prototype/ledger.html IDs 'settlement', 'owed_to_me', 'i_owe', 'pay_now'. SettlementScreen is a bottom tab navigator screen — NOT nested inside EventsStack. It contains four tab-switched views (segmented control at top, NOT bottom tabs): (1) 'Owed to me' tab: FlatList grouped by event, each participant row shows display_name, amount_owed, payment_status chip (amber 'Waiting' for pending, blue 'Reported' for self_reported), two action buttons: Confirm (POST /events/:eventId/settlement/:id/confirm, only visible on self_reported) and Nudge (POST /events/:eventId/messages/nudge/:id, visible on both pending and self_reported, shows 'Nudged Xh ago' and is disabled within 48 hours). (2) 'I owe' tab: FlatList of events where user owes money. Each row shows event name, creator name, amount as large number, 'Pay now' button → PayNowScreen. (3) 'History' tab: settled events list. (4) PersonDetailScreen pushed as a stack screen when tapping a participant in 'Owed to me' — shows all transactions with that person. PayNowScreen: payment handle cards (tappable — use Linking.openURL() for deep links), 'I paid cash' button → POST /events/:eventId/settlement/:id/self-report. EventDetailScreen (settlement phase): add per-event settlement view reusing the same Confirm/Dispute/Nudge buttons, summary bar at top (total/collected/outstanding), segmented progress bar (green confirmed, amber self_reported, grey pending). Store all settlement data in Zustand settlementStore. Use absolute API URLs from process.env.EXPO_PUBLIC_API_URL."*
+*"Build dashboard and settlement mobile screens per docs/08-Mobile-App-Specification.md and prototype/home.html. (1) **RootNavigator:** confirm 3 tabs only — remove SettlementTab if present. (2) **HomeScreen:** keep net balance hero (`GET /users/me/balance`); replace placeholder lists with **Members | Guests** segmented toggle below hero. Members: `GET /users/me/counterparties?kind=members` → sections 'People who owe you' / 'People you owe' — one row per registered user, name + net amount only; tap → MemberDetailScreen. Guests: `kind=guests` — phone guests tap → GuestDetailScreen; name-only tap → EventDetailScreen directly (`event_id` on row). Hide empty sections. FAB '+ New event'. (3) **MemberDetailScreen** + **GuestDetailScreen** in HomeStack: `GET /settlement/member/:userId` and `GET /settlement/guest/:phoneHash`; outstanding events top, 'See more events' expands history; tap event → EventDetailScreen. No inline Confirm/Nudge on these screens. (4) **PayNowScreen** in HomeStack: payment handle deep links + 'I've paid' self-report (refer prototype/ledger.html `pay_now`). (5) **EventsScreen:** replace Active|Settled control with two sections — 'Events you created' (`GET /events?role=creator`) and 'Events you joined' (`role=participant'); settled collapsed under 'Settled (N)' per section. (6) **EventDetailScreen settlement phase:** per-participant Confirm/Nudge/Dispute/Mark cash; summary bar; progress bar; participant view shows share + 'I've paid'. (7) **settlementStore:** loadCounterparties, loadMemberDetail, loadGuestDetail, plus event-scoped owed-to-me/i-owe for Event Detail. Refer docs/02-User-Flows P28–P34."*
 
 **Files created:**
-- `mobile/src/screens/settlement/SettlementScreen.tsx`
-- `mobile/src/screens/settlement/PayNowScreen.tsx`
-- `mobile/src/screens/settlement/PersonDetailScreen.tsx`
+- `mobile/src/screens/HomeScreen.tsx` (replace placeholder list area)
+- `mobile/src/screens/MemberDetailScreen.tsx`
+- `mobile/src/screens/GuestDetailScreen.tsx`
+- `mobile/src/screens/PayNowScreen.tsx`
+- `mobile/src/screens/EventsScreen.tsx` (Created | Joined sections)
 - `mobile/src/store/settlementStore.ts`
 - `mobile/src/services/settlement.service.ts`
-- Updates to `mobile/src/screens/events/EventDetailScreen.tsx` (settlement phase)
+- Updates to `mobile/src/navigation/RootNavigator.tsx` (3-tab nav, HomeStack screens)
+- Updates to `mobile/src/screens/events/EventDetailScreen.tsx` (settlement phase actions)
 
 **Acceptance Criteria:**
-1. SettlementTab shows as 💳 icon in bottom navigation
-2. "Owed to me" tab shows all pending/self_reported participants across all creator's events
-3. Nudge button shows "Nudged 2h ago" and is disabled after being tapped
-4. "I owe" tab shows PayNow button → PayNowScreen with Venmo/PayPal/etc deep link buttons
-5. Tapping a Venmo deep link opens the Venmo app (or App Store if not installed)
+1. Bottom navigation has exactly 3 tabs: Home, Events, Profile (no Settlement tab)
+2. Home Members toggle shows net-aggregated counterparties; net=0 hidden; tap opens MemberDetailScreen
+3. Home Guests toggle shows only guests who owe viewer; phone → GuestDetailScreen; name-only → Event Detail directly
+4. MemberDetailScreen shows outstanding events + expandable history; no Confirm/Nudge buttons on this screen
+5. EventsScreen shows Created and Joined sections with collapsed settled groups
+6. EventDetailScreen settlement phase has Confirm, Nudge, I've paid, Mark cash — not on Home lists
+7. PayNowScreen opens Venmo/PayPal deep links via `Linking.openURL`
+8. E05-S03 balance hero graceful degradation still works if balance endpoint fails
 
 **Tests required:**
 ```
 mobile/src/__tests__/unit/store/settlementStore.test.ts
-  - loadOwedToMe populates owed list
-  - loadIOwe populates owe list
-  - confirmPayment removes participant from owed list
+  - loadCounterparties populates members owe_you / you_owe
+  - loadCounterparties guests separates phone vs name_only
+  - loadMemberDetail populates outstanding + history
 
-mobile/src/__tests__/components/settlement/SettlementScreen.test.tsx
-  - renders four tab views
-  - Nudge button disabled within 48h cooldown
-  - Confirm button only visible on self_reported participants
+mobile/src/__tests__/components/HomeScreen.test.tsx
+  - renders Members | Guests toggle
+  - member row navigates to MemberDetailScreen
+  - name-only guest row navigates to EventDetailScreen
+
+mobile/src/__tests__/components/MemberDetailScreen.test.tsx
+  - renders outstanding events
+  - See more events expands history
+  - no Confirm/Nudge buttons rendered
+
+mobile/src/__tests__/components/EventsScreen.test.tsx
+  - renders Created and Joined sections
+  - Settled (N) header collapses/expands
 
 mobile/src/__tests__/components/settlement/PayNowScreen.test.tsx
   - renders payment handle cards
-  - tapping Venmo card calls Linking.openURL with venmo:// scheme
-  - 'I paid cash' calls self-report service
+  - tapping Venmo card calls Linking.openURL
+  - I've paid calls self-report service
+
+mobile/src/__tests__/components/events/EventDetailScreen.test.tsx
+  - settlement phase shows Confirm on self_reported
+  - Nudge disabled within 48h cooldown
 ```
 
 ---

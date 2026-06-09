@@ -49,6 +49,7 @@ describe('Participants API integration', () => {
     mockAuth(USER_A);
     mockSupabase.__pushMockResultForTable('events', { data: EVENT_ROW, error: null });
     mockSupabase.__pushMockResultForTable('sms_opt_outs', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('users', { data: null, error: null });
     mockSupabase.__pushMockResultForTable('participants', { data: [], error: null });
     mockSupabase.__pushMockResultForTable('guest_pii', { data: [], error: null });
     mockSupabase.__pushMockResultForTable('guest_pii', { data: { id: GUEST_PII_ID }, error: null });

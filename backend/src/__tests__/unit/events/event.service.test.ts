@@ -43,11 +43,16 @@ describe('event.service', () => {
   });
 
   describe('createEvent', () => {
-    it('creates event with correct payer_id and join token', async () => {
+    it('creates event with correct payer_id, creator participant, and join token', async () => {
       mockSupabase.__pushMockResultForTable('events', {
         data: { id: EVENT_ID, title: 'Dinner', status: 'open' },
         error: null,
       });
+      mockSupabase.__pushMockResultForTable('users', {
+        data: { id: USER_ID, display_name: 'Alex' },
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('participants', { data: null, error: null });
       mockSupabase.__pushMockResultForTable('event_join_tokens', { data: null, error: null });
 
       const result = await createEvent(USER_ID, { title: 'Dinner' });
@@ -67,12 +72,24 @@ describe('event.service', () => {
         (call) => (call[0] as { payer_id?: string }).payer_id === USER_ID,
       );
       expect(eventInsert).toBeTruthy();
+
+      const participantInsert = mockSupabase.from.mock.results
+        .map((r) => (r.type === 'return' ? (r.value as { insert: jest.Mock }) : null))
+        .find((chain) =>
+          chain?.insert.mock.calls.some(
+            (call) =>
+              (call[0] as { event_id?: string; user_id?: string }).event_id === EVENT_ID &&
+              (call[0] as { user_id?: string }).user_id === USER_ID,
+          ),
+        );
+      expect(participantInsert).toBeTruthy();
     });
   });
 
   describe('listEvents', () => {
     it('returns cursor-paginated results', async () => {
-      mockSupabase.__setMockResultForTable('events', {
+      mockSupabase.__pushMockResultForTable('participants', { data: [], error: null });
+      mockSupabase.__pushMockResultForTable('events', {
         data: [
           {
             id: 'event-2',
@@ -80,6 +97,7 @@ describe('event.service', () => {
             status: 'open',
             total_amount: null,
             created_at: '2026-01-02T00:00:00.000Z',
+            payer_id: USER_ID,
           },
           {
             id: 'event-1',
@@ -87,18 +105,21 @@ describe('event.service', () => {
             status: 'locked',
             total_amount: 42.5,
             created_at: '2026-01-01T00:00:00.000Z',
+            payer_id: USER_ID,
           },
         ],
         error: null,
       });
-      mockSupabase.__setMockResultForTable('participants', { data: [], error: null });
+      mockSupabase.__pushMockResultForTable('participants', { data: [{ id: 'p1' }], error: null });
 
       const page1 = await listEvents(USER_ID, { limit: 1 });
       expect(page1.events).toHaveLength(1);
+      expect(page1.events[0]?.role).toBe('creator');
       expect(page1.has_more).toBe(true);
       expect(page1.next_cursor).toBeTruthy();
 
-      mockSupabase.__setMockResultForTable('events', {
+      mockSupabase.__pushMockResultForTable('participants', { data: [], error: null });
+      mockSupabase.__pushMockResultForTable('events', {
         data: [
           {
             id: 'event-1',
@@ -106,10 +127,12 @@ describe('event.service', () => {
             status: 'locked',
             total_amount: 42.5,
             created_at: '2026-01-01T00:00:00.000Z',
+            payer_id: USER_ID,
           },
         ],
         error: null,
       });
+      mockSupabase.__pushMockResultForTable('participants', { data: [{ id: 'p1' }], error: null });
 
       const page2 = await listEvents(USER_ID, {
         limit: 1,
@@ -178,7 +201,7 @@ describe('event.service', () => {
         data: [{ id: 'p1' }, { id: 'p2' }],
         error: null,
       });
-      mockSupabase.__pushMockResultForTable('events', { data: null, error: null });
+      mockSupabase.__pushMockResultForTable('events', { data: { id: EVENT_ID }, error: null });
       mockSupabase.__pushMockResultForTable('event_join_tokens', { data: null, error: null });
 
       const result = await lockEvent(USER_ID, EVENT_ID);
@@ -238,7 +261,7 @@ describe('event.service', () => {
         deleted_at: null,
       };
       mockSupabase.__pushMockResultForTable('events', { data: lockedEvent, error: null });
-      mockSupabase.__pushMockResultForTable('events', { data: null, error: null });
+      mockSupabase.__pushMockResultForTable('events', { data: { id: EVENT_ID }, error: null });
       mockSupabase.__pushMockResultForTable('event_join_tokens', { data: null, error: null });
       mockSupabase.__pushMockResultForTable('event_join_tokens', { data: null, error: null });
 

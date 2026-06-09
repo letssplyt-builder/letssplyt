@@ -161,14 +161,10 @@ describe('Web join integration', () => {
     mockSupabase.__setMockResultForTable('funnel_checkpoints', { data: null, error: null });
     mockSupabase.__setMockResultForTable('sms_opt_outs', { data: null, error: null });
     mockSupabase.__setMockResultForTable('participants', { data: [], error: null });
-    mockSupabase.__pushMockResultForTable('users', { data: { display_name: 'Alex' }, error: null });
-    mockSupabase.__pushMockResultForTable('users', { data: { display_name: 'Alex' }, error: null });
-    mockSupabase.__pushMockResultForTable('users', { data: null, error: null });
+    mockSupabase.__setMockResultForTable('users', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('guest_pii', { data: [], error: null });
+    mockSupabase.__pushMockResultForTable('participants', { data: null, error: null });
     mockSupabase.__pushMockResultForTable('participants', { data: [], error: null });
-    mockSupabase.__pushMockResultForTable('guest_pii', {
-      data: { id: 'guest-pii-1' },
-      error: null,
-    });
     mockSupabase.__pushMockResultForTable('participants', {
       data: { id: 'participant-1' },
       error: null,
@@ -193,29 +189,42 @@ describe('Web join integration', () => {
 
     expect(response.status).toBe(200);
     expect(response.text).toContain("You're in!");
-    expect(mockSupabase.from).toHaveBeenCalledWith('guest_pii');
     expect(mockSupabase.from).toHaveBeenCalledWith('participants');
+    expect(mockSupabase.auth.admin.createUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_metadata: { display_name: 'Sam Guest' },
+      }),
+    );
+
+    const participantInsert = mockSupabase.from.mock.results
+      .map((r) => (r.type === 'return' ? r.value : null))
+      .flatMap((chain) => {
+        if (!chain) return [];
+        return (chain as { insert: jest.Mock }).insert.mock.calls;
+      })
+      .find((call) => (call[0] as { join_method?: string }).join_method === 'qr_web');
+
+    expect(participantInsert).toBeTruthy();
+    expect((participantInsert![0] as { display_name: string }).display_name).toBe('Sam Guest');
   });
 
-  it('second join attempt with same phone → redirected (idempotent)', async () => {
+  it('registered user already in event → idempotent without OTP', async () => {
     mockOpenJoinToken(TOKEN);
+    mockSupabase.__setMockResultForTable('funnel_checkpoints', { data: null, error: null });
     mockSupabase.__setMockResultForTable('sms_opt_outs', { data: null, error: null });
+    mockSupabase.__setMockResultForTable('users', { data: null, error: null });
+    // Each loadJoinEventContext consumes a payer lookup; submitJoinPhone adds a registered-user lookup.
+    mockSupabase.__pushMockResultForTable('users', { data: { display_name: 'Alex' }, error: null });
+    mockSupabase.__pushMockResultForTable('users', { data: { display_name: 'Alex' }, error: null });
+    mockSupabase.__pushMockResultForTable('users', {
+      data: { id: 'user-registered-1' },
+      error: null,
+    });
     mockSupabase.__pushMockResultForTable('participants', {
-      data: [{ id: 'participant-1', guest_pii_token: 'guest-pii-1' }],
+      data: { id: 'participant-1' },
       error: null,
     });
-    mockSupabase.__pushMockResultForTable('guest_pii', {
-      data: [{ id: 'guest-pii-1' }],
-      error: null,
-    });
-    mockSupabase.__pushMockResultForTable('participants', {
-      data: [{ id: 'participant-1', guest_pii_token: 'guest-pii-1' }],
-      error: null,
-    });
-    mockSupabase.__pushMockResultForTable('guest_pii', {
-      data: [{ id: 'guest-pii-1' }],
-      error: null,
-    });
+    mockSupabase.__pushMockResultForTable('users', { data: { display_name: 'Alex' }, error: null });
 
     const getResponse = await request(app).get(`/join/${TOKEN}`);
     const csrfToken = extractCookie(getResponse.headers['set-cookie'], 'csrf_token');

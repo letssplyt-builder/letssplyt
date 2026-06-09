@@ -48,6 +48,11 @@ describe('Events API integration', () => {
       data: { id: EVENT_ID, title: 'Friday Dinner', status: 'open' },
       error: null,
     });
+    mockSupabase.__pushMockResultForTable('users', {
+      data: { id: USER_A, display_name: 'Alex' },
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', { data: null, error: null });
     mockSupabase.__pushMockResultForTable('event_join_tokens', { data: null, error: null });
 
     const response = await request(app)
@@ -63,7 +68,8 @@ describe('Events API integration', () => {
 
   it('GET /events returns paginated list for auth user', async () => {
     mockAuth(USER_A);
-    mockSupabase.__setMockResultForTable('events', {
+    mockSupabase.__pushMockResultForTable('participants', { data: [], error: null });
+    mockSupabase.__pushMockResultForTable('events', {
       data: [
         {
           id: EVENT_ID,
@@ -71,11 +77,12 @@ describe('Events API integration', () => {
           status: 'open',
           total_amount: null,
           created_at: '2026-01-01T00:00:00.000Z',
+          payer_id: USER_A,
         },
       ],
       error: null,
     });
-    mockSupabase.__setMockResultForTable('participants', { data: [], error: null });
+    mockSupabase.__pushMockResultForTable('participants', { data: [], error: null });
 
     const response = await request(app).get('/api/v1/events').set(AUTH_A);
 

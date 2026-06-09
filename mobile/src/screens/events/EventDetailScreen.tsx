@@ -3,6 +3,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -15,6 +16,8 @@ import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AddParticipantModal } from '../../components/events/AddParticipantModal';
+import { EventMemberRow } from '../../components/events/EventMemberRow';
+import { ParticipantEventDetail } from '../../components/events/ParticipantEventDetail';
 import { QRDisplayModal } from '../../components/events/QRDisplayModal';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { BottomToast } from '../../components/BottomToast';
@@ -22,11 +25,13 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { screenScrollBottomPadding } from '../../constants/layout';
 import { getSupabase } from '../../lib/supabase';
 import type { EventsStackParamList } from '../../navigation/types';
+import { getApiErrorCode, isApiRequestError } from '../../services/api';
 import * as eventService from '../../services/event.service';
+import { useAuthStore } from '../../store/authStore';
 import { useEventStore } from '../../store/eventStore';
 import { glassStyles } from '../../theme/glassStyles';
 import { authColors } from '../../theme/colors';
-import { formatMoney, joinMethodLabel } from '../../utils/events';
+import { formatMoney, isPayerParticipant } from '../../utils/events';
 
 type Props = NativeStackScreenProps<EventsStackParamList, 'EventDetail'>;
 
@@ -40,10 +45,42 @@ function isJoiningPhase(status: string): boolean {
   return status === 'open';
 }
 
+function lockGroupErrorMessage(code: string | undefined): string {
+  switch (code) {
+    case 'MINIMUM_PARTICIPANTS_REQUIRED':
+    case 'MIN_PARTICIPANTS':
+      return 'Add at least 2 members before locking the group.';
+    case 'ALREADY_LOCKED':
+      return 'Group is already locked. Pull down to refresh.';
+    default:
+      return 'Could not lock group. Try again.';
+  }
+}
+
+function removeParticipantErrorMessage(code: string | undefined): string {
+  switch (code) {
+    case 'CANNOT_REMOVE_ACTIVE_PARTICIPANT':
+      return 'Only pending members can be removed.';
+    case 'GROUP_IS_LOCKED':
+      return 'Group is locked — reopen the join window to make changes.';
+    default:
+      return 'Could not remove member. Try again.';
+  }
+}
+
 export function EventDetailScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { eventId } = route.params;
-  const { currentEvent, isLoadingDetail, isLocking, loadEventDetail, lockEvent } = useEventStore();
+  const authUser = useAuthStore((state) => state.user);
+  const {
+    currentEvent,
+    isLoadingDetail,
+    isLocking,
+    loadEventDetail,
+    lockEvent,
+    removeParticipant,
+    reopenEvent,
+  } = useEventStore();
 
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [qrFullscreen, setQrFullscreen] = useState(false);
@@ -53,6 +90,8 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const [lockError, setLockError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const [isReopening, setIsReopening] = useState(false);
+  const [removingParticipantId, setRemovingParticipantId] = useState<string | null>(null);
   const [fetchError, setFetchError] = useState(false);
 
   const refreshDetail = useCallback(async () => {
@@ -105,7 +144,8 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const expired = isTokenExpired(tokenExpiresAt);
   const joining = event ? isJoiningPhase(event.status) : true;
   const memberCount = participants.length;
-  const lockEnabled = memberCount >= 1;
+  const lockEnabled = memberCount >= 2;
+  const isPayer = Boolean(authUser && event && authUser.id === event.payer_id);
 
   const settlementSummary = useMemo(() => {
     if (!currentEvent?.summary) {
@@ -137,8 +177,9 @@ export function EventDetailScreen({ navigation, route }: Props) {
     setLockError(null);
     try {
       await lockEvent(eventId);
-    } catch {
-      setLockError('Could not lock group. Add more members or try again.');
+    } catch (err: unknown) {
+      const code = isApiRequestError(err) ? err.code : getApiErrorCode(err);
+      setLockError(lockGroupErrorMessage(code));
     }
   };
 
@@ -161,6 +202,46 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const handleShareLink = async () => {
     if (!joinUrl) return;
     await Share.share({ message: joinUrl, url: joinUrl });
+  };
+
+  const handleRemoveParticipant = (participantId: string, displayName: string) => {
+    Alert.alert(
+      `Remove ${displayName} from this event?`,
+      'They will need to scan the QR or use the link again to rejoin.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: () => {
+            setRemovingParticipantId(participantId);
+            void removeParticipant(eventId, participantId)
+              .then(() => {
+                setToast(`✓ ${displayName} removed`);
+              })
+              .catch((err: unknown) => {
+                const code = isApiRequestError(err) ? err.code : getApiErrorCode(err);
+                setToast(removeParticipantErrorMessage(code));
+              })
+              .finally(() => {
+                setRemovingParticipantId(null);
+              });
+          },
+        },
+      ],
+    );
+  };
+
+  const handleReopen = async () => {
+    setIsReopening(true);
+    try {
+      await reopenEvent(eventId);
+      setToast('Join window reopened');
+    } catch {
+      setToast('Could not reopen join window. Try again.');
+    } finally {
+      setIsReopening(false);
+    }
   };
 
   if (isLoadingDetail && !currentEvent) {
@@ -212,7 +293,11 @@ export function EventDetailScreen({ navigation, route }: Props) {
           <Text style={styles.bannerError}>Couldn&apos;t load member list. Pull to retry.</Text>
         ) : null}
 
-        {joining ? (
+        {!isPayer && currentEvent ? (
+          <ParticipantEventDetail detail={currentEvent} />
+        ) : null}
+
+        {isPayer && joining ? (
           <>
             <Pressable
               accessibilityRole="button"
@@ -249,23 +334,24 @@ export function EventDetailScreen({ navigation, route }: Props) {
             </View>
 
             <Text style={glassStyles.sectionTitle}>Members · {memberCount}</Text>
-            {participants.map((participant) => (
-              <View key={participant.id} style={styles.memberRow}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>
-                    {participant.display_name.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-                <View style={styles.memberInfo}>
-                  <Text style={glassStyles.title}>{participant.display_name}</Text>
-                  <View style={glassStyles.chip}>
-                    <Text style={glassStyles.chipText}>
-                      {joinMethodLabel(participant.join_method)}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            ))}
+            <View style={styles.memberList}>
+              {participants.map((participant) => (
+                <EventMemberRow
+                  key={participant.id}
+                  variant="joining"
+                  displayName={participant.display_name}
+                  joinMethod={participant.join_method}
+                  isOrganiser={participant.is_organiser}
+                  showRemove={
+                    Boolean(isPayer && event && !isPayerParticipant(participant, event.payer))
+                  }
+                  isRemoving={removingParticipantId === participant.id}
+                  onRemove={() =>
+                    handleRemoveParticipant(participant.id, participant.display_name)
+                  }
+                />
+              ))}
+            </View>
 
             <PrimaryButton
               label="+ Add manually"
@@ -282,10 +368,31 @@ export function EventDetailScreen({ navigation, route }: Props) {
               accessibilityLabel={`Lock group, ${memberCount} members`}
               style={styles.lockButton}
             />
+            {memberCount < 2 ? (
+              <Text style={styles.lockHint}>
+                Add at least one more member besides you to lock the group.
+              </Text>
+            ) : null}
             {lockError ? <Text style={glassStyles.errorText}>{lockError}</Text> : null}
           </>
-        ) : (
+        ) : isPayer ? (
           <View style={styles.settlementPhase}>
+            {event?.status === 'locked' && isPayer ? (
+              <View style={styles.reopenSection}>
+                <PrimaryButton
+                  label="Reopen join window"
+                  variant="inverse"
+                  loading={isReopening}
+                  disabled={isReopening}
+                  onPress={() => void handleReopen()}
+                  style={styles.reopenButton}
+                />
+                <Text style={styles.reopenHelper}>
+                  Reopens QR and link for 24 hours for latecomers.
+                </Text>
+              </View>
+            ) : null}
+
             <Text style={glassStyles.heading}>Settlement phase</Text>
             <View style={styles.summaryCard}>
               <View style={styles.summaryRow}>
@@ -309,28 +416,24 @@ export function EventDetailScreen({ navigation, route }: Props) {
             </View>
 
             <Text style={glassStyles.sectionTitle}>Roster</Text>
-            {participants.map((participant) => (
-              <View key={participant.id} style={styles.memberRow}>
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>
-                    {participant.display_name.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-                <View style={styles.memberInfo}>
-                  <Text style={glassStyles.title}>{participant.display_name}</Text>
-                  <Text style={glassStyles.meta}>{participant.payment_status}</Text>
-                </View>
-                <Text style={styles.amountOwed}>
-                  {formatMoney(participant.amount_owed, event?.currency ?? 'USD')}
-                </Text>
-              </View>
-            ))}
+            <View style={styles.memberList}>
+              {participants.map((participant) => (
+                <EventMemberRow
+                  key={participant.id}
+                  variant="settlement"
+                  displayName={participant.display_name}
+                  paymentStatus={participant.payment_status}
+                  amountOwed={participant.amount_owed}
+                  currency={event?.currency ?? 'USD'}
+                />
+              ))}
+            </View>
           </View>
-        )}
+        ) : null}
       </ScrollView>
 
       <AddParticipantModal
-        visible={addModalOpen}
+        visible={isPayer && addModalOpen}
         isSubmitting={isAdding}
         error={addError}
         onClose={() => {
@@ -340,7 +443,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
         onSubmit={(input) => void handleAddParticipant(input)}
       />
 
-      {event && joinUrl ? (
+      {isPayer && event && joinUrl ? (
         <QRDisplayModal
           visible={qrFullscreen}
           title={event.title}
@@ -435,34 +538,8 @@ const styles = StyleSheet.create({
   linkButton: {
     flex: 1,
   },
-  memberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    ...glassStyles.card,
-    marginBottom: 8,
-    gap: 12,
-  },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: authColors.pillOnDark,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: authColors.textOnDark,
-  },
-  memberInfo: {
-    flex: 1,
-    gap: 4,
-  },
-  amountOwed: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: authColors.textOnDark,
+  memberList: {
+    marginBottom: 4,
   },
   addButton: {
     marginTop: 8,
@@ -470,6 +547,24 @@ const styles = StyleSheet.create({
   },
   lockButton: {
     marginTop: 4,
+  },
+  lockHint: {
+    fontSize: 12,
+    color: authColors.textOnDarkMuted,
+    marginTop: 8,
+    lineHeight: 17,
+  },
+  reopenSection: {
+    marginBottom: 20,
+    gap: 8,
+  },
+  reopenButton: {
+    alignSelf: 'stretch',
+  },
+  reopenHelper: {
+    fontSize: 13,
+    color: authColors.textOnDarkMuted,
+    lineHeight: 18,
   },
   settlementPhase: {
     marginTop: 8,

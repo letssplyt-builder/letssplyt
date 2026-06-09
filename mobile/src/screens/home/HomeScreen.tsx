@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -30,6 +30,8 @@ type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, 'HomeTab'>,
   NativeStackScreenProps<RootStackParamList>
 >;
+
+const RECENT_EVENTS_LIMIT = 4;
 
 export function HomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
@@ -63,8 +65,17 @@ export function HomeScreen({ navigation }: Props) {
     try {
       const result = await fetchBalance();
       setBalance(result);
+      if (result.unavailable) {
+        setBalanceError(false);
+      }
     } catch {
-      setBalance({ net_balance: 0, currency: 'USD', unavailable: true });
+      setBalance({
+        net_balance: 0,
+        currency: 'USD',
+        owed_to_you: 0,
+        you_owe: 0,
+        unavailable: true,
+      });
       setBalanceError(true);
     } finally {
       setBalanceLoading(false);
@@ -83,6 +94,16 @@ export function HomeScreen({ navigation }: Props) {
   useEffect(() => {
     void refreshData();
   }, [refreshData]);
+
+  const createdEvents = useMemo(
+    () => events.filter((event) => event.role === 'creator').slice(0, RECENT_EVENTS_LIMIT),
+    [events],
+  );
+
+  const memberEvents = useMemo(
+    () => events.filter((event) => event.role === 'participant').slice(0, RECENT_EVENTS_LIMIT),
+    [events],
+  );
 
   const handleCreate = async () => {
     const trimmed = titleDraft.trim();
@@ -107,8 +128,33 @@ export function HomeScreen({ navigation }: Props) {
     }
   };
 
-  const recentEvents = events.slice(0, 3);
-  const needsAttention = events.filter((event) => event.status === 'sent');
+  const openEvent = (eventId: string) => {
+    navigation.navigate('EventsTab', {
+      screen: 'EventDetail',
+      params: { eventId },
+    });
+  };
+
+  const renderEventSection = (
+    title: string,
+    items: typeof events,
+    emptyMessage: string,
+  ) => (
+    <View style={styles.section}>
+      <Text style={glassStyles.sectionTitle}>{title}</Text>
+      {!listError && !isLoadingEvents && items.length === 0 ? (
+        <Text style={styles.emptySection}>{emptyMessage}</Text>
+      ) : null}
+      {items.map((event) => (
+        <EventCard
+          key={event.id}
+          event={event}
+          variant="compact"
+          onPress={() => openEvent(event.id)}
+        />
+      ))}
+    </View>
+  );
 
   return (
     <AuthGradientLayout contentStyle={styles.layout}>
@@ -152,49 +198,21 @@ export function HomeScreen({ navigation }: Props) {
           onRetry={() => void loadBalance()}
         />
 
-        {needsAttention.length > 0 ? (
-          <View style={styles.section}>
-            <Text style={glassStyles.sectionTitle}>Needs attention</Text>
-            {needsAttention.map((event) => (
-              <Pressable
-                key={event.id}
-                accessibilityRole="button"
-                onPress={() =>
-                  navigation.navigate('EventsTab', {
-                    screen: 'EventDetail',
-                    params: { eventId: event.id },
-                  })
-                }
-                style={glassStyles.attentionCard}
-              >
-                <Text style={glassStyles.attentionTitle}>{event.title}</Text>
-                <Text style={glassStyles.attentionMeta}>Pending confirmations</Text>
-              </Pressable>
-            ))}
-          </View>
+        {listError ? (
+          <Text style={glassStyles.errorText}>Couldn&apos;t load events. Pull to retry.</Text>
         ) : null}
 
-        <View style={styles.section}>
-          <Text style={glassStyles.sectionTitle}>Your recent events</Text>
-          {listError ? (
-            <Text style={glassStyles.errorText}>Something went wrong. Pull to retry.</Text>
-          ) : null}
-          {!listError && !isLoadingEvents && recentEvents.length === 0 ? (
-            <Text style={glassStyles.emptyText}>No events yet. Tap + to split your first bill.</Text>
-          ) : null}
-          {recentEvents.map((event) => (
-            <EventCard
-              key={event.id}
-              event={event}
-              onPress={() =>
-                navigation.navigate('EventsTab', {
-                  screen: 'EventDetail',
-                  params: { eventId: event.id },
-                })
-              }
-            />
-          ))}
-        </View>
+        {renderEventSection(
+          'Events you created',
+          createdEvents,
+          'No events yet. Tap + to split your first bill.',
+        )}
+
+        {renderEventSection(
+          'Events you joined',
+          memberEvents,
+          'When someone adds you to a group, it shows up here.',
+        )}
       </ScrollView>
 
       <EventFab onPress={openCreateModal} />
@@ -242,6 +260,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   section: {
-    marginBottom: 20,
+    marginBottom: 18,
+  },
+  emptySection: {
+    fontSize: 13,
+    color: authColors.textOnDarkMuted,
+    lineHeight: 18,
+    marginBottom: 4,
   },
 });

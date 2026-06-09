@@ -25,6 +25,8 @@ interface EventState {
   loadEventDetail: (eventId: string) => Promise<void>;
   loadParticipants: (eventId: string) => Promise<void>;
   lockEvent: (eventId: string) => Promise<void>;
+  removeParticipant: (eventId: string, participantId: string) => Promise<void>;
+  reopenEvent: (eventId: string) => Promise<void>;
   openCreateModal: () => void;
   closeCreateModal: () => void;
   showQrPresentation: (presentation: QrPresentation) => void;
@@ -49,7 +51,7 @@ export const useEventStore = create<EventState>((set, get) => ({
     set({ isLoadingEvents: true });
     try {
       const cursor = refresh ? undefined : get().nextCursor ?? undefined;
-      const page = await eventService.fetchEvents(cursor);
+      const page = await eventService.fetchEvents(cursor, { role: 'all' });
       const prior = refresh ? [] : get().events;
       set({
         events: refresh ? page.events : [...prior, ...page.events],
@@ -71,9 +73,11 @@ export const useEventStore = create<EventState>((set, get) => ({
         id: created.id,
         title: created.title,
         status: created.status,
-        participant_count: 0,
+        participant_count: 1,
         total_amount: null,
         created_at: new Date().toISOString(),
+        role: 'creator',
+        creator_name: null,
       };
       set((state) => ({
         events: [listItem, ...state.events],
@@ -123,6 +127,32 @@ export const useEventStore = create<EventState>((set, get) => ({
       set({ isLocking: false });
       throw err;
     }
+  },
+
+  removeParticipant: async (eventId, participantId) => {
+    await eventService.deleteParticipant(eventId, participantId);
+    set((state) => {
+      if (!state.currentEvent || state.currentEvent.event.id !== eventId) {
+        return state;
+      }
+      return {
+        currentEvent: {
+          ...state.currentEvent,
+          participants: state.currentEvent.participants.filter((p) => p.id !== participantId),
+        },
+      };
+    });
+    await get().loadEventDetail(eventId);
+  },
+
+  reopenEvent: async (eventId) => {
+    await eventService.reopenEvent(eventId);
+    await get().loadEventDetail(eventId);
+    set((state) => ({
+      events: state.events.map((event) =>
+        event.id === eventId ? { ...event, status: 'open' } : event,
+      ),
+    }));
   },
 
   openCreateModal: () => set({ createModalOpen: true }),

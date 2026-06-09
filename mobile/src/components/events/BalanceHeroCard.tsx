@@ -10,17 +10,11 @@ interface BalanceHeroCardProps {
   onRetry: () => void;
 }
 
-function balanceMessage(balance: BalanceSummary): { text: string; tone: 'positive' | 'negative' | 'neutral' } {
-  if (balance.unavailable) {
-    return { text: 'Balance unavailable', tone: 'neutral' };
-  }
-  if (balance.net_balance > 0) {
-    return { text: `You're owed ${formatMoney(balance.net_balance, balance.currency)}`, tone: 'positive' };
-  }
-  if (balance.net_balance < 0) {
-    return { text: `You owe ${formatMoney(Math.abs(balance.net_balance), balance.currency)}`, tone: 'negative' };
-  }
-  return { text: 'All settled up', tone: 'neutral' };
+function netLabel(net: number, unavailable: boolean): string {
+  if (unavailable) return 'Settles after bills are split';
+  if (net > 0) return 'Net in your favour';
+  if (net < 0) return 'Net you need to pay';
+  return 'All settled up';
 }
 
 export function BalanceHeroCard({ balance, isLoading, error, onRetry }: BalanceHeroCardProps) {
@@ -43,29 +37,53 @@ export function BalanceHeroCard({ balance, isLoading, error, onRetry }: BalanceH
     return null;
   }
 
-  const { text, tone } = balanceMessage(balance);
-  const amountColor =
-    tone === 'positive'
-      ? '#6EE7B7'
-      : tone === 'negative'
-        ? authColors.errorOnDark
-        : authColors.textOnDarkMuted;
+  const unavailable = Boolean(balance.unavailable);
+  const owedToYou = balance.owed_to_you ?? 0;
+  const youOwe = balance.you_owe ?? 0;
+  const net = balance.net_balance ?? owedToYou - youOwe;
+  const currency = balance.currency ?? 'USD';
 
   return (
-    <View accessibilityRole="text" accessibilityLabel={text} style={[styles.card, styles.heroCard]}>
-      <Text style={styles.heroLabel}>Net balance</Text>
-      <Text style={[styles.heroAmount, { color: amountColor }]}>
-        {balance.unavailable ? '—' : formatMoney(balance.net_balance, balance.currency)}
-      </Text>
-      <Text style={[styles.heroSub, { color: amountColor }]}>{text}</Text>
+    <View
+      accessibilityRole="summary"
+      accessibilityLabel={`Owed to you ${formatMoney(owedToYou, currency)}. You owe ${formatMoney(youOwe, currency)}.`}
+      style={[styles.card, styles.heroCard]}
+    >
+      <View style={styles.columns}>
+        <View style={styles.column}>
+          <Text style={styles.columnLabel}>Owed to you</Text>
+          <Text style={[styles.columnAmount, styles.positive]}>
+            {unavailable ? '—' : formatMoney(owedToYou, currency)}
+          </Text>
+        </View>
+        <View style={styles.divider} />
+        <View style={styles.column}>
+          <Text style={styles.columnLabel}>You owe</Text>
+          <Text style={[styles.columnAmount, styles.negative]}>
+            {unavailable ? '—' : formatMoney(youOwe, currency)}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.netRow}>
+        <Text style={styles.netLabel}>Net</Text>
+        <Text
+          style={[
+            styles.netAmount,
+            net > 0 ? styles.positive : net < 0 ? styles.negative : styles.neutral,
+          ]}
+        >
+          {unavailable ? '—' : formatMoney(net, currency)}
+        </Text>
+      </View>
+      <Text style={styles.netHint}>{netLabel(net, unavailable)}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 22,
-    padding: 24,
+    borderRadius: 18,
+    padding: 16,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: authColors.glassBorder,
@@ -74,7 +92,7 @@ const styles = StyleSheet.create({
     backgroundColor: authColors.glassStrong,
   },
   skeleton: {
-    height: 120,
+    height: 108,
     backgroundColor: authColors.glass,
     opacity: 0.7,
   },
@@ -100,22 +118,61 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: authColors.textOnDark,
   },
-  heroLabel: {
+  columns: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  column: {
+    flex: 1,
+    gap: 4,
+  },
+  divider: {
+    width: 1,
+    backgroundColor: authColors.glassBorder,
+    marginHorizontal: 12,
+  },
+  columnLabel: {
     fontSize: 11,
     fontWeight: '600',
     color: authColors.textOnDarkFaint,
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 6,
+    letterSpacing: 0.7,
   },
-  heroAmount: {
-    fontSize: 42,
+  columnAmount: {
+    fontSize: 24,
     fontWeight: '800',
-    letterSpacing: -1,
-    marginBottom: 4,
+    letterSpacing: -0.5,
   },
-  heroSub: {
-    fontSize: 13,
+  positive: {
+    color: '#6EE7B7',
+  },
+  negative: {
+    color: authColors.errorOnDark,
+  },
+  neutral: {
+    color: authColors.textOnDarkMuted,
+  },
+  netRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: authColors.glassBorder,
+  },
+  netLabel: {
+    fontSize: 12,
     fontWeight: '600',
+    color: authColors.textOnDarkMuted,
+  },
+  netAmount: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  netHint: {
+    fontSize: 12,
+    color: authColors.textOnDarkFaint,
+    marginTop: 6,
   },
 });

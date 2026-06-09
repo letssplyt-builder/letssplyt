@@ -1,6 +1,6 @@
 # LetsSplyt — Product Requirements Document (PRD)
 **Version:** 1.2 | **Date:** May 2026 | **Status:** MVP Definition Complete
-**Last updated:** Waiting room removed — Event Detail is now a single screen serving both the joining phase (QR live, member list, manual add) and the settlement phase (progress bar, confirm/dispute/nudge/cash). Manual add consolidated into two types: with phone and name-only.
+**Last updated:** Home dashboard — Members/Guests toggle with net counterparty balances; Events tab — Created/Joined sections (settled collapsed). MVP US market, USD only. OTP = register everywhere; pure guests only via payer manual add without OTP.
 
 ---
 
@@ -68,7 +68,7 @@ Through product research, we identified 9 distinct participant types. Not all ar
 |---|---|---|---|---|
 | 1 | App user (on Splitwise/similar) | ✓ Phone | ✓ Full | WhatsApp + deep links |
 | 2 | Known contact | ✓ Phone | ✓ Full | WhatsApp + deep links |
-| 3 | New acquaintance (no app) | ✗ None | ✓ Via QR/URL | QR/URL → browser → name+phone+OTP → joins as participant, no account created |
+| 3 | New acquaintance (no app) | ✗ None → ✓ After OTP | ✓ Via QR/URL | QR/URL → browser → name+phone+OTP → registered user + event participant |
 | 4 | International guest | ✓ Foreign phone | ✓ Partial | WhatsApp + filtered payment options |
 | 5 | Cash-only person | Maybe | ✓ Via cash type | No message, manual settle |
 | 6 | The Ghost (never pays) | ✓ Phone | ~ Partial | Nudge + write-off option |
@@ -112,6 +112,8 @@ A group goes out for breakfast, lunch, dinner, or any shared event. One person c
 **Step 2 — Event creator sets up the group.**
 The payer opens LetsSplyt, creates an event (e.g. "Dinner at Nobu"), and a QR code + shareable URL is generated instantly. They show the QR at the table or drop the link in the group chat.
 
+**Organiser is always a member.** Creating the event automatically adds the payer to the member list (labelled **Organiser** in the app). They count toward the participant total but cannot be removed. Locking requires at least one other person besides the organiser — i.e. two rows in the member list (organiser + ≥1 guest or app member).
+
 **Step 3 — Everyone scans or clicks to join. Two paths depending on whether they have the app:**
 
 *Path A — Existing LetsSplyt member (app installed):*
@@ -124,7 +126,7 @@ The payer opens LetsSplyt, creates an event (e.g. "Dinner at Nobu"), and a QR co
 - They see: "[Payer name] invited you to [Event name]. Join the group."
 - They enter First Name, Last Name, and Phone Number.
 - An OTP is sent to verify the phone number is real and belongs to them.
-- They enter the code and join the group. Done. No account, no install.
+- They enter the code and join the group. OTP also creates their LetsSplyt account — the name they entered in the browser is saved to `users.display_name`. If they install the app later, they sign in with the same number (no name re-entry) and see this event on their dashboard.
 - They'll receive their payment request by SMS when the bill is split.
 
 **Step 4 — Payer tracks who's joined (via Event Detail — joining view).**
@@ -132,13 +134,13 @@ After sharing the QR, the payer can navigate away freely. When they return — b
 
 - **QR code + copy/share link** at the top (while the token is still valid). A subtle expiry timer reminds the payer how long the link has left.
 - **If the QR has expired**, the QR section is replaced with an amber "Expired" state and a single "Regenerate QR & link" button — generating a fresh token instantly.
-- **Members list** below the QR, showing everyone who has joined so far (via QR scan or manual add) with their join method as a subtitle.
+- **Members list** below the QR, starting with the organiser (auto-added on create), then everyone who has joined via QR scan or manual add. Each row shows a join-method chip (e.g. Organiser, QR Web, Manual). The organiser row has no remove control.
 - **"+ Add manually" button** on the member list header. Tapping opens a two-choice picker:
-  - *With phone number* — from the payer's contacts (native contact picker, no OTP needed — payer vouches) or entered manually with country code selector. They receive a text invite.
+  - *With phone number* — from contacts or manual entry, **no OTP** (payer vouches). If the number already has a LetsSplyt account, link by `user_id` immediately. If not, store in `guest_pii` for SMS only — they remain pure guests until they verify via OTP elsewhere (web join or app). They receive a text invite when messages are sent.
   - *Name only — no phone* — for cash payers and in-person guests. No message is ever sent to this person. The payer tells them their share verbally and marks their payment in the app on their behalf.
 
 **Step 5 — Payer locks the group.**
-When the payer is satisfied that everyone who needs to be in the group is in, they tap "Everyone's here — Lock & split" from Event Detail. This closes the join window — no new members can join and no one can leave. Locking is the explicit gate before splitting begins. (Payer can reopen for 24 hours if someone was missed.)
+When the payer is satisfied that everyone who needs to be in the group is in, they tap "Everyone's here — Lock & split" from Event Detail. The lock button stays disabled until the member list has at least two people (organiser plus one other). This closes the join window — no new members can join and no one can leave. Locking is the explicit gate before splitting begins. (Payer can reopen for 24 hours if someone was missed.)
 
 **Step 6 — Receipt scanning and split.**
 Payer photographs the receipt. AI (A1) reads every line item. Payer assigns items to people via drag-and-drop or natural language ("Rohan had the pasta and two beers"). AI (A2) calculates each person's exact share including proportional tax and tip.
@@ -147,10 +149,10 @@ Payer photographs the receipt. AI (A1) reads every line item. Payer assigns item
 Payer previews what each person's message will look like, then taps "Send to all" — one action delivers to every participant simultaneously. AI (A3) generates a personalised split image (recipient's row highlighted) and country-appropriate payment deep links for each person. Messages are sent server-side via Twilio, with in-app delivery tracking showing a green check per person as each message lands.
 
 **Step 8 — Everyone gets their message.**
-Each person receives a WhatsApp or SMS with the full group split table, their exact amount, and direct payment links (Venmo/PayPal/etc — filtered by their country). App members also see it in their "I owe" dashboard.
+Each person receives a WhatsApp or SMS with the full group split table, their exact amount, and direct payment links (Venmo/PayPal/etc — US MVP uses US payment apps). App members also see outstanding balances on the **Home** dashboard (Members toggle).
 
 **Step 9 — Settlement.**
-People pay via their preferred app (Venmo, PayPal, etc.). Registered participants return to the event in LetsSplyt, tap "I've paid", select the payment method, and confirm — the creator gets notified and their balance settles immediately on their end. The creator tracks and confirms payments from the **Event Detail screen**, accessible by tapping any event card in the Events tab. Event Detail shows a segmented progress bar (confirmed / self-reported / pending), per-member status, and inline actions to Confirm, Dispute, Nudge, or mark Cash. There is no separate settlement dashboard — everything lives inside the event context.
+People pay via their preferred app (Venmo, PayPal, etc.). Registered participants return to the event in LetsSplyt, tap "I've paid", select the payment method, and confirm — the creator gets notified. The creator tracks and confirms payments from **Event Detail** (Confirm, Dispute, Nudge, Mark cash). **Home** is a counterparty router (net balance hero → Members or Guests lists → optional detail screen → Event Detail), not a second settlement workspace. **Events** tab lists events by role (Created / Joined). There is no separate Settlement bottom tab.
 
 ### The Key Design Principles
 - **Recipients never need an account.** They receive a self-contained message. Everything they need is in it.
@@ -310,7 +312,7 @@ Phone numbers change. If phone were the PK, a user changing their number would c
 All phone numbers stored as E.164 (`+15550001234`). `libphonenumber` runs at the API layer before any DB operation. "555-000-1234", "5550001234", "+1 (555) 000-1234" all resolve to the same canonical form. Without this, the same person could appear as 3 different records.
 
 **Nullable `user_id` on PARTICIPANTS:**
-A participant may or may not be a registered user. `user_id = null` means guest (added manually by payer, no account). `user_id = <uuid>` means registered user (self-registered via QR or was already a user). This single nullable FK enables the dual dashboard — registered participants see events they're part of on their "I owe" screen.
+A participant may or may not be a registered user. `user_id = null` means **pure guest** — payer manual add when the phone is not registered (no OTP). `user_id = <uuid>` means registered user — OTP-verified web join, app join, or payer manual add when phone matches `users.phone_hash`. **OTP anywhere creates or resolves a `users` row**; legacy guest rows are upgraded to `user_id` on next OTP login. This nullable FK enables the dual dashboard.
 
 **Encrypted payment handles:**
 `handle_encrypted` column uses AES-256 encryption at rest. Decrypted only at message composition time, in memory, never logged. Payment identifiers are PII — treating them as such from day one avoids a security retrofit later.
@@ -380,7 +382,7 @@ The QR code and shareable URL serve two fundamentally different populations. The
 The operating system intercepts the URL via a universal link / app link and opens LetsSplyt directly to the event join screen. If the user is logged in, they see the event details (name, organiser, members already in) and join with one tap. If their session has expired, they do a quick OTP verification first, then join. No browser involved. No re-registration.
 
 **Path B — Non-member (no app):**
-The URL opens in the phone's default browser. The page shows an invitation card: who invited them, the event name, and how many members are already in. The user enters their First Name, Last Name, and Phone Number, then receives an OTP to verify the number is real and belongs to them. After verification they are added to the event as a participant. No LetsSplyt account is created — they exist only as a verified participant in this event. When the bill is split, they receive their payment request via SMS to the verified number. A soft nudge at the bottom of that message invites them to download LetsSplyt for future events.
+The URL opens in the phone's default browser. The page shows an invitation card: who invited them, the event name, and how many members are already in. The user enters their First Name, Last Name, and Phone Number, then receives an OTP to verify the number is real and belongs to them. After verification they are registered as a LetsSplyt user and added to the event as a participant (`user_id` set). When the bill is split, they receive their payment request via SMS; if they install the app, they sign in with the same number and see past and current joined events on the dashboard.
 
 **Why OTP is mandatory for Path B:**
 The payer doesn't know these people personally. OTP guarantees the phone number is real and belongs to the person who scanned. This prevents someone entering a stranger's number and receiving payment requests on their behalf.
@@ -405,9 +407,9 @@ QR / URL token expires on payer lock OR 24-hour TTL, whichever comes first. When
 
 **Reopen:** After locking, payer can reopen the join window for 24 hours via "Reopen join window." This generates a fresh short-lived token for a specific latecomer. Once they join, payer locks again.
 
-### OTP Verification on QR Join
-**Decision:** Mandatory OTP for self-registration via QR. Optional (payer vouches) for manually-added participants.
-**Rationale:** QR registration = payer doesn't know them. OTP guarantees phone number is real and belongs to that person. Manually-added = payer knows them (their contact or friend). Creator vouching is sufficient social proof. Also reduces Twilio costs for the Mark scenario.
+### OTP Verification — Registration Rule
+**Decision:** OTP verification **anywhere** (web join, app Get Started) creates or resolves a `users` account. The **only** path without OTP is payer manual add (payer vouches) — those numbers stay pure guests (`guest_pii`) until the person later verifies via OTP.
+**Rationale:** One verified phone = one identity. Web joiners who install the app later should not re-enter their name; their joined events and balances must appear on login. Manual add without OTP is the exception for people the payer knows personally.
 
 ### Twilio Server-Side Delivery Over Native Share Sheet
 **Decision:** Use Twilio Programmable Messaging for all outbound messages. One "Send to all" tap delivers to every participant simultaneously.
@@ -447,12 +449,14 @@ iOS and Android both prevent apps from silently sending SMS or WhatsApp messages
 - Split entry screen with four tabs: = Even (default), Itemised (receipt path only), $ Amount, % Percent, ⅟ Portion — manual total path skips the split-mode chooser and lands directly on this screen
 - Message preview carousel
 - One-tap "Send to all" via Twilio Programmable Messaging (WhatsApp-first, SMS fallback) with in-app per-person delivery tracking
-- Event Detail screen with inline settlement tracking (segmented progress bar, per-member confirm/dispute/nudge/cash actions — accessible from Events tab, no separate settlement dashboard)
+- Event Detail screen with inline settlement tracking (segmented progress bar, per-member confirm/dispute/nudge/cash actions)
+- Home dashboard: net balance hero; **Members | Guests** toggle; Members shows net counterparty rows (People who owe you / People you owe); Guests shows outstanding pure guests who owe the creator (phone guests aggregated, name-only guests per-event)
+- Member/Guest detail screens route to Event Detail; settlement actions execute in Event Detail only
+- Events tab: **Events you created** and **Events you joined** (settled events collapsed per section)
 - Post-send edit with selective resend
-- International participant support (payment filtering by country)
+- US market MVP — USD only; US payment apps in messages
 - Push notifications (self-report, nudge, confirmation)
 - Cash-only participant type
-- Dual dashboard ("owed to me" + "I owe")
 
 ### V2 (Post-PMF — 3 to 6 months)
 - Splitwise optional integration (contact developers@splitwise.com now)

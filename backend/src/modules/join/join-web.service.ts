@@ -2,8 +2,13 @@ import { randomUUID } from 'crypto';
 import { parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js';
 import { AppError } from '../../infrastructure/errors';
 import logger from '../../infrastructure/logger';
-import { encrypt, encryptPhone, hashPhone } from '../../infrastructure/security';
+import { encryptPhone, hashPhone } from '../../infrastructure/security';
 import { supabaseAdmin } from '../../infrastructure/supabase';
+import { resolveUserAfterOtp } from '../auth/auth.service';
+import {
+  findParticipantIdByUserInEvent,
+  linkParticipantToUser,
+} from '../participants/participant-link.service';
 import { sendOtp, verifyTwilioCodeForJoin } from './join-otp';
 import { JOIN_COUNTRY_OPTIONS } from './join-countries';
 
@@ -22,7 +27,6 @@ export type JoinServiceErrorCode =
   | 'OTP_UNAVAILABLE'
   | 'OPTED_OUT'
   | 'EVENT_LOCKED'
-  | 'APP_USER_REDIRECT'
   | 'INVALID_OTP'
   | 'NAME_REQUIRED';
 
@@ -53,14 +57,6 @@ interface EventRow {
   title: string;
   status: string;
   payer_id: string;
-}
-
-function encryptGuestName(displayName: string): string {
-  const key = process.env.PHONE_ENCRYPTION_KEY;
-  if (!key) {
-    throw new AppError('ENCRYPTION_CONFIG_MISSING', 'Phone encryption is not configured', 500);
-  }
-  return encrypt(displayName, key);
 }
 
 export function buildPhoneE164(countryDial: string, nationalDigits: string): string {
@@ -256,46 +252,14 @@ async function findRegisteredUserByPhoneHash(phoneHash: string): Promise<{ id: s
     throw new AppError('USER_LOOKUP_FAILED', 'Could not verify account status', 500);
   }
 
-  return data as { id: string } | null;
+  const row = data as { id: string } | null;
+  return row?.id ? row : null;
 }
 
-async function hasDuplicatePhoneInEvent(eventId: string, phoneHash: string): Promise<boolean> {
-  const { data: participants, error: participantsError } = await supabaseAdmin
-    .from('participants')
-    .select('guest_pii_token')
-    .eq('event_id', eventId)
-    .not('guest_pii_token', 'is', null);
-
-  if (participantsError) {
-    throw new AppError('PARTICIPANTS_LOOKUP_FAILED', 'Could not check existing participants', 500);
-  }
-
-  const guestTokens = (participants ?? [])
-    .map((row) => row.guest_pii_token as string | null)
-    .filter((token): token is string => Boolean(token));
-
-  if (guestTokens.length === 0) {
-    return false;
-  }
-
-  const { data: matches, error: guestError } = await supabaseAdmin
-    .from('guest_pii')
-    .select('id')
-    .in('id', guestTokens)
-    .eq('phone_hash', phoneHash)
-    .limit(1);
-
-  if (guestError) {
-    throw new AppError('GUEST_PII_LOOKUP_FAILED', 'Could not verify guest phone uniqueness', 500);
-  }
-
-  return (matches ?? []).length > 0;
-}
-
-async function findParticipantByPhone(eventId: string, phoneHash: string): Promise<string | null> {
-  const duplicate = await hasDuplicatePhoneInEvent(eventId, phoneHash);
-  if (!duplicate) return null;
-
+async function findGuestParticipantByPhone(
+  eventId: string,
+  phoneHash: string,
+): Promise<string | null> {
   const { data: participants, error } = await supabaseAdmin
     .from('participants')
     .select('id, guest_pii_token')
@@ -324,6 +288,19 @@ async function findParticipantByPhone(eventId: string, phoneHash: string): Promi
   const guestId = guestRows[0].id as string;
   const match = (participants ?? []).find((p) => p.guest_pii_token === guestId);
   return (match?.id as string) ?? null;
+}
+
+async function findParticipantInEvent(
+  eventId: string,
+  phoneHash: string,
+  userId?: string | null,
+): Promise<string | null> {
+  if (userId) {
+    const byUser = await findParticipantIdByUserInEvent(eventId, userId);
+    if (byUser) return byUser;
+  }
+
+  return findGuestParticipantByPhone(eventId, phoneHash);
 }
 
 export interface JoinPhoneSubmissionInput {
@@ -358,8 +335,14 @@ export async function submitJoinPhone(
   const phoneE164 = buildPhoneE164(input.countryDial, input.phoneNational);
   const phoneHash = hashPhone(phoneE164);
 
-  const existingParticipantId = await findParticipantByPhone(context.eventId, phoneHash);
-  if (existingParticipantId) {
+  const registeredUser = await findRegisteredUserByPhoneHash(phoneHash);
+  const existingParticipantId = await findParticipantInEvent(
+    context.eventId,
+    phoneHash,
+    registeredUser?.id,
+  );
+  // Skip OTP only when a registered user is already linked to this event.
+  if (existingParticipantId && registeredUser) {
     return { phoneE164, displayName, alreadyJoined: true };
   }
 
@@ -422,8 +405,51 @@ export async function verifyJoinOtp(
   const phoneE164 = input.phoneE164.trim();
   const phoneHash = hashPhone(phoneE164);
 
-  const existingParticipantId = await findParticipantByPhone(context.eventId, phoneHash);
+  const approved = await verifyTwilioCodeForJoin(phoneE164, input.code);
+  if (!approved) {
+    throw new JoinServiceError('INVALID_OTP', 'Incorrect code. Try again.', 400);
+  }
+
+  const phoneEncrypted = encryptPhone(phoneE164);
+  const resolvedUser = await resolveUserAfterOtp(
+    phoneE164,
+    phoneHash,
+    phoneEncrypted,
+    displayName,
+    'register',
+  );
+
+  const existingParticipantId = await findParticipantInEvent(
+    context.eventId,
+    phoneHash,
+    resolvedUser.userId,
+  );
   if (existingParticipantId) {
+    await linkParticipantToUser(existingParticipantId, resolvedUser.userId);
+    const { error: participantNameError } = await supabaseAdmin
+      .from('participants')
+      .update({ display_name: displayName })
+      .eq('id', existingParticipantId);
+    if (participantNameError) {
+      logger.warn({
+        msg: 'Failed to update participant display_name after web join',
+        participantId: existingParticipantId,
+        supabaseCode: participantNameError.code,
+        supabaseMessage: participantNameError.message,
+      });
+    }
+    await writeFunnelCheckpoint({
+      sessionId: input.sessionId,
+      eventId: context.eventId,
+      checkpoint: 'otp_verified',
+      metadata: { participant_id: existingParticipantId },
+    });
+    await writeFunnelCheckpoint({
+      sessionId: input.sessionId,
+      eventId: context.eventId,
+      checkpoint: 'join_confirmed',
+      metadata: { participant_id: existingParticipantId },
+    });
     return {
       participantId: existingParticipantId,
       eventTitle: eventRow.title,
@@ -431,52 +457,15 @@ export async function verifyJoinOtp(
     };
   }
 
-  const registeredUser = await findRegisteredUserByPhoneHash(phoneHash);
-  if (registeredUser) {
-    throw new JoinServiceError(
-      'APP_USER_REDIRECT',
-      'You already have LetsSplyt! Open the app to join.',
-      409,
-      `letssplyt://join/${input.token}`,
-    );
-  }
-
-  const approved = await verifyTwilioCodeForJoin(phoneE164, input.code);
-  if (!approved) {
-    throw new JoinServiceError('INVALID_OTP', 'Incorrect code. Try again.', 400);
-  }
-
-  const phoneEncrypted = encryptPhone(phoneE164);
   const messageChannel = resolveMessageChannel(phoneE164);
   const countryCode = resolveCountryCode(phoneE164);
-
-  const { data: guestPii, error: guestError } = await supabaseAdmin
-    .from('guest_pii')
-    .insert({
-      phone_hash: phoneHash,
-      phone_encrypted: phoneEncrypted,
-      name_encrypted: encryptGuestName(displayName),
-    })
-    .select('id')
-    .single();
-
-  if (guestError || !guestPii) {
-    logger.error({
-      msg: 'Guest PII create failed during web join',
-      eventId: context.eventId,
-      supabaseCode: guestError?.code,
-      supabaseMessage: guestError?.message,
-      hint: 'Apply supabase/migrations/20260608210000_guest_pii_and_participants_token.sql',
-    });
-    throw new AppError('GUEST_PII_CREATE_FAILED', 'Could not store guest contact details', 500);
-  }
 
   const { data: participant, error: participantError } = await supabaseAdmin
     .from('participants')
     .insert({
       event_id: context.eventId,
-      user_id: null,
-      guest_pii_token: guestPii.id,
+      user_id: resolvedUser.userId,
+      guest_pii_token: null,
       display_name: displayName,
       join_method: 'qr_web',
       payment_status: 'pending',
@@ -487,11 +476,10 @@ export async function verifyJoinOtp(
     .single();
 
   if (participantError || !participant) {
-    await supabaseAdmin.from('guest_pii').delete().eq('id', guestPii.id as string);
     logger.error({
       msg: 'Participant create failed during web join',
       eventId: context.eventId,
-      guestPiiId: guestPii.id,
+      userId: resolvedUser.userId,
       joinMethod: 'qr_web',
       supabaseCode: participantError?.code,
       supabaseMessage: participantError?.message,

@@ -102,11 +102,9 @@ describe('join-web.service', () => {
     expect(funnelCalls.length).toBeGreaterThanOrEqual(2);
 
     mockSupabase.__setMockResultForTable('users', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('guest_pii', { data: [], error: null });
+    mockSupabase.__pushMockResultForTable('participants', { data: null, error: null });
     mockSupabase.__pushMockResultForTable('participants', { data: [], error: null });
-    mockSupabase.__pushMockResultForTable('guest_pii', {
-      data: { id: 'guest-pii-2' },
-      error: null,
-    });
     mockSupabase.__pushMockResultForTable('participants', {
       data: { id: 'participant-2' },
       error: null,
@@ -122,5 +120,74 @@ describe('join-web.service', () => {
 
     const allFunnelCalls = mockSupabase.from.mock.calls.filter(([table]) => table === 'funnel_checkpoints');
     expect(allFunnelCalls.length).toBeGreaterThanOrEqual(4);
+    expect(mockSupabase.auth.admin.createUser).toHaveBeenCalled();
+
+    const participantInsert = mockSupabase.from.mock.results
+      .map((r) => (r.type === 'return' ? r.value : null))
+      .flatMap((chain) => {
+        if (!chain) return [];
+        return (chain as { insert: jest.Mock }).insert.mock.calls;
+      })
+      .find((call) => (call[0] as { join_method?: string }).join_method === 'qr_web');
+
+    expect(participantInsert).toBeTruthy();
+    const payload = participantInsert![0] as {
+      user_id: string;
+      guest_pii_token: null;
+      display_name: string;
+    };
+    expect(payload.user_id).toBeTruthy();
+    expect(payload.guest_pii_token).toBeNull();
+    expect(payload.display_name).toBe('Sam');
+    expect(mockSupabase.auth.admin.createUser).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_metadata: { display_name: 'Sam' },
+      }),
+    );
+  });
+
+  it('verifyJoinOtp upgrades existing guest participant display_name from web form', async () => {
+    mockJoinContext();
+    mockSupabase.__setMockResultForTable('funnel_checkpoints', { data: null, error: null });
+    mockSupabase.__setMockResultForTable('users', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('users', { data: { display_name: 'Alex' }, error: null });
+    mockSupabase.__pushMockResultForTable('users', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('users', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('users', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('guest_pii', { data: [], error: null });
+    mockSupabase.__pushMockResultForTable('participants', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: [{ id: 'guest-participant-1', guest_pii_token: 'guest-pii-1' }],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('guest_pii', {
+      data: [{ id: 'guest-pii-1' }],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('participants', { data: null, error: null });
+
+    await verifyJoinOtp({
+      token: TOKEN,
+      displayName: 'Robert',
+      phoneE164: PHONE_E164,
+      code: '000000',
+      sessionId: 'session-guest-upgrade',
+    });
+
+    const participantUpdates = mockSupabase.from.mock.results
+      .map((r) => (r.type === 'return' ? r.value : null))
+      .flatMap((chain) => {
+        if (!chain) return [];
+        return (chain as { update: jest.Mock }).update.mock.calls;
+      })
+      .map((call) => call[0] as { display_name?: string; user_id?: string });
+
+    expect(participantUpdates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ user_id: expect.any(String), guest_pii_token: null }),
+        expect.objectContaining({ display_name: 'Robert' }),
+      ]),
+    );
   });
 });

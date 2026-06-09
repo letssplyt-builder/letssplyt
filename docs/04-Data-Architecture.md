@@ -71,7 +71,7 @@ Instead, `participants` holds only a `guest_pii_token UUID` — a foreign key re
 
 ### The guest_pii Lifecycle
 
-1. **Creation:** When a non-app guest registers via the browser QR flow, the Node.js backend inserts a row into `guest_pii` with `purge_after = NULL` (unknown at join time — the settlement date is not yet determined). The `id` UUID is stored in `participants.guest_pii_token`.
+1. **Creation:** `guest_pii` is used only for **pure guests** — payer manual add when `phone_e164` does not match any `users.phone_hash` (`join_method='manual_phone'`, no OTP). OTP-verified paths (web join, app registration) create `users` rows and set `participants.user_id` directly. Legacy guest rows are upgraded to `user_id` when the same phone later completes OTP registration/login.
 2. **Purge date set:** A database trigger fires when `events.status` transitions to `'settled'`. The trigger sets `purge_after = NOW() + INTERVAL '30 days'` on all `guest_pii` rows linked to participants of that event. See Section 4 for the trigger definition.
 3. **Use:** When the A3 message composer needs to send an SMS to this guest, it fetches the `guest_pii` row using the service role, decrypts `phone_encrypted` in-memory, sends via Twilio, and discards the plaintext.
 4. **Purge:** A nightly background job (QStash cron at 02:00 UTC) deletes all `guest_pii` rows where `purge_after IS NOT NULL AND purge_after < NOW()`. This satisfies GDPR data minimisation and CCPA deletion rights automatically.
@@ -264,11 +264,13 @@ CREATE TABLE events (
   -- payer_id: the user who created the event and paid the bill
   -- All RLS policies use payer_id — NOT creator_id (that field does not exist)
   --
-  -- DESIGN DECISION: The event creator (payer) is NOT automatically inserted as a participant row.
-  -- The payer_id on the events table is the authoritative reference for the creator.
-  -- The "Lock group requires >= 2 participants" check counts rows in the participants table only.
-  -- The creator is never shown a "Pay now" flow for their own event.
-  -- This means a group of 2 people (creator + 1 participant) satisfies the minimum.
+  -- DESIGN DECISION (updated 2026-06-07): The event creator (payer) IS automatically inserted
+  -- as a participant row when POST /events creates the event (join_method='qr_app', user_id=payer_id).
+  -- payer_id on events remains the authoritative ownership reference; is_organiser on API responses
+  -- is derived from participants.user_id === events.payer_id.
+  -- Lock requires >= 2 participant rows (organiser + at least one other member).
+  -- The organiser cannot be removed (DELETE returns CANNOT_REMOVE_ORGANISER).
+  -- Backfill: migration 20260610000000_backfill_creator_participants.sql for pre-change events.
   payer_id        UUID        NOT NULL REFERENCES users(id),
 
   title           TEXT        NOT NULL,
@@ -386,9 +388,10 @@ Every person in an event — both registered app users and manual/guest addition
 -- ─────────────────────────────────────────────────────────────────────────────
 -- participants
 -- One row per person per event. The central junction between events and users.
--- user_id is NULL for guests (added manually, or self-registered via QR browser
--- but not converted to a full account).
--- guest_pii_token is NULL for registered app users (their phone is on users table).
+-- user_id is NULL for guests: QR browser join (OTP-verified, no app account), or payer
+-- manual add when phone is not registered. user_id is SET for registered app users:
+-- joined via app QR/deep link, or payer manual add when phone matches users.phone_hash.
+-- guest_pii_token is NULL for registered app users (phone resolved via users / auth).
 -- A participant can be EITHER a registered user (user_id set) OR a guest
 -- (guest_pii_token set) — never both, never neither for someone who can receive SMS.
 -- Exception: name-only (cash) participants have both NULL — no SMS is ever sent.

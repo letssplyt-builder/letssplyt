@@ -8,6 +8,13 @@ module.exports = {
   userInterfaceStyle: 'automatic',
   plugins: [
     'expo-camera',
+    [
+      'expo-contacts',
+      {
+        contactsPermission:
+          'LetsSplyt uses your contacts to add members to your group.',
+      },
+    ],
     'expo-local-authentication',
     'expo-secure-store',
     [
@@ -31,9 +38,14 @@ module.exports = {
   ios: {
     bundleIdentifier: 'com.letssplyt.app',
     supportsTablet: false,
+    infoPlist: {
+      NSContactsUsageDescription:
+        'LetsSplyt uses your contacts to add members to your group.',
+    },
   },
   android: {
     package: 'com.letssplyt.app',
+    permissions: ['READ_CONTACTS'],
   },
   extra: {
     apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000',

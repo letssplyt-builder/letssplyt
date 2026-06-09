@@ -46,7 +46,43 @@ async function checkSmsOptOut(phoneHash: string): Promise<void> {
   }
 }
 
-async function hasDuplicatePhoneInEvent(eventId: string, phoneHash: string): Promise<boolean> {
+async function findRegisteredUserByPhoneHash(phoneHash: string): Promise<{ id: string } | null> {
+  const { data, error } = await supabaseAdmin
+    .from('users')
+    .select('id')
+    .eq('phone_hash', phoneHash)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (error) {
+    throw new AppError('USER_LOOKUP_FAILED', 'Could not verify account status', 500);
+  }
+
+  return data as { id: string } | null;
+}
+
+async function hasDuplicatePhoneInEvent(
+  eventId: string,
+  phoneHash: string,
+  registeredUserId?: string | null,
+): Promise<boolean> {
+  if (registeredUserId) {
+    const { data: existingMember, error: memberError } = await supabaseAdmin
+      .from('participants')
+      .select('id')
+      .eq('event_id', eventId)
+      .eq('user_id', registeredUserId)
+      .maybeSingle();
+
+    if (memberError) {
+      throw new AppError('PARTICIPANTS_LOOKUP_FAILED', 'Could not check existing participants', 500);
+    }
+
+    if (existingMember) {
+      return true;
+    }
+  }
+
   const { data: participants, error: participantsError } = await supabaseAdmin
     .from('participants')
     .select('guest_pii_token')
@@ -132,8 +168,35 @@ export async function addManualParticipant(
 
   await checkSmsOptOut(phoneHash);
 
-  if (await hasDuplicatePhoneInEvent(eventId, phoneHash)) {
+  const registeredUser = await findRegisteredUserByPhoneHash(phoneHash);
+
+  if (registeredUser?.id === eventRow.payer_id) {
     throw Errors.conflict('This phone number is already in the event', 'DUPLICATE_PHONE');
+  }
+
+  if (await hasDuplicatePhoneInEvent(eventId, phoneHash, registeredUser?.id)) {
+    throw Errors.conflict('This phone number is already in the event', 'DUPLICATE_PHONE');
+  }
+
+  if (registeredUser) {
+    const { data: participant, error: participantError } = await supabaseAdmin
+      .from('participants')
+      .insert({
+        event_id: eventId,
+        user_id: registeredUser.id,
+        guest_pii_token: null,
+        display_name: input.display_name,
+        join_method: 'manual_phone',
+        payment_status: 'pending',
+      })
+      .select('id, display_name, join_method, payment_status')
+      .single();
+
+    if (participantError || !participant) {
+      throw new AppError('PARTICIPANT_CREATE_FAILED', 'Could not add participant', 500);
+    }
+
+    return mapManualParticipant(participant);
   }
 
   const { data: guestPii, error: guestError } = await supabaseAdmin
@@ -182,7 +245,7 @@ export async function deleteParticipant(
 
   const { data: participant, error: fetchError } = await supabaseAdmin
     .from('participants')
-    .select('id, payment_status, guest_pii_token')
+    .select('id, user_id, payment_status, guest_pii_token')
     .eq('id', participantId)
     .eq('event_id', eventId)
     .maybeSingle();
@@ -193,6 +256,14 @@ export async function deleteParticipant(
 
   if (!participant) {
     throw new NotFoundError('Participant not found');
+  }
+
+  if (participant.user_id === eventRow.payer_id) {
+    throw new AppError(
+      'CANNOT_REMOVE_ORGANISER',
+      'The organiser cannot be removed from their own event',
+      400,
+    );
   }
 
   if (participant.payment_status !== 'pending') {

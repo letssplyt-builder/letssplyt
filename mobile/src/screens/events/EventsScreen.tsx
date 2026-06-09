@@ -159,6 +159,7 @@ export function EventsScreen({ navigation }: Props) {
         renderItem={({ item }) => (
           <EventCard
             event={item}
+            variant="compact"
             onPress={() => navigation.navigate('EventDetail', { eventId: item.id })}
           />
         )}

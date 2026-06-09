@@ -3,6 +3,7 @@ import { authenticate } from '../../middleware/authenticate';
 import {
   handleCreateHandle,
   handleDeleteHandle,
+  handleGetBalance,
   handleGetHandles,
   handleGetMe,
   handlePatchMe,
@@ -16,6 +17,7 @@ const router = Router();
 router.use(authenticate);
 
 router.get('/me', handleGetMe);
+router.get('/me/balance', handleGetBalance);
 router.patch('/me', handlePatchMe);
 router.post('/me/push-token', handlePostPushToken);
 router.get('/me/handles', handleGetHandles);

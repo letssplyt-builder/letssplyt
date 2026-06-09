@@ -107,7 +107,9 @@ The backend is organised into 7 logical services (modules), each with a defined 
 ---
 
 ### Event Service
-**Owns:** Event lifecycle (open → locked → calculating → sent → settled → archived), event join tokens (creation, expiry, revocation), the group lock gate, participant list management, manual participant addition, the reopen window after locking.
+**Owns:** Event lifecycle (open → locked → calculating → sent → settled → archived), event join tokens (creation, expiry, revocation), the group lock gate, participant list management, manual participant addition (registered-user linking by `phone_hash` or `guest_pii` for pure guests), the reopen window after locking.
+
+**Registration rule:** OTP verification (web join or app auth) creates or resolves a `users` row via `resolveUserAfterOtp` and upgrades legacy `guest_pii` participant rows. Pure guests exist only for payer manual add without OTP.
 
 **Does NOT own:** Receipt parsing (AI Orchestrator), split calculation (AI Orchestrator), message composition and delivery (Message Service), settlement state transitions (Settlement Service), push notifications (Notification Service).
 
@@ -151,9 +153,11 @@ The backend is organised into 7 logical services (modules), each with a defined 
 ---
 
 ### Settlement Service
-**Owns:** The participant payment state machine (all valid state transitions), settlement log writes, dispute handling, the two-party confirmation model (participant self-reports, payer confirms or disputes), nudge job scheduling via QStash.
+**Owns:** The participant payment state machine (all valid state transitions), settlement log writes, dispute handling, the two-party confirmation model (participant self-reports, payer confirms or disputes), nudge job scheduling via QStash, and **cross-event counterparty aggregation** for the Home dashboard (`GET /users/me/balance`, `GET /users/me/counterparties`, `GET /settlement/member/:userId`, `GET /settlement/guest/:phoneHash`).
 
-**Does NOT own:** Delivery of notifications (Notification Service), event-level status aggregation (Event Service computes `events.status = 'settled'` when all participants reach `settled`).
+**Does NOT own:** Delivery of notifications (Notification Service), event-level status aggregation (Event Service computes `events.status = 'settled'` when all participants reach `settled`). Settlement **actions** (confirm, nudge, self-report) are invoked from Event Detail — Home is a read-only router to counterparties and events.
+
+**Counterparty aggregation (E09-S02):** For registered members, compute per-counterparty **net** across all shared events using direct payer↔participant links only: `net = Σ(they owe you) − Σ(you owe them)`. Positive → `owe_you`; negative → `you_owe`; zero → omitted. For guests, list only pure guests (`participants.user_id IS NULL`) with outstanding amounts where the viewer is payer; phone guests aggregated by `guest_pii.phone_hash`; name-only guests one row per participant. Not a Splitwise running ledger — event-scoped obligations with net display for UX.
 
 **Calls:** `settlement.state-machine.ts` (enforces that only valid transitions compile — TypeScript's `SettlementTransition` union type makes invalid transitions a compilation error), `settlement_log` table (every state change writes an audit row with actor_id, previous status, new status, and timestamp), Notification Service (triggers push to payer on self-report, push to participant on confirmation/dispute), QStash (enqueues nudge check job 48 hours after messages sent).
 
@@ -208,7 +212,7 @@ This section traces a single complete event from the creator opening the app to 
 **Step 4 — Creator locks group → validation**
 
 - **Service:** Event Service
-- **What happens:** Creator taps "Everyone's here — Lock & split." The backend checks that at least one participant exists. It sets `events.status = 'locked'`, records `events.participant_count_at_lock` and `events.time_to_lock_seconds`, and immediately revokes the active join token (`event_join_tokens.is_active = false`, `revoked_at = NOW()`). No new participants can join via QR or URL. The "Scan receipt & split" button becomes enabled on the mobile app. The `group_locked` analytics event fires and the creator_activation funnel checkpoint (step 5) is written.
+- **What happens:** Creator taps "Everyone's here — Lock & split." The backend checks that at least **two** participant rows exist (organiser, auto-inserted on event create, plus at least one other member). It sets `events.status = 'locked'`, records `events.participant_count_at_lock` and `events.time_to_lock_seconds`, and immediately revokes the active join token (`event_join_tokens.is_active = false`, `revoked_at = NOW()`). No new participants can join via QR or URL. The "Scan receipt & split" button becomes enabled on the mobile app. The `group_locked` analytics event fires and the creator_activation funnel checkpoint (step 5) is written.
 - **Tables read:** `participants` (count check)
 - **Tables written:** `events` (status='locked', locked_at, participant_count_at_lock, time_to_lock_seconds), `event_join_tokens` (is_active=false, revoked_at), `analytics_events` (group_locked), `funnel_checkpoints`
 - **External calls:** None
@@ -352,10 +356,18 @@ letssplyt/
           hooks/
             useAuth.ts
           auth.api.ts              ← typed API calls to backend
+        home/
+          screens/
+            HomeScreen.tsx              ← net balance + Members|Guests toggle
+            MemberDetailScreen.tsx      ← registered counterparty drill-down
+            GuestDetailScreen.tsx       ← phone-guest drill-down
+            PayNowScreen.tsx            ← payer handles when viewer owes
+          home.api.ts
         events/
           screens/
+            EventsScreen.tsx            ← Created | Joined sections
+            EventDetailScreen.tsx       ← joining + settlement actions
             CreateEventScreen.tsx
-            EventDetailScreen.tsx
             QRDisplayScreen.tsx
           hooks/
             useEvent.ts
@@ -372,16 +384,7 @@ letssplyt/
             SplitEntryScreen.tsx
           receipt.api.ts
         settlement/
-          screens/
-            SettlementDetailScreen.tsx
-            ConfirmPaymentScreen.tsx
-          settlement.api.ts
-        dashboard/
-          screens/
-            HomeScreen.tsx
-            EventsScreen.tsx
-          hooks/
-            useDashboard.ts
+          settlement.api.ts             ← event-scoped owed-to-me / i-owe helpers
       shared/
         components/                ← Reusable UI (Button, Card, PhoneInput, etc.)
         hooks/

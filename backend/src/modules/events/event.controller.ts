@@ -18,6 +18,7 @@ const createEventSchema = z.object({
 const listEventsSchema = z.object({
   cursor: z.string().min(1).optional(),
   limit: z.coerce.number().int().min(1).max(50).optional(),
+  role: z.enum(['creator', 'participant', 'all']).optional(),
 });
 
 function validationError(res: Response, issues: z.ZodIssue[]): void {

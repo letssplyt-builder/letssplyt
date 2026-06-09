@@ -9,6 +9,7 @@ const EVENT_ID = 'event-11111111-1111-1111-1111-111111111111';
 const PARTICIPANT_ID = 'participant-11111111-1111-1111-1111-111111111111';
 const GUEST_PII_ID = 'guest-pii-11111111-1111-1111-1111-111111111111';
 const PHONE = '+15005550007';
+const REGISTERED_USER_ID = '00000000-0000-0000-0000-000000000002';
 
 const OPEN_EVENT = {
   id: EVENT_ID,
@@ -41,6 +42,7 @@ describe('participant.service', () => {
     it('hashes phone before storing in guest_pii', async () => {
       mockSupabase.__pushMockResultForTable('events', { data: OPEN_EVENT, error: null });
       mockSupabase.__pushMockResultForTable('sms_opt_outs', { data: null, error: null });
+      mockSupabase.__pushMockResultForTable('users', { data: null, error: null });
       mockSupabase.__pushMockResultForTable('participants', { data: [], error: null });
       mockSupabase.__pushMockResultForTable('guest_pii', { data: [], error: null });
       mockSupabase.__pushMockResultForTable('guest_pii', {
@@ -85,6 +87,65 @@ describe('participant.service', () => {
       expect(guestPayload.phone_hash).not.toBe(PHONE);
       expect(guestPayload.phone_encrypted).not.toContain(PHONE);
       expect(guestPayload.name_encrypted).toBeTruthy();
+    });
+
+    it('links registered users by user_id without creating guest_pii', async () => {
+      mockSupabase.__pushMockResultForTable('events', { data: OPEN_EVENT, error: null });
+      mockSupabase.__pushMockResultForTable('sms_opt_outs', { data: null, error: null });
+      mockSupabase.__pushMockResultForTable('users', {
+        data: { id: REGISTERED_USER_ID },
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('participants', { data: null, error: null });
+      mockSupabase.__pushMockResultForTable('participants', { data: [], error: null });
+      mockSupabase.__pushMockResultForTable('participants', {
+        data: {
+          id: PARTICIPANT_ID,
+          display_name: 'Jordan',
+          join_method: 'manual_phone',
+          payment_status: 'pending',
+        },
+        error: null,
+      });
+
+      const result = await addManualParticipant(USER_ID, EVENT_ID, {
+        display_name: 'Jordan',
+        phone_e164: PHONE,
+        join_method: 'manual_phone',
+      });
+
+      expect(result.display_name).toBe('Jordan');
+      expect(result.join_method).toBe('manual_phone');
+
+      const participantInsert = mockSupabase.from.mock.results
+        .map((r) => (r.type === 'return' ? r.value : null))
+        .flatMap((chain) => {
+          if (!chain) return [];
+          const insert = (chain as { insert: jest.Mock }).insert;
+          return insert.mock.calls;
+        })
+        .find((call) => (call[0] as { display_name?: string }).display_name === 'Jordan');
+
+      expect(participantInsert).toBeTruthy();
+      const payload = participantInsert![0] as {
+        user_id: string;
+        guest_pii_token: null;
+        join_method: string;
+      };
+      expect(payload.user_id).toBe(REGISTERED_USER_ID);
+      expect(payload.guest_pii_token).toBeNull();
+      expect(payload.join_method).toBe('manual_phone');
+
+      const guestInsert = mockSupabase.from.mock.results
+        .map((r) => (r.type === 'return' ? r.value : null))
+        .flatMap((chain) => {
+          if (!chain) return [];
+          const insert = (chain as { insert: jest.Mock }).insert;
+          return insert.mock.calls;
+        })
+        .find((call) => (call[0] as { phone_hash?: string }).phone_hash !== undefined);
+
+      expect(guestInsert).toBeUndefined();
     });
 
     it('creates name-only participant with user_id=null and no guest_pii', async () => {
@@ -156,11 +217,30 @@ describe('participant.service', () => {
   });
 
   describe('deleteParticipant', () => {
+    it('rejects delete for the organiser', async () => {
+      mockSupabase.__pushMockResultForTable('events', { data: OPEN_EVENT, error: null });
+      mockSupabase.__pushMockResultForTable('participants', {
+        data: {
+          id: PARTICIPANT_ID,
+          user_id: USER_ID,
+          payment_status: 'pending',
+          guest_pii_token: null,
+        },
+        error: null,
+      });
+
+      await expect(deleteParticipant(USER_ID, EVENT_ID, PARTICIPANT_ID)).rejects.toMatchObject({
+        code: 'CANNOT_REMOVE_ORGANISER',
+        statusCode: 400,
+      });
+    });
+
     it('rejects delete when payment_status is not pending', async () => {
       mockSupabase.__pushMockResultForTable('events', { data: OPEN_EVENT, error: null });
       mockSupabase.__pushMockResultForTable('participants', {
         data: {
           id: PARTICIPANT_ID,
+          user_id: null,
           payment_status: 'self_reported',
           guest_pii_token: null,
         },
@@ -178,6 +258,7 @@ describe('participant.service', () => {
       mockSupabase.__pushMockResultForTable('participants', {
         data: {
           id: PARTICIPANT_ID,
+          user_id: null,
           payment_status: 'pending',
           guest_pii_token: GUEST_PII_ID,
         },

@@ -74,6 +74,7 @@ describe('eventStore', () => {
 
     expect(useEventStore.getState().events).toHaveLength(1);
     expect(useEventStore.getState().events[0]?.title).toBe('Friday Dinner');
+    expect(useEventStore.getState().events[0]?.participant_count).toBe(1);
     expect(useEventStore.getState().qrPresentation?.joinUrl).toBe(mockCreateResponse.join_url);
   });
 
@@ -85,6 +86,66 @@ describe('eventStore', () => {
     expect(eventService.fetchEventById).toHaveBeenCalledWith('event-1');
     expect(useEventStore.getState().currentEvent?.participants).toHaveLength(1);
     expect(useEventStore.getState().currentEvent?.participants[0]?.display_name).toBe('Sam');
+  });
+
+  it('removeParticipant removes from local participants list', async () => {
+    jest.mocked(eventService.deleteParticipant).mockResolvedValue(undefined);
+    jest.mocked(eventService.fetchEventById).mockResolvedValue({
+      ...mockDetail,
+      participants: [],
+    });
+    useEventStore.setState({ currentEvent: mockDetail });
+
+    await useEventStore.getState().removeParticipant('event-1', 'p-1');
+
+    expect(eventService.deleteParticipant).toHaveBeenCalledWith('event-1', 'p-1');
+    expect(useEventStore.getState().currentEvent?.participants).toHaveLength(0);
+  });
+
+  it('reopenEvent updates event status to open and refreshes join_url', async () => {
+    const lockedDetail: EventDetailResponse = {
+      ...mockDetail,
+      event: { ...mockDetail.event, status: 'locked' },
+    };
+    const reopenedDetail: EventDetailResponse = {
+      ...mockDetail,
+      event: { ...mockDetail.event, status: 'open' },
+      join_token: {
+        token: 'token-2',
+        join_url: 'https://letssplyt.app/join/token-2',
+        expires_at: '2026-06-10T00:00:00.000Z',
+        is_active: true,
+      },
+    };
+
+    jest.mocked(eventService.reopenEvent).mockResolvedValue({
+      join_token: 'token-2',
+      join_url: 'https://letssplyt.app/join/token-2',
+      expires_at: '2026-06-10T00:00:00.000Z',
+    });
+    jest.mocked(eventService.fetchEventById).mockResolvedValue(reopenedDetail);
+    useEventStore.setState({
+      currentEvent: lockedDetail,
+      events: [
+        {
+          id: 'event-1',
+          title: 'Friday Dinner',
+          status: 'locked',
+          participant_count: 1,
+          total_amount: null,
+          created_at: '2026-06-08T00:00:00.000Z',
+        },
+      ],
+    });
+
+    await useEventStore.getState().reopenEvent('event-1');
+
+    expect(eventService.reopenEvent).toHaveBeenCalledWith('event-1');
+    expect(useEventStore.getState().currentEvent?.event.status).toBe('open');
+    expect(useEventStore.getState().currentEvent?.join_token?.join_url).toBe(
+      'https://letssplyt.app/join/token-2',
+    );
+    expect(useEventStore.getState().events[0]?.status).toBe('open');
   });
 
   it('lockEvent updates event status', async () => {
@@ -107,6 +168,8 @@ describe('eventStore', () => {
           participant_count: 2,
           total_amount: null,
           created_at: '2026-06-08T00:00:00.000Z',
+          role: 'creator',
+          creator_name: null,
         },
       ],
     });

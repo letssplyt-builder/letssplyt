@@ -296,8 +296,59 @@ Returns the authenticated user's net balance across all events — amounts other
 ```
 
 // Note: Positive `net_balance_minor_units` means others owe you; negative means you owe others.
-// Multi-currency: if user has balances in multiple currencies, this returns the most-used currency. For full breakdown, use GET /settlement/owed-to-me and GET /settlement/i-owe.
+// MVP: US market only — `currency` is always `"USD"`. Multi-currency deferred post-MVP.
 // Built in: E09-S02
+
+---
+
+### GET `/users/me/counterparties`
+**Auth:** `[AUTH]` | **Built in:** E09-S02
+
+Powers the Home dashboard **Members** and **Guests** toggles. All amounts in USD minor units (cents). Only **outstanding** obligations included in list totals (`payment_status` IN `pending`, `self_reported`, `disputed`; `amount_owed` NOT NULL).
+
+**Query params:**
+- `kind`: `"members"` | `"guests"` (required)
+
+**Response `200` when `kind=members`:**
+```typescript
+{
+  owe_you: Array<{
+    user_id: string;
+    display_name: string;
+    avatar_colour: string;
+    net_amount_minor_units: number;   // always > 0
+  }>;
+  you_owe: Array<{
+    user_id: string;
+    display_name: string;
+    avatar_colour: string;
+    net_amount_minor_units: number;   // always > 0 (absolute value; client shows as "you owe")
+  }>;
+}
+```
+
+**Net calculation (per registered counterparty):**
+`net = Σ(amount_owed where viewer is payer and counterparty is participant) − Σ(amount_owed where counterparty is payer and viewer is participant)`, counting only direct payer↔participant links. If `net > 0` → `owe_you`. If `net < 0` → `you_owe`. If `net === 0` → **omit** from both arrays.
+
+**Response `200` when `kind=guests`:**
+```typescript
+{
+  guests: Array<{
+    guest_key: string;              // phone_hash for phone guests; participant_id for name-only
+    kind: "phone" | "name_only";
+    display_name: string;
+    amount_minor_units: number;     // total outstanding to viewer (viewer is always payer)
+    event_id?: string;              // name_only only — for direct navigation to Event Detail
+    participant_id?: string;        // name_only only
+  }>;
+}
+```
+
+**Guest rules:**
+- Only participants with `user_id = null` on events where `events.payer_id = viewer`.
+- **Settled / confirmed** guest obligations excluded entirely.
+- **Phone guests:** aggregate rows sharing the same `guest_pii.phone_hash` into one `guest_key`.
+- **Name-only guests:** one row per `participant_id` (no aggregation); include `event_id` + `participant_id` for client deep-link.
 
 ---
 
@@ -407,6 +458,7 @@ Sets `is_active = false` (soft delete). Does not hard-delete — needed for hist
 Returns all events the user is payer of or participant in, sorted by created_at desc.
 
 // Cursor-based pagination preferred over offset — consistent results under concurrent inserts.
+// Mobile Events tab uses two sections: `role=creator` ("Events you created") and `role=participant` ("Events you joined"). Settled events collapsed client-side per section.
 
 **Query params:**
 - `status`: filter by event status (optional)
@@ -493,27 +545,35 @@ Full event detail with participants and settlement status.
     fully_settled_at: string | null;
     created_at: string;
   };
-  // participants array contains only non-creator participants.
-  // The payer/creator identity is in the top-level payer_id and payer_display_name fields.
-  // The creator is never a participant in their own event.
+  // participants array includes the organiser (payer) as the first row on new events.
+  // POST /events auto-inserts the payer as a participant (join_method='qr_app', user_id=payer_id).
+  // is_organiser is true when participants.user_id === event.payer_id.
   participants: Array<{
     id: string;
     display_name: string;
     join_method: JoinMethod;   // 'qr_app' | 'qr_web' | 'manual_phone' | 'manual_name_only'
     amount_owed: number | null;  // null until A2 (split calculation) completes; clients should show a skeleton/loading state when null
     payment_status: PaymentStatus;  // 'pending' | 'self_reported' | 'payer_marked' | 'confirmed' | 'disputed' | 'opted_out' | 'settled'
+    is_organiser?: boolean;   // true for the payer's own row; used for UI badge and remove guard
+    is_self?: boolean;        // true for the authenticated viewer's row (participant Event Detail UI)
     message_delivered_at: string | null;
     self_reported_at: string | null;
     last_nudged_at: string | null;
     nudge_count: number;
     opted_out_at: string | null;
   }>;
-  join_token: {             // only included if event status = "open"
+  join_token: {             // payer only, and only when event status = "open"
     token: string;
     join_url: string;
     expires_at: string;
     is_active: boolean;
   } | null;
+  my_items?: Array<{        // participant view; itemised splits only, when viewer's amount_owed is set
+    id: string;
+    name: string;
+    share_amount: number;
+    is_shared: boolean;
+  }>;
   summary: {
     total: number;
     collected: number;
@@ -559,8 +619,8 @@ Lock the group. Expires the active join token. No new participants can join afte
 ```
 
 **Error codes:**
-- `ALREADY_LOCKED` 409 — event already locked
-- `MIN_PARTICIPANTS` 400 — cannot lock with fewer than 2 participants
+- `ALREADY_LOCKED` 409 — event already locked (or status not `open`)
+- `MINIMUM_PARTICIPANTS_REQUIRED` 400 — cannot lock with fewer than 2 participants (organiser + ≥1 other)
 
 ---
 
@@ -629,6 +689,20 @@ interface ParticipantResponse {
 
 Manually add a participant. Payer vouches — no OTP required for join.
 
+**Registered-user linking (`join_method: "manual_phone"` only):**
+When `phone_e164` is provided, the server hashes it with `hashPhone()` and queries `users` by `phone_hash`. If a registered user exists:
+- Inserts `participants` with `user_id` set, `guest_pii_token = null`, `join_method = 'manual_phone'`
+- Uses payer-supplied `display_name` for the member list
+- Does **not** create a `users` row and does **not** send OTP
+- That user sees the event via `GET /events?role=all` (joined events) on next login
+
+If no registered user exists:
+- Inserts `guest_pii` (hashed + encrypted phone) and `participants` with `user_id = null`
+- Phone is available for outbound SMS via `resolveParticipantPhone` at message time
+- Account creation remains OTP-only (QR join / app registration)
+
+Duplicate detection checks both `participants.user_id` (registered) and `guest_pii.phone_hash` (guests) within the event.
+
 **Request body:**
 ```typescript
 {
@@ -660,7 +734,9 @@ Manually add a participant. Payer vouches — no OTP required for join.
 **Response `204`:** no body
 
 **Error codes:**
-- `GROUP_LOCKED` 409 — cannot remove after lock
+- `GROUP_IS_LOCKED` 400 — cannot remove after lock
+- `CANNOT_REMOVE_ORGANISER` 400 — payer cannot remove their own row
+- `CANNOT_REMOVE_ACTIVE_PARTICIPANT` 400 — only `payment_status='pending'` rows can be removed
 - `NOT_FOUND` 404
 
 ---
@@ -742,9 +818,11 @@ Send OTP to the number provided in the browser join form. Checks opt-out before 
 **Auth:** `[NO AUTH]` | **Rate limit:** 3 per phone per 10 minutes
 **CSRF:** Include `X-CSRF-Token` header (double-submit cookie pattern)
 
-Verify OTP and add person to event as participant. Creates a guest participant record (no user account).
+Verify OTP, **create or resolve a `users` account** (same as app registration), and add the person to the event as a participant with `user_id` set. Legacy guest participant rows for the same phone are upgraded to `user_id` on verify.
 
-**Note:** Before creating participant, checks if `phone_hash` exists in `users` table. If yes, returns 409 with code `APP_USER_REDIRECT` and `deep_link_url` in body — the web page shows "You have LetsSplyt — open the app to join".
+**Display name persistence:** The browser `display_name` (carried from the join form through a hidden field on the OTP page) is written to `users.display_name` on registration via `resolveUserAfterOtp`. If a profile already exists with a placeholder name (`LetsSplyt User`) or empty name, the web-entered name replaces it. The same name is stored on `participants.display_name` for new inserts; when upgrading a pure-guest row, `participants.display_name` is updated to the web-entered name. Existing real names are not overwritten.
+
+**Idempotent join:** If the phone is already a registered user linked to this event, returns success without creating a duplicate. Pure-guest rows (payer manual add) still receive OTP on re-submit so the account can be created and linked.
 
 **Request body:**
 ```typescript
@@ -774,8 +852,7 @@ Verify OTP and add person to event as participant. Creates a guest participant r
 - `TOKEN_EXPIRED` 410 — join window closed
 - `TOKEN_REVOKED` 410 — group locked
 - `DUPLICATE_PHONE` 409 — already in this event
-- `NAME_REQUIRED` 400 — new guest but display_name not provided
-- `APP_USER_REDIRECT` 409 — phone belongs to an existing LetsSplyt user; body includes `deep_link_url`
+- `NAME_REQUIRED` 400 — new user but display_name not provided
 - `INVALID_OTP` 400 — wrong OTP code
 - `EVENT_LOCKED` 409 — event is locked, no longer accepting new participants
 
@@ -1163,27 +1240,77 @@ Returns all amounts the authenticated user owes to others.
 
 ---
 
-### GET `/settlement/person/:userId`
-**Auth:** `[AUTH]`
+### GET `/settlement/member/:userId`
+**Auth:** `[AUTH]` | **Built in:** E09-S02
 
-Cross-event settlement history between authenticated user and `:userId`.
+Member detail screen (registered counterparty). Only events with a **direct payer↔participant** relationship between viewer and `:userId`.
 
 **Response `200`:**
-```json
+```typescript
 {
-  "data": [
-    {
-      "event_id": "uuid",
-      "event_title": "string",
-      "event_date": "ISO8601",
-      "amount_minor_units": 1200,
-      "currency": "USD",
-      "direction": "owed_to_me | i_owe",
-      "payment_status": "..."
-    }
-  ]
+  counterparty: {
+    user_id: string;
+    display_name: string;
+    avatar_colour: string;
+  };
+  net_amount_minor_units: number;   // signed: positive = they owe you net
+  currency: "USD";
+  outstanding: Array<{
+    event_id: string;
+    event_title: string;
+    event_date: string | null;
+    amount_minor_units: number;
+    direction: "owed_to_me" | "i_owe";
+    payment_status: PaymentStatus;
+    participant_id: string;         // row to act on in Event Detail / settlement APIs
+  }>;
+  history: Array<{
+    event_id: string;
+    event_title: string;
+    event_date: string | null;
+    amount_minor_units: number;
+    direction: "owed_to_me" | "i_owe";
+    payment_status: PaymentStatus;    // confirmed, settled, or zero outstanding
+    participant_id: string;
+  }>;
 }
 ```
+
+**Client:** Render `outstanding` expanded; `history` behind "See more events" (collapsed by default).
+
+**Alias:** `GET /settlement/person/:userId` MAY redirect or duplicate this shape for backward compatibility.
+
+---
+
+### GET `/settlement/guest/:phoneHash`
+**Auth:** `[AUTH]` | **Built in:** E09-S02
+
+Guest detail screen for **phone guests** aggregated by `guest_pii.phone_hash`. Viewer must be payer on all returned events.
+
+**Response `200`:**
+```typescript
+{
+  display_name: string;             // from most recent participant row
+  amount_minor_units: number;       // total outstanding
+  currency: "USD";
+  outstanding: Array<{
+    event_id: string;
+    event_title: string;
+    amount_minor_units: number;
+    payment_status: PaymentStatus;
+    participant_id: string;
+  }>;
+  history: Array<{
+    event_id: string;
+    event_title: string;
+    amount_minor_units: number;
+    payment_status: PaymentStatus;
+    participant_id: string;
+  }>;
+}
+```
+
+**Note:** Name-only guests do not call this endpoint — client navigates directly to `GET /events/:id` using `event_id` from `GET /users/me/counterparties?kind=guests`.
 
 ---
 
@@ -1437,6 +1564,7 @@ Android Digital Asset Links JSON. Required for App Links (Android). The backend 
 | PATCH | /users/me | AUTH | — |
 | POST | /users/me/push-token | AUTH | — |
 | GET | /users/me/balance | AUTH | — |
+| GET | /users/me/counterparties | AUTH | — |
 | GET | /users/me/data | AUTH | 1/user/24hr |
 | DELETE | /users/me | AUTH | — |
 | GET | /users/me/handles | AUTH | — |
@@ -1468,7 +1596,9 @@ Android Digital Asset Links JSON. Required for App Links (Android). The backend 
 | POST | /events/:id/messages/nudge/:pid | AUTH PAYER | 1/participant/48hr |
 | GET | /settlement/owed-to-me | AUTH | — |
 | GET | /settlement/i-owe | AUTH | — |
-| GET | /settlement/person/:userId | AUTH | — |
+| GET | /settlement/member/:userId | AUTH | — |
+| GET | /settlement/guest/:phoneHash | AUTH | — |
+| GET | /settlement/person/:userId | AUTH | — (alias of member detail) |
 | POST | /events/:id/settlement/:pid/self-report | AUTH PARTICIPANT | — |
 | POST | /events/:id/settlement/:pid/confirm | AUTH PAYER | — |
 | POST | /events/:id/settlement/:pid/dispute | AUTH PAYER | — |

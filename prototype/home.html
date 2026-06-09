@@ -101,11 +101,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sa
 <aside id="sidebar">
   <div id="sb-logo">
     <div class="mark"><div class="gem">✦</div><div class="name">LetsSplyt</div></div>
-    <div class="sub">Home · P29–P31</div>
+    <div class="sub">Home · P28–P34</div>
   </div>
   <div id="sb-screens">
     <div class="sg-hdr">Dashboard</div>
-    <div class="sc active" data-id="tab_home" onclick="switchTab('home')"><span class="sc-badge">①</span><span class="sc-name">Dashboard tab</span></div>
+    <div class="sc active" data-id="tab_home" onclick="switchTab('home')"><span class="sc-badge">①</span><span class="sc-name">Home tab — Members | Guests</span></div>
 
     <div class="sg-hdr" style="margin-top:4px;">Events</div>
     <div class="sc" data-id="tab_events" onclick="switchTab('events')"><span class="sc-badge">②</span><span class="sc-name">Events tab</span></div>
@@ -117,11 +117,13 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sa
     <div class="sc" data-id="event_detail" onclick="switchTab('events');setTimeout(showEventDetail,120)"><span class="sc-badge">↳</span><span class="sc-name">Event detail — settlement</span></div>
     <div class="sc" data-id="confirm_payment" onclick="switchTab('events');setTimeout(()=>{showEventDetail();setTimeout(()=>showConfirmPayment(2),120)},120)"><span class="sc-badge">↳</span><span class="sc-name">Confirm payment</span></div>
 
-    <div class="sg-hdr" style="margin-top:4px;">Members</div>
-    <div class="sc" data-id="tab_members" onclick="switchTab('members')"><span class="sc-badge">③</span><span class="sc-name">Members tab</span></div>
+    <div class="sg-hdr" style="margin-top:4px;">Home drill-down</div>
+    <div class="sc" data-id="home_guests" onclick="switchTab('home');setHomeToggle('guests')"><span class="sc-badge">↳</span><span class="sc-name">Home — Guests toggle</span></div>
+    <div class="sc" data-id="member_detail" onclick="showMemberDetail()"><span class="sc-badge">↳</span><span class="sc-name">Member detail (P32)</span></div>
+    <div class="sc" data-id="guest_detail" onclick="showGuestDetail()"><span class="sc-badge">↳</span><span class="sc-name">Guest detail (P33)</span></div>
 
-    <div class="sg-hdr" style="margin-top:4px;">Settings</div>
-    <div class="sc" data-id="tab_settings" onclick="switchTab('settings')"><span class="sc-badge">④</span><span class="sc-name">Settings tab</span></div>
+    <div class="sg-hdr" style="margin-top:4px;">Profile</div>
+    <div class="sc" data-id="tab_settings" onclick="switchTab('settings')"><span class="sc-badge">③</span><span class="sc-name">Profile tab</span></div>
   </div>
 </aside>
 
@@ -146,20 +148,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sa
         <div id="tab-bar">
           <div class="tab active" id="tb-home" onclick="switchTab('home')">
             <div class="tab-icon">⬡</div>
-            <div class="tab-label">Dashboard</div>
+            <div class="tab-label">Home</div>
           </div>
           <div class="tab" id="tb-events" onclick="switchTab('events')">
             <div class="tab-icon">◫</div>
             <div class="tab-label">Events</div>
             <div class="tab-dot"></div>
           </div>
-          <div class="tab" id="tb-members" onclick="switchTab('members')">
-            <div class="tab-icon">◎</div>
-            <div class="tab-label">Members</div>
-          </div>
           <div class="tab" id="tb-settings" onclick="switchTab('settings')">
             <div class="tab-icon">◈</div>
-            <div class="tab-label">Settings</div>
+            <div class="tab-label">Profile</div>
           </div>
         </div>
 
@@ -177,9 +175,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',sa
       <div class="ic-label">Current Tab</div>
       <div id="ic-badge" class="ic-badge">①</div>
       <div id="ic-name" class="ic-name">Dashboard</div>
-      <div id="ic-desc" class="ic-desc">Net balance at a glance — owed to you vs. you owe. Urgent items surface automatically.</div>
+      <div id="ic-desc" class="ic-desc">Net balance hero + Members | Guests toggle. Tap a counterparty to drill down — settlement actions live in Event Detail.</div>
     </div>
-    <div id="tip"><p>✦ One number that matters: your net position. Green = you're ahead. Red = you owe more than you're owed. Everything else is detail.</p></div>
+    <div id="tip"><p>✦ Home is a router — name + net amount only. Confirm, Nudge, and Pay actions stay in Event Detail. No Settlement tab.</p></div>
   </div>
 </div>
 
@@ -210,6 +208,10 @@ const JOINING_MEMBERS=[
   {name:'Sara',  l:'S',  bg:'#6366F1'},
   {name:'Mike',  l:'M',  bg:'#10B981'},
   {name:'Jamie', l:'J',  bg:'#A78BFA'},
+];
+const GUESTS=[
+  {l:'T',name:'Taylor (guest)', bg:'#F59E0B',amt:42.00,kind:'phone'},
+  {l:'N',name:'Noah',         bg:'#3B82F6',amt:18.50,kind:'name_only',event:'Rooftop drinks'},
 ];
 const MEMBERS=[
   {l:'R',name:'Raj',   bg:'#EF4444',netOwed:66.64, events:2,lastEvent:'Dinner at Nobu',   status:'overdue'},
@@ -256,13 +258,19 @@ let confirmMemberIdx = 2; // Jamie by default
    TAB SWITCHING
 ═══════════════════════════════════════ */
 const TAB_META={
-  home:    {badge:'①',name:'Dashboard',desc:'Net balance at a glance — owed to you vs. you owe. Urgent items surface automatically.',tip:'✦ One number that matters: your net position. Green = you\'re ahead. Everything else is detail.'},
-  events:  {badge:'②',name:'Events',desc:'All events — ones you created and ones you were added to. Status, totals, and outstanding at a glance.',tip:'✦ Every event you\'ve touched, in one place. Yours are labelled, others show who organised.'},
-  members: {badge:'③',name:'Members',desc:'Cross-event view of every person — how much they owe you in aggregate, or you owe them.',tip:'✦ Members tab replaces per-event drilling for recurring groups. See Raj\'s total across all events at once.'},
-  settings:{badge:'④',name:'Settings',desc:'Profile, payment handles, notifications, and account management.',tip:'✦ Delete account is deliberately buried at the bottom — behind two confirmation steps.'},
+  home:    {badge:'①',name:'Home',desc:'Net balance hero + Members | Guests toggle. Counterparty rows show name and net amount only.',tip:'✦ Home routes to Member/Guest detail or Event Detail. Settlement actions live in Event Detail only.'},
+  events:  {badge:'②',name:'Events',desc:'Events you created and events you joined. Settled events collapsed per section.',tip:'✦ Two sections — not Active|Settled. Tap a card to open Event Detail (payer or participant view).'},
+  settings:{badge:'③',name:'Profile',desc:'Profile, payment handles, notifications, and account management.',tip:'✦ Delete account is deliberately buried at the bottom — behind two confirmation steps.'},
 };
 
 let currentTab='home';
+let homeToggle='members'; // 'members' | 'guests'
+
+function setHomeToggle(t){
+  homeToggle=t;
+  if(currentTab==='home') switchTab('home');
+}
+
 function switchTab(tab){
   currentTab=tab;
   const c=document.getElementById('app-content');
@@ -272,9 +280,9 @@ function switchTab(tab){
     c.style.opacity='1';c.style.transition='opacity .16s';c.scrollTop=0;
   },80);
   // Update tab bar
-  ['home','events','members','settings'].forEach(t=>{
+  ['home','events','settings'].forEach(t=>{
     const el=document.getElementById('tb-'+t);
-    el.classList.toggle('active',t===tab);
+    if(el) el.classList.toggle('active',t===tab);
   });
   // Update sidebar
   document.querySelectorAll('.sc').forEach(e=>e.classList.toggle('active',e.dataset.id==='tab_'+tab));
@@ -977,127 +985,63 @@ TABS.home=()=>{
     </div>
   </div>
 
-  ${isMember ? `
-  <!-- ══ MEMBER: YOU OWE (primary section) ══ -->
-  <div style="padding:22px 18px 0;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-      <div style="font-size:14px;font-weight:700;color:var(--t1);">You owe</div>
-      <div style="font-size:11px;color:var(--red);font-weight:600;">2 pending</div>
-    </div>
-    ${MEMBER_OWE.map((ev,i)=>`
-    <div style="background:var(--white);border-radius:18px;border:1.5px solid #FECACA;
-      padding:14px 16px;margin-bottom:8px;animation:fadeUp .25s ease ${i*.06}s both;">
-      <div style="display:flex;align-items:center;gap:11px;">
-        <div class="av" style="background:${ev.og_bg};">${ev.og}</div>
-        <div style="flex:1;">
-          <div style="font-size:14px;font-weight:700;color:var(--t1);">${ev.event}</div>
-          <div style="font-size:11px;color:var(--t3);margin-top:1px;">${ev.organiser} · ${ev.date}</div>
-        </div>
-        <div style="text-align:right;">
-          <div style="font-size:16px;font-weight:800;color:var(--red);">$${ev.amt.toFixed(2)}</div>
-          <button style="font-size:10px;font-weight:700;color:var(--indigo);background:var(--indigo-lt);
-            border:none;padding:3px 8px;border-radius:6px;cursor:pointer;font-family:inherit;margin-top:3px;">Pay →</button>
-        </div>
+  <!-- Members | Guests toggle -->
+  <div style="margin:18px 18px 0;display:flex;background:var(--white);border-radius:14px;padding:4px;border:1px solid var(--border);">
+    ${[['members','Members'],['guests','Guests']].map(([k,l])=>`
+    <div onclick="setHomeToggle('${k}')" style="flex:1;text-align:center;padding:9px 0;border-radius:11px;cursor:pointer;
+      font-size:13px;font-weight:700;
+      background:${homeToggle===k?'var(--indigo)':'transparent'};
+      color:${homeToggle===k?'#fff':'var(--t2)'};">${l}</div>`).join('')}
+  </div>
+
+  ${homeToggle==='members' ? `
+  <!-- People who owe you -->
+  <div style="padding:20px 18px 0;">
+    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">People who owe you</div>
+    ${MEMBERS.filter(m=>m.netOwed>0).map((m,i)=>`
+    <div onclick="showMemberDetail('${m.name}')" style="background:var(--white);border-radius:18px;border:1px solid var(--border);
+      padding:14px 16px;margin-bottom:8px;cursor:pointer;animation:fadeUp .25s ease ${i*.05}s both;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="av" style="background:${m.bg};">${m.l}</div>
+        <div style="flex:1;font-size:14px;font-weight:700;color:var(--t1);">${m.name}</div>
+        <div style="font-size:16px;font-weight:800;color:var(--green);">$${m.netOwed.toFixed(2)}</div>
+        <div style="font-size:16px;color:var(--t3);">›</div>
       </div>
     </div>`).join('')}
   </div>
-
-  <!-- ══ MEMBER: OWED TO YOU (secondary, compact) ══ -->
-  <div style="padding:20px 18px 24px;">
-    <div style="font-size:14px;font-weight:700;color:var(--t1);margin-bottom:12px;">Owed to you</div>
-    <div style="background:var(--white);border-radius:18px;border:1px solid var(--border);padding:14px 16px;">
-      <div style="display:flex;align-items:center;gap:11px;">
-        <div class="av" style="background:#8B5CF6;">P</div>
-        <div style="flex:1;">
-          <div style="font-size:14px;font-weight:600;color:var(--t1);">Priya S.</div>
-          <div style="font-size:11px;color:var(--t3);margin-top:1px;">Team lunch · May 21</div>
-        </div>
-        <div style="font-size:15px;font-weight:800;color:var(--green);">$12.50</div>
+  <!-- People you owe -->
+  <div style="padding:16px 18px 24px;">
+    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">People you owe</div>
+    ${MEMBERS.filter(m=>m.netOwed<0).map((m,i)=>`
+    <div onclick="showMemberDetail('${m.name}')" style="background:var(--white);border-radius:18px;border:1px solid var(--border);
+      padding:14px 16px;margin-bottom:8px;cursor:pointer;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="av" style="background:${m.bg};">${m.l}</div>
+        <div style="flex:1;font-size:14px;font-weight:700;color:var(--t1);">${m.name}</div>
+        <div style="font-size:16px;font-weight:800;color:var(--red);">$${Math.abs(m.netOwed).toFixed(2)}</div>
+        <div style="font-size:16px;color:var(--t3);">›</div>
       </div>
-    </div>
+    </div>`).join('')}
   </div>
   ` : `
-  <!-- ══ CREATOR: NEEDS ATTENTION ══ -->
-  <div style="padding:22px 18px 0;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-      <div style="font-size:14px;font-weight:700;color:var(--t1);">Needs attention</div>
-      <div style="font-size:11px;color:var(--indigo);font-weight:600;">2 urgent</div>
-    </div>
-    <div style="background:var(--white);border-radius:18px;border:1.5px solid #FECACA;
-      padding:14px 16px;margin-bottom:8px;animation:fadeUp .25s ease both;">
-      <div style="display:flex;align-items:center;gap:11px;">
-        <div class="av" style="background:#EF4444;">R</div>
+  <!-- Guests who owe you -->
+  <div style="padding:20px 18px 24px;">
+    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Guests who owe you</div>
+    ${GUESTS.map((g,i)=>`
+    <div onclick="${g.kind==='phone'?'showGuestDetail()':'switchTab(\\'events\\');setTimeout(showEventDetail,120)'}" 
+      style="background:var(--white);border-radius:18px;border:1px solid var(--border);
+      padding:14px 16px;margin-bottom:8px;cursor:pointer;">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="av" style="background:${g.bg};">${g.l}</div>
         <div style="flex:1;">
-          <div style="font-size:14px;font-weight:700;color:var(--t1);">Raj · $66.64</div>
-          <div style="font-size:11px;color:var(--red);margin-top:1px;">🔴 Overdue 3 days · Dinner at Nobu</div>
+          <div style="font-size:14px;font-weight:700;color:var(--t1);">${g.name}</div>
+          ${g.kind==='name_only'?`<div style="font-size:10px;color:var(--t3);">${g.event} · tap → Event Detail</div>`:''}
         </div>
-        <button style="padding:7px 12px;border-radius:10px;border:none;background:var(--red-lt);
-          color:var(--red);font-size:11px;font-weight:700;cursor:pointer;font-family:inherit;">Nudge</button>
-      </div>
-    </div>
-    <div style="background:var(--white);border-radius:18px;border:1.5px solid #FDE68A;
-      padding:14px 16px;margin-bottom:8px;animation:fadeUp .25s ease .05s both;">
-      <div style="display:flex;align-items:center;gap:11px;">
-        <div class="av" style="background:#A78BFA;">J</div>
-        <div style="flex:1;">
-          <div style="font-size:14px;font-weight:700;color:var(--t1);">Jamie · $71.80</div>
-          <div style="font-size:11px;color:var(--amber);margin-top:1px;">⚠️ Payment disputed · waiting</div>
-        </div>
-        <div class="pill pill-a">Disputed</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ══ CREATOR: YOU OWE ══ -->
-  <div style="padding:20px 18px 0;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-      <div style="font-size:14px;font-weight:700;color:var(--t1);">You owe</div>
-      <div style="font-size:11px;color:var(--t3);">Pay now ↗</div>
-    </div>
-    ${I_OWE.map((ev,i)=>`
-    <div style="background:var(--white);border-radius:18px;border:1.5px solid var(--border);
-      padding:14px 16px;margin-bottom:8px;animation:fadeUp .25s ease ${.1+i*.06}s both;">
-      <div style="display:flex;align-items:center;gap:11px;">
-        <div class="av" style="background:${ev.og_bg};">${ev.og}</div>
-        <div style="flex:1;">
-          <div style="font-size:14px;font-weight:700;color:var(--t1);">${ev.event}</div>
-          <div style="font-size:11px;color:var(--t3);margin-top:1px;">${ev.organiser} · ${ev.date}</div>
-        </div>
-        <div style="text-align:right;">
-          <div style="font-size:16px;font-weight:800;color:var(--red);">$${ev.amt.toFixed(2)}</div>
-          <button style="font-size:10px;font-weight:700;color:var(--indigo);background:var(--indigo-lt);
-            border:none;padding:3px 8px;border-radius:6px;cursor:pointer;font-family:inherit;margin-top:3px;">Pay →</button>
-        </div>
+        <div style="font-size:16px;font-weight:800;color:var(--green);">$${g.amt.toFixed(2)}</div>
+        <div style="font-size:16px;color:var(--t3);">›</div>
       </div>
     </div>`).join('')}
-  </div>
-
-  <!-- ══ CREATOR: OWED TO ME — compact ══ -->
-  <div style="padding:20px 18px 24px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-      <div style="font-size:14px;font-weight:700;color:var(--t1);">Owed to you</div>
-      <div style="font-size:11px;color:var(--indigo);font-weight:600;">4 pending</div>
-    </div>
-    <div style="background:var(--white);border-radius:20px;border:1px solid var(--border);padding:6px 16px;
-      box-shadow:0 2px 12px rgba(99,102,241,.06);">
-      ${OWED_TO_ME.map((p,i)=>{
-        const c={overdue:'var(--red)',disputed:'var(--amber)',pending:'var(--t1)'}[p.status];
-        const bg={overdue:'var(--red-lt)',disputed:'var(--amber-lt)',pending:'transparent'}[p.status];
-        const tag={overdue:'🔴',disputed:'⚠️',pending:''}[p.status];
-        return `
-        <div style="display:flex;align-items:center;gap:11px;padding:11px 0;
-          border-bottom:${i<OWED_TO_ME.length-1?'1px solid var(--border)':'none'};
-          background:${bg};margin:0 -16px;padding-left:16px;padding-right:16px;
-          border-radius:${i===0?'14px 14px 0 0':i===OWED_TO_ME.length-1?'0 0 14px 14px':'0'};">
-          <div class="av" style="background:${p.bg};width:32px;height:32px;border-radius:16px;font-size:12px;">${p.l}</div>
-          <div style="flex:1;">
-            <div style="font-size:13px;font-weight:600;color:var(--t1);">${p.name}</div>
-            <div style="font-size:10px;color:var(--t3);">${p.event}</div>
-          </div>
-          <div style="font-size:14px;font-weight:800;color:${c};">${tag} $${p.amt.toFixed(2)}</div>
-        </div>`;
-      }).join('')}
-    </div>
+    <div style="font-size:11px;color:var(--t3);text-align:center;margin-top:8px;">Settled guests are hidden</div>
   </div>
   `}
 </div>`;};
@@ -1115,24 +1059,10 @@ TABS.events=()=>`
       box-shadow:0 3px 12px rgba(99,102,241,.3);" onclick="createEvent()">+</button>
   </div>
 
-  <!-- Summary strip -->
-  <div style="padding:0 18px 16px;display:flex;gap:8px;">
-    ${[
-      {label:'Active',val:EVENTS.filter(e=>e.status!=='settled').length,c:'var(--indigo)'},
-      {label:'Settled',val:EVENTS.filter(e=>e.status==='settled').length,c:'var(--green)'},
-      {label:'Outstanding',val:'$200.64',c:'var(--amber)'},
-    ].map(s=>`
-    <div style="flex:1;background:var(--white);border-radius:14px;padding:10px 12px;
-      border:1px solid var(--border);box-shadow:0 1px 6px rgba(99,102,241,.04);">
-      <div style="font-size:18px;font-weight:800;color:${s.c};">${s.val}</div>
-      <div style="font-size:10px;color:var(--t3);margin-top:1px;">${s.label}</div>
-    </div>`).join('')}
-  </div>
-
   <div style="padding:0 18px 24px;">
-    <!-- Active first -->
-    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Active</div>
-    ${EVENTS.filter(e=>e.status!=='settled').map((ev,i)=>{
+    <!-- Events you created -->
+    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Events you created</div>
+    ${EVENTS.filter(e=>e.mine&&e.status!=='settled').map((ev,i)=>{
       if(ev.status==='joining') return `
       <div onclick="showEventDetailJoining()" style="background:var(--white);border-radius:20px;
         border:1.5px solid #A7F3D0;padding:16px;margin-bottom:10px;
@@ -1188,22 +1118,32 @@ TABS.events=()=>`
         </div>
       </div>`;
     }).join('')}
+    <div style="font-size:12px;font-weight:700;color:var(--indigo);padding:10px 0;cursor:pointer;margin-bottom:8px;">
+      Settled (${EVENTS.filter(e=>e.mine&&e.status==='settled').length}) ▾
+    </div>
 
-    <!-- Settled -->
-    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 10px;">Settled</div>
-    ${EVENTS.filter(e=>e.status==='settled').map((ev,i)=>`
-    <div style="background:var(--white);border-radius:18px;border:1px solid var(--border);
-      padding:14px 16px;margin-bottom:8px;opacity:.7;animation:fadeUp .25s ease ${i*.06}s both;">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="width:36px;height:36px;border-radius:12px;background:var(--green-lt);
-          display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;">✓</div>
-        <div style="flex:1;">
-          <div style="font-size:14px;font-weight:600;color:var(--t2);">${ev.name}</div>
-          <div style="font-size:11px;color:var(--t3);">${ev.date} · ${ev.people} people</div>
+    <!-- Events you joined -->
+    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin:16px 0 10px;">Events you joined</div>
+    ${EVENTS.filter(e=>!e.mine&&e.status!=='settled').map((ev,i)=>{
+      const dot={active:'var(--indigo)',partial:'var(--amber)'}[ev.status]||'var(--indigo)';
+      return `
+      <div onclick="showEventDetail()" style="background:var(--white);border-radius:20px;border:1.5px solid var(--border);
+        padding:16px;margin-bottom:10px;cursor:pointer;">
+        <div style="display:flex;align-items:flex-start;gap:10px;">
+          <div style="width:40px;height:40px;border-radius:14px;background:${dot}18;display:flex;align-items:center;justify-content:center;">
+            <div style="width:10px;height:10px;border-radius:5px;background:${dot};"></div>
+          </div>
+          <div style="flex:1;">
+            <div style="font-size:15px;font-weight:700;color:var(--t1);">${ev.name}</div>
+            <div style="font-size:11px;color:var(--t3);">${ev.date} · by ${ev.host}</div>
+          </div>
+          <div style="font-size:16px;font-weight:800;color:var(--red);">$${ev.outstanding.toFixed(2)}</div>
         </div>
-        <div style="font-size:14px;font-weight:700;color:var(--t3);">$${ev.total.toFixed(2)}</div>
-      </div>
-    </div>`).join('')}
+      </div>`;
+    }).join('')}
+    <div style="font-size:12px;font-weight:700;color:var(--indigo);padding:10px 0;cursor:pointer;">
+      Settled (0) ▾
+    </div>
   </div>
 </div>`;
 
@@ -1382,13 +1322,69 @@ s.textContent=`
 document.head.appendChild(s);
 switchTab('home');
 
-// ── OPEN MEMBER DETAIL ──
+// ── MEMBER / GUEST DETAIL (HomeStack drill-down) ──
+function showMemberDetail(name){
+  const m=MEMBERS.find(x=>x.name===name)||MEMBERS[0];
+  const c=document.getElementById('app-content');
+  c.style.opacity='0';
+  setTimeout(()=>{
+    c.innerHTML=`
+<div style="min-height:100%;background:var(--bg);">
+  <div style="padding:56px 18px 16px;display:flex;align-items:center;gap:12px;">
+    <div onclick="switchTab('home')" style="font-size:22px;cursor:pointer;color:var(--t3);">‹</div>
+    <div class="av" style="background:${m.bg};width:44px;height:44px;border-radius:22px;font-size:16px;">${m.l}</div>
+    <div style="flex:1;">
+      <div style="font-size:18px;font-weight:800;color:var(--t1);">${m.name}</div>
+      <div style="font-size:13px;font-weight:700;color:${m.netOwed>=0?'var(--green)':'var(--red)'};">
+        ${m.netOwed>=0?'Owes you':'You owe'} $${Math.abs(m.netOwed).toFixed(2)} net
+      </div>
+    </div>
+  </div>
+  <div style="padding:0 18px 24px;">
+    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Outstanding</div>
+    <div onclick="switchTab('events');setTimeout(showEventDetail,120)" style="background:var(--white);border-radius:18px;border:1px solid var(--border);padding:14px 16px;margin-bottom:8px;cursor:pointer;">
+      <div style="font-size:14px;font-weight:700;color:var(--t1);">${m.lastEvent}</div>
+      <div style="font-size:12px;color:var(--t3);margin-top:4px;">Tap → Event Detail (settlement actions there)</div>
+    </div>
+    <button style="width:100%;padding:12px;border-radius:12px;border:1.5px solid var(--border);background:var(--white);
+      font-size:13px;font-weight:700;color:var(--indigo);cursor:pointer;font-family:inherit;">See more events</button>
+  </div>
+</div>`;
+    c.style.opacity='1';c.scrollTop=0;
+  },80);
+  document.getElementById('crumb').textContent='member_detail';
+}
+
+function showGuestDetail(){
+  const g=GUESTS.find(x=>x.kind==='phone')||GUESTS[0];
+  const c=document.getElementById('app-content');
+  c.style.opacity='0';
+  setTimeout(()=>{
+    c.innerHTML=`
+<div style="min-height:100%;background:var(--bg);">
+  <div style="padding:56px 18px 16px;display:flex;align-items:center;gap:12px;">
+    <div onclick="switchTab('home');setHomeToggle('guests')" style="font-size:22px;cursor:pointer;color:var(--t3);">‹</div>
+    <div class="av" style="background:${g.bg};">${g.l}</div>
+    <div style="flex:1;">
+      <div style="font-size:18px;font-weight:800;color:var(--t1);">${g.name}</div>
+      <div style="font-size:13px;font-weight:700;color:var(--green);">Owes you $${g.amt.toFixed(2)}</div>
+    </div>
+  </div>
+  <div style="padding:0 18px 24px;">
+    <div style="font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Outstanding events</div>
+    <div onclick="switchTab('events');setTimeout(showEventDetail,120)" style="background:var(--white);border-radius:18px;border:1px solid var(--border);padding:14px 16px;cursor:pointer;">
+      <div style="font-size:14px;font-weight:700;color:var(--t1);">Dinner at Nobu</div>
+      <div style="font-size:14px;font-weight:800;color:var(--green);margin-top:4px;">$${g.amt.toFixed(2)}</div>
+    </div>
+  </div>
+</div>`;
+    c.style.opacity='1';c.scrollTop=0;
+  },80);
+  document.getElementById('crumb').textContent='guest_detail';
+}
+
 function openMemberDetail(name){
-  if(window.parent !== window){
-    window.parent.postMessage({loadFile:'ledger.html', nav:'owed_person', memberName:name}, '*');
-  } else {
-    location.href = 'ledger.html';
-  }
+  showMemberDetail(name);
 }
 
 // ── CREATE EVENT ──

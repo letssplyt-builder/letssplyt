@@ -11,6 +11,7 @@ import {
   sendOtp,
   verifyOtpAndCreateSession,
 } from '../../../modules/auth/auth.service';
+import { upgradeGuestParticipantsToUser } from '../../../modules/participants/participant-link.service';
 
 jest.mock('../../../infrastructure/supabase-auth', () => ({
   createAdminSession: jest.fn(() =>
@@ -21,6 +22,10 @@ jest.mock('../../../infrastructure/supabase-auth', () => ({
     }),
   ),
   internalEmailForUserId: (userId: string) => `${userId}@letssplyt.internal`,
+}));
+
+jest.mock('../../../modules/participants/participant-link.service', () => ({
+  upgradeGuestParticipantsToUser: jest.fn(() => Promise.resolve()),
 }));
 
 const PHONE = '+15005550006';
@@ -74,6 +79,33 @@ describe('auth.service OTP verify regressions', () => {
         userDisplayName: 'Alex',
         avatarColour: '#4F46E5',
       });
+      expect(upgradeGuestParticipantsToUser).toHaveBeenCalledWith('hash-1', 'user-public-1');
+    });
+
+    it('applies web join display_name when public profile still has placeholder name', async () => {
+      mockSupabase.__pushMockResultForTable('users', {
+        data: {
+          id: 'user-public-1',
+          display_name: 'LetsSplyt User',
+          avatar_colour: '#4F46E5',
+        },
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('users', {
+        data: { display_name: 'Sam Guest' },
+        error: null,
+      });
+
+      const resolved = await resolveUserAfterOtp(
+        PHONE,
+        'hash-1',
+        'enc-1',
+        'Sam Guest',
+        'register',
+      );
+
+      expect(resolved.userDisplayName).toBe('Sam Guest');
+      expect(mockSupabase.from).toHaveBeenCalledWith('users');
     });
 
     it('logs in on login flow when only auth.users exists (no public profile)', async () => {
