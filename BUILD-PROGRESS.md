@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
 **Last updated:** 2026-06-09
-**Current story:** E06-S02 — In-App Join + Deep Link Handler (Universal Links, AppJoinScreen)
+**Current story:** E07-S01 — Receipt Image Upload (mobile compress → Supabase Storage signed URL)
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -46,8 +46,8 @@
 
 ### Epic 6: Join Flows (3 stories)
 - [x] E06-S01 — Web Join Page (server-rendered HTML — works without JavaScript) (2026-06-08)
-- [ ] E06-S02 — In-App Join + Deep Link Handler (Universal Links, AppJoinScreen)
-- [ ] E06-S03 — Deep Link Infrastructure (AASA, App Links, Expo Config)
+- [x] E06-S02 — In-App Join + Deep Link Handler (Universal Links, AppJoinScreen) (2026-06-09)
+- [x] E06-S03 — Deep Link Infrastructure (AASA, App Links, Expo Config) (2026-06-09)
 
 ### Epic 7: AI Receipt Pipeline
 - [ ] E07-S01 — Receipt Image Upload (mobile compress → Supabase Storage signed URL)
@@ -118,4 +118,6 @@
 - [2026-06-08] — Product — **Dashboard redesign** (approved): Home = net balance hero + **Members | Guests** toggle (counterparty lists, no settlement actions); MemberDetailScreen / GuestDetailScreen drill-down; Events tab = **Created | Joined** with collapsed settled; **no Settlement bottom tab** (3-tab nav). USD-only MVP. Docs fully aligned: 01-PRD, 02-User-Flows (P28–P34), 03-System-Architecture (counterparty aggregation), 05-API (counterparties, member/guest detail), 08-Mobile-App-Spec, 12-Build-Sequence (E05-S03 placeholder note, E09-S02/S03 rewritten, E08-S07 → EventDetailScreen), prototype/home.html. Implementation deferred to E09-S02/E09-S03.
 - [2026-06-09] — E05-S04 — Event member management UI: contact picker + manual add, remove before lock, reopen after lock; participant Event Detail view; registered-user manual add by `user_id`; web join `display_name` fix; creator backfill migration; dashboard spec alignment. 142 backend + 89 mobile tests passing at sign-off.
 - [2026-06-09] — Fix: event member lists show **live** profile names for registered members — `GET /events/:id` resolves `users.display_name` for linked participants; `PATCH /users/me` syncs all `participants.display_name` rows for that user (Realtime + SMS/split consistency). Tests: `participant-display-name` unit, profile sync unit, events integration. Docs: 01, 02, 03, 04, 05, 08, 09, 12.
+- [2026-06-09] — E06-S03 — Deep Link Infrastructure: AASA + assetlinks served from backend/public, Expo associatedDomains/intentFilters. 155 backend tests passing at sign-off.
+- [2026-06-09] — E06-S02 — In-App Join + Deep Link Handler: join preview/app-join API, AppJoin/AppJoined/AppLocked screens, linking + pending token through auth, DevJoinTestPanel for Expo Go. 155 backend + 94 mobile tests passing at sign-off.
 - [2026-06-08] — E03-S04 + auth hardening. Session creation via `backend/src/infrastructure/supabase-auth.ts` (`generateLink` + `verifyOtp` + internal email `{userId}@letssplyt.internal`) — NOT `createSession()` or REST `/admin/users/{id}/sessions` (404). Registration writes `public.users` via `upsert_user_profile_on_auth` SECURITY DEFINER RPC + `users_service_role_all` policy — migration `20260608000000_users_auth_registration.sql`. Login OTP requires `public.users` row (orphan `auth.users` → `ACCOUNT_NOT_FOUND`). Mobile: duck-typed `isApiRequestError()` in `api.ts` (Metro breaks `instanceof`); E.164 normalization in `phone.ts`; Register CTA + logout on Home. Dev cleanup: `cd backend && doppler run -- npm run cleanup:phone -- +1XXXXXXXXXX`. If schema already applied: `npx supabase migration repair 20260601000000 --status applied` before `db push`.
