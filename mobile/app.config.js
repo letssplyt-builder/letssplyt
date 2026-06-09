@@ -38,6 +38,7 @@ module.exports = {
   ios: {
     bundleIdentifier: 'com.letssplyt.app',
     supportsTablet: false,
+    associatedDomains: ['applinks:letssplyt.app', 'applinks:staging.letssplyt.app'],
     infoPlist: {
       NSContactsUsageDescription:
         'LetsSplyt uses your contacts to add members to your group.',
@@ -46,6 +47,17 @@ module.exports = {
   android: {
     package: 'com.letssplyt.app',
     permissions: ['READ_CONTACTS'],
+    intentFilters: [
+      {
+        action: 'VIEW',
+        autoVerify: true,
+        data: [
+          { scheme: 'https', host: 'letssplyt.app', pathPrefix: '/join/' },
+          { scheme: 'https', host: 'staging.letssplyt.app', pathPrefix: '/join/' },
+        ],
+        category: ['BROWSABLE', 'DEFAULT'],
+      },
+    ],
   },
   extra: {
     apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000',
