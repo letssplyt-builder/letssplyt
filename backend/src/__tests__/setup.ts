@@ -11,6 +11,9 @@ process.env.HANDLE_ENCRYPTION_KEY =
   '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 process.env.TWILIO_ACCOUNT_SID = 'ACtest';
 process.env.TWILIO_AUTH_TOKEN = 'test-auth-token';
+process.env.TWILIO_PHONE_NUMBER = '+15005550006';
+process.env.TWILIO_WHATSAPP_NUMBER = '+15005550006';
+process.env.APP_URL = 'http://localhost:3000';
 process.env.TWILIO_VERIFY_SERVICE_SID = 'VAtest';
 process.env.AI_PROVIDER_A1 = 'gemini';
 process.env.AI_MODEL_A1 = 'gemini-2.5-flash';

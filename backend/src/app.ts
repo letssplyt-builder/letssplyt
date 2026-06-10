@@ -13,6 +13,7 @@ import joinAppRoutes from './modules/join/join-app.routes';
 import joinWebRoutes from './modules/join/join-web.routes';
 import receiptsRoutes from './modules/receipts/receipts.routes';
 import settlementRoutes from './modules/settlement/settlement.routes';
+import twilioWebhookRouter from './modules/webhooks/twilio.routes';
 import { errorHandler } from './modules/auth/auth.controller';
 
 const app = express();
@@ -59,6 +60,8 @@ app.use(piiScrubberMiddleware);
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+app.use('/api/v1/webhooks/twilio', twilioWebhookRouter);
 
 app.use('/join', joinWebRoutes);
 

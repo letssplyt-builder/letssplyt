@@ -1,5 +1,5 @@
 /**
- * Live smoke test for split confirm + messages preview (E08-S01).
+ * Live smoke test for split confirm, messages preview (E08-S01), and send (E08-S02).
  *
  * Usage (backend must be running on PORT, default 3000):
  *   doppler run -- npm run smoke:messages-preview
@@ -54,6 +54,7 @@ async function requestJson(
 }
 
 async function cleanup(eventId: string): Promise<void> {
+  await supabaseAdmin.from('notification_log').delete().eq('event_id', eventId);
   await supabaseAdmin.from('ai_audit_log').delete().eq('event_id', eventId);
   const { data: items } = await supabaseAdmin
     .from('receipt_items')
@@ -93,7 +94,7 @@ async function ensurePayerHandle(accessToken: string): Promise<boolean> {
 }
 
 async function main(): Promise<void> {
-  console.log(`Smoke: messages preview (E08-S01) (${BASE_URL})\n`);
+  console.log(`Smoke: messages preview + send (E08-S01 / E08-S02) (${BASE_URL})\n`);
 
   let eventId: string | null = null;
 
@@ -287,6 +288,64 @@ async function main(): Promise<void> {
       pass('GET messages/preview (repeat)', 'idempotent 200');
     } else {
       fail('GET messages/preview (repeat)', `status ${previewAgain.status}`);
+    }
+
+    const send = await requestJson(
+      'POST',
+      `/api/v1/events/${eventId}/messages/send`,
+      {},
+      accessToken,
+    );
+    const sentCount = send.body.sent_count as number | undefined;
+    const skippedCount = send.body.skipped_count as number | undefined;
+    const eventStatus = send.body.event_status as string | undefined;
+    if (
+      send.status === 200 &&
+      sentCount === 1 &&
+      skippedCount === 1 &&
+      eventStatus === 'sent'
+    ) {
+      pass('POST messages/send', `sent=${sentCount} skipped=${skippedCount}`);
+    } else {
+      fail('POST messages/send', `status ${send.status} ${JSON.stringify(send.body)}`);
+      return;
+    }
+
+    const { data: logs } = await supabaseAdmin
+      .from('notification_log')
+      .select('id, participant_id, status, twilio_sid, channel')
+      .eq('event_id', eventId);
+    if (logs?.length === 1 && logs[0]?.status === 'sent' && logs[0]?.twilio_sid) {
+      pass('DB notification_log', `1 row status=sent sid=${logs[0].twilio_sid}`);
+    } else {
+      fail('DB notification_log', JSON.stringify(logs));
+    }
+
+    const { data: eventAfterSend } = await supabaseAdmin
+      .from('events')
+      .select('status, ai_stage, messages_sent_at')
+      .eq('id', eventId)
+      .maybeSingle();
+    if (
+      eventAfterSend?.status === 'sent' &&
+      eventAfterSend?.ai_stage === 'complete' &&
+      eventAfterSend?.messages_sent_at
+    ) {
+      pass('DB event after send', `${eventAfterSend.status}/${eventAfterSend.ai_stage}`);
+    } else {
+      fail('DB event after send', JSON.stringify(eventAfterSend));
+    }
+
+    const sendAgain = await requestJson(
+      'POST',
+      `/api/v1/events/${eventId}/messages/send`,
+      {},
+      accessToken,
+    );
+    if (sendAgain.status === 200 && (sendAgain.body.sent_count as number) >= 0) {
+      pass('POST messages/send (repeat)', 'idempotent 200');
+    } else {
+      fail('POST messages/send (repeat)', `status ${sendAgain.status}`);
     }
   } finally {
     if (eventId) {

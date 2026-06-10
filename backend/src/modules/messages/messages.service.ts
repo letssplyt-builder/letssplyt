@@ -103,14 +103,11 @@ async function loadParticipantItemNames(eventId: string): Promise<Map<string, st
   return map;
 }
 
-export async function previewEventMessages(
-  userId: string,
+export async function buildMessagePreviewsForEvent(
   eventId: string,
-): Promise<MessagePreviewResponse> {
-  const eventRow: EventRowWithReceiptFields = await fetchEventRow(eventId);
-  await assertEventOwner(eventRow, userId);
-
-  await ensureMessagingStage(eventId, eventRow.ai_stage);
+  payerId: string,
+): Promise<MessagePreviewItem[]> {
+  const eventRow = await fetchEventRow(eventId);
 
   const { data: payer, error: payerError } = await supabaseAdmin
     .from('users')
@@ -122,7 +119,7 @@ export async function previewEventMessages(
     throw new AppError('PAYER_FETCH_FAILED', 'Could not load payer profile', 500);
   }
 
-  const payerHandles = await getHandles(eventRow.payer_id);
+  const payerHandles = await getHandles(payerId);
   const payerHandleInputs = payerHandles.map((handle) => ({
     provider: handle.provider,
     handle_value: handle.handle_value,
@@ -204,5 +201,16 @@ export async function previewEventMessages(
     });
   }
 
+  return previews;
+}
+
+export async function previewEventMessages(
+  userId: string,
+  eventId: string,
+): Promise<MessagePreviewResponse> {
+  const eventRow = await fetchEventRow(eventId);
+  await assertEventOwner(eventRow, userId);
+  await ensureMessagingStage(eventId, eventRow.ai_stage);
+  const previews = await buildMessagePreviewsForEvent(eventId, eventRow.payer_id);
   return { previews };
 }

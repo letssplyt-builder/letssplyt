@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
 **Last updated:** 2026-06-07
-**Current story:** E08-S02 — Send Messages + Twilio Delivery (+ STOP webhook)
+**Current story:** E08-S03 — Split Image Generator (@napi-rs/canvas, upload to Storage, Twilio mediaUrl)
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -59,7 +59,7 @@
 
 ### Epic 8: Message System (7 stories)
 - [x] E08-S01 — A3 Message Generation + Preview API (2026-06-07)
-- [ ] E08-S02 — Send Messages + Twilio Delivery (+ STOP webhook)
+- [x] E08-S02 — Send Messages + Twilio Delivery (+ STOP webhook) (2026-06-07)
 - [ ] E08-S03 — Split Image Generator (@napi-rs/canvas, upload to Storage, Twilio mediaUrl)
 - [ ] E08-S04 — Message Preview Screen (carousel, per-participant split image)
 - [ ] E08-S05 — Send + Realtime Delivery Tracking (Supabase Realtime, status badges)
@@ -103,9 +103,9 @@
 | Tier | Epics | Stories | Done | Remaining |
 |---|---|---|---|---|
 | Tier 1 — Foundation | 4 | 16 | 16 | 0 |
-| Tier 2 — Core Flow | 5 | 23 | 14 | 9 |
+| Tier 2 — Core Flow | 5 | 23 | 15 | 8 |
 | Tier 3 — Operations | 4 | 13 | 0 | 13 |
-| **Total** | **13** | **52** | **24** | **28** |
+| **Total** | **13** | **52** | **25** | **27** |
 
 ---
 
@@ -129,4 +129,5 @@
 - [2026-06-09] — E06-S02 — In-App Join + Deep Link Handler: join preview/app-join API, AppJoin/AppJoined/AppLocked screens, linking + pending token through auth, DevJoinTestPanel for Expo Go. 155 backend + 94 mobile tests passing at sign-off.
 - [2026-06-10] — Planning — Epic 13 (AI Eval Framework) added as **last** epic in `docs/12-Build-Sequence.md` (after E12). Spec remains in `docs/07-AI-Agent-Specification.md` §7; implementation deferred until E07–E12 agents exist.
 - [2026-06-08] — E03-S04 + auth hardening. Session creation via `backend/src/infrastructure/supabase-auth.ts` (`generateLink` + `verifyOtp` + internal email `{userId}@letssplyt.internal`) — NOT `createSession()` or REST `/admin/users/{id}/sessions` (404). Registration writes `public.users` via `upsert_user_profile_on_auth` SECURITY DEFINER RPC + `users_service_role_all` policy — migration `20260608000000_users_auth_registration.sql`. Login OTP requires `public.users` row (orphan `auth.users` → `ACCOUNT_NOT_FOUND`). Mobile: duck-typed `isApiRequestError()` in `api.ts` (Metro breaks `instanceof`); E.164 normalization in `phone.ts`; Register CTA + logout on Home. Dev cleanup: `cd backend && doppler run -- npm run cleanup:phone -- +1XXXXXXXXXX`. If schema already applied: `npx supabase migration repair 20260601000000 --status applied` before `db push`.
+- [2026-06-07] — E08-S02 — Send Messages + Twilio Delivery: POST /events/:id/messages/send, notification_log, Twilio opt-out/delivery webhooks, messaging dev-bypass (local smoke 19/19). 244 backend tests passing at sign-off.
 - [2026-06-10] — E07-S03 — Item Review Screen + `POST /receipts/confirm`, receipt-review snapshot on GET event, Event Detail footer modes (review/edit), ReceiptReviewSlip UX. **Partial E09 (ahead of E09-S02/S03):** Home Members|Guests dashboard, counterparties + member/guest detail APIs, HomeStack (Member/Guest detail), Events Active|Settled toggle with Created/Joined sections, tab stack reset on Dashboard/Events tap. Docs: 01, 02, 03, 08, 12 updated for Events layout. Tests: counterparties.service, EventsScreen, settlementStore, HomeScreen, filterEventsBySegment, eventSections, receipt confirm/review, ItemReview, eventSplitFooter.

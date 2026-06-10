@@ -31,6 +31,18 @@ export const mockTwilio = {
   },
 };
 
-export function twilioMockFactory(): jest.Mock<() => typeof mockTwilio> {
-  return jest.fn<() => typeof mockTwilio>().mockReturnValue(mockTwilio);
+export const mockValidateRequest = jest
+  .fn<(authToken: string, signature: string, url: string, params: Record<string, string>) => boolean>()
+  .mockReturnValue(true);
+
+export function twilioMockFactory(): jest.Mock<() => typeof mockTwilio> & {
+  validateRequest: typeof mockValidateRequest;
+} {
+  const factory = jest.fn<() => typeof mockTwilio>().mockReturnValue(mockTwilio) as jest.Mock<
+    () => typeof mockTwilio
+  > & {
+    validateRequest: typeof mockValidateRequest;
+  };
+  factory.validateRequest = mockValidateRequest;
+  return factory;
 }
