@@ -64,6 +64,27 @@ jest.mock('expo-device', () => ({
   osName: 'iOS',
 }));
 
+jest.mock('react-native-gesture-handler', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    GestureHandlerRootView: View,
+    Swipeable: ({
+      children,
+      renderRightActions,
+    }: {
+      children: React.ReactNode;
+      renderRightActions?: () => React.ReactNode;
+    }) =>
+      React.createElement(
+        View,
+        null,
+        children,
+        renderRightActions ? renderRightActions() : null,
+      ),
+  };
+});
+
 jest.mock('react-native-draggable-flatlist', () => {
   const React = require('react');
   const { FlatList } = require('react-native');

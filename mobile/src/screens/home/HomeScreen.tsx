@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import {
+  ActivityIndicator,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -15,35 +16,41 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { BalanceHeroCard } from '../../components/events/BalanceHeroCard';
 import { CreateEventModal } from '../../components/events/CreateEventModal';
-import { EventCard } from '../../components/events/EventCard';
 import { EventFab } from '../../components/events/EventFab';
 import { QRDisplayModal } from '../../components/events/QRDisplayModal';
+import { SegmentedControl } from '../../components/events/SegmentedControl';
+import { CounterpartyRow } from '../../components/settlement/CounterpartyRow';
 import { screenScrollBottomPadding } from '../../constants/layout';
-import type { MainTabParamList, RootStackParamList } from '../../navigation/types';
+import type {
+  HomeStackParamList,
+  MainTabParamList,
+  RootStackParamList,
+} from '../../navigation/types';
 import { fetchBalance, regenerateJoinToken, type BalanceSummary } from '../../services/event.service';
 import { useAuthStore } from '../../store/authStore';
 import { useEventStore } from '../../store/eventStore';
+import { useSettlementStore } from '../../store/settlementStore';
 import { DevJoinTestPanel } from '../../components/dev/DevJoinTestPanel';
 import { glassStyles } from '../../theme/glassStyles';
 import { authColors } from '../../theme/colors';
 
 type Props = CompositeScreenProps<
-  BottomTabScreenProps<MainTabParamList, 'HomeTab'>,
-  NativeStackScreenProps<RootStackParamList>
+  NativeStackScreenProps<HomeStackParamList, 'Home'>,
+  CompositeScreenProps<
+    BottomTabScreenProps<MainTabParamList>,
+    NativeStackScreenProps<RootStackParamList>
+  >
 >;
 
-const RECENT_EVENTS_LIMIT = 4;
+type HomeSegment = 'members' | 'guests';
 
 export function HomeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const user = useAuthStore((state) => state.user);
   const {
-    events,
-    isLoadingEvents,
     createModalOpen,
     qrPresentation,
     isCreating,
-    loadEvents,
     createEvent,
     openCreateModal,
     closeCreateModal,
@@ -51,6 +58,14 @@ export function HomeScreen({ navigation }: Props) {
     updateJoinUrl,
   } = useEventStore();
 
+  const membersOweYou = useSettlementStore((state) => state.membersOweYou);
+  const membersYouOwe = useSettlementStore((state) => state.membersYouOwe);
+  const guests = useSettlementStore((state) => state.guests);
+  const isLoadingCounterparties = useSettlementStore((state) => state.isLoadingCounterparties);
+  const counterpartyError = useSettlementStore((state) => state.counterpartyError);
+  const loadCounterparties = useSettlementStore((state) => state.loadCounterparties);
+
+  const [segment, setSegment] = useState<HomeSegment>('members');
   const [titleDraft, setTitleDraft] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
   const [balance, setBalance] = useState<BalanceSummary | null>(null);
@@ -58,7 +73,6 @@ export function HomeScreen({ navigation }: Props) {
   const [balanceError, setBalanceError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
-  const [listError, setListError] = useState(false);
 
   const loadBalance = useCallback(async () => {
     setBalanceLoading(true);
@@ -66,9 +80,6 @@ export function HomeScreen({ navigation }: Props) {
     try {
       const result = await fetchBalance();
       setBalance(result);
-      if (result.unavailable) {
-        setBalanceError(false);
-      }
     } catch {
       setBalance({
         net_balance: 0,
@@ -84,27 +95,16 @@ export function HomeScreen({ navigation }: Props) {
   }, []);
 
   const refreshData = useCallback(async () => {
-    setListError(false);
-    try {
-      await Promise.all([loadBalance(), loadEvents(true)]);
-    } catch {
-      setListError(true);
-    }
-  }, [loadBalance, loadEvents]);
+    await Promise.all([loadBalance(), loadCounterparties(segment)]);
+  }, [loadBalance, loadCounterparties, segment]);
 
   useEffect(() => {
     void refreshData();
   }, [refreshData]);
 
-  const createdEvents = useMemo(
-    () => events.filter((event) => event.role === 'creator').slice(0, RECENT_EVENTS_LIMIT),
-    [events],
-  );
-
-  const memberEvents = useMemo(
-    () => events.filter((event) => event.role === 'participant').slice(0, RECENT_EVENTS_LIMIT),
-    [events],
-  );
+  useEffect(() => {
+    void loadCounterparties(segment);
+  }, [loadCounterparties, segment]);
 
   const handleCreate = async () => {
     const trimmed = titleDraft.trim();
@@ -129,33 +129,102 @@ export function HomeScreen({ navigation }: Props) {
     }
   };
 
-  const openEvent = (eventId: string) => {
+  const openEventDetail = (eventId: string) => {
     navigation.navigate('EventsTab', {
       screen: 'EventDetail',
       params: { eventId },
     });
   };
 
-  const renderEventSection = (
-    title: string,
-    items: typeof events,
-    emptyMessage: string,
-  ) => (
-    <View style={styles.section}>
-      <Text style={glassStyles.sectionTitle}>{title}</Text>
-      {!listError && !isLoadingEvents && items.length === 0 ? (
-        <Text style={styles.emptySection}>{emptyMessage}</Text>
-      ) : null}
-      {items.map((event) => (
-        <EventCard
-          key={event.id}
-          event={event}
-          variant="compact"
-          onPress={() => openEvent(event.id)}
-        />
-      ))}
-    </View>
-  );
+  const renderMembersLists = () => {
+    if (counterpartyError) {
+      return (
+        <Text style={glassStyles.errorText}>Couldn&apos;t load balances. Pull to retry.</Text>
+      );
+    }
+
+    if (isLoadingCounterparties && membersOweYou.length === 0 && membersYouOwe.length === 0) {
+      return <ActivityIndicator color={authColors.textOnDark} style={styles.loader} />;
+    }
+
+    const oweYouEmpty = membersOweYou.length === 0;
+    const youOweEmpty = membersYouOwe.length === 0;
+
+    if (oweYouEmpty && youOweEmpty) {
+      return <Text style={styles.emptySection}>No outstanding balances with members.</Text>;
+    }
+
+    return (
+      <>
+        {!oweYouEmpty ? (
+          <View style={styles.section}>
+            <Text style={glassStyles.sectionTitle}>People who owe you</Text>
+            {membersOweYou.map((row) => (
+              <CounterpartyRow
+                key={row.user_id}
+                displayName={row.display_name}
+                amount={row.net_amount}
+                avatarColour={row.avatar_colour}
+                directionLabel="owe you"
+                onPress={() =>
+                  navigation.navigate('MemberDetail', { userId: row.user_id })
+                }
+              />
+            ))}
+          </View>
+        ) : null}
+
+        {!youOweEmpty ? (
+          <View style={styles.section}>
+            <Text style={glassStyles.sectionTitle}>People you owe</Text>
+            {membersYouOwe.map((row) => (
+              <CounterpartyRow
+                key={row.user_id}
+                displayName={row.display_name}
+                amount={row.net_amount}
+                avatarColour={row.avatar_colour}
+                directionLabel="you owe"
+                onPress={() =>
+                  navigation.navigate('MemberDetail', { userId: row.user_id })
+                }
+              />
+            ))}
+          </View>
+        ) : null}
+      </>
+    );
+  };
+
+  const renderGuestsList = () => {
+    if (counterpartyError) {
+      return (
+        <Text style={glassStyles.errorText}>Couldn&apos;t load balances. Pull to retry.</Text>
+      );
+    }
+
+    if (isLoadingCounterparties && guests.length === 0) {
+      return <ActivityIndicator color={authColors.textOnDark} style={styles.loader} />;
+    }
+
+    if (guests.length === 0) {
+      return <Text style={styles.emptySection}>No guests owe you right now.</Text>;
+    }
+
+    return guests.map((guest) => (
+      <CounterpartyRow
+        key={guest.guest_key}
+        displayName={guest.display_name}
+        amount={guest.amount}
+        onPress={() => {
+          if (guest.kind === 'name_only' && guest.event_id) {
+            openEventDetail(guest.event_id);
+            return;
+          }
+          navigation.navigate('GuestDetail', { phoneHash: guest.guest_key });
+        }}
+      />
+    ));
+  };
 
   return (
     <AuthGradientLayout contentStyle={styles.layout}>
@@ -199,23 +268,18 @@ export function HomeScreen({ navigation }: Props) {
           onRetry={() => void loadBalance()}
         />
 
+        <SegmentedControl
+          segments={['members', 'guests'] as const}
+          labels={{ members: 'Members', guests: 'Guests' }}
+          value={segment}
+          onChange={setSegment}
+        />
+
+        <View style={styles.listArea}>
+          {segment === 'members' ? renderMembersLists() : renderGuestsList()}
+        </View>
+
         <DevJoinTestPanel navigation={navigation} />
-
-        {listError ? (
-          <Text style={glassStyles.errorText}>Couldn&apos;t load events. Pull to retry.</Text>
-        ) : null}
-
-        {renderEventSection(
-          'Events you created',
-          createdEvents,
-          'No events yet. Tap + to split your first bill.',
-        )}
-
-        {renderEventSection(
-          'Events you joined',
-          memberEvents,
-          'When someone adds you to a group, it shows up here.',
-        )}
       </ScrollView>
 
       <EventFab onPress={openCreateModal} />
@@ -262,6 +326,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 16,
   },
+  listArea: {
+    marginTop: 16,
+  },
   section: {
     marginBottom: 18,
   },
@@ -270,5 +337,8 @@ const styles = StyleSheet.create({
     color: authColors.textOnDarkMuted,
     lineHeight: 18,
     marginBottom: 4,
+  },
+  loader: {
+    marginVertical: 16,
   },
 });

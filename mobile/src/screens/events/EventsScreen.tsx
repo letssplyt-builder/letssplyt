@@ -5,8 +5,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import {
   ActivityIndicator,
-  FlatList,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -14,13 +14,14 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { CreateEventModal } from '../../components/events/CreateEventModal';
-import { EventCard } from '../../components/events/EventCard';
 import { EventFab } from '../../components/events/EventFab';
+import { EventRoleSection } from '../../components/events/EventRoleSection';
 import { QRDisplayModal } from '../../components/events/QRDisplayModal';
 import { SegmentedControl } from '../../components/events/SegmentedControl';
 import { screenScrollBottomPadding } from '../../constants/layout';
 import type { EventsStackParamList, MainTabParamList } from '../../navigation/types';
-import { regenerateJoinToken } from '../../services/event.service';
+import { fetchEvents, regenerateJoinToken } from '../../services/event.service';
+import type { EventListItem } from '@letssplyt/shared/event.types';
 import { useEventStore } from '../../store/eventStore';
 import { glassStyles } from '../../theme/glassStyles';
 import { authColors } from '../../theme/colors';
@@ -36,13 +37,9 @@ type Segment = 'active' | 'settled';
 export function EventsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const {
-    events,
-    isLoadingEvents,
-    hasMore,
     createModalOpen,
     qrPresentation,
     isCreating,
-    loadEvents,
     createEvent,
     openCreateModal,
     closeCreateModal,
@@ -51,25 +48,49 @@ export function EventsScreen({ navigation }: Props) {
   } = useEventStore();
 
   const [segment, setSegment] = useState<Segment>('active');
+  const [createdEvents, setCreatedEvents] = useState<EventListItem[]>([]);
+  const [joinedEvents, setJoinedEvents] = useState<EventListItem[]>([]);
   const [titleDraft, setTitleDraft] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [listError, setListError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [isRegenerating, setIsRegenerating] = useState(false);
 
-  const filteredEvents = useMemo(
-    () => filterEventsBySegment(events, segment),
-    [events, segment],
+  const createdForSegment = useMemo(
+    () => filterEventsBySegment(createdEvents, segment),
+    [createdEvents, segment],
   );
+  const joinedForSegment = useMemo(
+    () => filterEventsBySegment(joinedEvents, segment),
+    [joinedEvents, segment],
+  );
+
+  const createdEmptyMessage =
+    segment === 'active'
+      ? "You haven't created any active events yet. Tap + to split your first bill."
+      : "No settled events you've created yet.";
+  const joinedEmptyMessage =
+    segment === 'active'
+      ? "You haven't joined any active events yet."
+      : "No settled events you've joined yet.";
 
   const refreshList = useCallback(async () => {
     setListError(false);
+    setIsLoading(true);
     try {
-      await loadEvents(true);
+      const [createdPage, joinedPage] = await Promise.all([
+        fetchEvents(undefined, { role: 'creator' }),
+        fetchEvents(undefined, { role: 'participant' }),
+      ]);
+      setCreatedEvents(createdPage.events);
+      setJoinedEvents(joinedPage.events);
     } catch {
       setListError(true);
+    } finally {
+      setIsLoading(false);
     }
-  }, [loadEvents]);
+  }, []);
 
   useEffect(() => {
     void refreshList();
@@ -82,6 +103,7 @@ export function EventsScreen({ navigation }: Props) {
     try {
       await createEvent(trimmed);
       setTitleDraft('');
+      await refreshList();
     } catch {
       setCreateError("Couldn't create event. Try again.");
     }
@@ -98,33 +120,10 @@ export function EventsScreen({ navigation }: Props) {
     }
   };
 
-  const emptyMessage =
-    segment === 'active'
-      ? 'No events yet. Tap + to split your first bill.'
-      : 'No settled events yet.';
-
-  const listHeader = (
-    <View style={styles.header}>
-      <Text style={styles.title}>Events</Text>
-      <SegmentedControl
-        segments={['active', 'settled'] as const}
-        labels={{ active: 'Active', settled: 'Settled' }}
-        value={segment}
-        onChange={setSegment}
-      />
-      {listError ? (
-        <Text style={glassStyles.errorText}>Something went wrong. Pull to retry.</Text>
-      ) : null}
-    </View>
-  );
-
   return (
     <AuthGradientLayout contentStyle={styles.layout}>
       <StatusBar style="light" />
-      <FlatList
-        data={filteredEvents}
-        keyExtractor={(item) => item.id}
-        ListHeaderComponent={listHeader}
+      <ScrollView
         contentContainerStyle={[
           styles.list,
           { paddingBottom: screenScrollBottomPadding(insets.bottom) },
@@ -139,31 +138,44 @@ export function EventsScreen({ navigation }: Props) {
             }}
           />
         }
-        ListEmptyComponent={
-          !isLoadingEvents && !listError ? (
-            <Text style={glassStyles.emptyText}>{emptyMessage}</Text>
-          ) : null
-        }
-        ListFooterComponent={
-          isLoadingEvents ? (
-            <ActivityIndicator color={authColors.textOnDark} style={styles.loader} />
-          ) : null
-        }
-        onEndReached={() => {
-          if (hasMore && !isLoadingEvents) {
-            void loadEvents(false);
-          }
-        }}
-        onEndReachedThreshold={0.4}
         showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <EventCard
-            event={item}
-            variant="compact"
-            onPress={() => navigation.navigate('EventDetail', { eventId: item.id })}
+      >
+        <View style={styles.header}>
+          <Text style={styles.title}>Events</Text>
+          <SegmentedControl
+            segments={['active', 'settled'] as const}
+            labels={{ active: 'Active', settled: 'Settled' }}
+            value={segment}
+            onChange={setSegment}
           />
+          {listError ? (
+            <Text style={glassStyles.errorText}>Something went wrong. Pull to retry.</Text>
+          ) : null}
+        </View>
+
+        {isLoading ? (
+          <ActivityIndicator color={authColors.textOnDark} style={styles.loader} />
+        ) : (
+          <>
+            <EventRoleSection
+              title="Events you created"
+              events={createdForSegment}
+              emptyMessage={createdEmptyMessage}
+              onEventPress={(eventId) =>
+                navigation.navigate('EventDetail', { eventId })
+              }
+            />
+            <EventRoleSection
+              title="Events you joined"
+              events={joinedForSegment}
+              emptyMessage={joinedEmptyMessage}
+              onEventPress={(eventId) =>
+                navigation.navigate('EventDetail', { eventId })
+              }
+            />
+          </>
         )}
-      />
+      </ScrollView>
 
       <EventFab onPress={openCreateModal} />
 
@@ -211,8 +223,8 @@ const styles = StyleSheet.create({
     color: authColors.textOnDark,
   },
   list: {
-    paddingHorizontal: 28,
     flexGrow: 1,
+    paddingHorizontal: 28,
   },
   loader: {
     marginVertical: 16,

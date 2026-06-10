@@ -67,7 +67,7 @@ RootNavigator (NativeStack)
 │   │
 │   ├── EventsTab       (icon: list)
 │   │   └── EventsStack (NativeStack)
-│   │       ├── EventsScreen             ← Events you created | Events you joined (settled collapsed)
+│   │       ├── EventsScreen             ← Active|Settled toggle + created/joined sections
 │   │       ├── EventDetailScreen        ← payer or participant view (joining / settlement)
 │   │       ├── ReceiptScanScreen        ← native doc scanner launcher
 │   │       ├── ReceiptPreviewScreen     ← confirm cropped scan before upload
@@ -908,6 +908,8 @@ Refer to `prototype/home.html` (dashboard states). **MVP: USD only.**
 4. **FAB** bottom right: "＋ New event" → `CreateEventModal`
 5. Pull to refresh refreshes balance + active toggle list
 
+**Tab navigation:** Tapping the **Dashboard** bottom tab resets the Home stack to this screen (does not leave the user on Member/Guest detail).
+
 **Members toggle** — `GET /api/v1/users/me/counterparties?kind=members`
 
 | Section | Rows | Row content | Tap |
@@ -980,25 +982,29 @@ Refer to `prototype/home.html` (dashboard states). **MVP: USD only.**
 
 #### EventsScreen
 
-Two **sections** (not Active|Settled segmented control):
+**Layout (top → bottom):**
 
-1. **Events you created** — `GET /api/v1/events?role=creator` (paginated)
-2. **Events you joined** — `GET /api/v1/events?role=participant` (paginated)
+1. **Active | Settled** segmented toggle
+2. **Events you created** — `GET /api/v1/events?role=creator` (paginated)
+3. **Events you joined** — `GET /api/v1/events?role=participant` (paginated)
 
-Within each section:
-- **Active** events (status not `settled` / `archived`) listed first
-- **Settled** events collapsed under tappable header **"Settled (N)"** — expands inline
-- Event card: title, date, participant count, status chip, optional outstanding amount
-- FAB: "＋ New event" → `CreateEventModal`
-- Tap card → `EventDetailScreen`
+The toggle filters **both** sections:
+- **Active** — events where `status` is not `settled` or `archived`
+- **Settled** — events where `status` is `settled` or `archived`
 
-**Empty states:**
-- Created section empty: "You haven't created any events yet. Tap + to split your first bill."
-- Joined section empty: "You haven't joined any events yet."
+Each section lists only events matching the selected toggle. Event card: title, date, participant count, status chip, optional outstanding amount. FAB: "＋ New event" → `CreateEventModal`. Tap card → `EventDetailScreen`.
+
+**Tab navigation:** Tapping the **Events** bottom tab always resets the Events stack to this list (does not leave the user on a previously opened `EventDetailScreen`).
+
+**Empty states (per section, per toggle):**
+- Active / created empty: "You haven't created any active events yet. Tap + to split your first bill."
+- Active / joined empty: "You haven't joined any active events yet."
+- Settled / created empty: "No settled events you've created yet."
+- Settled / joined empty: "No settled events you've joined yet."
 
 **Loading / error:** Same skeleton and pull-to-retry patterns as prior spec.
 
-**Accessibility:** Card: `accessibilityRole="button"`, `accessibilityLabel="[title], [role created|joined], [status]"`.
+**Accessibility:** Toggle: `accessibilityRole="tab"`. Card: `accessibilityRole="button"`, `accessibilityLabel="[title], [role created|joined], [status]"`.
 
 ---
 
@@ -1023,6 +1029,21 @@ Within each section:
 - "Reopen join window" button (shown when status is `locked` and user is payer — POST `/events/:id/reopen` reverts to `"open"`, new QR/link for 24h)
 
 **Settlement phase — payer only** (event status = `"locked"`, `"calculating"`, `"sent"`, `"settled"`):
+
+**Locked-event split footer** (`EventSplitActionBar` in `AuthGradientLayout` footer; creator only). Mode derives from `event.ai_stage` and `receipt_review` via `resolveEventSplitActionMode()`:
+
+| Condition | Footer CTA |
+|-----------|------------|
+| `ai_stage = none` | **Scan receipt** + **Enter total** |
+| `ai_stage = parsing` | **Reading receipt…** (disabled) |
+| `ai_stage = failed` | **Scan receipt** + **Enter total** (retry) |
+| `ai_stage = parsed` | **Review items** only |
+| `ai_stage = parsed_confirmed` or later AI stages | **Edit share** only |
+
+**Review items** / **Edit share** navigate to `ItemReviewScreen` with `receipt_review` from `GET /events/:id` (no re-scan). If `receipt_review` is missing, show toast and pull to refresh.
+
+Event Detail **refetches on focus** (`useFocusEffect`) so returning from Item Review without confirming still shows **Review items** (not Scan/Enter total) once A1 has persisted `ai_stage = parsed`.
+
 - Summary bar: total | collected | outstanding + progress ring
 - Segmented progress bar: green (confirmed) | amber (self-reported) | grey (pending)
 - Per-member roster:
@@ -1095,17 +1116,23 @@ This applies to both the joining phase (channel `event-members:{eventId}`, subsc
 
 #### ItemReviewScreen
 
-- Editable list of food/drink items from parse (`items`; `is_fee = false` in DB)
-- Separate editable fee rows from `additional_charges` / `is_fee = true` rows (SVC Fee, City Fee, …)
-- "Add item" button at bottom of food list
-- Tax + Fees + Tip fields (pre-filled from parse, editable)
-- Total (computed live: sum(food items) + tax + fees + tip)
-- Low-confidence items shown with amber highlight and a small warning icon
-- CTA: "Confirm items →" → POST `/api/v1/events/:eventId/receipt/confirm` (with `parse_attempt_id` from the scan response stored in eventStore) → navigate to SplitEntryScreen
+**Path:** `mobile/src/screens/receipts/ItemReviewScreen.tsx` · **UI:** `ReceiptReviewSlip` (`mobile/src/components/receipts/ReceiptReviewSlip.tsx`)
 
-**Error state:** If the POST fails: "Couldn't save items. Check your connection and try again." The user's edits are preserved locally.
+Receipt-slip layout on `AuthGradientLayout`: warm paper card on teal gradient. Compact lines by default (name + amount like a thermal receipt); **tap a line** to expand inline edit (name, qty stepper, price). Swipe left on compact food rows to delete.
 
-**Accessibility:** Each item row: `accessibilityLabel="[Item name], [price]"`, `accessibilityHint="Tap to edit"`. Delete swipe action: `accessibilityLabel="Delete [item name]"`. Low-confidence items: `accessibilityLabel="[Item name], [price] — may be inaccurate"`.
+- Food lines from parse (`items` → `is_fee = false` in DB)
+- Fee/surcharge lines from `additional_charges` (`is_fee = true` in DB)
+- **+ Add line** / **+ Add fee or surcharge** on the slip
+- Tax and tip editable on slip footer; subtotal + fees + grand total computed live
+- Low-confidence items: amber row + **Check** chip (`confidence: 'low'`)
+- Pull-to-refresh → `GET /events/:id` → applies `receipt_review` (does **not** re-run A1)
+- CTA: **Looks good → assign shares** → `POST /api/v1/receipts/confirm` → `SplitEntryScreen` (`mode: 'itemised'`)
+
+Entry: after `POST /receipts/parse` (`ReceiptPreviewScreen`) or from Event Detail **Review items** / **Edit share** (uses `receipt_review` snapshot).
+
+**Error state:** If confirm fails: "Couldn't save items. Check your connection and try again." Local edits preserved.
+
+**Accessibility:** Compact row: `accessibilityLabel="[Item name], tap to edit"`. Expanded name field: `accessibilityLabel="[Item name], edit name"`. Swipe delete: `accessibilityLabel="Delete [item name]"`. Confirm: `accessibilityLabel="Confirm items"`.
 
 ---
 

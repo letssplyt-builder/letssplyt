@@ -11,6 +11,7 @@ import {
   handleReorderHandles,
   handleUpdateHandle,
 } from './profile.controller';
+import { handleGetCounterparties } from '../settlement/settlement.controller';
 
 const router = Router();
 
@@ -18,6 +19,7 @@ router.use(authenticate);
 
 router.get('/me', handleGetMe);
 router.get('/me/balance', handleGetBalance);
+router.get('/me/counterparties', handleGetCounterparties);
 router.patch('/me', handlePatchMe);
 router.post('/me/push-token', handlePostPushToken);
 router.get('/me/handles', handleGetHandles);

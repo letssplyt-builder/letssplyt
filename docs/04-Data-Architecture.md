@@ -305,14 +305,15 @@ CREATE TABLE events (
 
   -- Correction 7: ai_stage column with full enum and NOT NULL constraint
   -- Used by the AI idempotency guard to prevent duplicate AI runs on retried requests
-  -- State machine: none → parsing → parsed → calculating → calculated → messaging → complete → failed
-  -- CHECK (ai_stage IN ('none','parsing','parsed','calculating','calculated','messaging','complete','failed'))
+  -- State machine: none → parsing → parsed → parsed_confirmed → calculating → calculated → messaging → complete → failed
+  -- CHECK (ai_stage IN ('none','parsing','parsed','parsed_confirmed','calculating','calculated','messaging','complete','failed'))
   -- The failed → none reset is performed only by the admin utility
   -- backend/scripts/reset-ai-stage.ts. Application code NEVER resets ai_stage directly.
   ai_stage        TEXT        NOT NULL DEFAULT 'none' CHECK (ai_stage IN (
                     'none',        -- no AI processing started
                     'parsing',     -- A1 receipt parsing in progress
-                    'parsed',      -- A1 complete
+                    'parsed',      -- A1 complete; items in DB; payer may edit on Item Review
+                    'parsed_confirmed', -- payer confirmed Item Review (POST /receipts/confirm); safe to run A2
                     'calculating', -- A2 split calculation in progress
                     'calculated',  -- A2 complete
                     'messaging',   -- A3 message composition in progress

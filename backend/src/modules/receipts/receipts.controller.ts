@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { AppError } from '../../infrastructure/errors';
+import { confirmReceipt, confirmReceiptBodySchema } from './receipts.confirm';
 import { createReceiptUploadUrl, parseReceipt } from './receipts.service';
 
 const uploadUrlSchema = z.object({
@@ -25,6 +26,25 @@ export async function postUploadUrlHandler(
 
     const body = uploadUrlSchema.parse(req.body);
     const result = await createReceiptUploadUrl(userId, body.event_id);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function postConfirmHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new AppError('AUTH_REQUIRED', 'Unauthorized', 401);
+    }
+
+    const body = confirmReceiptBodySchema.parse(req.body);
+    const result = await confirmReceipt(userId, body);
     res.status(200).json(result);
   } catch (err) {
     next(err);

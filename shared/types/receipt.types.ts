@@ -20,6 +20,42 @@ export interface ReceiptAdditionalCharge {
   confidence?: 'high' | 'low';
 }
 
+/** Editable receipt snapshot for Item Review (from parse or GET event). */
+export interface ReceiptReviewSnapshot {
+  items: ReceiptParseResultItem[];
+  additional_charges: ReceiptAdditionalCharge[];
+  tax_amount: number;
+  tip_amount: number;
+  fees_amount: number;
+  currency: string;
+}
+
+export interface ReceiptConfirmItemInput {
+  id?: string;
+  name: string;
+  price: number;
+  quantity: number;
+}
+
+export interface ReceiptConfirmChargeInput {
+  name: string;
+  amount: number;
+}
+
+export interface ReceiptConfirmRequest {
+  event_id: string;
+  items: ReceiptConfirmItemInput[];
+  additional_charges: ReceiptConfirmChargeInput[];
+  tax: number;
+  fees: number;
+  tip: number;
+}
+
+export interface ReceiptConfirmResponse {
+  confirmed: true;
+  total_amount: number;
+}
+
 export interface ReceiptParseResponse {
   items: ReceiptParseResultItem[];
   additional_charges: ReceiptAdditionalCharge[];

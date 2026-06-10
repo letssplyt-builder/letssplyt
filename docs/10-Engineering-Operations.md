@@ -523,6 +523,10 @@ npx supabase db reset --db-url $SUPABASE_URL  # WARNING: wipes dev DB
 cd backend
 doppler run -- npm run dev  # starts on port 3000
 
+# Live smoke — receipts confirm + receipt_review (backend must be running):
+cd backend
+doppler run -- npx ts-node scripts/smoke-receipts-confirm.ts
+
 # Start mobile (in another terminal):
 cd mobile
 npx expo start          # shows QR code for Expo Go

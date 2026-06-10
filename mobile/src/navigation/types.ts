@@ -2,6 +2,12 @@ import type { NavigatorScreenParams } from '@react-navigation/native';
 import type { PaymentProvider } from '@letssplyt/shared/profile.types';
 import type { ReceiptParseResponse } from '@letssplyt/shared/receipt.types';
 
+export type HomeStackParamList = {
+  Home: undefined;
+  MemberDetail: { userId: string };
+  GuestDetail: { phoneHash: string };
+};
+
 export type EventsStackParamList = {
   Events: undefined;
   EventDetail: { eventId: string };
@@ -16,7 +22,7 @@ export type EventsStackParamList = {
 };
 
 export type MainTabParamList = {
-  HomeTab: undefined;
+  HomeTab: NavigatorScreenParams<HomeStackParamList> | undefined;
   EventsTab: NavigatorScreenParams<EventsStackParamList> | undefined;
 };
 

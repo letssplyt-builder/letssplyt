@@ -1,13 +1,82 @@
 import { StyleSheet, View } from 'react-native';
+import type { EventSplitActionMode } from '../../utils/eventSplitFooter';
 import { PrimaryButton } from '../PrimaryButton';
 
 interface EventSplitActionBarProps {
+  mode: EventSplitActionMode;
   onScanReceipt: () => void;
   onEnterTotal: () => void;
+  onReviewItems: () => void;
+  onEditShare: () => void;
 }
 
 /** Split CTAs shown after the group is locked (creator only). Render in AuthGradientLayout footer. */
-export function EventSplitActionBar({ onScanReceipt, onEnterTotal }: EventSplitActionBarProps) {
+export function EventSplitActionBar({
+  mode,
+  onScanReceipt,
+  onEnterTotal,
+  onReviewItems,
+  onEditShare,
+}: EventSplitActionBarProps) {
+  if (mode === 'parsing') {
+    return (
+      <View style={styles.container} pointerEvents="box-none">
+        <PrimaryButton
+          label="Reading receipt…"
+          disabled
+          accessibilityLabel="Reading receipt"
+          style={styles.fullWidth}
+        />
+      </View>
+    );
+  }
+
+  if (mode === 'review') {
+    return (
+      <View style={styles.container} pointerEvents="box-none">
+        <PrimaryButton
+          label="Review items"
+          onPress={onReviewItems}
+          accessibilityLabel="Review receipt items"
+          style={styles.fullWidth}
+        />
+      </View>
+    );
+  }
+
+  if (mode === 'edit') {
+    return (
+      <View style={styles.container} pointerEvents="box-none">
+        <PrimaryButton
+          label="Edit share"
+          onPress={onEditShare}
+          accessibilityLabel="Edit itemised split"
+          style={styles.fullWidth}
+        />
+      </View>
+    );
+  }
+
+  if (mode === 'failed') {
+    return (
+      <View style={styles.container} pointerEvents="box-none">
+        <PrimaryButton
+          label="Scan receipt"
+          onPress={onScanReceipt}
+          accessibilityLabel="Scan receipt again"
+          style={styles.fullWidth}
+        />
+        <PrimaryButton
+          label="Enter total"
+          variant="inverse"
+          onPress={onEnterTotal}
+          accessibilityLabel="Enter total for custom split"
+          style={styles.fullWidth}
+        />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container} pointerEvents="box-none">
       <PrimaryButton
@@ -35,5 +104,9 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
+  },
+  fullWidth: {
+    flex: 1,
+    alignSelf: 'stretch',
   },
 });

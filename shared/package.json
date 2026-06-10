@@ -12,6 +12,7 @@
     "./profile.types": "./types/profile.types.ts",
     "./receipt.types": "./types/receipt.types.ts",
     "./settlement.types": "./types/settlement.types.ts",
+    "./counterparty.types": "./types/counterparty.types.ts",
     "./paymentHandleValidation": "./utils/paymentHandleValidation.ts"
   },
   "scripts": {

@@ -532,7 +532,7 @@ Full event detail with participants and settlement status.
     title: string;
     event_date: string | null;
     status: EventStatus;       // 'open' | 'locked' | 'settled' | 'cancelled' | 'archived' — NOTE: 'calculating' and 'sent' are NOT events.status values; 'archived' = creator has archived the event from their history (does not affect participant views)
-    ai_stage: string;          // 'none' | 'parsing' | 'parsed' | 'calculating' | 'calculated' | 'messaging' | 'complete' | 'failed' — use this (not status) to track AI processing progress
+    ai_stage: string;          // 'none' | 'parsing' | 'parsed' | 'parsed_confirmed' | 'calculating' | 'calculated' | 'messaging' | 'complete' | 'failed' — use this (not status) to track AI processing progress
     total_amount: number | null;
     currency: string;
     split_mode: string | null;   // 'equal' | 'portion' | 'itemised' | null
@@ -585,9 +585,28 @@ Full event detail with participants and settlement status.
     outstanding: number;
     confirmed_count: number;
     pending_count: number;
+  } | null;
+  receipt_review?: {          // payer only; present when ai_stage is 'parsed' or 'parsed_confirmed' and receipt_scan_attempted
+    items: Array<{
+      name: string;
+      unit_price: number;
+      quantity: number;
+      confidence?: 'high' | 'low';
+    }>;
+    additional_charges: Array<{
+      name: string;
+      amount: number;
+      confidence?: 'high' | 'low';
+    }>;
+    tax_amount: number;
+    tip_amount: number;
+    fees_amount: number;
+    currency: string;
   };
 }
 ```
+
+`receipt_review` is built from `receipt_items` (food vs `is_fee` rows) plus `events.tax_amount` / `tip_amount` / `fees_amount`. Used by Item Review pull-to-refresh and Event Detail **Review items** / **Edit share** CTAs. Does **not** re-run A1.
 
 ---
 
@@ -982,6 +1001,34 @@ Runs A1 with atomic idempotency (`ai_stage`). Returns major-unit amounts (not mi
 **Error codes:** `ALREADY_PROCESSING` 409, `PARSE_FAILED` 500, `RECEIPT_UNREADABLE` 400, `AI_QUOTA_EXCEEDED` 429
 
 **Dev:** `A1_DEV_STUB=true` (non-production) skips the LLM and returns fixture data.
+
+#### POST `/api/v1/receipts/confirm`
+**Auth:** `[AUTH]` | `[PAYER]` | Event must be `locked`
+
+Payer confirms (and optionally edits) parsed receipt lines before split assignment. Human checkpoint before A2.
+
+**Request:**
+```typescript
+{
+  event_id: string;
+  items: Array<{ id?: string; name: string; price: number; quantity: number }>;
+  additional_charges: Array<{ name: string; amount: number }>;
+  tax: number;
+  fees: number;   // must equal sum(additional_charges) ± 0.02
+  tip: number;
+}
+```
+
+**Atomic guard:** `UPDATE events SET ai_stage = 'parsed_confirmed' WHERE id = event_id AND ai_stage IN ('parsed', 'parsed_confirmed')` — allows first confirm and re-itemization edits.
+
+**Side effects:** Deletes existing `receipt_items` for the event; inserts food rows (`is_fee = false`) and fee rows (`is_fee = true`); updates `events.total_amount`, `tax_amount`, `tip_amount`, `fees_amount`, `receipt_scan_attempted`, `ai_parse_success`.
+
+**Response `200`:**
+```typescript
+{ confirmed: true; total_amount: number; }
+```
+
+**Error codes:** `INVALID_AI_STAGE` 400 (not `parsed` / `parsed_confirmed`), `EVENT_NOT_LOCKED` 400, `VALIDATION_ERROR` 400 (e.g. fees mismatch), `FORBIDDEN` 403
 
 ---
 

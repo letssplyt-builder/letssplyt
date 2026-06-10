@@ -367,7 +367,7 @@ letssplyt/
           home.api.ts
         events/
           screens/
-            EventsScreen.tsx            ← Created | Joined sections
+            EventsScreen.tsx            ← Active|Settled toggle + created/joined sections
             EventDetailScreen.tsx       ← joining + settlement actions
             CreateEventScreen.tsx
             QRDisplayScreen.tsx

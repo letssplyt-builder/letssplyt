@@ -1,7 +1,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Platform, StyleSheet, Text } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { HomeScreen } from '../screens/home/HomeScreen';
+import { HomeStackNavigator } from './HomeStackNavigator';
 import { EventsStackNavigator } from './EventsStackNavigator';
 import { TAB_BAR_CONTENT_HEIGHT } from '../constants/layout';
 import { authColors } from '../theme/colors';
@@ -49,11 +49,16 @@ export function MainTabNavigator() {
     >
       <Tab.Screen
         name="HomeTab"
-        component={HomeScreen}
+        component={HomeStackNavigator}
         options={{
           tabBarLabel: 'Dashboard',
           tabBarIcon: ({ focused }) => <TabIcon label="⬡" focused={focused} />,
         }}
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            navigation.navigate('HomeTab', { screen: 'Home' });
+          },
+        })}
       />
       <Tab.Screen
         name="EventsTab"
@@ -62,6 +67,11 @@ export function MainTabNavigator() {
           tabBarLabel: 'Events',
           tabBarIcon: ({ focused }) => <TabIcon label="☰" focused={focused} />,
         }}
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            navigation.navigate('EventsTab', { screen: 'Events' });
+          },
+        })}
       />
     </Tab.Navigator>
   );

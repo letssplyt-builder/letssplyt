@@ -12,6 +12,7 @@ import eventRoutes from './modules/events/event.routes';
 import joinAppRoutes from './modules/join/join-app.routes';
 import joinWebRoutes from './modules/join/join-web.routes';
 import receiptsRoutes from './modules/receipts/receipts.routes';
+import settlementRoutes from './modules/settlement/settlement.routes';
 import { errorHandler } from './modules/auth/auth.controller';
 
 const app = express();
@@ -67,6 +68,7 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', profileRoutes);
 app.use('/api/v1/events', eventRoutes);
 app.use('/api/v1/receipts', receiptsRoutes);
+app.use('/api/v1/settlement', settlementRoutes);
 
 app.use(errorHandler);
 

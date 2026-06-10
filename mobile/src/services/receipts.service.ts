@@ -1,4 +1,6 @@
 import type {
+  ReceiptConfirmRequest,
+  ReceiptConfirmResponse,
   ReceiptParseResponse,
   ReceiptUploadUrlResponse,
 } from '@letssplyt/shared/receipt.types';
@@ -62,6 +64,12 @@ export async function uploadReceiptToSignedUrl(
       uploadResponse.status,
     );
   }
+}
+
+export async function confirmReceipt(
+  body: ReceiptConfirmRequest,
+): Promise<ReceiptConfirmResponse> {
+  return apiPostAuth<ReceiptConfirmResponse>('/receipts/confirm', body);
 }
 
 export async function parseReceipt(

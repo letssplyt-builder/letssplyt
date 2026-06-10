@@ -18,6 +18,7 @@ import type {
   ParticipantAssignedItem,
   ReopenEventResponse,
 } from '@letssplyt/shared/event.types';
+import { fetchReceiptReviewSnapshot } from '../receipts/receipt-review.read';
 
 const DEFAULT_LIST_LIMIT = 20;
 const MAX_LIST_LIMIT = 50;
@@ -25,6 +26,15 @@ const MAX_LIST_LIMIT = 50;
 const JOIN_TOKEN_TTL_HOURS = 24;
 
 type EventRow = EventRecord & { deleted_at?: string | null };
+
+export type EventRowWithReceiptFields = EventRow & {
+  tax_amount: number | null;
+  tip_amount: number | null;
+  fees_amount: number | null;
+  receipt_scan_attempted: boolean;
+};
+
+const RECEIPT_REVIEW_STAGES = new Set(['parsed', 'parsed_confirmed']);
 
 interface EventCursor {
   created_at: string;
@@ -65,11 +75,11 @@ export function decodeEventCursor(cursor: string): EventCursor {
   }
 }
 
-export async function fetchEventRow(eventId: string): Promise<EventRow> {
+export async function fetchEventRow(eventId: string): Promise<EventRowWithReceiptFields> {
   const { data, error } = await supabaseAdmin
     .from('events')
     .select(
-      'id, payer_id, title, event_date, total_amount, currency, status, split_mode, ai_stage, locale, locked_at, messages_sent_at, fully_settled_at, created_at, updated_at, deleted_at',
+      'id, payer_id, title, event_date, total_amount, currency, status, split_mode, ai_stage, locale, locked_at, messages_sent_at, fully_settled_at, created_at, updated_at, deleted_at, tax_amount, tip_amount, fees_amount, receipt_scan_attempted',
     )
     .eq('id', eventId)
     .is('deleted_at', null)
@@ -79,7 +89,7 @@ export async function fetchEventRow(eventId: string): Promise<EventRow> {
     throw new NotFoundError('Event not found');
   }
 
-  return data as EventRow;
+  return data as EventRowWithReceiptFields;
 }
 
 export async function assertEventOwner(event: EventRow, userId: string): Promise<void> {
@@ -455,7 +465,7 @@ async function fetchMyAssignedItems(
 }
 
 export async function getEventById(userId: string, eventId: string): Promise<EventDetailResponse> {
-  const eventRow = await fetchEventRow(eventId);
+  const eventRow: EventRowWithReceiptFields = await fetchEventRow(eventId);
   await assertEventAccess(eventRow, userId);
   const isPayer = eventRow.payer_id === userId;
 
@@ -519,6 +529,20 @@ export async function getEventById(userId: string, eventId: string): Promise<Eve
     my_items = await fetchMyAssignedItems(eventId, selfParticipant.id);
   }
 
+  let receipt_review: EventDetailResponse['receipt_review'];
+  if (
+    isPayer &&
+    RECEIPT_REVIEW_STAGES.has(eventRow.ai_stage) &&
+    eventRow.receipt_scan_attempted
+  ) {
+    receipt_review = await fetchReceiptReviewSnapshot(eventId, {
+      tax_amount: eventRow.tax_amount,
+      tip_amount: eventRow.tip_amount,
+      fees_amount: eventRow.fees_amount,
+      currency: eventRow.currency,
+    });
+  }
+
   return {
     event: {
       ...mapEventRecord(eventRow),
@@ -532,6 +556,7 @@ export async function getEventById(userId: string, eventId: string): Promise<Eve
     join_token,
     summary,
     ...(my_items !== undefined ? { my_items } : {}),
+    ...(receipt_review !== undefined ? { receipt_review } : {}),
   };
 }
 

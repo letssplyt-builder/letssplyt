@@ -1,6 +1,6 @@
 # LetsSplyt — Product Requirements Document (PRD)
 **Version:** 1.2 | **Date:** May 2026 | **Status:** MVP Definition Complete
-**Last updated:** Home dashboard — Members/Guests toggle with net counterparty balances; Events tab — Created/Joined sections (settled collapsed). MVP US market, USD only. OTP = register everywhere; pure guests only via payer manual add without OTP.
+**Last updated:** Home dashboard — Members/Guests toggle with net counterparty balances; Events tab — Active|Settled toggle with Created/Joined sections under each. MVP US market, USD only. OTP = register everywhere; pure guests only via payer manual add without OTP.
 
 ---
 
@@ -454,7 +454,7 @@ iOS and Android both prevent apps from silently sending SMS or WhatsApp messages
 - Event Detail screen with inline settlement tracking (segmented progress bar, per-member confirm/dispute/nudge/cash actions)
 - Home dashboard: net balance hero; **Members | Guests** toggle; Members shows net counterparty rows (People who owe you / People you owe); Guests shows outstanding pure guests who owe the creator (phone guests aggregated, name-only guests per-event)
 - Member/Guest detail screens route to Event Detail; settlement actions execute in Event Detail only
-- Events tab: **Events you created** and **Events you joined** (settled events collapsed per section)
+- Events tab: **Active | Settled** toggle; under each, **Events you created** and **Events you joined**
 - Post-send edit with selective resend
 - US market MVP — USD only; US payment apps in messages
 - Push notifications (self-report, nudge, confirmation)

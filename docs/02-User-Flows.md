@@ -1,6 +1,6 @@
 # LetsSplyt — Complete User Actions Document
 **Version:** 1.3 | **Date:** June 2026 | **Total Actions:** 66
-**Last updated:** Home dashboard — **Members | Guests** toggle, net counterparty balances, Member/Guest detail → Event Detail. Events tab — **Created / Joined** (settled collapsed). US MVP, USD only. OTP = register; pure guests via manual add only.
+**Last updated:** Home dashboard — **Members | Guests** toggle, net counterparty balances, Member/Guest detail → Event Detail. Events tab — **Active | Settled** toggle with **Created / Joined** sections under each. US MVP, USD only. OTP = register; pure guests via manual add only.
 
 ---
 
@@ -78,7 +78,7 @@ Settlement tracking lives entirely inside **Event Detail** — there is no separ
 | P25 | Confirm a self-reported payment | From Event Detail — member row with "🕐 Self-reported" status shows a "✓ Confirm payment" button. Tap → Confirm Payment screen shows amount, method, and timestamp. Payer taps "Confirm — Mark as settled" → member row turns green, progress bar updates, participant notified. | Two-party confirmation model. Recipient self-reports from their side; payer verifies from theirs. Prevents unilateral "mark myself paid" abuse while giving recipients agency. **MVP** |
 | P26 | Dispute a self-reported payment | From Event Detail — member row with "🕐 Self-reported" status also shows "✕ Dispute" button. Tap → status resets to Pending → participant notified. | Someone marked paid without actually paying. Dispute resets the status and notifies the participant. The audit trail (SETTLEMENT_LOG) captures the full history for both parties. **MVP** |
 | P27 | Manually mark a participant as paid (Cash) | From Event Detail — each Pending member row shows a "💵 Cash" button alongside "⏰ Nudge". Payer taps Cash → confirmation sheet (amount, member name, method) → confirms → status changes to Paid immediately. Available for all pending participants, not just cash-only ones. | Cash payments and Zelle transfers leave no in-app trace. "Cash" button is surfaced directly on the Event Detail member row next to Nudge. Confirmation sheet prevents accidental taps on a financial action. **MVP** |
-| P28 | View event history | **Events** tab: two sections — **Events you created** and **Events you joined**. Active events shown first; **settled events collapsed** under "Settled (N)" in each section. Tap any card → Event Detail (joining or settlement phase). | Browse by role (creator vs participant), not by lifecycle alone. Settled history stays accessible without cluttering the default view. **MVP** |
+| P28 | View event history | **Events** tab: **Active | Settled** toggle at top; under each toggle, two sections — **Events you created** and **Events you joined** (filtered by lifecycle). Tap any card → Event Detail. Tapping Events tab again returns to the list (stack reset). | Browse by lifecycle (active vs settled) and role (creator vs participant). **MVP** |
 
 ### Dashboard Views (Home tab)
 

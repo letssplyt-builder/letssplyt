@@ -1,5 +1,7 @@
 /** Event types — shared between mobile and backend */
 
+import type { ReceiptReviewSnapshot } from './receipt.types';
+
 export type EventStatus =
   | 'open'
   | 'locked'
@@ -14,6 +16,7 @@ export type AiStage =
   | 'none'
   | 'parsing'
   | 'parsed'
+  | 'parsed_confirmed'
   | 'calculating'
   | 'calculated'
   | 'messaging'
@@ -109,6 +112,8 @@ export interface EventDetailResponse {
   summary: EventSettlementSummary | null;
   /** Itemised split — current viewer's assigned line items (participant view only). */
   my_items?: ParticipantAssignedItem[];
+  /** Payer only — parsed receipt lines for Item Review refresh (no AI re-run). */
+  receipt_review?: ReceiptReviewSnapshot;
 }
 
 export interface LockEventResponse {

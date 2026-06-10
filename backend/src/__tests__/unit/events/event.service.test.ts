@@ -6,6 +6,7 @@ import {
   decodeEventCursor,
   encodeEventCursor,
   generateJoinTokenValue,
+  getEventById,
   listEvents,
   lockEvent,
   reopenEvent,
@@ -237,6 +238,145 @@ describe('event.service', () => {
         code: 'FORBIDDEN',
         statusCode: 403,
       });
+    });
+  });
+
+  describe('getEventById receipt_review', () => {
+    const lockedParsedEvent = {
+      id: EVENT_ID,
+      payer_id: USER_ID,
+      title: 'Dinner',
+      event_date: null,
+      total_amount: 23,
+      currency: 'USD',
+      status: 'locked',
+      split_mode: null,
+      ai_stage: 'parsed',
+      locale: 'en-US',
+      locked_at: '2026-01-01T01:00:00.000Z',
+      messages_sent_at: null,
+      fully_settled_at: null,
+      created_at: '2026-01-01T00:00:00.000Z',
+      updated_at: '2026-01-01T00:00:00.000Z',
+      deleted_at: null,
+      tax_amount: 1,
+      tip_amount: 2,
+      fees_amount: 2,
+      receipt_scan_attempted: true,
+    };
+
+    it('includes receipt_review for payer when parsed and scan attempted', async () => {
+      mockSupabase.__pushMockResultForTable('events', { data: lockedParsedEvent, error: null });
+      mockSupabase.__pushMockResultForTable('users', {
+        data: { id: USER_ID, display_name: 'Alex', avatar_colour: '#4F46E5' },
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('participants', {
+        data: [
+          {
+            id: 'p1',
+            user_id: USER_ID,
+            display_name: 'Alex',
+            join_method: 'qr_app',
+            payment_status: 'pending',
+            amount_owed: null,
+          },
+        ],
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('users', {
+        data: [{ id: USER_ID, display_name: 'Alex' }],
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('receipt_items', {
+        data: [
+          {
+            name: 'Burger',
+            unit_price: 10,
+            quantity: 1,
+            confidence_score: 0.95,
+            is_low_confidence: false,
+            is_fee: false,
+          },
+        ],
+        error: null,
+      });
+
+      const detail = await getEventById(USER_ID, EVENT_ID);
+
+      expect(detail.receipt_review).toEqual({
+        items: [{ name: 'Burger', unit_price: 10, quantity: 1, confidence: 'high' }],
+        additional_charges: [],
+        tax_amount: 1,
+        tip_amount: 2,
+        fees_amount: 2,
+        currency: 'USD',
+      });
+    });
+
+    it('omits receipt_review when ai_stage is none', async () => {
+      mockSupabase.__pushMockResultForTable('events', {
+        data: { ...lockedParsedEvent, ai_stage: 'none', receipt_scan_attempted: false },
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('users', {
+        data: { id: USER_ID, display_name: 'Alex', avatar_colour: '#4F46E5' },
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('participants', {
+        data: [
+          {
+            id: 'p1',
+            user_id: USER_ID,
+            display_name: 'Alex',
+            join_method: 'qr_app',
+            payment_status: 'pending',
+            amount_owed: null,
+          },
+        ],
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('users', {
+        data: [{ id: USER_ID, display_name: 'Alex' }],
+        error: null,
+      });
+
+      const detail = await getEventById(USER_ID, EVENT_ID);
+
+      expect(detail.receipt_review).toBeUndefined();
+    });
+
+    it('omits receipt_review for non-payer participants', async () => {
+      mockSupabase.__pushMockResultForTable('events', { data: lockedParsedEvent, error: null });
+      mockSupabase.__pushMockResultForTable('participants', {
+        data: { id: 'p2' },
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('users', {
+        data: { id: USER_ID, display_name: 'Alex', avatar_colour: '#4F46E5' },
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('participants', {
+        data: [
+          {
+            id: 'p2',
+            user_id: OTHER_USER_ID,
+            display_name: 'Guest',
+            join_method: 'qr_app',
+            payment_status: 'pending',
+            amount_owed: null,
+          },
+        ],
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('users', {
+        data: [{ id: OTHER_USER_ID, display_name: 'Guest' }],
+        error: null,
+      });
+
+      const detail = await getEventById(OTHER_USER_ID, EVENT_ID);
+
+      expect(detail.receipt_review).toBeUndefined();
     });
   });
 

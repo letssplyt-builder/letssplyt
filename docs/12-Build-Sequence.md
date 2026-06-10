@@ -1574,7 +1574,7 @@ backend/src/__tests__/integration/events/participants.test.ts
 7. Balance card calls `GET /api/v1/users/me/balance` but gracefully degrades: if the endpoint returns 404 or the call fails, show 'Balance unavailable' placeholder. Do NOT hard-fail. The endpoint is built in E09-S02.
 8. Do NOT call any settlement endpoint that isn't built yet. Use a stub response shape for the balance card.
 
-> **Placeholder UI (superseded in E09-S03):** E05-S03 shipped a **placeholder** HomeScreen (Needs attention + recent events) and EventsScreen (Active|Settled segmented control). The **final** dashboard design — Home **Members | Guests** toggle with counterparty lists, MemberDetailScreen, GuestDetailScreen, and Events **Created | Joined** sections with collapsed settled — is specified in `docs/01-PRD.md`, `docs/02-User-Flows.md` (P28–P34), `docs/08-Mobile-App-Specification.md`, and built in **E09-S03**. E05-S03 only needs the net balance hero + graceful degradation; list areas may remain placeholder until E09.
+> **Placeholder UI (superseded in E09-S03):** E05-S03 shipped a **placeholder** HomeScreen (Needs attention + recent events) and EventsScreen (single Active|Settled list). The **final** dashboard design — Home **Members | Guests** toggle, Member/Guest detail, Events **Active | Settled** toggle with **Created / Joined** sections under each — is specified in `docs/01-PRD.md`, `docs/02-User-Flows.md` (P28–P34), `docs/08-Mobile-App-Specification.md`, and built in **E09-S03** (partially shipped ahead in E07-S03 for Home + Events list layout). E05-S03 only needs the net balance hero + graceful degradation; list areas may remain placeholder until E09.
 
 > **Deferred to E05-S04:** Native contact picker ("From contacts"), remove-participant UI (before lock), and "Reopen join window" UI (after lock). E05-S03 shipped manual entry only; APIs for delete/reopen already exist from E05-S01/E05-S02.
 
@@ -1935,31 +1935,42 @@ backend/src/__tests__/unit/ai/receipt-parser.dedupe.test.ts
 *"Build the ItemReviewScreen and the receipts confirm endpoint for LetsSplyt. (1) Mobile ItemReviewScreen (refer to prototype/receipt-split.html ID 'item_review'): editable FlatList of food/drink receipt items (is_fee=false), each row shows item name (tapping opens an inline TextInput), price (tapping opens a numeric TextInput), and quantity. Separate section or rows for additional_charges / fee lines (is_fee=true) from the parse result. Swipe left on a row reveals a red delete button. 'Add item' button at the bottom of the list adds a new empty row. Tax field pre-filled from the AI parse result (editable). Fees section pre-filled from additional_charges (editable). Tip field pre-filled (editable). Running total shown live = sum(food items) + tax + fees + tip. Items with confidence='low' are shown with an amber left border and amber background tint. CTA button 'Confirm items →' at the bottom calls POST /api/v1/receipts/confirm, then navigates to SplitEntryScreen. Pull-to-refresh re-fetches GET /events/:id and re-displays the stored items — it does NOT re-run the AI. (2) Backend: POST /api/v1/receipts/confirm (requires authenticate middleware): body { event_id, items: [{ id?: string, name: string, price: number, quantity: number }], additional_charges: [{ name: string, amount: number }], tax: number, fees: number, tip: number }. Atomic guard: UPDATE events SET ai_stage='parsed_confirmed' WHERE id=event_id AND ai_stage='parsed' — return 400 if 0 rows updated. Delete existing receipt_items rows for event_id (allows re-confirmation). Insert food items (is_fee=false) and fee rows (is_fee=true) from the body. UPDATE events SET total_amount=sum(items)+tax+fees+tip, tax_amount=tax, fees_amount=fees, tip_amount=tip. Return { confirmed: true }."*
 
 **Files created:**
-- `mobile/src/screens/ItemReviewScreen.tsx`
+- `mobile/src/screens/receipts/ItemReviewScreen.tsx`
+- `mobile/src/screens/receipts/itemReview.utils.ts`
+- `mobile/src/components/receipts/ReceiptReviewSlip.tsx`
+- `mobile/src/utils/eventSplitFooter.ts`
+- `mobile/src/components/events/EventSplitActionBar.tsx` (footer modes)
 - `mobile/src/__tests__/components/receipts/ItemReviewScreen.test.tsx`
+- `mobile/src/__tests__/components/receipts/ReceiptReviewSlip.test.tsx`
+- `mobile/src/__tests__/unit/utils/eventSplitFooter.test.ts`
+- `backend/src/modules/receipts/receipts.confirm.ts`
+- `backend/src/modules/receipts/receipt-review.read.ts`
 - `backend/src/__tests__/unit/receipts/confirm.test.ts`
+- `backend/src/__tests__/unit/receipts/receipt-review.read.test.ts`
+- `backend/scripts/smoke-receipts-confirm.ts`
+- `supabase/migrations/20260614000000_events_ai_stage_parsed_confirmed.sql`
 
 **Acceptance Criteria:**
-1. ItemReviewScreen displays all items from the AI parse result with names and prices populated
-2. Tap an item name → TextInput appears, type a new name, tap away → item name updates in the list
-3. Low-confidence items (confidence='low') have a visible amber left border distinguishing them from others
-4. Swipe left on an item → delete button appears → tap → item is removed and running total recalculates immediately
-5. Tap "Add item" → a new empty row appears at the bottom with editable fields
-6. Tap "Confirm items" → navigates to SplitEntryScreen
+1. ItemReviewScreen displays all items from the AI parse result (receipt-slip compact rows)
+2. Tap a line → expands inline edit; name/qty/price update; total recalculates live
+3. Low-confidence items show amber highlight + **Check** chip
+4. Swipe left on compact food row → delete → total updates
+5. **+ Add line** adds a new editable row
+6. **Looks good → assign shares** → `POST /api/v1/receipts/confirm` → `SplitEntryScreen` (`itemised`)
+7. Event Detail (locked payer): after scan without confirm, footer shows **Review items** (not Scan/Enter total); after confirm, **Edit share**; refetch on screen focus
 
 **Tests required:**
 ```
 mobile/src/__tests__/components/receipts/ItemReviewScreen.test.tsx
-  - renders all items from parse result
-  - low-confidence items have amber styling
-  - editing item name updates the list
-  - deleting item updates running total
-  - confirm button calls receipts service
+mobile/src/__tests__/components/receipts/ReceiptReviewSlip.test.tsx
+mobile/src/__tests__/unit/utils/eventSplitFooter.test.ts
+mobile/src/__tests__/unit/screens/itemReview.utils.test.ts
 
 backend/src/__tests__/unit/receipts/confirm.test.ts
-  - updates ai_stage to 'parsed_confirmed'
-  - rejects if ai_stage is not 'parsed'
-  - calculates total_amount correctly
+backend/src/__tests__/unit/receipts/receipt-review.read.test.ts
+backend/src/__tests__/unit/events/event.service.test.ts (getEventById receipt_review)
+
+Live smoke (manual): backend/scripts/smoke-receipts-confirm.ts
 ```
 
 ---
@@ -2460,7 +2471,7 @@ backend/src/__tests__/integration/settlement/ledger.test.ts
 2. Home Members toggle shows net-aggregated counterparties; net=0 hidden; tap opens MemberDetailScreen
 3. Home Guests toggle shows only guests who owe viewer; phone → GuestDetailScreen; name-only → Event Detail directly
 4. MemberDetailScreen shows outstanding events + expandable history; no Confirm/Nudge buttons on this screen
-5. EventsScreen shows Created and Joined sections with collapsed settled groups
+5. EventsScreen shows Active|Settled toggle; under each toggle, Created and Joined sections (lifecycle-filtered)
 6. EventDetailScreen settlement phase has Confirm, Nudge, I've paid, Mark cash — not on Home lists
 7. PayNowScreen opens Venmo/PayPal deep links via `Linking.openURL`
 8. E05-S03 balance hero graceful degradation still works if balance endpoint fails
@@ -2482,9 +2493,11 @@ mobile/src/__tests__/components/MemberDetailScreen.test.tsx
   - See more events expands history
   - no Confirm/Nudge buttons rendered
 
-mobile/src/__tests__/components/EventsScreen.test.tsx
-  - renders Created and Joined sections
-  - Settled (N) header collapses/expands
+mobile/src/__tests__/components/events/EventsScreen.test.tsx
+  - renders Active|Settled toggle and Created/Joined sections
+  - Active segment shows non-settled events only
+  - Settled segment shows settled/archived events only
+  - tap card navigates to EventDetailScreen
 
 mobile/src/__tests__/components/settlement/PayNowScreen.test.tsx
   - renders payment handle cards

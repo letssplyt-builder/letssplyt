@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -35,7 +36,9 @@ import { useAuthStore } from '../../store/authStore';
 import { useEventStore } from '../../store/eventStore';
 import { glassStyles } from '../../theme/glassStyles';
 import { authColors } from '../../theme/colors';
+import { receiptReviewToParseResult } from '../receipts/itemReview.utils';
 import { formatMoney, isPayerParticipant } from '../../utils/events';
+import { resolveEventSplitActionMode } from '../../utils/eventSplitFooter';
 
 type Props = NativeStackScreenProps<EventsStackParamList, 'EventDetail'>;
 
@@ -107,10 +110,15 @@ export function EventDetailScreen({ navigation, route }: Props) {
     }
   }, [eventId, loadEventDetail]);
 
+  useFocusEffect(
+    useCallback(() => {
+      void refreshDetail();
+    }, [refreshDetail]),
+  );
+
   useEffect(() => {
-    void refreshDetail();
     return () => useEventStore.getState().resetCurrentEvent();
-  }, [refreshDetail]);
+  }, []);
 
   useEffect(() => {
     const event = currentEvent?.event;
@@ -151,6 +159,22 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const lockEnabled = memberCount >= 2;
   const isPayer = Boolean(authUser && event && authUser.id === event.payer_id);
   const showSplitActions = isPayer && event?.status === 'locked';
+  const splitActionMode = event
+    ? resolveEventSplitActionMode(event.ai_stage, Boolean(currentEvent?.receipt_review))
+    : 'initial';
+
+  const openItemReview = () => {
+    const review = currentEvent?.receipt_review;
+    if (!review) {
+      setToast('Receipt data is not ready yet. Pull to refresh.');
+      return;
+    }
+    navigation.navigate('ItemReview', {
+      eventId,
+      storagePath: '',
+      parseResult: receiptReviewToParseResult(review),
+    });
+  };
 
   const settlementSummary = useMemo(() => {
     if (!currentEvent?.summary) {
@@ -264,10 +288,13 @@ export function EventDetailScreen({ navigation, route }: Props) {
       footer={
         showSplitActions ? (
           <EventSplitActionBar
+            mode={splitActionMode}
             onScanReceipt={() => navigation.navigate('ReceiptScan', { eventId })}
             onEnterTotal={() =>
               navigation.navigate('SplitEntry', { eventId, mode: 'manual' })
             }
+            onReviewItems={openItemReview}
+            onEditShare={openItemReview}
           />
         ) : undefined
       }

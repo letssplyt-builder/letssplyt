@@ -13,6 +13,17 @@ import { ApiRequestError } from '../../../services/api';
 import * as eventService from '../../../services/event.service';
 import { useEventStore } from '../../../store/eventStore';
 
+jest.mock('@react-navigation/native', () => {
+  const React = require('react');
+  return {
+    useFocusEffect: (callback: () => void) => {
+      React.useEffect(() => {
+        callback();
+      }, [callback]);
+    },
+  };
+});
+
 jest.mock('../../../services/event.service');
 
 let mockAuthUser: { id: string; display_name: string; avatar_colour: string } | null = {
@@ -341,6 +352,143 @@ describe('EventDetailScreen', () => {
     });
 
     expect(screen.queryByLabelText('Remove Sam')).toBeNull();
+  });
+
+  it('shows scan and enter total when locked and receipt not scanned', async () => {
+    jest.mocked(eventService.fetchEventById).mockResolvedValue(mockDetailLocked);
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Scan receipt for itemised split')).toBeTruthy();
+      expect(screen.getByLabelText('Enter total for custom split')).toBeTruthy();
+    });
+  });
+
+  it('shows Review items when receipt parsed but not confirmed', async () => {
+    jest.mocked(eventService.fetchEventById).mockResolvedValue({
+      ...mockDetailLocked,
+      event: { ...mockDetailLocked.event, ai_stage: 'parsed' },
+      receipt_review: {
+        items: [{ name: 'Burger', unit_price: 10, quantity: 1 }],
+        additional_charges: [],
+        tax_amount: 0,
+        tip_amount: 0,
+        fees_amount: 0,
+        currency: 'USD',
+      },
+    });
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Review receipt items')).toBeTruthy();
+    });
+    expect(screen.queryByLabelText('Scan receipt for itemised split')).toBeNull();
+    expect(screen.queryByLabelText('Enter total for custom split')).toBeNull();
+  });
+
+  it('shows Edit share after itemization is confirmed', async () => {
+    jest.mocked(eventService.fetchEventById).mockResolvedValue({
+      ...mockDetailLocked,
+      event: { ...mockDetailLocked.event, ai_stage: 'parsed_confirmed' },
+      receipt_review: {
+        items: [{ name: 'Burger', unit_price: 10, quantity: 1 }],
+        additional_charges: [],
+        tax_amount: 0,
+        tip_amount: 0,
+        fees_amount: 0,
+        currency: 'USD',
+      },
+    });
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Edit itemised split')).toBeTruthy();
+    });
+    expect(screen.queryByLabelText('Scan receipt for itemised split')).toBeNull();
+  });
+
+  it('shows Review items when receipt_review exists but ai_stage is stale none', async () => {
+    jest.mocked(eventService.fetchEventById).mockResolvedValue({
+      ...mockDetailLocked,
+      event: { ...mockDetailLocked.event, ai_stage: 'none' },
+      receipt_review: {
+        items: [{ name: 'Burger', unit_price: 10, quantity: 1 }],
+        additional_charges: [],
+        tax_amount: 0,
+        tip_amount: 0,
+        fees_amount: 0,
+        currency: 'USD',
+      },
+    });
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Review receipt items')).toBeTruthy();
+    });
+    expect(screen.queryByLabelText('Scan receipt for itemised split')).toBeNull();
+  });
+
+  it('navigates to ItemReview from Review items CTA', async () => {
+    jest.mocked(eventService.fetchEventById).mockResolvedValue({
+      ...mockDetailLocked,
+      event: { ...mockDetailLocked.event, ai_stage: 'parsed' },
+      receipt_review: {
+        items: [{ name: 'Burger', unit_price: 10, quantity: 1 }],
+        additional_charges: [],
+        tax_amount: 1,
+        tip_amount: 2,
+        fees_amount: 0,
+        currency: 'USD',
+      },
+    });
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Review receipt items')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByLabelText('Review receipt items'));
+
+    expect(navigation.navigate).toHaveBeenCalledWith(
+      'ItemReview',
+      expect.objectContaining({
+        eventId: 'event-1',
+        parseResult: expect.objectContaining({
+          items: [{ name: 'Burger', unit_price: 10, quantity: 1 }],
+          currency: 'USD',
+        }),
+      }),
+    );
   });
 
   it('shows Reopen join window when event locked (payer)', async () => {
