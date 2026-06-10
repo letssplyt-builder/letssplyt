@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
-**Last updated:** 2026-06-10
-**Current story:** E07-S04 — Split Calculator (getCurrencyMinorUnits, largest-remainder, 100% coverage)
+**Last updated:** 2026-06-07
+**Current story:** E07-S05 — A2 NLP Assignment Agent (sanitizePromptInput, delegates math to calculator)
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -53,7 +53,7 @@
 - [x] E07-S01 — Receipt Image Upload (native doc scanner → preview confirm → compress → Supabase Storage signed URL) (2026-06-10)
 - [x] E07-S02 — A1 Receipt Parsing (AI Agent — atomic idempotency, Zod validation, additional_charges/fees, dedupe) (2026-06-10)
 - [x] E07-S03 — Item Review Screen (mobile — editable items, low-confidence highlight) (2026-06-10)
-- [ ] E07-S04 — Split Calculator (getCurrencyMinorUnits, largest-remainder, 100% coverage)
+- [x] E07-S04 — Split Calculator (getCurrencyMinorUnits, largest-remainder, 100% coverage) (2026-06-07)
 - [ ] E07-S05 — A2 NLP Assignment Agent (sanitizePromptInput, delegates math to calculator)
 - [ ] E07-S06 — Split Entry + Review Screens (4 tabs, drag-drop, NLP input)
 
