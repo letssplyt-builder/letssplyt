@@ -666,6 +666,40 @@ Reopen the join window for 24 hours. Generates a new join token.
 
 ---
 
+### POST `/events/:eventId/expenses/reset`
+**Auth:** `[AUTH]` | `[PAYER]` | Event must be `status = "locked"` | Blocked after `messages_sent_at` is set
+
+Clears all expense and split data for the event so the creator can start again with **Scan receipt** or **Enter total**. Participants and join tokens are **not** deleted.
+
+**Side effects:**
+- Deletes all `receipt_items` for the event (`item_assignments` cascade)
+- Clears event receipt/AI fields: `total_amount`, `tax_amount`, `tip_amount`, `fees_amount`, `split_mode`, `receipt_scan_attempted`, `ai_parse_success`, `ai_parse_confidence`, `last_parse_attempt_id`, `ai_stage → 'none'`
+- Clears participant split fields: `amount_owed`, `payment_status → 'pending'`, message/self-report/confirm timestamps
+- Deletes `ai_audit_log` rows for the event
+- Deletes receipt images from Storage bucket `receipts/{eventId}/` (best-effort)
+
+Implemented via Postgres function `reset_event_expenses_data(p_event_id)` when the migration is applied; otherwise falls back to equivalent row updates. Verifies the event is fully cleared before returning success.
+
+**Request body:** none
+
+**Response `200`:**
+```typescript
+{
+  reset: true;
+  event_id: string;
+  ai_stage: 'none';
+}
+```
+
+**Error codes:**
+- `EVENT_NOT_LOCKED` 409 — event is not in `locked` status
+- `MESSAGES_ALREADY_SENT` 409 — `messages_sent_at` is set; cannot reset after send
+- `NOTHING_TO_RESET` 400 — no receipt scan, totals, or AI stage data to clear
+- `RESET_FAILED` 500 — expense data could not be fully cleared (check migrations / logs)
+- `FORBIDDEN` 403 — caller is not the payer
+
+---
+
 ## Participant Endpoints
 
 ### Canonical Participant Response Shape

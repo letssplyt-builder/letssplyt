@@ -1,9 +1,9 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Platform, StyleSheet, Text } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StyleSheet, Text } from 'react-native';
+import { TAB_BAR_CONTENT_HEIGHT, TAB_BAR_PADDING_TOP } from '../constants/layout';
+import { useAppInsets } from '../hooks/useAppInsets';
 import { HomeStackNavigator } from './HomeStackNavigator';
 import { EventsStackNavigator } from './EventsStackNavigator';
-import { TAB_BAR_CONTENT_HEIGHT } from '../constants/layout';
 import { authColors } from '../theme/colors';
 import type { MainTabParamList } from './types';
 
@@ -18,8 +18,8 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
 }
 
 export function MainTabNavigator() {
-  const insets = useSafeAreaInsets();
-  const tabBarHeight = TAB_BAR_CONTENT_HEIGHT + insets.bottom;
+  const { tabBarPaddingBottom } = useAppInsets();
+  const tabBarHeight = TAB_BAR_PADDING_TOP + TAB_BAR_CONTENT_HEIGHT + tabBarPaddingBottom;
 
   return (
     <Tab.Navigator
@@ -32,18 +32,19 @@ export function MainTabNavigator() {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(11, 61, 69, 0.94)',
-          borderTopColor: authColors.glassBorder,
-          borderTopWidth: 1,
+          backgroundColor: 'rgba(11, 61, 69, 0.92)',
+          borderTopColor: 'rgba(255, 255, 255, 0.12)',
+          borderTopWidth: StyleSheet.hairlineWidth,
           height: tabBarHeight,
-          paddingTop: 8,
-          paddingBottom: Math.max(insets.bottom, Platform.OS === 'android' ? 8 : 0),
-          elevation: 12,
+          paddingTop: TAB_BAR_PADDING_TOP,
+          paddingBottom: tabBarPaddingBottom,
+          elevation: 8,
           shadowColor: '#000000',
-          shadowOffset: { width: 0, height: -4 },
-          shadowOpacity: 0.25,
-          shadowRadius: 12,
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.18,
+          shadowRadius: 8,
         },
+        tabBarItemStyle: styles.tabItem,
         tabBarLabelStyle: styles.tabLabel,
       }}
     >
@@ -78,18 +79,25 @@ export function MainTabNavigator() {
 }
 
 const styles = StyleSheet.create({
+  tabItem: {
+    paddingTop: 0,
+    paddingBottom: 0,
+    minHeight: TAB_BAR_CONTENT_HEIGHT,
+    justifyContent: 'center',
+  },
   tabLabel: {
     fontSize: 10,
     fontWeight: '600',
     letterSpacing: 0.2,
-    marginBottom: 2,
+    marginTop: 2,
+    marginBottom: 0,
   },
   tabIcon: {
-    fontSize: 22,
+    fontSize: 18,
     color: authColors.textOnDarkMuted,
+    lineHeight: 20,
   },
   tabIconFocused: {
     color: authColors.textOnDark,
-    transform: [{ scale: 1.08 }],
   },
 });

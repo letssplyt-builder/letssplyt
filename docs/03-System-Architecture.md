@@ -250,6 +250,15 @@ This section traces a single complete event from the creator opening the app to 
 
 ---
 
+**Step 7b — Reset expenses (optional, pre-send)**
+
+- **Service:** Event Service (`expenses.reset.ts`)
+- **What happens:** Before messages are sent, the payer may tap **Reset expenses** on Event Detail. `POST /events/:id/expenses/reset` clears receipt items, split amounts, AI audit logs, and resets `events.ai_stage` to `'none'` while keeping participants and join tokens. The mobile footer returns to **Scan receipt** + **Enter total**. Blocked once `messages_sent_at` is set.
+- **Tables written:** `receipt_items` (DELETE), `participants` (amount_owed and message fields cleared), `events` (receipt/total/ai_stage reset), `ai_audit_log` (DELETE for event)
+- **DB function:** `reset_event_expenses_data(p_event_id)` when migration `20260615000000` is applied
+
+---
+
 **Step 8 — A3 invoked → messages composed**
 
 - **Service:** AI Orchestrator (`message-composer.service.ts`) + Message Service

@@ -129,5 +129,11 @@ export interface ReopenEventResponse {
   expires_at: string;
 }
 
+export interface ResetExpensesResponse {
+  reset: true;
+  event_id: string;
+  ai_stage: 'none';
+}
+
 /** @deprecated Use EventRecord */
 export type Event = EventRecord;

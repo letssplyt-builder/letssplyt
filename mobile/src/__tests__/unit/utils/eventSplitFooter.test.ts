@@ -1,7 +1,10 @@
 import { describe, expect, it } from '@jest/globals';
 import {
+  canResetEventExpenses,
   getEventSplitActionMode,
+  hasEventExpensesEntered,
   resolveEventSplitActionMode,
+  resolveSplitEntryMode,
 } from '../../../utils/eventSplitFooter';
 
 describe('getEventSplitActionMode', () => {
@@ -37,5 +40,49 @@ describe('getEventSplitActionMode', () => {
 
   it('resolve shows edit when confirmed with receipt data', () => {
     expect(resolveEventSplitActionMode('parsed_confirmed', true)).toBe('edit');
+  });
+});
+
+describe('resolveSplitEntryMode', () => {
+  it('uses itemised when receipt review is present', () => {
+    expect(resolveSplitEntryMode(null, 'none', true)).toBe('itemised');
+  });
+
+  it('uses itemised when split_mode is itemised', () => {
+    expect(resolveSplitEntryMode('itemised', 'parsed_confirmed', false)).toBe('itemised');
+  });
+
+  it('uses manual for equal split after calculate without receipt scan', () => {
+    expect(resolveSplitEntryMode('equal', 'calculated', false)).toBe('manual');
+  });
+
+  it('uses manual for portion split after calculate', () => {
+    expect(resolveSplitEntryMode('portion', 'calculated', false)).toBe('manual');
+  });
+
+  it('uses manual when calculated even if split_mode is still null', () => {
+    expect(resolveSplitEntryMode(null, 'calculated', false)).toBe('manual');
+  });
+});
+
+describe('hasEventExpensesEntered', () => {
+  it('is true after receipt confirm or split calculate', () => {
+    expect(hasEventExpensesEntered('parsed_confirmed')).toBe(true);
+    expect(hasEventExpensesEntered('calculated')).toBe(true);
+  });
+
+  it('is false before expenses are entered', () => {
+    expect(hasEventExpensesEntered('none')).toBe(false);
+    expect(hasEventExpensesEntered('parsed')).toBe(false);
+  });
+});
+
+describe('canResetEventExpenses', () => {
+  it('allows reset when expenses entered and messages not sent', () => {
+    expect(canResetEventExpenses('calculated', null)).toBe(true);
+  });
+
+  it('blocks reset after messages sent', () => {
+    expect(canResetEventExpenses('calculated', '2026-01-01T00:00:00.000Z')).toBe(false);
   });
 });

@@ -11,6 +11,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Welcome'>;
 export function WelcomeScreen({ navigation }: Props) {
   return (
     <AuthGradientLayout
+      bottomSafeArea="system"
       contentStyle={styles.content}
       footer={
         <FadeSlideIn delay={280}>

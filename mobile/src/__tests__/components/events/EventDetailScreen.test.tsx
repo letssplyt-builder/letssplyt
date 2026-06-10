@@ -398,6 +398,122 @@ describe('EventDetailScreen', () => {
     expect(screen.queryByLabelText('Enter total for custom split')).toBeNull();
   });
 
+  it('navigates to manual SplitEntry after Enter total flow without receipt scan', async () => {
+    jest.mocked(eventService.fetchEventById).mockResolvedValue({
+      ...mockDetailLocked,
+      event: {
+        ...mockDetailLocked.event,
+        ai_stage: 'calculated',
+        split_mode: 'equal',
+        total_amount: 120,
+      },
+    });
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Edit split')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByLabelText('Edit split'));
+
+    await waitFor(() => {
+      expect(navigation.navigate).toHaveBeenCalledWith('SplitEntry', {
+        eventId: 'event-1',
+        mode: 'manual',
+      });
+    });
+  });
+
+  it('navigates to SplitEntry from Edit share CTA', async () => {
+    jest.mocked(eventService.fetchEventById).mockResolvedValue({
+      ...mockDetailLocked,
+      event: { ...mockDetailLocked.event, ai_stage: 'parsed_confirmed' },
+      receipt_review: {
+        items: [{ id: 'item-1', name: 'Burger', unit_price: 10, quantity: 1 }],
+        additional_charges: [],
+        tax_amount: 0,
+        tip_amount: 0,
+        fees_amount: 0,
+        currency: 'USD',
+      },
+    });
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Edit split')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByLabelText('Edit split'));
+
+    expect(navigation.navigate).toHaveBeenCalledWith('SplitEntry', {
+      eventId: 'event-1',
+      mode: 'itemised',
+    });
+  });
+
+  it('resets expenses and returns to scan or enter total', async () => {
+    const calculatedDetail = {
+      ...mockDetailLocked,
+      event: {
+        ...mockDetailLocked.event,
+        ai_stage: 'calculated' as const,
+        split_mode: 'equal' as const,
+        total_amount: 90,
+      },
+    };
+    const resetDetail = {
+      ...mockDetailLocked,
+      event: {
+        ...mockDetailLocked.event,
+        ai_stage: 'none' as const,
+        split_mode: null,
+        total_amount: null,
+      },
+    };
+    jest.mocked(eventService.fetchEventById).mockResolvedValue(calculatedDetail);
+    jest.mocked(eventService.resetEventExpenses).mockImplementation(async () => {
+      jest.mocked(eventService.fetchEventById).mockResolvedValue(resetDetail);
+      return {
+        reset: true,
+        event_id: 'event-1',
+        ai_stage: 'none',
+      };
+    });
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Reset expenses')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByLabelText('Reset expenses'));
+
+    const resetButton = Alert.alert.mock.calls[0]?.[2]?.find((b) => b.text === 'Reset');
+    resetButton?.onPress?.();
+
+    await waitFor(() => {
+      expect(eventService.resetEventExpenses).toHaveBeenCalledWith('event-1');
+      expect(screen.getByLabelText('Scan receipt for itemised split')).toBeTruthy();
+    });
+  });
+
   it('shows Edit share after itemization is confirmed', async () => {
     jest.mocked(eventService.fetchEventById).mockResolvedValue({
       ...mockDetailLocked,
@@ -420,7 +536,7 @@ describe('EventDetailScreen', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Edit itemised split')).toBeTruthy();
+      expect(screen.getByLabelText('Edit split')).toBeTruthy();
     });
     expect(screen.queryByLabelText('Scan receipt for itemised split')).toBeNull();
   });

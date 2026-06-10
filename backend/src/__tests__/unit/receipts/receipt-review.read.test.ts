@@ -13,6 +13,7 @@ describe('fetchReceiptReviewSnapshot', () => {
     mockSupabase.__setMockResultForTable('receipt_items', {
       data: [
         {
+          id: '11111111-1111-1111-1111-111111111111',
           name: 'Burger',
           unit_price: 10,
           quantity: 1,
@@ -21,6 +22,7 @@ describe('fetchReceiptReviewSnapshot', () => {
           is_fee: false,
         },
         {
+          id: '22222222-2222-2222-2222-222222222222',
           name: 'SVC Fee',
           unit_price: 2,
           quantity: 1,
@@ -29,6 +31,7 @@ describe('fetchReceiptReviewSnapshot', () => {
           is_fee: true,
         },
         {
+          id: '33333333-3333-3333-3333-333333333333',
           name: 'Salad',
           unit_price: 8,
           quantity: 1,
@@ -48,8 +51,20 @@ describe('fetchReceiptReviewSnapshot', () => {
     });
 
     expect(snapshot.items).toEqual([
-      { name: 'Burger', unit_price: 10, quantity: 1, confidence: 'high' },
-      { name: 'Salad', unit_price: 8, quantity: 1, confidence: 'low' },
+      {
+        id: '11111111-1111-1111-1111-111111111111',
+        name: 'Burger',
+        unit_price: 10,
+        quantity: 1,
+        confidence: 'high',
+      },
+      {
+        id: '33333333-3333-3333-3333-333333333333',
+        name: 'Salad',
+        unit_price: 8,
+        quantity: 1,
+        confidence: 'low',
+      },
     ]);
     expect(snapshot.additional_charges).toEqual([
       { name: 'SVC Fee', amount: 2, confidence: 'high' },

@@ -4,6 +4,7 @@ import type {
   EventListResponse,
   LockEventResponse,
   ReopenEventResponse,
+  ResetExpensesResponse,
 } from '@letssplyt/shared/event.types';
 import type { ManualParticipantResponse } from '@letssplyt/shared/participant.types';
 import { ApiRequestError, apiGet, apiPostAuth, apiDelete } from './api';
@@ -47,6 +48,10 @@ export async function regenerateJoinToken(eventId: string): Promise<ReopenEventR
 
 export async function reopenEvent(eventId: string): Promise<ReopenEventResponse> {
   return apiPostAuth<ReopenEventResponse>(`/events/${eventId}/reopen`, {});
+}
+
+export async function resetEventExpenses(eventId: string): Promise<ResetExpensesResponse> {
+  return apiPostAuth<ResetExpensesResponse>(`/events/${eventId}/expenses/reset`, {});
 }
 
 export async function addManualParticipant(

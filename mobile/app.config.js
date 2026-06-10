@@ -36,6 +36,7 @@ module.exports = {
         android: {
           // Respect system navigation bar insets on gesture + 3-button nav devices.
           enableEdgeToEdge: true,
+          softwareKeyboardLayoutMode: 'resize',
         },
       },
     ],

@@ -13,7 +13,7 @@ export async function fetchReceiptReviewSnapshot(
 ): Promise<ReceiptReviewSnapshot> {
   const { data: rows, error } = await supabaseAdmin
     .from('receipt_items')
-    .select('name, unit_price, quantity, confidence_score, is_low_confidence, is_fee')
+    .select('id, name, unit_price, quantity, confidence_score, is_low_confidence, is_fee')
     .eq('event_id', eventId)
     .order('created_at');
 
@@ -27,6 +27,7 @@ export async function fetchReceiptReviewSnapshot(
 
   return {
     items: foodRows.map((row) => ({
+      id: row.id as string,
       name: row.name as string,
       unit_price: Number(row.unit_price),
       quantity: Number(row.quantity),

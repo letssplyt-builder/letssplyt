@@ -307,8 +307,9 @@ CREATE TABLE events (
   -- Used by the AI idempotency guard to prevent duplicate AI runs on retried requests
   -- State machine: none → parsing → parsed → parsed_confirmed → calculating → calculated → messaging → complete → failed
   -- CHECK (ai_stage IN ('none','parsing','parsed','parsed_confirmed','calculating','calculated','messaging','complete','failed'))
-  -- The failed → none reset is performed only by the admin utility
-  -- backend/scripts/reset-ai-stage.ts. Application code NEVER resets ai_stage directly.
+  -- The failed → none reset is performed by POST /events/:id/expenses/reset (payer, pre-send)
+  -- via reset_event_expenses_data() or the dev script supabase/scripts/reset-receipt-scans.sql.
+  -- Do not reset ai_stage elsewhere in application code.
   ai_stage        TEXT        NOT NULL DEFAULT 'none' CHECK (ai_stage IN (
                     'none',        -- no AI processing started
                     'parsing',     -- A1 receipt parsing in progress
@@ -1754,15 +1755,26 @@ All schema changes are versioned migration files under `supabase/migrations/` at
 
 **Note:** `supabase/migrations/` lives at repo root, not inside `backend/`. Supabase CLI expects it at root. All migration commands run from the repo root.
 
+### Migration registry
+
+**Authoritative inventory:** `supabase/MIGRATIONS.md` — all 17 migrations with story refs, feature dependencies, staging/production checklist, and rollback notes.
+
+**CI enforcement:** `backend/src/__tests__/unit/migrations/migration-manifest.test.ts` — fails if a new `.sql` file is added without updating the manifest.
+
+**Post-push verification:** run `supabase/scripts/verify-deployment-schema.sql` in the Supabase SQL Editor after every `supabase db push` on staging or production.
+
 ### Migration File Structure
 
 ```
 supabase/
+  MIGRATIONS.md                              ← registry (update when adding migrations)
   migrations/
-    20260601000000_initial_schema.sql           ← all tables, triggers, indexes, RLS, seed data
-    20260608000000_users_auth_registration.sql ← service_role users policy + upsert_user_profile_on_auth RPC
-    20260615000000_add_ai_audit_log.sql         ← if adding separately from initial
-    20260620000000_[description].sql       ← each subsequent change
+    20260601000000_initial_schema.sql
+    20260608000000_users_auth_registration.sql
+    … (15 more — see MIGRATIONS.md for full ordered list)
+    20260615000000_reset_event_expenses_function.sql
+  scripts/
+    verify-deployment-schema.sql             ← post-push schema audit
   config.toml
 ```
 

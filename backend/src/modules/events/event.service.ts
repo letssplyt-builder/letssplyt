@@ -34,7 +34,15 @@ export type EventRowWithReceiptFields = EventRow & {
   receipt_scan_attempted: boolean;
 };
 
-const RECEIPT_REVIEW_STAGES = new Set(['parsed', 'parsed_confirmed']);
+/** Stages where payer may edit itemised split — include post-calculate stages so Edit share keeps receipt data. */
+const RECEIPT_REVIEW_STAGES = new Set([
+  'parsed',
+  'parsed_confirmed',
+  'calculating',
+  'calculated',
+  'messaging',
+  'complete',
+]);
 
 interface EventCursor {
   created_at: string;

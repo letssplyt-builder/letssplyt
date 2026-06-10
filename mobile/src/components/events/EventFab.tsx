@@ -1,6 +1,5 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { fabBottomOffset } from '../../constants/layout';
+import { useAppInsets } from '../../hooks/useAppInsets';
 import { authColors } from '../../theme/colors';
 
 interface EventFabProps {
@@ -8,7 +7,7 @@ interface EventFabProps {
 }
 
 export function EventFab({ onPress }: EventFabProps) {
-  const insets = useSafeAreaInsets();
+  const { fabBottomOffset } = useAppInsets();
 
   return (
     <Pressable
@@ -17,7 +16,7 @@ export function EventFab({ onPress }: EventFabProps) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.fab,
-        { bottom: fabBottomOffset(insets.bottom) },
+        { bottom: fabBottomOffset },
         pressed && styles.fabPressed,
       ]}
     >

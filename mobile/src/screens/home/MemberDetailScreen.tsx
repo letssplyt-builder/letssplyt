@@ -12,9 +12,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
-import { screenScrollBottomPadding } from '../../constants/layout';
+import { useAppInsets } from '../../hooks/useAppInsets';
 import type { HomeStackParamList, MainTabParamList } from '../../navigation/types';
 import { useSettlementStore } from '../../store/settlementStore';
 import { glassStyles } from '../../theme/glassStyles';
@@ -28,7 +27,7 @@ type Props = CompositeScreenProps<
 
 export function MemberDetailScreen({ navigation, route }: Props) {
   const { userId } = route.params;
-  const insets = useSafeAreaInsets();
+  const { screenScrollBottomPadding } = useAppInsets();
   const memberDetail = useSettlementStore((state) => state.memberDetail);
   const isLoadingDetail = useSettlementStore((state) => state.isLoadingDetail);
   const loadMemberDetail = useSettlementStore((state) => state.loadMemberDetail);
@@ -58,7 +57,7 @@ export function MemberDetailScreen({ navigation, route }: Props) {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: screenScrollBottomPadding(insets.bottom) },
+          { paddingBottom: screenScrollBottomPadding },
         ]}
         refreshControl={
           <RefreshControl

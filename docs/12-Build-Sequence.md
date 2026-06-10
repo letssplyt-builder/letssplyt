@@ -1957,7 +1957,8 @@ backend/src/__tests__/unit/ai/receipt-parser.dedupe.test.ts
 4. Swipe left on compact food row → delete → total updates
 5. **+ Add line** adds a new editable row
 6. **Looks good → assign shares** → `POST /api/v1/receipts/confirm` → `SplitEntryScreen` (`itemised`)
-7. Event Detail (locked payer): after scan without confirm, footer shows **Review items** (not Scan/Enter total); after confirm, **Edit share**; refetch on screen focus
+7. Event Detail (locked payer): after scan without confirm, footer shows **Review items** (not Scan/Enter total); after confirm or manual split entry, **Edit share** + **Reset expenses**; refetch on screen focus (skip one refresh after reset alert)
+8. **Reset expenses** → `POST /events/:id/expenses/reset` → footer returns to **Scan receipt** + **Enter total** (blocked after `messages_sent_at`)
 
 **Tests required:**
 ```
@@ -1965,12 +1966,16 @@ mobile/src/__tests__/components/receipts/ItemReviewScreen.test.tsx
 mobile/src/__tests__/components/receipts/ReceiptReviewSlip.test.tsx
 mobile/src/__tests__/unit/utils/eventSplitFooter.test.ts
 mobile/src/__tests__/unit/screens/itemReview.utils.test.ts
+mobile/src/__tests__/components/events/EventDetailScreen.test.tsx (reset + footer modes)
 
 backend/src/__tests__/unit/receipts/confirm.test.ts
 backend/src/__tests__/unit/receipts/receipt-review.read.test.ts
 backend/src/__tests__/unit/events/event.service.test.ts (getEventById receipt_review)
+backend/src/__tests__/unit/events/expenses.reset.test.ts
+backend/src/__tests__/integration/events/expenses-reset.test.ts
 
-Live smoke (manual): backend/scripts/smoke-receipts-confirm.ts
+Live smoke: backend/scripts/smoke-receipts-confirm.ts
+Live smoke: backend/scripts/smoke-expenses-reset.ts
 ```
 
 ---
@@ -2093,6 +2098,16 @@ cd backend && npm test src/modules/splits/splits.router.test.ts
 3. NLP field: type "Mark had the salmon", tap submit → loading indicator → Mark's row shows the salmon item highlighted in the assignment grid
 4. SplitReviewScreen: all participant amounts are shown in a table and the sum at the bottom matches the receipt total with a checkmark
 5. "Send to all" button is disabled if any participant has no amount assigned or the sum constraint fails
+6. Event Detail: **Edit share** opens `SplitEntry` (`itemised` or `manual` per `resolveSplitEntryMode`); **Reset expenses** clears DB state and restores **Scan receipt** + **Enter total** footer
+
+**Files (workflow additions):**
+- `backend/src/modules/events/expenses.reset.ts`
+- `backend/src/__tests__/unit/events/expenses.reset.test.ts`
+- `backend/src/__tests__/integration/events/expenses-reset.test.ts`
+- `backend/scripts/smoke-expenses-reset.ts`
+- `supabase/migrations/20260615000000_reset_event_expenses_function.sql`
+- `mobile/src/store/eventStore.ts` (`applyExpensesResetLocal`)
+- `shared/types/event.types.ts` (`ResetExpensesResponse`)
 
 **Tests required:**
 ```

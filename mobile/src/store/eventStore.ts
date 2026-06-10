@@ -33,6 +33,8 @@ interface EventState {
   dismissQrPresentation: () => void;
   updateJoinUrl: (joinUrl: string, tokenExpiresAt: string) => void;
   resetCurrentEvent: () => void;
+  /** Optimistic UI after POST /expenses/reset succeeds. */
+  applyExpensesResetLocal: (eventId: string) => void;
 }
 
 export const useEventStore = create<EventState>((set, get) => ({
@@ -174,4 +176,43 @@ export const useEventStore = create<EventState>((set, get) => ({
   },
 
   resetCurrentEvent: () => set({ currentEvent: null }),
+
+  applyExpensesResetLocal: (eventId) => {
+    set((state) => {
+      if (!state.currentEvent || state.currentEvent.event.id !== eventId) {
+        return state;
+      }
+
+      const summary = state.currentEvent.summary
+        ? {
+            ...state.currentEvent.summary,
+            total: 0,
+            collected: 0,
+            outstanding: 0,
+            confirmed_count: 0,
+            pending_count: state.currentEvent.participants.length,
+          }
+        : null;
+
+      const { receipt_review: _review, ...detailWithoutReview } = state.currentEvent;
+
+      return {
+        currentEvent: {
+          ...detailWithoutReview,
+          summary,
+          participants: state.currentEvent.participants.map((participant) => ({
+            ...participant,
+            amount_owed: null,
+            payment_status: 'pending',
+          })),
+          event: {
+            ...state.currentEvent.event,
+            ai_stage: 'none',
+            split_mode: null,
+            total_amount: null,
+          },
+        },
+      };
+    });
+  },
 }));

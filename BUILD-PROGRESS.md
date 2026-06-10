@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
 **Last updated:** 2026-06-07
-**Current story:** E07-S06 — Split Entry + Review Screens (4 tabs, drag-drop, NLP input)
+**Current story:** E08-S01 — A3 Message Generation + Preview API
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -55,7 +55,7 @@
 - [x] E07-S03 — Item Review Screen (mobile — editable items, low-confidence highlight) (2026-06-10)
 - [x] E07-S04 — Split Calculator (getCurrencyMinorUnits, largest-remainder, 100% coverage) (2026-06-07)
 - [x] E07-S05 — A2 NLP Assignment Agent (sanitizePromptInput, delegates math to calculator) (2026-06-07)
-- [ ] E07-S06 — Split Entry + Review Screens (4 tabs, drag-drop, NLP input)
+- [x] E07-S06 — Split Entry + Review Screens (4 tabs, drag-drop, NLP input) (2026-06-07)
 
 ### Epic 8: Message System (7 stories)
 - [ ] E08-S01 — A3 Message Generation + Preview API
@@ -103,9 +103,9 @@
 | Tier | Epics | Stories | Done | Remaining |
 |---|---|---|---|---|
 | Tier 1 — Foundation | 4 | 16 | 16 | 0 |
-| Tier 2 — Core Flow | 5 | 23 | 12 | 11 |
+| Tier 2 — Core Flow | 5 | 23 | 13 | 10 |
 | Tier 3 — Operations | 4 | 13 | 0 | 13 |
-| **Total** | **13** | **52** | **22** | **30** |
+| **Total** | **13** | **52** | **23** | **29** |
 
 ---
 

@@ -1,10 +1,7 @@
 import * as Contacts from 'expo-contacts';
 import { useEffect, useRef, useState } from 'react';
 import {
-  KeyboardAvoidingView,
   Linking,
-  Modal,
-  Platform,
   Pressable,
   StyleSheet,
   Switch,
@@ -12,7 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BottomSheetModal } from '../layout/BottomSheetModal';
 import { PrimaryButton } from '../PrimaryButton';
 import { authColors } from '../../theme/colors';
 import {
@@ -51,7 +48,6 @@ export function AddParticipantModal({
   onClose,
   onSubmit,
 }: AddParticipantModalProps) {
-  const insets = useSafeAreaInsets();
   const nameRef = useRef<TextInput>(null);
   const [step, setStep] = useState<ModalStep>('choose');
   const [name, setName] = useState('');
@@ -144,130 +140,120 @@ export function AddParticipantModal({
   const busy = isSubmitting || isPickingContact;
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Dismiss add participant" />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}
-      >
-        <View style={styles.handle} />
-        <Text style={styles.heading}>Add member</Text>
+    <BottomSheetModal
+      visible={visible}
+      onClose={onClose}
+      keyboardAware={step === 'manual'}
+      dismissLabel="Dismiss add participant"
+      sheetStyle={styles.sheetBg}
+    >
+      <View style={styles.handle} />
+      <Text style={styles.heading}>Add member</Text>
 
-        {step === 'choose' ? (
-          <>
-            <PrimaryButton
-              label="From contacts"
-              variant="inverse"
-              loading={isPickingContact}
-              disabled={busy}
-              onPress={() => void handleFromContacts()}
-              style={styles.choiceButton}
-            />
-            <PrimaryButton
-              label="Enter manually"
-              disabled={busy}
-              onPress={() => setStep('manual')}
-              style={styles.choiceButton}
-            />
+      {step === 'choose' ? (
+        <>
+          <PrimaryButton
+            label="From contacts"
+            variant="inverse"
+            loading={isPickingContact}
+            disabled={busy}
+            onPress={() => void handleFromContacts()}
+            style={styles.choiceButton}
+          />
+          <PrimaryButton
+            label="Enter manually"
+            disabled={busy}
+            onPress={() => setStep('manual')}
+            style={styles.choiceButton}
+          />
 
-            {contactsDenied ? (
-              <View style={styles.deniedBox}>
-                <Text style={styles.deniedText}>
-                  Contacts access is off. You can still add members manually, or enable contacts in
-                  Settings.
-                </Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Open Settings"
-                  onPress={() => void Linking.openSettings()}
-                >
-                  <Text style={styles.settingsLink}>Open Settings</Text>
-                </Pressable>
-              </View>
-            ) : null}
-
-            {contactsError ? <Text style={styles.error}>{contactsError}</Text> : null}
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-          </>
-        ) : (
-          <>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Back to add options"
-              onPress={() => setStep('choose')}
-              disabled={busy}
-              style={styles.backLink}
-            >
-              <Text style={styles.backLinkText}>← Back</Text>
-            </Pressable>
-
-            <Text style={styles.label}>Name</Text>
-            <TextInput
-              ref={nameRef}
-              value={name}
-              onChangeText={setName}
-              placeholder="Alex"
-              placeholderTextColor={authColors.textOnDarkFaint}
-              style={styles.input}
-              editable={!busy}
-            />
-
-            <View style={styles.toggleRow}>
-              <Text style={styles.toggleLabel}>Name only (no phone)</Text>
-              <Switch
-                value={nameOnly}
-                onValueChange={setNameOnly}
-                trackColor={{ false: authColors.glassBorder, true: 'rgba(45, 212, 191, 0.55)' }}
-                thumbColor="#FFFFFF"
-                disabled={busy}
-              />
+          {contactsDenied ? (
+            <View style={styles.deniedBox}>
+              <Text style={styles.deniedText}>
+                Contacts access is off. You can still add members manually, or enable contacts in
+                Settings.
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Open Settings"
+                onPress={() => void Linking.openSettings()}
+              >
+                <Text style={styles.settingsLink}>Open Settings</Text>
+              </Pressable>
             </View>
+          ) : null}
 
-            {!nameOnly ? (
-              <>
-                <Text style={styles.label}>Phone ({AUTH_COUNTRIES[region].dial})</Text>
-                <TextInput
-                  value={phone}
-                  onChangeText={setPhone}
-                  placeholder={AUTH_COUNTRIES[region].placeholder}
-                  placeholderTextColor={authColors.textOnDarkFaint}
-                  keyboardType="phone-pad"
-                  style={styles.input}
-                  editable={!busy}
-                />
-              </>
-            ) : null}
+          {contactsError ? <Text style={styles.error}>{contactsError}</Text> : null}
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+        </>
+      ) : (
+        <>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Back to add options"
+            onPress={() => setStep('choose')}
+            disabled={busy}
+            style={styles.backLink}
+          >
+            <Text style={styles.backLinkText}>← Back</Text>
+          </Pressable>
 
-            {error ? <Text style={styles.error}>{error}</Text> : null}
+          <Text style={styles.label}>Name</Text>
+          <TextInput
+            ref={nameRef}
+            value={name}
+            onChangeText={setName}
+            placeholder="Alex"
+            placeholderTextColor={authColors.textOnDarkFaint}
+            style={styles.input}
+            editable={!busy}
+          />
 
-            <PrimaryButton
-              label="Add to group"
-              loading={isSubmitting}
-              disabled={!canSubmitManual || busy}
-              onPress={handleManualSubmit}
-              variant="inverse"
-              style={styles.cta}
+          <View style={styles.toggleRow}>
+            <Text style={styles.toggleLabel}>Name only (no phone)</Text>
+            <Switch
+              value={nameOnly}
+              onValueChange={setNameOnly}
+              trackColor={{ false: authColors.glassBorder, true: 'rgba(45, 212, 191, 0.55)' }}
+              thumbColor="#FFFFFF"
+              disabled={busy}
             />
-          </>
-        )}
-      </KeyboardAvoidingView>
-    </Modal>
+          </View>
+
+          {!nameOnly ? (
+            <>
+              <Text style={styles.label}>Phone ({AUTH_COUNTRIES[region].dial})</Text>
+              <TextInput
+                value={phone}
+                onChangeText={setPhone}
+                placeholder={AUTH_COUNTRIES[region].placeholder}
+                placeholderTextColor={authColors.textOnDarkFaint}
+                keyboardType="phone-pad"
+                style={styles.input}
+                editable={!busy}
+              />
+            </>
+          ) : null}
+
+          {error ? <Text style={styles.error}>{error}</Text> : null}
+
+          <PrimaryButton
+            label="Add to group"
+            loading={isSubmitting}
+            disabled={!canSubmitManual || busy}
+            onPress={handleManualSubmit}
+            variant="inverse"
+            style={styles.cta}
+          />
+        </>
+      )}
+    </BottomSheetModal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(11, 61, 69, 0.55)',
-  },
-  sheet: {
+  sheetBg: {
     backgroundColor: authColors.gradientMid,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-    paddingHorizontal: 24,
-    paddingTop: 12,
   },
   handle: {
     width: 40,

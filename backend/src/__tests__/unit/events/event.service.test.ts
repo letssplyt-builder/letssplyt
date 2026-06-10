@@ -291,6 +291,7 @@ describe('event.service', () => {
       mockSupabase.__pushMockResultForTable('receipt_items', {
         data: [
           {
+            id: '11111111-1111-1111-1111-111111111111',
             name: 'Burger',
             unit_price: 10,
             quantity: 1,
@@ -305,13 +306,68 @@ describe('event.service', () => {
       const detail = await getEventById(USER_ID, EVENT_ID);
 
       expect(detail.receipt_review).toEqual({
-        items: [{ name: 'Burger', unit_price: 10, quantity: 1, confidence: 'high' }],
+        items: [
+          {
+            id: '11111111-1111-1111-1111-111111111111',
+            name: 'Burger',
+            unit_price: 10,
+            quantity: 1,
+            confidence: 'high',
+          },
+        ],
         additional_charges: [],
         tax_amount: 1,
         tip_amount: 2,
         fees_amount: 2,
         currency: 'USD',
       });
+    });
+
+    it('includes receipt_review when ai_stage is calculated', async () => {
+      mockSupabase.__pushMockResultForTable('events', {
+        data: { ...lockedParsedEvent, ai_stage: 'calculated' },
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('users', {
+        data: { id: USER_ID, display_name: 'Alex', avatar_colour: '#4F46E5' },
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('participants', {
+        data: [
+          {
+            id: 'p1',
+            user_id: USER_ID,
+            display_name: 'Alex',
+            join_method: 'qr_app',
+            payment_status: 'pending',
+            amount_owed: 10,
+          },
+        ],
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('users', {
+        data: [{ id: USER_ID, display_name: 'Alex' }],
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('receipt_items', {
+        data: [
+          {
+            id: '11111111-1111-1111-1111-111111111111',
+            name: 'Burger',
+            unit_price: 10,
+            quantity: 1,
+            confidence_score: 0.95,
+            is_low_confidence: false,
+            is_fee: false,
+          },
+        ],
+        error: null,
+      });
+
+      const detail = await getEventById(USER_ID, EVENT_ID);
+
+      expect(detail.receipt_review?.items).toHaveLength(1);
+      expect(detail.receipt_review?.items[0].name).toBe('Burger');
     });
 
     it('omits receipt_review when ai_stage is none', async () => {

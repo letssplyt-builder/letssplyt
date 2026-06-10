@@ -1,4 +1,4 @@
-import type { AiStage } from '@letssplyt/shared/event.types';
+import type { AiStage, SplitMode } from '@letssplyt/shared/event.types';
 
 export type EventSplitActionMode = 'initial' | 'review' | 'edit' | 'parsing' | 'failed';
 
@@ -40,4 +40,47 @@ export function resolveEventSplitActionMode(
     return aiStage === 'parsed_confirmed' ? 'edit' : 'review';
   }
   return 'initial';
+}
+
+/** Split entry screen mode for Edit share — itemised receipt vs custom/manual total. */
+export function resolveSplitEntryMode(
+  splitMode: SplitMode | null,
+  aiStage: AiStage,
+  hasReceiptReview: boolean,
+): 'itemised' | 'manual' {
+  if (hasReceiptReview || splitMode === 'itemised') {
+    return 'itemised';
+  }
+  if (
+    splitMode === 'equal' ||
+    splitMode === 'portion' ||
+    aiStage === 'calculated' ||
+    aiStage === 'messaging' ||
+    aiStage === 'complete'
+  ) {
+    return 'manual';
+  }
+  return 'itemised';
+}
+
+/** Whether expense data has been entered (receipt confirmed or split calculated). */
+export function hasEventExpensesEntered(aiStage: AiStage): boolean {
+  switch (aiStage) {
+    case 'parsed_confirmed':
+    case 'calculating':
+    case 'calculated':
+    case 'messaging':
+    case 'complete':
+      return true;
+    default:
+      return false;
+  }
+}
+
+/** Reset is allowed once expenses exist but payment messages have not been sent. */
+export function canResetEventExpenses(
+  aiStage: AiStage,
+  messagesSentAt: string | null,
+): boolean {
+  return hasEventExpensesEntered(aiStage) && !messagesSentAt;
 }

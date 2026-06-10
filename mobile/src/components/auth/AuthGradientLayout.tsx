@@ -2,14 +2,22 @@ import type { ReactNode } from 'react';
 import { useEffect, useRef } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Animated, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { systemFooterPadding } from '../../constants/layout';
 import { authColors } from '../../theme/colors';
+
+type BottomSafeAreaMode = 'tabBar' | 'system';
 
 interface AuthGradientLayoutProps {
   children: ReactNode;
   footer?: ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
   footerStyle?: StyleProp<ViewStyle>;
+  /**
+   * `tabBar` — bottom inset handled by floating tab bar + sticky footers (main app).
+   * `system` — respect OS home-indicator inset (auth / join flows without tab bar).
+   */
+  bottomSafeArea?: BottomSafeAreaMode;
 }
 
 function FloatingOrb({
@@ -66,7 +74,16 @@ export function AuthGradientLayout({
   footer,
   contentStyle,
   footerStyle,
+  bottomSafeArea = 'tabBar',
 }: AuthGradientLayoutProps) {
+  const insets = useSafeAreaInsets();
+  const safeAreaEdges =
+    bottomSafeArea === 'system'
+      ? (['top', 'left', 'right', 'bottom'] as const)
+      : (['top', 'left', 'right'] as const);
+  const systemFooterPad =
+    bottomSafeArea === 'system' ? systemFooterPadding(insets.bottom) : undefined;
+
   return (
     <View style={styles.root}>
       <LinearGradient
@@ -81,9 +98,19 @@ export function AuthGradientLayout({
         driftY={-16}
         driftX={14}
       />
-      <SafeAreaView style={styles.safe}>
+      <SafeAreaView style={styles.safe} edges={safeAreaEdges}>
         <View style={[styles.content, contentStyle]}>{children}</View>
-        {footer ? <View style={[styles.footer, footerStyle]}>{footer}</View> : null}
+        {footer ? (
+          <View
+            style={[
+              styles.footer,
+              systemFooterPad !== undefined && { paddingBottom: systemFooterPad },
+              footerStyle,
+            ]}
+          >
+            {footer}
+          </View>
+        ) : null}
       </SafeAreaView>
     </View>
   );
@@ -105,7 +132,6 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: 28,
-    paddingBottom: 24,
   },
   orb: {
     position: 'absolute',

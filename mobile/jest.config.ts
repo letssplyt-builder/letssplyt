@@ -8,7 +8,9 @@ const config: Config = {
   ],
   moduleNameMapper: {
     '@letssplyt/shared/paymentHandleValidation': '<rootDir>/../shared/utils/paymentHandleValidation.ts',
+    '@letssplyt/shared/utils/splitCalculator': '<rootDir>/../shared/utils/splitCalculator.ts',
     '@letssplyt/shared/(.*)': '<rootDir>/../shared/types/$1',
+    '^expo-haptics$': '<rootDir>/src/__tests__/mocks/expo-haptics.ts',
     '^expo-constants$': '<rootDir>/src/__tests__/mocks/expo-constants.ts',
     '^expo-linear-gradient$': '<rootDir>/src/__tests__/mocks/expo-linear-gradient.tsx',
     '^expo-status-bar$': '<rootDir>/src/__tests__/mocks/expo-status-bar.tsx',

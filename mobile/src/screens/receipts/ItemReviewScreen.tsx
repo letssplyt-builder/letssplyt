@@ -14,7 +14,8 @@ import type { ReceiptAdditionalCharge } from '@letssplyt/shared/receipt.types';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { ReceiptReviewSlip } from '../../components/receipts/ReceiptReviewSlip';
 import { PrimaryButton } from '../../components/PrimaryButton';
-import { splitActionBarFooterPadding } from '../../constants/layout';
+import { splitActionBarFooterStyle } from '../../constants/layout';
+import { useAppInsets } from '../../hooks/useAppInsets';
 import type { EventsStackParamList } from '../../navigation/types';
 import * as eventService from '../../services/event.service';
 import * as receiptsService from '../../services/receipts.service';
@@ -33,6 +34,7 @@ type Props = NativeStackScreenProps<EventsStackParamList, 'ItemReview'>;
 
 export function ItemReviewScreen({ navigation, route }: Props) {
   const { eventId, parseResult } = route.params;
+  const { rawBottom } = useAppInsets();
 
   const initialSnapshot = useMemo(() => parseResultToSnapshot(parseResult), [parseResult]);
   const initialEditable = useMemo(
@@ -177,7 +179,7 @@ export function ItemReviewScreen({ navigation, route }: Props) {
           style={styles.confirmButton}
         />
       }
-      footerStyle={styles.footerBar}
+      footerStyle={splitActionBarFooterStyle(rawBottom)}
     >
       <StatusBar style="light" />
 
@@ -239,11 +241,6 @@ export function ItemReviewScreen({ navigation, route }: Props) {
 const styles = StyleSheet.create({
   layout: {
     paddingHorizontal: 0,
-  },
-  footerBar: {
-    paddingHorizontal: 28,
-    paddingTop: 8,
-    paddingBottom: splitActionBarFooterPadding(),
   },
   topBar: {
     flexDirection: 'row',

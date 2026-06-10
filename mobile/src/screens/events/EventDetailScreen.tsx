@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
@@ -15,7 +15,6 @@ import {
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AddParticipantModal } from '../../components/events/AddParticipantModal';
 import { EventMemberRow } from '../../components/events/EventMemberRow';
 import { EventSplitActionBar } from '../../components/events/EventSplitActionBar';
@@ -24,21 +23,24 @@ import { QRDisplayModal } from '../../components/events/QRDisplayModal';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { BottomToast } from '../../components/BottomToast';
 import { PrimaryButton } from '../../components/PrimaryButton';
-import {
-  screenScrollBottomPadding,
-  splitActionBarFooterPadding,
-} from '../../constants/layout';
+import { splitActionBarFooterStyle } from '../../constants/layout';
+import { useAppInsets } from '../../hooks/useAppInsets';
 import { getSupabase } from '../../lib/supabase';
 import type { EventsStackParamList } from '../../navigation/types';
 import { getApiErrorCode, isApiRequestError } from '../../services/api';
 import * as eventService from '../../services/event.service';
 import { useAuthStore } from '../../store/authStore';
 import { useEventStore } from '../../store/eventStore';
+import { useSplitStore } from '../../store/splitStore';
 import { glassStyles } from '../../theme/glassStyles';
 import { authColors } from '../../theme/colors';
 import { receiptReviewToParseResult } from '../receipts/itemReview.utils';
 import { formatMoney, isPayerParticipant } from '../../utils/events';
-import { resolveEventSplitActionMode } from '../../utils/eventSplitFooter';
+import {
+  canResetEventExpenses,
+  resolveEventSplitActionMode,
+  resolveSplitEntryMode,
+} from '../../utils/eventSplitFooter';
 
 type Props = NativeStackScreenProps<EventsStackParamList, 'EventDetail'>;
 
@@ -76,8 +78,8 @@ function removeParticipantErrorMessage(code: string | undefined): string {
 }
 
 export function EventDetailScreen({ navigation, route }: Props) {
-  const insets = useSafeAreaInsets();
   const { eventId } = route.params;
+  const { rawBottom, screenScrollBottomPadding } = useAppInsets();
   const authUser = useAuthStore((state) => state.user);
   const {
     currentEvent,
@@ -99,7 +101,9 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const [isRegenerating, setIsRegenerating] = useState(false);
   const [isReopening, setIsReopening] = useState(false);
   const [removingParticipantId, setRemovingParticipantId] = useState<string | null>(null);
+  const [isResettingExpenses, setIsResettingExpenses] = useState(false);
   const [fetchError, setFetchError] = useState(false);
+  const skipFocusRefreshRef = useRef(false);
 
   const refreshDetail = useCallback(async () => {
     setFetchError(false);
@@ -112,6 +116,10 @@ export function EventDetailScreen({ navigation, route }: Props) {
 
   useFocusEffect(
     useCallback(() => {
+      if (skipFocusRefreshRef.current) {
+        skipFocusRefreshRef.current = false;
+        return;
+      }
       void refreshDetail();
     }, [refreshDetail]),
   );
@@ -162,6 +170,9 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const splitActionMode = event
     ? resolveEventSplitActionMode(event.ai_stage, Boolean(currentEvent?.receipt_review))
     : 'initial';
+  const showResetExpenses = event
+    ? canResetEventExpenses(event.ai_stage, event.messages_sent_at)
+    : false;
 
   const openItemReview = () => {
     const review = currentEvent?.receipt_review;
@@ -174,6 +185,78 @@ export function EventDetailScreen({ navigation, route }: Props) {
       storagePath: '',
       parseResult: receiptReviewToParseResult(review),
     });
+  };
+
+  const openEditShare = async () => {
+    let detail = currentEvent;
+    if (!detail?.receipt_review) {
+      try {
+        await loadEventDetail(eventId);
+        detail = useEventStore.getState().currentEvent;
+      } catch {
+        setToast('Could not load event. Try again.');
+        return;
+      }
+    }
+
+    const event = detail?.event;
+    if (!event) {
+      setToast('Could not load event. Try again.');
+      return;
+    }
+
+    const mode = resolveSplitEntryMode(
+      event.split_mode,
+      event.ai_stage,
+      Boolean(detail?.receipt_review),
+    );
+    navigation.navigate('SplitEntry', { eventId, mode });
+  };
+
+  const confirmResetExpenses = () => {
+    Alert.alert(
+      'Reset expenses?',
+      'All receipt scans, line items, and manually entered amounts for this event will be deleted. You can scan again or enter a new total.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => {
+            void handleResetExpenses();
+          },
+        },
+      ],
+    );
+  };
+
+  const handleResetExpenses = async () => {
+    skipFocusRefreshRef.current = true;
+    setIsResettingExpenses(true);
+    try {
+      await eventService.resetEventExpenses(eventId);
+      useEventStore.getState().applyExpensesResetLocal(eventId);
+      if (useSplitStore.getState().eventId === eventId) {
+        useSplitStore.getState().clear();
+      }
+      await loadEventDetail(eventId);
+      setToast('Expenses reset — choose how to split again');
+    } catch (err: unknown) {
+      const code = isApiRequestError(err) ? err.code : getApiErrorCode(err);
+      if (code === 'MESSAGES_ALREADY_SENT') {
+        setToast('Cannot reset after messages have been sent');
+      } else if (code === 'NOTHING_TO_RESET') {
+        setToast('Nothing to reset for this event');
+      } else if (code === 'RESET_FAILED' || code === 'DB_WRITE_FAILED') {
+        const detail = isApiRequestError(err) ? err.message : undefined;
+        setToast(detail ?? 'Could not reset expenses. Try again.');
+      } else {
+        const detail = isApiRequestError(err) ? err.message : undefined;
+        setToast(detail ?? 'Could not reset expenses. Try again.');
+      }
+    } finally {
+      setIsResettingExpenses(false);
+    }
   };
 
   const settlementSummary = useMemo(() => {
@@ -289,24 +372,18 @@ export function EventDetailScreen({ navigation, route }: Props) {
         showSplitActions ? (
           <EventSplitActionBar
             mode={splitActionMode}
+            canResetExpenses={showResetExpenses && !isResettingExpenses}
             onScanReceipt={() => navigation.navigate('ReceiptScan', { eventId })}
             onEnterTotal={() =>
               navigation.navigate('SplitEntry', { eventId, mode: 'manual' })
             }
             onReviewItems={openItemReview}
-            onEditShare={openItemReview}
+            onEditShare={() => void openEditShare()}
+            onResetExpenses={confirmResetExpenses}
           />
         ) : undefined
       }
-      footerStyle={
-        showSplitActions
-          ? {
-              paddingHorizontal: 20,
-              paddingTop: 8,
-              paddingBottom: splitActionBarFooterPadding(),
-            }
-          : undefined
-      }
+      footerStyle={showSplitActions ? splitActionBarFooterStyle(rawBottom) : undefined}
     >
       <StatusBar style="light" />
 
@@ -332,7 +409,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
           {
             paddingBottom: showSplitActions
               ? 24
-              : screenScrollBottomPadding(insets.bottom),
+              : screenScrollBottomPadding,
           },
         ]}
         refreshControl={

@@ -11,14 +11,13 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { CreateEventModal } from '../../components/events/CreateEventModal';
 import { EventFab } from '../../components/events/EventFab';
 import { EventRoleSection } from '../../components/events/EventRoleSection';
 import { QRDisplayModal } from '../../components/events/QRDisplayModal';
 import { SegmentedControl } from '../../components/events/SegmentedControl';
-import { screenScrollBottomPadding } from '../../constants/layout';
+import { useAppInsets } from '../../hooks/useAppInsets';
 import type { EventsStackParamList, MainTabParamList } from '../../navigation/types';
 import { fetchEvents, regenerateJoinToken } from '../../services/event.service';
 import type { EventListItem } from '@letssplyt/shared/event.types';
@@ -35,7 +34,7 @@ type Props = CompositeScreenProps<
 type Segment = 'active' | 'settled';
 
 export function EventsScreen({ navigation }: Props) {
-  const insets = useSafeAreaInsets();
+  const { screenScrollBottomPadding } = useAppInsets();
   const {
     createModalOpen,
     qrPresentation,
@@ -126,7 +125,7 @@ export function EventsScreen({ navigation }: Props) {
       <ScrollView
         contentContainerStyle={[
           styles.list,
-          { paddingBottom: screenScrollBottomPadding(insets.bottom) },
+          { paddingBottom: screenScrollBottomPadding },
         ]}
         refreshControl={
           <RefreshControl

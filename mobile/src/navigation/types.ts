@@ -19,6 +19,7 @@ export type EventsStackParamList = {
     parseResult: ReceiptParseResponse;
   };
   SplitEntry: { eventId: string; mode?: 'itemised' | 'manual' };
+  SplitReview: { eventId: string };
 };
 
 export type MainTabParamList = {

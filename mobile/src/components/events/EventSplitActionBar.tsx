@@ -4,19 +4,23 @@ import { PrimaryButton } from '../PrimaryButton';
 
 interface EventSplitActionBarProps {
   mode: EventSplitActionMode;
+  canResetExpenses: boolean;
   onScanReceipt: () => void;
   onEnterTotal: () => void;
   onReviewItems: () => void;
   onEditShare: () => void;
+  onResetExpenses: () => void;
 }
 
 /** Split CTAs shown after the group is locked (creator only). Render in AuthGradientLayout footer. */
 export function EventSplitActionBar({
   mode,
+  canResetExpenses,
   onScanReceipt,
   onEnterTotal,
   onReviewItems,
   onEditShare,
+  onResetExpenses,
 }: EventSplitActionBarProps) {
   if (mode === 'parsing') {
     return (
@@ -50,9 +54,18 @@ export function EventSplitActionBar({
         <PrimaryButton
           label="Edit share"
           onPress={onEditShare}
-          accessibilityLabel="Edit itemised split"
-          style={styles.fullWidth}
+          accessibilityLabel="Edit split"
+          style={styles.button}
         />
+        {canResetExpenses ? (
+          <PrimaryButton
+            label="Reset expenses"
+            variant="inverse"
+            onPress={onResetExpenses}
+            accessibilityLabel="Reset expenses"
+            style={styles.button}
+          />
+        ) : null}
       </View>
     );
   }

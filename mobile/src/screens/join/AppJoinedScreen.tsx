@@ -39,6 +39,7 @@ export function AppJoinedScreen({ navigation, route }: Props) {
 
   return (
     <AuthGradientLayout
+      bottomSafeArea="system"
       contentStyle={styles.content}
       footer={
         <FadeSlideIn delay={160}>

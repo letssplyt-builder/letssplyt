@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAppInsets } from '../hooks/useAppInsets';
 import { authColors } from '../theme/colors';
 
 interface BottomToastProps {
@@ -10,7 +10,7 @@ interface BottomToastProps {
 }
 
 export function BottomToast({ message, onDismiss, durationMs = 3200 }: BottomToastProps) {
-  const insets = useSafeAreaInsets();
+  const { tabBarTotalHeight } = useAppInsets();
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(16)).current;
 
@@ -45,7 +45,7 @@ export function BottomToast({ message, onDismiss, durationMs = 3200 }: BottomToa
   if (!message) return null;
 
   return (
-    <View pointerEvents="none" style={[styles.host, { bottom: insets.bottom + 20 }]}>
+    <View pointerEvents="none" style={[styles.host, { bottom: tabBarTotalHeight + 12 }]}>
       <Animated.View style={[styles.bubble, { opacity, transform: [{ translateY }] }]}>
         <Text style={styles.icon}>✓</Text>
         <Text style={styles.message}>{message}</Text>

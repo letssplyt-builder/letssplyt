@@ -12,7 +12,6 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { BalanceHeroCard } from '../../components/events/BalanceHeroCard';
 import { CreateEventModal } from '../../components/events/CreateEventModal';
@@ -20,7 +19,7 @@ import { EventFab } from '../../components/events/EventFab';
 import { QRDisplayModal } from '../../components/events/QRDisplayModal';
 import { SegmentedControl } from '../../components/events/SegmentedControl';
 import { CounterpartyRow } from '../../components/settlement/CounterpartyRow';
-import { screenScrollBottomPadding } from '../../constants/layout';
+import { useAppInsets } from '../../hooks/useAppInsets';
 import type {
   HomeStackParamList,
   MainTabParamList,
@@ -45,7 +44,7 @@ type Props = CompositeScreenProps<
 type HomeSegment = 'members' | 'guests';
 
 export function HomeScreen({ navigation }: Props) {
-  const insets = useSafeAreaInsets();
+  const { screenScrollBottomPadding } = useAppInsets();
   const user = useAuthStore((state) => state.user);
   const {
     createModalOpen,
@@ -232,7 +231,7 @@ export function HomeScreen({ navigation }: Props) {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: screenScrollBottomPadding(insets.bottom) },
+          { paddingBottom: screenScrollBottomPadding },
         ]}
         refreshControl={
           <RefreshControl

@@ -15,6 +15,9 @@
     "test:unit": "jest --testPathPattern=unit",
     "test:integration": "jest --testPathPattern=integration",
     "test:rls": "jest --testPathPattern=rls",
+    "smoke:expenses-reset": "ts-node scripts/smoke-expenses-reset.ts",
+    "smoke:receipts-confirm": "ts-node scripts/smoke-receipts-confirm.ts",
+    "smoke:splits": "ts-node scripts/smoke-splits.ts",
     "cleanup:phone": "ts-node scripts/cleanup-auth-by-phone.ts"
   },
   "dependencies": {

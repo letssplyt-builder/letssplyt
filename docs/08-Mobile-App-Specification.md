@@ -1030,7 +1030,7 @@ Each section lists only events matching the selected toggle. Event card: title, 
 
 **Settlement phase — payer only** (event status = `"locked"`, `"calculating"`, `"sent"`, `"settled"`):
 
-**Locked-event split footer** (`EventSplitActionBar` in `AuthGradientLayout` footer; creator only). Mode derives from `event.ai_stage` and `receipt_review` via `resolveEventSplitActionMode()`:
+**Locked-event split footer** (`EventSplitActionBar` in `AuthGradientLayout` footer; creator only). Mode derives from `event.ai_stage` and `receipt_review` via `resolveEventSplitActionMode()` in `mobile/src/utils/eventSplitFooter.ts`:
 
 | Condition | Footer CTA |
 |-----------|------------|
@@ -1038,11 +1038,17 @@ Each section lists only events matching the selected toggle. Event card: title, 
 | `ai_stage = parsing` | **Reading receipt…** (disabled) |
 | `ai_stage = failed` | **Scan receipt** + **Enter total** (retry) |
 | `ai_stage = parsed` | **Review items** only |
-| `ai_stage = parsed_confirmed` or later AI stages | **Edit share** only |
+| `ai_stage = parsed_confirmed` or later AI stages (before messages sent) | **Edit share** + **Reset expenses** |
 
-**Review items** / **Edit share** navigate to `ItemReviewScreen` with `receipt_review` from `GET /events/:id` (no re-scan). If `receipt_review` is missing, show toast and pull to refresh.
+**Review items** navigates to `ItemReviewScreen` with `receipt_review` from `GET /events/:id` (no re-scan). If `receipt_review` is missing, show toast and pull to refresh.
 
-Event Detail **refetches on focus** (`useFocusEffect`) so returning from Item Review without confirming still shows **Review items** (not Scan/Enter total) once A1 has persisted `ai_stage = parsed`.
+**Edit share** navigates to `SplitEntryScreen` via `resolveSplitEntryMode()`:
+- `itemised` when `receipt_review` exists or `split_mode = 'itemised'`
+- `manual` for **Enter total** flows (`split_mode = equal|portion` or `ai_stage = calculated|messaging|complete` without receipt data)
+
+**Reset expenses** shows a destructive confirmation alert, then calls `POST /events/:id/expenses/reset`. On success: optimistic store patch (`applyExpensesResetLocal`), clear split store, refetch event detail, toast success. Footer returns to **Scan receipt** + **Enter total**. Hidden when `messages_sent_at` is set (`canResetEventExpenses()`).
+
+Event Detail **refetches on focus** (`useFocusEffect`) except immediately after reset (skip one focus refresh to avoid alert-dismiss race overwriting optimistic state).
 
 - Summary bar: total | collected | outstanding + progress ring
 - Segmented progress bar: green (confirmed) | amber (self-reported) | grey (pending)

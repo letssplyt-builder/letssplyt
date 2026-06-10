@@ -523,9 +523,11 @@ npx supabase db reset --db-url $SUPABASE_URL  # WARNING: wipes dev DB
 cd backend
 doppler run -- npm run dev  # starts on port 3000
 
-# Live smoke — receipts confirm + receipt_review (backend must be running):
+# Live smoke tests (backend must be running on PORT, default 3000):
 cd backend
-doppler run -- npx ts-node scripts/smoke-receipts-confirm.ts
+doppler run -- npm run smoke:receipts-confirm   # POST /receipts/confirm + receipt_review
+doppler run -- npm run smoke:splits           # split calculate + NLP assign
+doppler run -- npm run smoke:expenses-reset   # POST /events/:id/expenses/reset workflow
 
 # Start mobile (in another terminal):
 cd mobile
@@ -701,27 +703,44 @@ npx supabase db push
 
 # 4. Verify the migration ran and your schema looks correct
 npx supabase db diff
+
+# 5. Run post-push verification (Supabase SQL Editor or psql)
+#    Paste contents of supabase/scripts/verify-deployment-schema.sql
+#    All checks should pass; fix any MISSING rows before promoting.
 ```
+
+### Migration registry
+
+See **`supabase/MIGRATIONS.md`** for the full ordered list (currently 17 migrations), feature-to-migration mapping, and staging/production checklist.
+
+When adding a migration, also update:
+
+- `supabase/MIGRATIONS.md` (inventory table)
+- `backend/src/__tests__/unit/migrations/migration-manifest.test.ts` (CI manifest)
 
 ### Migration File Location
 
 ```
 /supabase/
+  MIGRATIONS.md
   migrations/
     20260601000000_initial_schema.sql
-    20260615000000_add_ai_audit_log.sql
-    20260620000000_[next_change].sql
+    … (see MIGRATIONS.md)
+    20260615000000_reset_event_expenses_function.sql
+  scripts/
+    verify-deployment-schema.sql
   config.toml
 ```
 
 ### Environment Promotion Sequence
 
 1. Write the migration file in `supabase/migrations/` on your feature branch.
-2. Test locally: `npx supabase db push` (against your dev Supabase project). Verify with `npx supabase db diff` that the result matches expectations.
-3. Commit the migration file to the feature branch.
-4. Merge the feature branch into `develop`. On merge to `staging`, CI/CD automatically runs `npx supabase db push --db-url $SUPABASE_DB_URL_STAGING`.
-5. Test the feature end-to-end in the staging environment.
-6. Open a PR from `staging` into `main`. On merge to `main`, CI/CD takes a backup, then runs `npx supabase db push --db-url $SUPABASE_DB_URL_PRODUCTION`.
+2. Update `supabase/MIGRATIONS.md` and `migration-manifest.test.ts`.
+3. Test locally: `npx supabase db push` (against your dev Supabase project). Run `verify-deployment-schema.sql` and confirm all checks pass.
+5. Merge the feature branch into `develop`. On merge to `staging`, CI/CD automatically runs `npx supabase db push --db-url $SUPABASE_DB_URL_STAGING`.
+6. Run `verify-deployment-schema.sql` on staging; run smoke tests (`smoke:receipts-confirm`, `smoke:splits`, `smoke:expenses-reset`).
+7. Open a PR from `staging` into `main`. On merge to `main`, CI/CD takes a backup, then runs `npx supabase db push --db-url $SUPABASE_DB_URL_PRODUCTION`.
+8. Run `verify-deployment-schema.sql` on production before declaring the deploy complete.
 
 ### Emergency Rollback Procedure
 

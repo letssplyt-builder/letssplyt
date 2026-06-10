@@ -1,4 +1,6 @@
 -- Reset receipt scan data for dev/testing (Supabase SQL Editor — runs as postgres, bypasses RLS).
+-- Production equivalent: POST /api/v1/events/:eventId/expenses/reset (payer only, pre-send).
+-- DB function: reset_event_expenses_data() — see migration 20260615000000_reset_event_expenses_function.sql
 --
 -- Two modes below. Run PREVIEW first. Replace YOUR_USER_ID with your users.id (same as auth.users.id).
 --

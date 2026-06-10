@@ -347,7 +347,15 @@ export async function calculateEventSplits(
     const participantNames = participants.map((p) => p.display_name);
     const splits = calculateEvenSplits(totals.total, participantNames, currency);
     await setAiStage(eventId, 'calculated');
-    await supabaseAdmin.from('events').update({ split_mode: 'equal' }).eq('id', eventId);
+    await supabaseAdmin
+      .from('events')
+      .update({
+        split_mode: 'equal',
+        ...(body.manual_total !== undefined
+          ? { total_amount: Number(body.manual_total.toFixed(2)) }
+          : {}),
+      })
+      .eq('id', eventId);
 
     return buildSplitResponse(
       splits,
@@ -377,7 +385,15 @@ export async function calculateEventSplits(
 
     const splits = calculatePortionSplits(totals.total, weights, currency);
     await setAiStage(eventId, 'calculated');
-    await supabaseAdmin.from('events').update({ split_mode: 'portion' }).eq('id', eventId);
+    await supabaseAdmin
+      .from('events')
+      .update({
+        split_mode: 'portion',
+        ...(body.manual_total !== undefined
+          ? { total_amount: Number(body.manual_total.toFixed(2)) }
+          : {}),
+      })
+      .eq('id', eventId);
 
     return buildSplitResponse(
       splits,

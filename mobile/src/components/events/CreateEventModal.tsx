@@ -1,15 +1,6 @@
 import { useEffect, useRef } from 'react';
-import {
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { BottomSheetModal } from '../layout/BottomSheetModal';
 import { PrimaryButton } from '../PrimaryButton';
 import { authColors } from '../../theme/colors';
 
@@ -32,7 +23,6 @@ export function CreateEventModal({
   onClose,
   onCreate,
 }: CreateEventModalProps) {
-  const insets = useSafeAreaInsets();
   const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
@@ -44,68 +34,58 @@ export function CreateEventModal({
   }, [visible]);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Dismiss create event" />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}
-      >
-        <View style={styles.handle} />
-        <Text style={styles.heading}>New event</Text>
-        <Text style={styles.label}>Event title</Text>
-        <TextInput
-          ref={inputRef}
-          value={title}
-          onChangeText={onTitleChange}
-          placeholder="Friday Dinner"
-          placeholderTextColor={authColors.textOnDarkFaint}
-          style={styles.input}
-          autoFocus
-          editable={!isCreating}
-          returnKeyType="done"
-          onSubmitEditing={onCreate}
-        />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        <PrimaryButton
-          label="Create event →"
-          loading={isCreating}
-          disabled={!title.trim() || isCreating}
-          onPress={onCreate}
-          variant="inverse"
-          style={styles.cta}
-        />
-      </KeyboardAvoidingView>
-    </Modal>
+    <BottomSheetModal
+      visible={visible}
+      onClose={onClose}
+      keyboardAware
+      dismissLabel="Dismiss create event"
+      sheetStyle={styles.sheetBg}
+    >
+      <View style={styles.handle} />
+      <Text style={styles.heading}>New event</Text>
+      <Text style={styles.label}>Event title</Text>
+      <TextInput
+        ref={inputRef}
+        value={title}
+        onChangeText={onTitleChange}
+        placeholder="Friday Dinner"
+        placeholderTextColor={authColors.textOnDarkFaint}
+        style={styles.input}
+        autoFocus
+        editable={!isCreating}
+        returnKeyType="done"
+        onSubmitEditing={onCreate}
+      />
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      <PrimaryButton
+        label="Create event →"
+        loading={isCreating}
+        disabled={!title.trim() || isCreating}
+        onPress={onCreate}
+        variant="inverse"
+        style={styles.cta}
+      />
+    </BottomSheetModal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(11, 61, 69, 0.55)',
-  },
-  sheet: {
+  sheetBg: {
     backgroundColor: authColors.gradientMid,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-    paddingHorizontal: 24,
-    paddingTop: 12,
   },
   handle: {
-    width: 40,
+    width: 36,
     height: 4,
     borderRadius: 2,
     backgroundColor: authColors.glassBorder,
     alignSelf: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   heading: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '800',
     color: authColors.textOnDark,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   label: {
     fontSize: 12,
@@ -116,9 +96,9 @@ const styles = StyleSheet.create({
   input: {
     borderWidth: 1.5,
     borderColor: authColors.glassBorder,
-    borderRadius: 18,
+    borderRadius: 16,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 12,
     fontSize: 16,
     color: authColors.textOnDark,
     backgroundColor: authColors.glassStrong,
@@ -130,6 +110,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   cta: {
-    marginTop: 8,
+    marginTop: 6,
   },
 });

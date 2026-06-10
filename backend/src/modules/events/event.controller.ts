@@ -8,6 +8,7 @@ import {
   regenerateJoinToken,
   reopenEvent,
 } from './event.service';
+import { resetEventExpenses } from './expenses.reset';
 
 const createEventSchema = z.object({
   title: z.string().trim().min(1).max(100),
@@ -131,6 +132,27 @@ export async function handleReopenEvent(
     }
 
     const result = await reopenEvent(req.user!.id, eventId);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleResetExpenses(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const eventId = req.params.id;
+    if (!eventId) {
+      res.status(400).json({
+        error: { code: 'VALIDATION_ERROR', message: 'Event id is required' },
+      });
+      return;
+    }
+
+    const result = await resetEventExpenses(req.user!.id, eventId);
     res.status(200).json(result);
   } catch (err) {
     next(err);
