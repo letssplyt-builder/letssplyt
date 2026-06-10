@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
 **Last updated:** 2026-06-07
-**Current story:** E08-S01 — A3 Message Generation + Preview API
+**Current story:** E08-S02 — Send Messages + Twilio Delivery (+ STOP webhook)
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -58,7 +58,7 @@
 - [x] E07-S06 — Split Entry + Review Screens (4 tabs, drag-drop, NLP input) (2026-06-07)
 
 ### Epic 8: Message System (7 stories)
-- [ ] E08-S01 — A3 Message Generation + Preview API
+- [x] E08-S01 — A3 Message Generation + Preview API (2026-06-07)
 - [ ] E08-S02 — Send Messages + Twilio Delivery (+ STOP webhook)
 - [ ] E08-S03 — Split Image Generator (@napi-rs/canvas, upload to Storage, Twilio mediaUrl)
 - [ ] E08-S04 — Message Preview Screen (carousel, per-participant split image)
@@ -103,9 +103,9 @@
 | Tier | Epics | Stories | Done | Remaining |
 |---|---|---|---|---|
 | Tier 1 — Foundation | 4 | 16 | 16 | 0 |
-| Tier 2 — Core Flow | 5 | 23 | 13 | 10 |
+| Tier 2 — Core Flow | 5 | 23 | 14 | 9 |
 | Tier 3 — Operations | 4 | 13 | 0 | 13 |
-| **Total** | **13** | **52** | **23** | **29** |
+| **Total** | **13** | **52** | **24** | **28** |
 
 ---
 

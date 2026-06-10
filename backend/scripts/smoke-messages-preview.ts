@@ -1,0 +1,310 @@
+/**
+ * Live smoke test for split confirm + messages preview (E08-S01).
+ *
+ * Usage (backend must be running on PORT, default 3000):
+ *   doppler run -- npm run smoke:messages-preview
+ */
+import { supabaseAdmin } from '../src/infrastructure/supabase';
+
+const BASE_URL = (process.env.SMOKE_TEST_BASE_URL ?? `http://127.0.0.1:${process.env.PORT ?? 3000}`).replace(
+  /\/$/,
+  '',
+);
+const ALEX_PHONE = '+15005550001';
+
+type StepResult = { name: string; ok: boolean; detail: string };
+
+const results: StepResult[] = [];
+
+function pass(name: string, detail = 'ok'): void {
+  results.push({ name, ok: true, detail });
+  console.log(`  ✓ ${name}: ${detail}`);
+}
+
+function fail(name: string, detail: string): void {
+  results.push({ name, ok: false, detail });
+  console.error(`  ✗ ${name}: ${detail}`);
+}
+
+async function requestJson(
+  method: string,
+  path: string,
+  body?: unknown,
+  token?: string,
+): Promise<{ status: number; body: Record<string, unknown> }> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(`${BASE_URL}${path}`, {
+    method,
+    headers,
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+
+  const text = await res.text();
+  let parsed: Record<string, unknown> = {};
+  if (text) {
+    try {
+      parsed = JSON.parse(text) as Record<string, unknown>;
+    } catch {
+      parsed = { _raw: text };
+    }
+  }
+  return { status: res.status, body: parsed };
+}
+
+async function cleanup(eventId: string): Promise<void> {
+  await supabaseAdmin.from('ai_audit_log').delete().eq('event_id', eventId);
+  const { data: items } = await supabaseAdmin
+    .from('receipt_items')
+    .select('id')
+    .eq('event_id', eventId);
+  const itemIds = (items ?? []).map((row) => row.id as string);
+  if (itemIds.length > 0) {
+    await supabaseAdmin.from('item_assignments').delete().in('item_id', itemIds);
+  }
+  await supabaseAdmin.from('receipt_items').delete().eq('event_id', eventId);
+  await supabaseAdmin.from('participants').delete().eq('event_id', eventId);
+  await supabaseAdmin.from('event_join_tokens').delete().eq('event_id', eventId);
+  await supabaseAdmin.from('events').delete().eq('id', eventId);
+}
+
+async function ensurePayerHandle(accessToken: string): Promise<boolean> {
+  const handles = await requestJson('GET', '/api/v1/users/me/handles', undefined, accessToken);
+  const list = handles.body.data as Array<{ provider: string }> | undefined;
+  if (handles.status === 200 && list && list.length > 0) {
+    pass('GET /users/me/handles', `${list.length} handle(s)`);
+    return true;
+  }
+
+  const created = await requestJson(
+    'POST',
+    '/api/v1/users/me/handles',
+    { provider: 'venmo', handle_value: 'smoke-payer' },
+    accessToken,
+  );
+  if (created.status === 201) {
+    pass('POST /users/me/handles', 'venmo smoke-payer');
+    return true;
+  }
+
+  fail('POST /users/me/handles', `status ${created.status} ${JSON.stringify(created.body)}`);
+  return false;
+}
+
+async function main(): Promise<void> {
+  console.log(`Smoke: messages preview (E08-S01) (${BASE_URL})\n`);
+
+  let eventId: string | null = null;
+
+  try {
+    const health = await requestJson('GET', '/health');
+    if (health.status !== 200) {
+      fail('GET /health', `status ${health.status}`);
+      return;
+    }
+    pass('GET /health', `status ${health.status}`);
+
+    const verify = await requestJson('POST', '/api/v1/auth/otp/verify', {
+      phone_e164: ALEX_PHONE,
+      code: '123456',
+      context: 'login',
+    });
+    const accessToken = verify.body.access_token as string | undefined;
+    if (verify.status !== 200 || !accessToken) {
+      fail('POST /auth/otp/verify', `status ${verify.status} ${JSON.stringify(verify.body)}`);
+      return;
+    }
+    pass('POST /auth/otp/verify', 'token received');
+
+    if (!(await ensurePayerHandle(accessToken))) return;
+
+    const created = await requestJson(
+      'POST',
+      '/api/v1/events',
+      { title: `Smoke Messages ${Date.now()}` },
+      accessToken,
+    );
+    const newEventId = created.body.id as string | undefined;
+    if (created.status !== 201 || !newEventId) {
+      fail('POST /events', `status ${created.status}`);
+      return;
+    }
+    eventId = newEventId;
+    pass('POST /events', eventId);
+
+    const addGuest = await requestJson(
+      'POST',
+      `/api/v1/events/${eventId}/participants/manual`,
+      { display_name: 'Jordan', join_method: 'manual_name_only' },
+      accessToken,
+    );
+    if (addGuest.status !== 201) {
+      fail('POST /participants/manual', `status ${addGuest.status}`);
+      return;
+    }
+    pass('POST /participants/manual');
+
+    const locked = await requestJson('POST', `/api/v1/events/${eventId}/lock`, {}, accessToken);
+    if (locked.status !== 200) {
+      fail('POST /events/:id/lock', `status ${locked.status}`);
+      return;
+    }
+    pass('POST /events/:id/lock');
+
+    const manualTotal = 84;
+    const calculate = await requestJson(
+      'POST',
+      `/api/v1/events/${eventId}/split/calculate`,
+      { split_mode: 'equal', manual_total: manualTotal },
+      accessToken,
+    );
+    const calcSplits = calculate.body.splits as
+      | Array<{ participant_id: string; amount_owed: number }>
+      | undefined;
+    if (calculate.status !== 200 || !calcSplits?.length) {
+      fail('POST split/calculate', `status ${calculate.status} ${JSON.stringify(calculate.body)}`);
+      return;
+    }
+    pass('POST split/calculate', `${calcSplits.length} splits`);
+
+    const detailPreConfirm = await requestJson('GET', `/api/v1/events/${eventId}`, undefined, accessToken);
+    const participantsPre = detailPreConfirm.body.participants as
+      | Array<{ amount_owed: number | null }>
+      | undefined;
+    const allNull =
+      participantsPre?.every((row) => row.amount_owed === null || row.amount_owed === undefined) ?? false;
+    if (detailPreConfirm.status === 200 && allNull) {
+      pass('GET /events/:id pre-confirm', 'participant amount_owed still null');
+    } else {
+      fail('GET /events/:id pre-confirm', JSON.stringify(participantsPre));
+    }
+
+    const previewEarly = await requestJson(
+      'GET',
+      `/api/v1/events/${eventId}/messages/preview`,
+      undefined,
+      accessToken,
+    );
+    if (previewEarly.status === 409) {
+      pass('GET messages/preview before confirm', '409 as expected');
+    } else {
+      fail('GET messages/preview before confirm', `status ${previewEarly.status}`);
+    }
+
+    const confirm = await requestJson(
+      'POST',
+      `/api/v1/events/${eventId}/split/confirm`,
+      {
+        splits: calcSplits.map((row) => ({
+          participant_id: row.participant_id,
+          amount_owed: row.amount_owed,
+        })),
+      },
+      accessToken,
+    );
+    if (confirm.status === 200 && confirm.body.confirmed === true && confirm.body.ai_stage === 'calculated') {
+      pass('POST split/confirm', 'confirmed');
+    } else {
+      fail('POST split/confirm', `status ${confirm.status} ${JSON.stringify(confirm.body)}`);
+      return;
+    }
+
+    const detailPostConfirm = await requestJson('GET', `/api/v1/events/${eventId}`, undefined, accessToken);
+    const participantsPost = detailPostConfirm.body.participants as
+      | Array<{ amount_owed: number | null; display_name: string }>
+      | undefined;
+    const allSet =
+      participantsPost?.every((row) => row.amount_owed !== null && row.amount_owed > 0) ?? false;
+    const sumPost =
+      participantsPost?.reduce((acc, row) => acc + (row.amount_owed ?? 0), 0) ?? 0;
+    if (detailPostConfirm.status === 200 && allSet && Math.abs(sumPost - manualTotal) <= 0.02) {
+      pass('GET /events/:id post-confirm', `amounts set sum=${sumPost.toFixed(2)}`);
+    } else {
+      fail('GET /events/:id post-confirm', JSON.stringify(participantsPost));
+    }
+
+    const preview = await requestJson(
+      'GET',
+      `/api/v1/events/${eventId}/messages/preview`,
+      undefined,
+      accessToken,
+    );
+    const previews = preview.body.previews as
+      | Array<{
+          participant_id: string;
+          display_name: string;
+          amount_owed: number;
+          message_text: string;
+          channel: string;
+          payment_links: Array<{ provider: string; label: string; url: string }>;
+        }>
+      | undefined;
+
+    const previewsWithLinks = previews?.filter((p) => p.payment_links.length > 0) ?? [];
+    if (
+      preview.status === 200 &&
+      previews?.length === calcSplits.length &&
+      previews.every((p) => p.message_text.length > 20) &&
+      previewsWithLinks.length >= 1
+    ) {
+      pass(
+        'GET messages/preview',
+        `${previews.length} previews, ${previewsWithLinks.length} with payment_links`,
+      );
+    } else {
+      fail('GET messages/preview', `status ${preview.status} ${JSON.stringify(preview.body)}`);
+      return;
+    }
+
+    const hasDisplayName = previews?.every(
+      (p) => p.message_text.includes(p.display_name) && !p.message_text.includes('Recipient'),
+    );
+    if (hasDisplayName) {
+      pass('preview message_text', 'uses display_name not Recipient');
+    } else {
+      fail('preview message_text', 'missing display_name or contains Recipient');
+    }
+
+    const { data: stageRow } = await supabaseAdmin
+      .from('events')
+      .select('ai_stage')
+      .eq('id', eventId)
+      .maybeSingle();
+    if (stageRow?.ai_stage === 'messaging') {
+      pass('DB ai_stage after preview', stageRow.ai_stage);
+    } else {
+      fail('DB ai_stage after preview', String(stageRow?.ai_stage));
+    }
+
+    const previewAgain = await requestJson(
+      'GET',
+      `/api/v1/events/${eventId}/messages/preview`,
+      undefined,
+      accessToken,
+    );
+    if (previewAgain.status === 200 && (previewAgain.body.previews as unknown[] | undefined)?.length) {
+      pass('GET messages/preview (repeat)', 'idempotent 200');
+    } else {
+      fail('GET messages/preview (repeat)', `status ${previewAgain.status}`);
+    }
+  } finally {
+    if (eventId) {
+      await cleanup(eventId);
+      console.log(`\nCleaned up event ${eventId}`);
+    }
+
+    const failed = results.filter((row) => !row.ok);
+    console.log(`\n${results.length - failed.length}/${results.length} steps passed`);
+    if (failed.length > 0) {
+      console.error('Failed steps:', failed.map((row) => row.name).join(', '));
+      process.exit(1);
+    }
+    console.log('All smoke steps passed.');
+  }
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

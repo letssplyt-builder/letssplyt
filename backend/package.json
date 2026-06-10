@@ -18,6 +18,7 @@
     "smoke:expenses-reset": "ts-node scripts/smoke-expenses-reset.ts",
     "smoke:receipts-confirm": "ts-node scripts/smoke-receipts-confirm.ts",
     "smoke:splits": "ts-node scripts/smoke-splits.ts",
+    "smoke:messages-preview": "ts-node scripts/smoke-messages-preview.ts",
     "cleanup:phone": "ts-node scripts/cleanup-auth-by-phone.ts"
   },
   "dependencies": {

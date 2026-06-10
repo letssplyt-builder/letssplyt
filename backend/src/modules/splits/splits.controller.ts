@@ -1,7 +1,11 @@
 import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
 import { AppError } from '../../infrastructure/errors';
-import { assignSplitsWithNlp, calculateEventSplits } from './splits.service';
+import {
+  assignSplitsWithNlp,
+  calculateEventSplits,
+  confirmEventSplit,
+} from './splits.service';
 
 const calculateBodySchema = z.object({
   split_mode: z.enum(['equal', 'itemised', 'portion']),
@@ -29,6 +33,17 @@ const assignBodySchema = z.object({
   instruction: z.string().min(1).max(500),
 });
 
+const confirmBodySchema = z.object({
+  splits: z
+    .array(
+      z.object({
+        participant_id: z.string().uuid(),
+        amount_owed: z.number().nonnegative(),
+      }),
+    )
+    .min(1),
+});
+
 export async function postSplitCalculateHandler(
   req: Request,
   res: Response,
@@ -47,6 +62,30 @@ export async function postSplitCalculateHandler(
 
     const body = calculateBodySchema.parse(req.body);
     const result = await calculateEventSplits(userId, eventId, body);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function postSplitConfirmHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new AppError('AUTH_REQUIRED', 'Unauthorized', 401);
+    }
+
+    const eventId = req.params.id;
+    if (!eventId) {
+      throw new AppError('VALIDATION_ERROR', 'Event id is required', 400);
+    }
+
+    const body = confirmBodySchema.parse(req.body);
+    const result = await confirmEventSplit(userId, eventId, body);
     res.status(200).json(result);
   } catch (err) {
     next(err);

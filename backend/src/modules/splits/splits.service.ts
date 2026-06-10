@@ -502,3 +502,103 @@ export async function calculateEventSplits(
     totals.total,
   );
 }
+
+export interface ConfirmSplitBody {
+  splits: Array<{ participant_id: string; amount_owed: number }>;
+}
+
+export interface ConfirmSplitResponse {
+  confirmed: true;
+  event_status: string;
+  ai_stage: 'calculated';
+  splits: Array<{ participant_id: string; amount_owed: number }>;
+}
+
+function isSumWithinTolerance(sum: number, expected: number): boolean {
+  return Math.abs(sum - expected) <= 0.01;
+}
+
+export async function confirmEventSplit(
+  userId: string,
+  eventId: string,
+  body: ConfirmSplitBody,
+): Promise<ConfirmSplitResponse> {
+  const eventRow = await fetchEventRow(eventId);
+  await assertEventOwner(eventRow, userId);
+
+  if (eventRow.status !== 'locked') {
+    throw new AppError('EVENT_NOT_LOCKED', 'Event must be locked before confirming split', 409);
+  }
+
+  if (!body.splits.length) {
+    throw new AppError('VALIDATION_ERROR', 'splits array is required', 400);
+  }
+
+  const participants = await loadParticipants(eventId);
+  const participantIds = new Set(participants.map((p) => p.id));
+
+  for (const split of body.splits) {
+    if (!participantIds.has(split.participant_id)) {
+      throw new AppError(
+        'VALIDATION_ERROR',
+        `Unknown participant_id: ${split.participant_id}`,
+        400,
+      );
+    }
+    if (split.amount_owed < 0) {
+      throw new AppError('VALIDATION_ERROR', 'amount_owed must be non-negative', 400);
+    }
+  }
+
+  const sum = Number(
+    body.splits.reduce((acc, row) => acc + row.amount_owed, 0).toFixed(2),
+  );
+
+  const storedTotal =
+    eventRow.total_amount !== null && eventRow.total_amount !== undefined
+      ? Number(eventRow.total_amount)
+      : 0;
+  const expectedTotal = storedTotal > 0 ? storedTotal : sum;
+
+  if (!isSumWithinTolerance(sum, expectedTotal)) {
+    throw new AppError(
+      'SUM_MISMATCH',
+      `Split total ${sum} does not match event total ${storedTotal > 0 ? storedTotal : expectedTotal}`,
+      400,
+    );
+  }
+
+  for (const split of body.splits) {
+    const { error } = await supabaseAdmin
+      .from('participants')
+      .update({ amount_owed: split.amount_owed })
+      .eq('id', split.participant_id)
+      .eq('event_id', eventId);
+
+    if (error) {
+      throw new AppError('DB_WRITE_FAILED', error.message, 500);
+    }
+  }
+
+  if (storedTotal <= 0) {
+    const { error: totalError } = await supabaseAdmin
+      .from('events')
+      .update({ total_amount: sum })
+      .eq('id', eventId);
+    if (totalError) {
+      throw new AppError('DB_WRITE_FAILED', totalError.message, 500);
+    }
+  }
+
+  await setAiStage(eventId, 'calculated');
+
+  return {
+    confirmed: true,
+    event_status: eventRow.status,
+    ai_stage: 'calculated',
+    splits: body.splits.map((row) => ({
+      participant_id: row.participant_id,
+      amount_owed: row.amount_owed,
+    })),
+  };
+}

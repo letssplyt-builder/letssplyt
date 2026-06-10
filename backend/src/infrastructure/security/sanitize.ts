@@ -32,18 +32,22 @@ export function sanitizePromptInput(input: string, maxLength = 200): string {
     .slice(0, maxLength);
 }
 
+export function defaultLocaleForCurrency(currency: string): string {
+  const upper = currency.toUpperCase();
+  return SUPPORTED_CURRENCIES[upper] ?? 'en-US';
+}
+
 export function formatCurrency(amount: number, currency: string, locale?: string): string {
   const upper = currency.toUpperCase();
-  const resolvedLocale = locale ?? SUPPORTED_CURRENCIES[upper];
-  if (!resolvedLocale) {
-    throw new CurrencyFormatError(
-      `Unsupported currency: ${upper}. Supported: USD, INR, EUR, GBP, AUD, CAD, SGD, JPY`,
-    );
+  const resolvedLocale = locale ?? defaultLocaleForCurrency(upper);
+  try {
+    return new Intl.NumberFormat(resolvedLocale, {
+      style: 'currency',
+      currency: upper,
+    }).format(amount);
+  } catch {
+    return `${upper} ${amount}`;
   }
-  return new Intl.NumberFormat(resolvedLocale, {
-    style: 'currency',
-    currency: upper,
-  }).format(amount);
 }
 
 export async function resolveParticipantPhone(participant: {

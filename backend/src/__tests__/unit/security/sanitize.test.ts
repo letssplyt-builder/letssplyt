@@ -71,9 +71,8 @@ describe('formatCurrency', () => {
     expect(formatCurrency(12.34, 'GBP', 'en-GB')).toBe('£12.34');
   });
 
-  it('throws CurrencyFormatError for unknown currency code', () => {
-    expect(() => formatCurrency(100, 'XYZ')).toThrow(CurrencyFormatError);
-    expect(() => formatCurrency(100, 'XYZ')).toThrow(/Unsupported currency: XYZ/);
+  it('falls back for unknown currency code without throwing', () => {
+    expect(formatCurrency(100, 'XYZ')).toMatch(/XYZ.*100/);
   });
 
   it('handles zero correctly ($0.00)', () => {

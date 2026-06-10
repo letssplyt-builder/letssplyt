@@ -11,6 +11,7 @@ export {
 export {
   sanitizePromptInput,
   formatCurrency,
+  defaultLocaleForCurrency,
   resolveParticipantPhone,
   CurrencyFormatError,
 } from './sanitize';

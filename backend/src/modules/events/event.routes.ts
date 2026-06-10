@@ -14,6 +14,7 @@ import {
   handleDeleteParticipant,
 } from './participant.controller';
 import splitsRouter from '../splits/splits.router';
+import { handlePreviewMessages } from '../messages/messages.controller';
 
 const router = Router();
 
@@ -28,6 +29,7 @@ router.post('/:id/lock', handleLockEvent);
 router.post('/:id/expenses/reset', handleResetExpenses);
 router.post('/:id/reopen', handleReopenEvent);
 router.post('/:id/join-token/regenerate', handleRegenerateJoinToken);
+router.get('/:id/messages/preview', handlePreviewMessages);
 
 router.use('/', splitsRouter);
 
