@@ -77,7 +77,7 @@ async function ensureMessagingStage(eventId: string, currentStage: AiStage): Pro
   }
 }
 
-async function loadParticipantItemNames(eventId: string): Promise<Map<string, string[]>> {
+export async function loadParticipantItemNames(eventId: string): Promise<Map<string, string[]>> {
   const { data, error } = await supabaseAdmin
     .from('item_assignments')
     .select('participant_id, receipt_items!inner(name, event_id)')

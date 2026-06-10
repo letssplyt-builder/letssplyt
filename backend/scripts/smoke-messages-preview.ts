@@ -1,10 +1,13 @@
 /**
- * Live smoke test for split confirm, messages preview (E08-S01), and send (E08-S02).
+ * Live smoke test for split confirm, messages preview (E08-S01), send (E08-S02),
+ * and split image upload (E08-S03).
  *
  * Usage (backend must be running on PORT, default 3000):
  *   doppler run -- npm run smoke:messages-preview
  */
+import sharp from 'sharp';
 import { supabaseAdmin } from '../src/infrastructure/supabase';
+import { splitImageStoragePath } from '../src/modules/messages/split-image.generator';
 
 const BASE_URL = (process.env.SMOKE_TEST_BASE_URL ?? `http://127.0.0.1:${process.env.PORT ?? 3000}`).replace(
   /\/$/,
@@ -53,7 +56,17 @@ async function requestJson(
   return { status: res.status, body: parsed };
 }
 
+async function cleanupStorage(eventId: string): Promise<void> {
+  const bucket = supabaseAdmin.storage.from('receipts');
+  const { data: files } = await bucket.list(eventId);
+  if (files?.length) {
+    const paths = files.map((file) => `${eventId}/${file.name}`);
+    await bucket.remove(paths);
+  }
+}
+
 async function cleanup(eventId: string): Promise<void> {
+  await cleanupStorage(eventId);
   await supabaseAdmin.from('notification_log').delete().eq('event_id', eventId);
   await supabaseAdmin.from('ai_audit_log').delete().eq('event_id', eventId);
   const { data: items } = await supabaseAdmin
@@ -94,7 +107,7 @@ async function ensurePayerHandle(accessToken: string): Promise<boolean> {
 }
 
 async function main(): Promise<void> {
-  console.log(`Smoke: messages preview + send (E08-S01 / E08-S02) (${BASE_URL})\n`);
+  console.log(`Smoke: messages preview + send + split image (E08-S01–S03) (${BASE_URL})\n`);
 
   let eventId: string | null = null;
 
@@ -319,6 +332,48 @@ async function main(): Promise<void> {
       pass('DB notification_log', `1 row status=sent sid=${logs[0].twilio_sid}`);
     } else {
       fail('DB notification_log', JSON.stringify(logs));
+      return;
+    }
+
+    const sentParticipantId = logs[0]?.participant_id as string;
+    const storagePath = splitImageStoragePath(eventId, sentParticipantId);
+    const receiptsBucket = supabaseAdmin.storage.from('receipts');
+
+    const { data: fileBlob, error: downloadError } = await receiptsBucket.download(storagePath);
+    if (downloadError || !fileBlob) {
+      fail('Storage split image download', downloadError?.message ?? `missing ${storagePath}`);
+      return;
+    }
+
+    const imageBuffer = Buffer.from(await fileBlob.arrayBuffer());
+    const imageMeta = await sharp(imageBuffer).metadata();
+    const underSizeLimit = imageBuffer.length < 200 * 1024;
+    if (
+      imageMeta.width === 640 &&
+      underSizeLimit &&
+      imageBuffer[0] === 0x89 &&
+      imageBuffer[1] === 0x50
+    ) {
+      pass(
+        'Storage split image PNG',
+        `${storagePath} ${imageBuffer.length}b w=${imageMeta.width} h=${imageMeta.height ?? '?'}`,
+      );
+    } else {
+      fail(
+        'Storage split image PNG',
+        `path=${storagePath} w=${imageMeta.width} bytes=${imageBuffer.length}`,
+      );
+      return;
+    }
+
+    const { data: signedUrlData, error: signedUrlError } = await receiptsBucket.createSignedUrl(
+      storagePath,
+      3600,
+    );
+    if (!signedUrlError && signedUrlData?.signedUrl?.startsWith('http')) {
+      pass('Storage split image signed URL', 'created');
+    } else {
+      fail('Storage split image signed URL', signedUrlError?.message ?? 'missing signedUrl');
     }
 
     const { data: eventAfterSend } = await supabaseAdmin

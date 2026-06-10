@@ -26,6 +26,7 @@ export async function sendTwilioMessage(
   phoneE164: string,
   preferredChannel: 'sms' | 'whatsapp',
   body: string,
+  mediaUrl?: string,
 ): Promise<TwilioSendResult> {
   if (isMessagingDevBypassEnabled()) {
     return {
@@ -41,6 +42,7 @@ export async function sendTwilioMessage(
   const baseParams = {
     body,
     ...(callback ? { statusCallback: callback } : {}),
+    ...(mediaUrl ? { mediaUrl: [mediaUrl] } : {}),
   };
 
   if (preferredChannel === 'sms') {

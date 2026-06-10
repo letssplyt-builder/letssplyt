@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 jest.mock('../../../modules/messages/messages.service', () => ({
   buildMessagePreviewsForEvent: jest.fn(),
+  loadParticipantItemNames: jest.fn(),
+}));
+
+jest.mock('../../../modules/messages/split-image.service', () => ({
+  prepareSplitImageMediaUrl: jest.fn(),
 }));
 
 jest.mock('../../../infrastructure/notification/opt-out', () => ({
@@ -20,14 +25,19 @@ import { mockTwilio } from '../../mocks/twilio.mock';
 import { mockSupabase } from '../../mocks/supabase.mock';
 import { isPhoneOptedOut } from '../../../infrastructure/notification/opt-out';
 import { sendTwilioMessage } from '../../../infrastructure/notification/twilio-messaging';
-import { buildMessagePreviewsForEvent } from '../../../modules/messages/messages.service';
+import {
+  buildMessagePreviewsForEvent,
+  loadParticipantItemNames,
+} from '../../../modules/messages/messages.service';
 import { resolveParticipantPhoneContext } from '../../../modules/messages/participant-phone';
+import { prepareSplitImageMediaUrl } from '../../../modules/messages/split-image.service';
 import { sendEventMessages } from '../../../modules/messages/send.service';
 
 const EVENT_ID = 'event-eeee-eeee-eeee-eeee-eeee-eeee-eeee';
 const PAYER_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const PARTICIPANT_A = 'part-a-1111-1111-1111-111111111111';
 const PARTICIPANT_B = 'part-b-2222-2222-2222-222222222222';
+const MEDIA_URL = 'https://test.supabase.co/object/receipts/event/split-part-a.png';
 
 describe('sendEventMessages', () => {
   beforeEach(() => {
@@ -35,6 +45,8 @@ describe('sendEventMessages', () => {
     mockSupabase.__resetMock();
     jest.mocked(isPhoneOptedOut).mockResolvedValue(false);
     jest.mocked(sendTwilioMessage).mockResolvedValue({ sid: 'SMtest123', channel: 'sms' });
+    jest.mocked(loadParticipantItemNames).mockResolvedValue(new Map());
+    jest.mocked(prepareSplitImageMediaUrl).mockResolvedValue(MEDIA_URL);
     jest.mocked(buildMessagePreviewsForEvent).mockResolvedValue([
       {
         participant_id: PARTICIPANT_A,
@@ -78,6 +90,11 @@ describe('sendEventMessages', () => {
       error: null,
     });
 
+    mockSupabase.__pushMockResultForTable('users', {
+      data: { display_name: 'Alex Payer' },
+      error: null,
+    });
+
     mockSupabase.__pushMockResultForTable('participants', {
       data: [
         {
@@ -86,6 +103,8 @@ describe('sendEventMessages', () => {
           guest_pii_token: null,
           country_code: 'US',
           join_method: 'qr_app',
+          display_name: 'Alex',
+          amount_owed: 20,
         },
         {
           id: PARTICIPANT_B,
@@ -93,6 +112,8 @@ describe('sendEventMessages', () => {
           guest_pii_token: null,
           country_code: null,
           join_method: 'manual_name_only',
+          display_name: 'Jordan',
+          amount_owed: 20,
         },
       ],
       error: null,
@@ -144,6 +165,49 @@ describe('sendEventMessages', () => {
       '+15005550001',
       'sms',
       expect.stringContaining('Alex'),
+      MEDIA_URL,
+    );
+  });
+
+  it('passes mediaUrl to Twilio when split image is available', async () => {
+    await sendEventMessages(PAYER_ID, EVENT_ID);
+
+    expect(prepareSplitImageMediaUrl).toHaveBeenCalled();
+    expect(sendTwilioMessage).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.any(String),
+      MEDIA_URL,
+    );
+  });
+
+  it('uploads split image before Twilio send', async () => {
+    const callOrder: string[] = [];
+    jest.mocked(prepareSplitImageMediaUrl).mockImplementation(async () => {
+      callOrder.push('split-image');
+      return MEDIA_URL;
+    });
+    jest.mocked(sendTwilioMessage).mockImplementation(async () => {
+      callOrder.push('twilio');
+      return { sid: 'SMtest123', channel: 'sms' };
+    });
+
+    await sendEventMessages(PAYER_ID, EVENT_ID);
+
+    expect(callOrder).toEqual(['split-image', 'twilio']);
+  });
+
+  it('still sends message when split image preparation fails', async () => {
+    jest.mocked(prepareSplitImageMediaUrl).mockResolvedValue(undefined);
+
+    const result = await sendEventMessages(PAYER_ID, EVENT_ID);
+
+    expect(result.sent_count).toBe(1);
+    expect(sendTwilioMessage).toHaveBeenCalledWith(
+      '+15005550001',
+      'sms',
+      expect.stringContaining('Alex'),
+      undefined,
     );
   });
 
@@ -177,6 +241,10 @@ describe('sendEventMessages', () => {
       },
       error: null,
     });
+    mockSupabase.__pushMockResultForTable('users', {
+      data: { display_name: 'Alex Payer' },
+      error: null,
+    });
     mockSupabase.__pushMockResultForTable('participants', {
       data: [
         {
@@ -185,6 +253,8 @@ describe('sendEventMessages', () => {
           guest_pii_token: null,
           country_code: 'GB',
           join_method: 'qr_app',
+          display_name: 'Alex',
+          amount_owed: 20,
         },
       ],
       error: null,
@@ -202,6 +272,7 @@ describe('sendEventMessages', () => {
       '+447700900123',
       'whatsapp',
       expect.stringContaining('Alex'),
+      MEDIA_URL,
     );
   });
 

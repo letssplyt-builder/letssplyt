@@ -88,6 +88,13 @@ export interface ChainableMock {
 }
 
 export interface StorageBucketMock {
+  upload: jest.Mock<
+    (
+      path: string,
+      body: Buffer,
+      options?: { contentType?: string; upsert?: boolean },
+    ) => Promise<{ data: { path: string } | null; error: null | { message: string } }>
+  >;
   createSignedUploadUrl: jest.Mock<
     (path: string) => Promise<{
       data: { signedUrl: string; path: string; token?: string } | null;
@@ -104,6 +111,17 @@ export interface StorageBucketMock {
 
 function createStorageBucket(bucket: string): StorageBucketMock {
   return {
+    upload: jest
+      .fn<
+        (
+          path: string,
+          _body: Buffer,
+          _options?: { contentType?: string; upsert?: boolean },
+        ) => Promise<{ data: { path: string } | null; error: null | { message: string } }>
+      >()
+      .mockImplementation((path) =>
+        Promise.resolve({ data: { path }, error: null }),
+      ),
     createSignedUploadUrl: jest
       .fn<
         (path: string) => Promise<{
@@ -139,12 +157,18 @@ function createStorageBucket(bucket: string): StorageBucketMock {
   };
 }
 
+const storageBucketCache = new Map<string, StorageBucketMock>();
+
 export const mockSupabase = {
   from: jest.fn<(table: string) => ChainableMock>().mockImplementation((table) => createChainable(table)),
   storage: {
-    from: jest.fn<(bucket: string) => StorageBucketMock>().mockImplementation((bucket) =>
-      createStorageBucket(bucket),
-    ),
+    from: jest.fn<(bucket: string) => StorageBucketMock>().mockImplementation((bucket) => {
+      const cached = storageBucketCache.get(bucket);
+      if (cached) return cached;
+      const created = createStorageBucket(bucket);
+      storageBucketCache.set(bucket, created);
+      return created;
+    }),
   },
   rpc: jest
     .fn<
@@ -258,6 +282,7 @@ export const mockSupabase = {
     mockResult = { ...defaultResult };
     tableResults.clear();
     tableResultQueues.clear();
+    storageBucketCache.clear();
   },
   __mockRLSError: () => {
     mockResult = {

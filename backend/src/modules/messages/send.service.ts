@@ -7,8 +7,9 @@ import {
   assertEventOwner,
   fetchEventRow,
 } from '../events/event.service';
-import { buildMessagePreviewsForEvent } from './messages.service';
+import { buildMessagePreviewsForEvent, loadParticipantItemNames } from './messages.service';
 import { resolveParticipantPhoneContext } from './participant-phone';
+import { prepareSplitImageMediaUrl } from './split-image.service';
 
 export type SendResultStatus =
   | 'sent'
@@ -75,21 +76,37 @@ export async function sendEventMessages(
   const previews = await buildMessagePreviewsForEvent(eventId, eventRow.payer_id);
   const previewMap = new Map(previews.map((row) => [row.participant_id, row]));
 
+  const { data: payer, error: payerError } = await supabaseAdmin
+    .from('users')
+    .select('display_name')
+    .eq('id', eventRow.payer_id)
+    .maybeSingle();
+
+  if (payerError || !payer) {
+    throw new AppError('PAYER_FETCH_FAILED', 'Could not load payer profile', 500);
+  }
+
   const { data: participantRows, error: participantsError } = await supabaseAdmin
     .from('participants')
-    .select('id, user_id, guest_pii_token, country_code, join_method')
+    .select(
+      'id, user_id, guest_pii_token, country_code, join_method, display_name, amount_owed',
+    )
     .eq('event_id', eventId);
 
   if (participantsError) {
     throw new AppError('PARTICIPANTS_FETCH_FAILED', 'Could not load participants', 500);
   }
 
+  const rows = participantRows ?? [];
+  const itemNamesByParticipant = await loadParticipantItemNames(eventId);
+  const payerDisplayName = payer.display_name as string;
+
   const results: SendMessagesResult['results'] = [];
   let sentCount = 0;
   let skippedCount = 0;
   let failedCount = 0;
 
-  for (const row of participantRows ?? []) {
+  for (const row of rows) {
     const participantId = row.id as string;
     if (filterIds && !filterIds.has(participantId)) {
       continue;
@@ -120,10 +137,23 @@ export async function sendEventMessages(
     }
 
     try {
+      const mediaUrl = await prepareSplitImageMediaUrl(
+        eventRow,
+        payerDisplayName,
+        rows.map((participant) => ({
+          id: participant.id as string,
+          display_name: participant.display_name as string,
+          amount_owed: participant.amount_owed as number | null,
+        })),
+        itemNamesByParticipant,
+        participantId,
+      );
+
       const twilioResult = await sendTwilioMessage(
         phoneContext.phoneE164,
         phoneContext.channel,
         preview.message_text,
+        mediaUrl,
       );
 
       const { error: participantError } = await supabaseAdmin

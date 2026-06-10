@@ -22,9 +22,10 @@
     "cleanup:phone": "ts-node scripts/cleanup-auth-by-phone.ts"
   },
   "dependencies": {
-    "@letssplyt/shared": "1.0.0",
     "@anthropic-ai/sdk": "^0.30.0",
     "@google/generative-ai": "^0.21.0",
+    "@letssplyt/shared": "1.0.0",
+    "@napi-rs/canvas": "^0.1.100",
     "@supabase/supabase-js": "^2.49.0",
     "@upstash/qstash": "^2.7.0",
     "@upstash/redis": "^1.34.0",
