@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
-**Last updated:** 2026-06-09
-**Current story:** E07-S01 — Receipt Image Upload (mobile compress → Supabase Storage signed URL)
+**Last updated:** 2026-06-10
+**Current story:** E07-S02 — A1 Receipt Parsing (AI Agent — atomic idempotency, Zod validation)
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -50,7 +50,7 @@
 - [x] E06-S03 — Deep Link Infrastructure (AASA, App Links, Expo Config) (2026-06-09)
 
 ### Epic 7: AI Receipt Pipeline
-- [ ] E07-S01 — Receipt Image Upload (mobile compress → Supabase Storage signed URL)
+- [x] E07-S01 — Receipt Image Upload (native doc scanner → preview confirm → compress → Supabase Storage signed URL) (2026-06-10)
 - [ ] E07-S02 — A1 Receipt Parsing (AI Agent — atomic idempotency, Zod validation)
 - [ ] E07-S03 — Item Review Screen (mobile — editable items, low-confidence highlight)
 - [ ] E07-S04 — Split Calculator (getCurrencyMinorUnits, largest-remainder, 100% coverage)

@@ -87,8 +87,65 @@ export interface ChainableMock {
   >;
 }
 
+export interface StorageBucketMock {
+  createSignedUploadUrl: jest.Mock<
+    (path: string) => Promise<{
+      data: { signedUrl: string; path: string; token?: string } | null;
+      error: null | { message: string };
+    }>
+  >;
+  createSignedUrl: jest.Mock<
+    (path: string, expiresIn: number) => Promise<{
+      data: { signedUrl: string } | null;
+      error: null | { message: string };
+    }>
+  >;
+}
+
+function createStorageBucket(bucket: string): StorageBucketMock {
+  return {
+    createSignedUploadUrl: jest
+      .fn<
+        (path: string) => Promise<{
+          data: { signedUrl: string; path: string; token?: string } | null;
+          error: null | { message: string };
+        }>
+      >()
+      .mockImplementation((path) =>
+        Promise.resolve({
+          data: {
+            signedUrl: `https://test.supabase.co/upload/${bucket}/${path}?token=mock-upload-token`,
+            path,
+            token: 'mock-upload-token',
+          },
+          error: null,
+        }),
+      ),
+    createSignedUrl: jest
+      .fn<
+        (path: string, _expiresIn: number) => Promise<{
+          data: { signedUrl: string } | null;
+          error: null | { message: string };
+        }>
+      >()
+      .mockImplementation((path) =>
+        Promise.resolve({
+          data: {
+            signedUrl: `https://test.supabase.co/object/${bucket}/${path}?token=mock-download-token`,
+          },
+          error: null,
+        }),
+      ),
+  };
+}
+
 export const mockSupabase = {
   from: jest.fn<(table: string) => ChainableMock>().mockImplementation((table) => createChainable(table)),
+  storage: {
+    from: jest.fn<(bucket: string) => StorageBucketMock>().mockImplementation((bucket) =>
+      createStorageBucket(bucket),
+    ),
+  },
   rpc: jest
     .fn<
       (fn: string) => Promise<{ data: unknown; error: null | { code: string; message: string } }>

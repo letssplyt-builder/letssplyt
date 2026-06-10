@@ -7,7 +7,12 @@ module.exports = {
   scheme: 'letssplyt',
   userInterfaceStyle: 'automatic',
   plugins: [
-    'expo-camera',
+    [
+      'react-native-document-scanner-plugin',
+      {
+        cameraPermission: 'LetsSplyt needs camera access to scan your receipt.',
+      },
+    ],
     [
       'expo-contacts',
       {
@@ -46,7 +51,7 @@ module.exports = {
   },
   android: {
     package: 'com.letssplyt.app',
-    permissions: ['READ_CONTACTS'],
+    permissions: ['READ_CONTACTS', 'CAMERA'],
     intentFilters: [
       {
         action: 'VIEW',
@@ -60,6 +65,9 @@ module.exports = {
     ],
   },
   extra: {
+    eas: {
+      projectId: '86a779d7-3bdf-4af9-ab0a-0e597e113aaa',
+    },
     apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000',
     supabaseUrl:
       process.env.EXPO_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '',

@@ -13,9 +13,25 @@ jest.mock('react-native-safe-area-context', () => {
   };
 });
 
-jest.mock('expo-camera', () => ({
-  useCameraPermissions: jest.fn().mockReturnValue([{ granted: true }, jest.fn()]),
-  CameraView: 'CameraView',
+jest.mock('react-native-document-scanner-plugin', () => ({
+  __esModule: true,
+  default: {
+    scanDocument: jest.fn(() =>
+      Promise.resolve({
+        scannedImages: ['file://scanned-receipt.jpg'],
+        status: 'success',
+      }),
+    ),
+  },
+  ScanDocumentResponseStatus: {
+    Success: 'success',
+    Cancel: 'cancel',
+  },
+}));
+
+jest.mock('expo-image-manipulator', () => ({
+  manipulateAsync: jest.fn((uri: string) => Promise.resolve({ uri: `${uri}-compressed` })),
+  SaveFormat: { JPEG: 'jpeg' },
 }));
 
 jest.mock('expo-secure-store', () => ({

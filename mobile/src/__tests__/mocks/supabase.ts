@@ -54,12 +54,19 @@ function createChannelMock() {
 
 export const mockChannel = jest.fn(() => createChannelMock());
 
+export const mockUploadToSignedUrl = jest.fn(() => Promise.resolve({ data: { path: 'ok' }, error: null }));
+
 export const supabaseMock = {
   auth: {
     onAuthStateChange: mockOnAuthStateChange,
     setSession: mockSetSession,
     getSession: mockGetSession,
     signOut: mockSignOut,
+  },
+  storage: {
+    from: jest.fn(() => ({
+      uploadToSignedUrl: mockUploadToSignedUrl,
+    })),
   },
   channel: mockChannel,
   removeChannel: mockRemoveChannel,

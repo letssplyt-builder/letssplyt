@@ -69,7 +69,8 @@ RootNavigator (NativeStack)
 │   │   └── EventsStack (NativeStack)
 │   │       ├── EventsScreen             ← Events you created | Events you joined (settled collapsed)
 │   │       ├── EventDetailScreen        ← payer or participant view (joining / settlement)
-│   │       ├── ReceiptScanScreen        ← camera
+│   │       ├── ReceiptScanScreen        ← native doc scanner launcher
+│   │       ├── ReceiptPreviewScreen     ← confirm cropped scan before upload
 │   │       ├── ItemReviewScreen         ← review/edit parsed items
 │   │       ├── SplitEntryScreen         ← 4-tab split mode picker
 │   │       ├── SplitReviewScreen        ← final per-person amounts
@@ -1054,20 +1055,40 @@ This applies to both the joining phase (channel `event-members:{eventId}`, subsc
 
 #### ReceiptScanScreen
 
-- Full-screen camera preview
-- Capture button (large circle, 72×72pt minimum touch target)
-- "Enter total manually" link at bottom → skips to SplitEntryScreen with manual mode
-- On capture: show loading overlay "Reading receipt..." with a spinner centred over the preview
+- **Native document scanner** via `react-native-document-scanner-plugin` (VisionKit on iOS, ML Kit on Android). Opens automatically on screen mount.
+- Does **not** use a custom `expo-camera` preview — the OS scanner UI handles live edge detection, crop, and dewarp.
+- On scan success → navigate to `ReceiptPreviewScreen` with `imageUri`.
+- On scan cancel → `navigation.goBack()`.
+- Brief loading state ("Opening scanner…") while the native module launches.
+- "Enter total manually" link → `SplitEntryScreen` with `mode: 'manual'`.
 
-**Loading state:** "Reading receipt..." overlay — semi-transparent dark overlay (rgba 0,0,0,0.6) covering the full screen, white spinner and white text centred.
+**Error state — permission denied (Android):** Show inline error with "Try again" and manual-entry link.
 
-**Error state — AI parse failure:** Dismiss the loading overlay. Show an alert: "Receipt couldn't be read. The image may be blurry or the lighting too low." Two options: "Try again" (re-opens camera) and "Add items manually" (navigates to SplitEntryScreen in manual mode).
+**Error state — scanner unavailable:** Inline error with retry + manual entry. Does not crash the app.
 
-**Error state — no connectivity:** Show a modal (not a toast): "No connection. Your photo is saved. Connect to the internet to continue." Single CTA: "OK". The captured image URI is held in local state so the upload can be retried when connectivity returns.
+**Dev requirement:** Requires a development build (not Expo Go). Config plugin in `app.config.js`.
 
-**Error state — camera unavailable:** Caught by the React error boundary (see Section 6). Shows: "Camera unavailable. Enter your total manually." with a button that navigates to SplitEntryScreen.
+**Accessibility:** Manual entry link: `accessibilityRole="button"`, `accessibilityLabel="Skip scanner and enter total manually"`.
 
-**Accessibility:** Capture button: `accessibilityRole="button"`, `accessibilityLabel="Capture receipt"`. Manual entry link: `accessibilityRole="button"`, `accessibilityLabel="Skip camera and enter total manually"`.
+---
+
+#### ReceiptPreviewScreen
+
+- Full-screen dark layout with cropped receipt preview (`Image`, `resizeMode="contain"`).
+- Subtitle: confirm receipt is fully visible before processing.
+- **Use this photo** → compress (`expo-image-manipulator`, max 1200px, JPEG 0.7) → `POST /receipts/upload-url` → PUT to signed URL → `POST /receipts/parse` → `ItemReviewScreen`.
+- **Retake** → `ReceiptScanScreen` (re-opens native scanner).
+- **Enter total manually** → `SplitEntryScreen` manual mode.
+
+**Loading state:** "Uploading receipt…" overlay — rgba(0,0,0,0.6), white spinner centred.
+
+**Error state — upload failure:** Red banner with message + "Retry upload" (re-PUT only, reuse signed URL and compressed URI in state).
+
+**Error state — no connectivity:** Banner: "No connection. Connect to the internet to upload your receipt." Retry when online.
+
+**Error state — AI parse failure (E07-S02+):** Handled after upload on parse step — see ItemReview error handling.
+
+**Accessibility:** Preview image: `accessibilityLabel="Scanned receipt preview"`. Use this photo: `accessibilityLabel="Use this photo and upload receipt"`. Retake: `accessibilityLabel="Retake receipt scan"`.
 
 ---
 
@@ -1421,10 +1442,10 @@ Use `@react-native-community/netinfo` to detect connectivity. On connectivity lo
 
 ### Per-Feature Offline Behaviour
 
-**Receipt scan (ReceiptScanScreen):**
-- Camera works offline (capture is local)
-- Upload to AI parse endpoint requires connectivity
-- Behaviour: capture the image locally, attempt upload, on network failure show a **modal** (not just a toast): "No connection. Your photo is saved. Connect to the internet to continue."
+**Receipt scan (ReceiptScanScreen → ReceiptPreviewScreen):**
+- Native document scanner works offline (cropped image saved locally as `imageUri`)
+- Upload on ReceiptPreviewScreen requires connectivity
+- Behaviour: user confirms scan on preview screen; on network failure show banner: "No connection. Connect to the internet to upload your receipt." Compressed URI held in state for retry.
 - The image URI is stored in component state. When the user reconnects (detected via NetInfo), show a toast: "Connection restored. Tap to upload your photo." with a retry button.
 - Do not auto-retry silently — require explicit user action to re-upload.
 

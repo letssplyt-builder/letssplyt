@@ -17,12 +17,16 @@ import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AddParticipantModal } from '../../components/events/AddParticipantModal';
 import { EventMemberRow } from '../../components/events/EventMemberRow';
+import { EventSplitActionBar } from '../../components/events/EventSplitActionBar';
 import { ParticipantEventDetail } from '../../components/events/ParticipantEventDetail';
 import { QRDisplayModal } from '../../components/events/QRDisplayModal';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { BottomToast } from '../../components/BottomToast';
 import { PrimaryButton } from '../../components/PrimaryButton';
-import { screenScrollBottomPadding } from '../../constants/layout';
+import {
+  screenScrollBottomPadding,
+  splitActionBarFooterPadding,
+} from '../../constants/layout';
 import { getSupabase } from '../../lib/supabase';
 import type { EventsStackParamList } from '../../navigation/types';
 import { getApiErrorCode, isApiRequestError } from '../../services/api';
@@ -146,6 +150,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const memberCount = participants.length;
   const lockEnabled = memberCount >= 2;
   const isPayer = Boolean(authUser && event && authUser.id === event.payer_id);
+  const showSplitActions = isPayer && event?.status === 'locked';
 
   const settlementSummary = useMemo(() => {
     if (!currentEvent?.summary) {
@@ -254,7 +259,28 @@ export function EventDetailScreen({ navigation, route }: Props) {
   }
 
   return (
-    <AuthGradientLayout contentStyle={styles.layout}>
+    <AuthGradientLayout
+      contentStyle={styles.layout}
+      footer={
+        showSplitActions ? (
+          <EventSplitActionBar
+            onScanReceipt={() => navigation.navigate('ReceiptScan', { eventId })}
+            onEnterTotal={() =>
+              navigation.navigate('SplitEntry', { eventId, mode: 'manual' })
+            }
+          />
+        ) : undefined
+      }
+      footerStyle={
+        showSplitActions
+          ? {
+              paddingHorizontal: 20,
+              paddingTop: 8,
+              paddingBottom: splitActionBarFooterPadding(),
+            }
+          : undefined
+      }
+    >
       <StatusBar style="light" />
 
       <View style={styles.topBar}>
@@ -273,9 +299,14 @@ export function EventDetailScreen({ navigation, route }: Props) {
       </View>
 
       <ScrollView
+        style={styles.scroll}
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: screenScrollBottomPadding(insets.bottom) },
+          {
+            paddingBottom: showSplitActions
+              ? 24
+              : screenScrollBottomPadding(insets.bottom),
+          },
         ]}
         refreshControl={
           <RefreshControl
@@ -495,6 +526,9 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: authColors.textOnDark,
     textAlign: 'center',
+  },
+  scroll: {
+    flex: 1,
   },
   content: {
     paddingHorizontal: 28,

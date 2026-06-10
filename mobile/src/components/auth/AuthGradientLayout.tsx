@@ -9,6 +9,7 @@ interface AuthGradientLayoutProps {
   children: ReactNode;
   footer?: ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
+  footerStyle?: StyleProp<ViewStyle>;
 }
 
 function FloatingOrb({
@@ -60,7 +61,12 @@ function FloatingOrb({
 /**
  * Full-screen dark teal gradient with softly drifting ambient orbs.
  */
-export function AuthGradientLayout({ children, footer, contentStyle }: AuthGradientLayoutProps) {
+export function AuthGradientLayout({
+  children,
+  footer,
+  contentStyle,
+  footerStyle,
+}: AuthGradientLayoutProps) {
   return (
     <View style={styles.root}>
       <LinearGradient
@@ -77,7 +83,7 @@ export function AuthGradientLayout({ children, footer, contentStyle }: AuthGradi
       />
       <SafeAreaView style={styles.safe}>
         <View style={[styles.content, contentStyle]}>{children}</View>
-        {footer ? <View style={styles.footer}>{footer}</View> : null}
+        {footer ? <View style={[styles.footer, footerStyle]}>{footer}</View> : null}
       </SafeAreaView>
     </View>
   );

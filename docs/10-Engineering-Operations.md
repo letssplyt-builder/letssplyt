@@ -533,6 +533,13 @@ npx expo start          # shows QR code for Expo Go
 # project: cd mobile && npx expo install expo@^54.0.0 --fix
 # Do NOT downgrade Expo Go — install the matching SDK in the project instead.
 
+# Receipt scanning requires a development build (NOT Expo Go):
+# react-native-document-scanner-plugin uses native VisionKit / ML Kit.
+# After adding or updating the plugin, run:
+#   cd mobile && npx expo prebuild
+#   npx expo run:ios    # or run:android
+# Or use EAS: eas build --profile development --platform ios
+
 # Physical device + local backend: localhost on the phone is NOT your Mac.
 # The app auto-uses your Mac's LAN IP from the Expo Metro bundler (e.g. http://192.168.x.x:3000).
 # Requirements: backend running, phone and Mac on the same Wi‑Fi, Mac firewall allows port 3000.

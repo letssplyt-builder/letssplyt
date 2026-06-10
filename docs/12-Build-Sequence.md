@@ -1817,26 +1817,31 @@ Run: `curl http://localhost:3000/.well-known/apple-app-site-association` and ver
 
 ### E07-S01 — Receipt Image Upload
 
-**Description:** Handle receipt image upload from mobile to Supabase Storage. The image is compressed on the mobile side to under 500KB, the backend issues a signed upload URL, and the mobile app uploads directly to Supabase Storage (not through the backend). Upload progress is shown to the user and failures show a retry option.
+**Description:** Handle receipt capture and upload from mobile to Supabase Storage. The payer scans via the **free native document scanner** (Apple VisionKit on iOS, Google ML Kit on Android via `react-native-document-scanner-plugin`) which auto-detects receipt edges, crops, and dewarps. The user **reviews the cropped scan** on ReceiptPreviewScreen before confirming. On confirm, the image is compressed on the mobile side to under 500KB, the backend issues a signed upload URL, and the mobile app uploads directly to Supabase Storage (not through the backend). Upload progress is shown to the user and failures show a retry option.
 
 **Prompt:**
-*"Build the receipt image upload flow for LetsSplyt. (1) Backend: POST /api/v1/receipts/upload-url (requires authenticate middleware): body { event_id }. Verifies event belongs to req.user.id and event.status='locked' (return 400 if not locked). Generates a Supabase Storage signed upload URL for bucket 'receipts' at path [eventId]/[uuid].jpg using supabase.storage.from('receipts').createSignedUploadUrl(path). Returns { upload_url, storage_path }. (2) Mobile ReceiptScanScreen (refer to prototype/receipt-split.html ID 'scan_receipt'): full-screen expo-camera view with a circular capture button at the bottom. On capture: use expo-image-manipulator to resize to max 1200px width and compress to JPEG quality 0.7 (this keeps files under ~500KB for typical receipts). Call POST /receipts/upload-url to get the signed URL. Then PUT the compressed image binary to upload_url with header Content-Type: image/jpeg using fetch(). Show a progress indicator (ActivityIndicator or progress bar) while uploading. On upload success: automatically call POST /receipts/parse (E07-S02) and navigate to ItemReviewScreen. On upload failure: show error toast with a 'Retry' button that repeats only the PUT (reuse the same signed URL if not expired). 'Enter total manually' link at bottom skips camera and navigates to SplitEntryScreen."*
+*"Build the receipt image upload flow for LetsSplyt. (1) Backend: POST /api/v1/receipts/upload-url (requires authenticate middleware): body { event_id }. Verifies event belongs to req.user.id and event.status='locked' (return 400 if not locked). Generates a Supabase Storage signed upload URL for bucket 'receipts' at path [eventId]/[uuid].jpg using supabase.storage.from('receipts').createSignedUploadUrl(path). Returns { upload_url, storage_path, upload_token }. (2) Mobile ReceiptScanScreen: on mount, launch `react-native-document-scanner-plugin` (Expo config plugin + dev client required — does NOT run in Expo Go). `maxNumDocuments: 1`, `croppedImageQuality: 85`. On cancel → go back. On success → navigate to ReceiptPreviewScreen with the cropped image URI. Show 'Enter total manually' fallback link. (3) ReceiptPreviewScreen: full-screen preview of the cropped scan with pinch-friendly contain layout. CTAs: 'Use this photo' (compress with expo-image-manipulator: max 1200px width, JPEG quality 0.7), POST /receipts/upload-url, PUT to signed URL with Content-Type image/jpeg, show progress overlay while uploading. On success call POST /receipts/parse (stub until E07-S02) and navigate to ItemReviewScreen. 'Retake' → ReceiptScanScreen (re-opens native scanner). On upload failure: error banner with Retry (re-PUT only, reuse signed URL). 'Enter total manually' → SplitEntryScreen manual mode. (4) Add `react-native-document-scanner-plugin` to app.config.js plugins with cameraPermission string. Android: request CAMERA permission before scanDocument when needed."*
 
 **Files created:**
 - `backend/src/modules/receipts/receipts.controller.ts`
 - `backend/src/modules/receipts/receipts.service.ts`
 - `backend/src/modules/receipts/receipts.routes.ts`
-- `mobile/src/screens/ReceiptScanScreen.tsx`
+- `mobile/src/screens/receipts/ReceiptScanScreen.tsx`
+- `mobile/src/screens/receipts/ReceiptPreviewScreen.tsx`
 - `mobile/src/services/receipts.service.ts`
+- `mobile/src/services/document-scanner.service.ts`
 - `backend/src/__tests__/unit/receipts/receipts.service.test.ts`
 - `mobile/src/__tests__/unit/services/receipts.service.test.ts`
+- `mobile/src/__tests__/unit/services/document-scanner.service.test.ts`
 
 **Acceptance Criteria:**
-1. Open ReceiptScanScreen → camera preview is visible with a circular capture button
-2. Take a photo → progress indicator appears while image is being compressed and uploaded
-3. After upload, file is visible in Supabase Storage dashboard at receipts/[eventId]/[uuid].jpg
-4. Uploaded file size is under 600KB regardless of the original photo resolution
-5. Tap "Enter total manually" link → navigates to SplitEntryScreen, bypassing the camera flow
+1. Tap Scan receipt → native document scanner opens (edge detect + crop on iOS/Android)
+2. After scan completes → ReceiptPreviewScreen shows the cropped receipt image
+3. Tap Use this photo → progress indicator while compressing and uploading
+4. After upload, file is visible in Supabase Storage at receipts/[eventId]/[uuid].jpg
+5. Uploaded file size is under 600KB regardless of original resolution
+6. Tap Retake → native scanner opens again
+7. Tap Enter total manually (on scan or preview) → SplitEntryScreen manual mode
 
 **Tests required:**
 ```
@@ -1846,11 +1851,18 @@ mobile/src/__tests__/unit/services/receipts.service.test.ts
   - uploads to the signed URL with correct content-type header
   - calls parse endpoint after successful upload
 
+mobile/src/__tests__/unit/services/document-scanner.service.test.ts
+  - returns cropped URI on success
+  - returns null on cancel
+  - requests Android camera permission before scan
+
 backend/src/__tests__/unit/receipts/receipts.service.test.ts
   - upload-url: verifies event belongs to requesting user
   - upload-url: returns 400 when event status is not 'locked'
   - generates signed URL for correct storage path format
 ```
+
+**Dev note:** Document scanner requires a **development build** (`npx expo prebuild` + `npx expo run:ios` / `run:android`, or EAS Build). It does not work in Expo Go.
 
 ---
 

@@ -10,6 +10,11 @@ export function fabBottomOffset(bottomInset: number): number {
   return tabBarTotalHeight(bottomInset) + 16;
 }
 
+/** Footer padding below split action buttons to clear the overlay tab bar (+ 10px gap). */
+export function splitActionBarFooterPadding(): number {
+  return TAB_BAR_CONTENT_HEIGHT + 10;
+}
+
 /** Scroll content padding below last item, above tab bar. */
 export function screenScrollBottomPadding(bottomInset: number): number {
   return tabBarTotalHeight(bottomInset) + 24;

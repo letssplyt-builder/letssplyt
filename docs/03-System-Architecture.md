@@ -381,7 +381,8 @@ letssplyt/
           participants.api.ts
         receipt/
           screens/
-            ReceiptScanScreen.tsx
+            ReceiptScanScreen.tsx      ← native doc scanner launcher
+            ReceiptPreviewScreen.tsx   ← confirm cropped scan before upload
             ItemReviewScreen.tsx
             SplitEntryScreen.tsx
           receipt.api.ts
