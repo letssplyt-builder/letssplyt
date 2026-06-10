@@ -539,6 +539,7 @@ Full event detail with participants and settlement status.
     payer: { id: string; display_name: string; avatar_colour: string; };
     tax_amount_minor_units: number | null;     // null until A1 parses
     tip_amount_minor_units: number | null;     // null until A1 parses
+    fees_amount_minor_units: number | null;    // null until A1 parses; sum of additional surcharges
     locale: string;                            // for formatting amounts (e.g. 'en-US', 'ja-JP')
     last_parse_attempt_id: string | null;      // needed by client for receipt confirm
     split_mode: "'equal' | 'portion' | 'itemised' | null";  // null until creator chooses
@@ -935,6 +936,55 @@ Used by App Members who scan a QR code and the Universal Link opens the app. The
 
 ## Receipt Endpoints
 
+### Implemented v1 routes (E07-S01 / E07-S02)
+
+Mobile upload + parse uses these paths under `/api/v1`:
+
+#### POST `/api/v1/receipts/upload-url`
+**Auth:** `[AUTH]` | `[PAYER]` | Event must be `locked`
+
+**Request:** `{ event_id: string }`
+
+**Response `200`:** `{ upload_url, storage_path, upload_token }` — client uploads JPEG to Storage bucket `receipts` at `storage_path`.
+
+#### POST `/api/v1/receipts/parse`
+**Auth:** `[AUTH]` | `[PAYER]` | Event must be `locked`
+
+Runs A1 with atomic idempotency (`ai_stage`). Returns major-unit amounts (not minor units).
+
+**Request:** `{ event_id: string, storage_path: string }`
+
+**Response `200`:**
+```typescript
+{
+  items: Array<{
+    name: string;
+    unit_price: number;      // major units (e.g. 12.50)
+    quantity: number;
+    confidence?: 'high' | 'low';
+  }>;
+  additional_charges: Array<{
+    name: string;            // e.g. "SVC Fee", "City Fee"
+    amount: number;
+    confidence?: 'high' | 'low';
+  }>;
+  tax_amount: number;
+  tip_amount: number;
+  fees_amount: number;       // sum(additional_charges.amount); also stored on events.fees_amount
+  total_amount: number;
+  currency: string;          // ISO 4217
+  storage_path: string;
+}
+```
+
+**Persistence:** Food lines → `receipt_items` (`is_fee = false`). Each `additional_charges` entry → `receipt_items` (`is_fee = true`) plus aggregate on `events.fees_amount`. Tax/tip → `events.tax_amount` / `events.tip_amount` only.
+
+**Error codes:** `ALREADY_PROCESSING` 409, `PARSE_FAILED` 500, `RECEIPT_UNREADABLE` 400, `AI_QUOTA_EXCEEDED` 429
+
+**Dev:** `A1_DEV_STUB=true` (non-production) skips the LLM and returns fixture data.
+
+---
+
 ### POST `/events/:eventId/receipt/scan`
 **Auth:** `[AUTH]` | `[PAYER]` | Event must be "locked" | **Rate limit:** 5 per event per hour
 
@@ -963,8 +1013,12 @@ image: File    (JPEG, PNG, WebP; max 10MB after client-side compression)
   ],
   "subtotal_minor_units": 4500,
   "tax_minor_units": 400,
+  "fees_minor_units": 200,
   "tip_minor_units": 300,
   "total_minor_units": 5200,
+  "additional_charges": [
+    { "name": "SVC Fee", "amount_minor_units": 200, "confidence_score": 0.92 }
+  ],
   "currency": "USD",
   "locale": "en-US",
   "low_confidence_item_count": 0
@@ -1005,6 +1059,8 @@ Payer confirms (and optionally edits) the parsed items. This is the human checkp
   }>;
   tax: number;
   tip: number;
+  fees: number;              // sum of additional surcharge lines; stored as events.fees_amount
+  additional_charges?: Array<{ name: string; amount: number }>;
   total: number;
   currency: string;
   entry_method: "receipt_scan" | "manual";

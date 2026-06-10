@@ -6,7 +6,7 @@
 
 ## How to Use This Document
 
-This document is your daily build companion. Each of the 47 stories in this document maps to a single Cursor session. Here is the exact workflow for every story, without exception.
+This document is your daily build companion. Each of the 52 stories in this document maps to a single Cursor session. Here is the exact workflow for every story, without exception.
 
 First, confirm that all dependencies listed at the top of the epic are fully complete — meaning you have verified every acceptance criterion in those stories on your phone or in your terminal. Do not skip this check. A broken foundation cascades into hours of debugging later.
 
@@ -626,7 +626,13 @@ TIER 3 — OPERATIONS (build after core flow is working)
 │ E10: Background │   │ E11: Account    │   │ E12: Analytics, │
 │ Jobs & Push     │   │ Management      │   │ Monitoring &    │
 │ Notifications   │   │                 │   │ Launch Ready    │
-└─────────────────┘   └─────────────────┘   └─────────────────┘
+└─────────────────┘   └─────────────────┘   └────────┬────────┘
+                                                       ▼
+                              ┌─────────────────────────────┐
+                              │ E13: AI Eval Framework      │
+                              │ (golden datasets + gates)   │
+                              │ — LAST epic before launch   │
+                              └─────────────────────────────┘
 ```
 
 ---
@@ -1876,11 +1882,17 @@ backend/src/__tests__/unit/receipts/receipts.service.test.ts
 **Files created:**
 - `backend/src/modules/ai/a1-receipt-parser.ts`
 - `backend/src/modules/ai/a1-idempotency.ts`
+- `backend/src/modules/ai/receipt-parser/receipt-parser.schema.ts`
+- `backend/src/modules/ai/receipt-parser/receipt-parser.prompt.ts`
+- `backend/src/modules/ai/receipt-parser/receipt-parser.dedupe.ts`
 - `backend/src/__tests__/unit/ai/a1-receipt-parser.test.ts`
 - `backend/src/__tests__/unit/ai/a1-idempotency.test.ts`
+- `backend/src/__tests__/unit/ai/receipt-parser.schema.test.ts`
+- `backend/src/__tests__/unit/ai/receipt-parser.dedupe.test.ts`
+- `supabase/migrations/20260612000000_event_fees_and_receipt_item_is_fee.sql`
 
 **Acceptance Criteria:**
-1. POST /receipts/parse with a valid storage_path → returns JSON with items array, tax, tip, total, and currency fields
+1. POST /receipts/parse with a valid storage_path → returns JSON with items, additional_charges, tax_amount, tip_amount, fees_amount, total_amount, and currency
 2. SELECT ai_stage FROM events WHERE id=... shows 'parsed' after a successful parse
 3. POST with the same event_id a second time → returns cached result from the database, AI provider is NOT called again (verify via mock call count)
 4. Two concurrent POST requests for the same event_id → exactly one AI call is made (atomic idempotency works)
@@ -1895,11 +1907,22 @@ backend/src/__tests__/unit/ai/a1-receipt-parser.test.ts
   - atomic idempotency: concurrent calls result in one AI call
   - getCachedReceiptResult reads from events table for financial fields (not receipt_items)
   - sanitizePromptInput called on all user-provided context
+  - additional_charges persisted as receipt_items with is_fee=true
+  - dedupeFeeLineItems removes duplicate SVC fee from items when also in additional_charges
 
 backend/src/__tests__/unit/ai/a1-idempotency.test.ts
   - claimParsingSlot returns true on first call
   - claimParsingSlot returns false on second concurrent call
   - ai_stage='failed' allows retry (claimParsingSlot succeeds again)
+  - getCachedReceiptResult splits food rows vs is_fee rows into items vs additional_charges
+
+backend/src/__tests__/unit/ai/receipt-parser.schema.test.ts
+  - additional_charges defaults to []
+  - sumAdditionalCharges totals fee amounts
+
+backend/src/__tests__/unit/ai/receipt-parser.dedupe.test.ts
+  - feeNamesLikelyMatch (SVC Fee / SVC Fees)
+  - dedupeFeeLineItems removes duplicates; no-op when amounts differ
 ```
 
 ---
@@ -1909,7 +1932,7 @@ backend/src/__tests__/unit/ai/a1-idempotency.test.ts
 **Description:** After A1 parsing, show the creator an editable list of receipt items so they can correct AI mistakes before splitting. Low-confidence items are visually flagged. The screen recalculates the running total live as items are edited. Confirming sends the finalised item list to the backend.
 
 **Prompt:**
-*"Build the ItemReviewScreen and the receipts confirm endpoint for LetsSplyt. (1) Mobile ItemReviewScreen (refer to prototype/receipt-split.html ID 'item_review'): editable FlatList of receipt items, each row shows item name (tapping opens an inline TextInput), price (tapping opens a numeric TextInput), and quantity. Swipe left on a row reveals a red delete button. 'Add item' button at the bottom of the list adds a new empty row. Tax field pre-filled from the AI parse result (editable). Tip field pre-filled (editable). Running total shown live = sum of all items + tax + tip. Items with confidence='low' are shown with an amber left border and amber background tint. CTA button 'Confirm items →' at the bottom calls POST /api/v1/receipts/confirm, then navigates to SplitEntryScreen. Pull-to-refresh re-fetches GET /events/:id and re-displays the stored items — it does NOT re-run the AI. (2) Backend: POST /api/v1/receipts/confirm (requires authenticate middleware): body { event_id, items: [{ id?: string, name: string, price: number, quantity: number }], tax: number, tip: number }. Atomic guard: UPDATE events SET ai_stage='parsed_confirmed' WHERE id=event_id AND ai_stage='parsed' — return 400 if 0 rows updated. Delete existing receipt_items rows for event_id (allows re-confirmation). Insert final items array as new receipt_items rows. UPDATE events SET total_amount=sum(items)+tax+tip, tax_amount=tax, tip_amount=tip. Return { confirmed: true }."*
+*"Build the ItemReviewScreen and the receipts confirm endpoint for LetsSplyt. (1) Mobile ItemReviewScreen (refer to prototype/receipt-split.html ID 'item_review'): editable FlatList of food/drink receipt items (is_fee=false), each row shows item name (tapping opens an inline TextInput), price (tapping opens a numeric TextInput), and quantity. Separate section or rows for additional_charges / fee lines (is_fee=true) from the parse result. Swipe left on a row reveals a red delete button. 'Add item' button at the bottom of the list adds a new empty row. Tax field pre-filled from the AI parse result (editable). Fees section pre-filled from additional_charges (editable). Tip field pre-filled (editable). Running total shown live = sum(food items) + tax + fees + tip. Items with confidence='low' are shown with an amber left border and amber background tint. CTA button 'Confirm items →' at the bottom calls POST /api/v1/receipts/confirm, then navigates to SplitEntryScreen. Pull-to-refresh re-fetches GET /events/:id and re-displays the stored items — it does NOT re-run the AI. (2) Backend: POST /api/v1/receipts/confirm (requires authenticate middleware): body { event_id, items: [{ id?: string, name: string, price: number, quantity: number }], additional_charges: [{ name: string, amount: number }], tax: number, fees: number, tip: number }. Atomic guard: UPDATE events SET ai_stage='parsed_confirmed' WHERE id=event_id AND ai_stage='parsed' — return 400 if 0 rows updated. Delete existing receipt_items rows for event_id (allows re-confirmation). Insert food items (is_fee=false) and fee rows (is_fee=true) from the body. UPDATE events SET total_amount=sum(items)+tax+fees+tip, tax_amount=tax, fees_amount=fees, tip_amount=tip. Return { confirmed: true }."*
 
 **Files created:**
 - `mobile/src/screens/ItemReviewScreen.tsx`
@@ -2796,9 +2819,114 @@ backend/src/__tests__/unit/infrastructure/logger.test.ts
 
 ---
 
+## EPIC 13 — AI Eval Framework (A1 / A2 / A3)
+
+**Depends on:** E07 (A1), E07-S05 (A2), E08-S01 (A3) — build **after** E12. This is the **last epic** in the build sequence. Evals score real LLM output against golden datasets; they are not a substitute for unit tests (mocked LLM).
+
+**Authoritative spec:** `docs/07-AI-Agent-Specification.md` §7 (eval types, thresholds, golden dataset sizes, deployment gate).
+
+**Deliverables:** `eval/` directory, `npm run eval:a1|a2|a3|eval:all`, pass/fail report, CI job on staging/pre-release.
+
+---
+
+### E13-S01 — Eval Runner Infrastructure
+
+**Description:** Shared CLI runner: load JSON manifests, call agents via `createLLMProvider`, score outputs, print report, exit non-zero on gate failure. No golden images yet — smoke test with 1–2 fixture cases.
+
+**Prompt:**
+*"Build the LetsSplyt AI eval runner per docs/07-AI-Agent-Specification.md §7. (1) `eval/runner.ts`: parse `--provider=gemini|haiku`, optional `--model`, `--agent=a1|a2|a3|all`. (2) Load cases from `eval/{agent}/manifest.json` + per-case folders. (3) For A1: read image bytes, call production parse path without DB (`callA1Model` or eval-only export), run `ReceiptParseOutputSchema.parse`, apply `dedupeFeeLineItems` before compare. (4) Scorers return `{ pass, score, detail }`. (5) Print table: eval name, pass rate, threshold, PASS/FAIL. (6) Root `package.json`: `eval:a1`, `eval:a2`, `eval:a3`, `eval:all` via `tsx eval/cli.ts`. (7) Document env vars (Doppler keys) in eval/README.md."*
+
+**Files created:**
+- `eval/cli.ts`
+- `eval/runner.ts`
+- `eval/README.md`
+- `eval/a1/manifest.json` (1–2 smoke cases)
+- `backend/src/__tests__/unit/eval/runner.test.ts` (scorer wiring with mocked provider)
+
+**Acceptance Criteria:**
+1. `npm run eval:a1 -- --provider=gemini` runs without DB and prints a report
+2. Runner exits code 1 when a deterministic eval fails
+3. Both `--provider=gemini` and `--provider=haiku` flags accepted
+
+---
+
+### E13-S02 — A1 Golden Dataset + Evals 1–6
+
+**Description:** Minimum 45 receipt images with hand-verified `expected.json`. Implement all six A1 evals from §7 (total accuracy, line items ≥90%, tax/fees/tip separation 100%, currency 100%, resilience ≤10% failure, schema 100%).
+
+**Prompt:**
+*"Implement A1 eval suite per docs/07 § 'Agent A1 Evals'. Golden dataset: `eval/a1/golden/{case-id}/receipt.jpg` + `expected.json` matching ReceiptParseResult (items, additional_charges, tax, tip, total, currency). Minimum 45 cases across categories in §7 (clean, low-quality, large bills, unusual formats, international). Scorers: Eval 1 exact total; Eval 2 item name fuzzy + price within 5%; Eval 3 tax/tip/additional_charges not in items; Eval 4 currency; Eval 5 valid JSON rate; Eval 6 Zod. Include cases for SVC Fee, city fee, duplicate-fee dedupe. Gate: 100% deterministic evals; ≥90% line items; ≤10% hard failures on low-quality subset."*
+
+**Files created:**
+- `eval/a1/golden/**` (images + expected JSON)
+- `eval/a1/scorers.ts`
+- `eval/a1/manifest.json`
+- `backend/src/__tests__/unit/eval/a1-scorers.test.ts`
+
+**Acceptance Criteria:**
+1. `npm run eval:a1 -- --provider=gemini` runs all 45+ cases
+2. Report shows per-eval scores vs thresholds from §7
+3. Adding a bad expected value causes eval to fail locally
+
+---
+
+### E13-S03 — A2 Golden Dataset + Eval Suite
+
+**Description:** Minimum 55 A2 cases (even split, itemised, NLP assignments, edge cases). Deterministic sum invariant ±1 minor unit. Reference `splitCalculator.ts`.
+
+**Prompt:**
+*"Build A2 eval per docs/07 § 'Agent A2 Evals'. Golden dataset `eval/a2/golden/` with items, participants, assignments, expected shares. Scorers: sum invariant, largest-remainder, NLP assignment accuracy thresholds from §7. `npm run eval:a2` integrated into runner."*
+
+**Files created:**
+- `eval/a2/**`
+- `eval/a2/scorers.ts`
+- `backend/src/__tests__/unit/eval/a2-scorers.test.ts`
+
+**Acceptance Criteria:**
+1. `npm run eval:a2 -- --provider=haiku` completes and reports gate status
+2. Sum invariant failures fail the gate at 100%
+
+---
+
+### E13-S04 — A3 Golden Dataset + LLM-Judge Evals
+
+**Description:** Minimum 20 message composition cases; LLM-as-judge (`claude-sonnet-4-6`) for tone/clarity rubric per §7.
+
+**Prompt:**
+*"Build A3 eval per docs/07 § 'Agent A3 Evals'. Golden cases: participant profiles, handles, expected link types per country, revision scenarios. Deterministic checks: correct payment deep links, no raw PII in message body. LLM-judge rubric for personalization. `npm run eval:a3`."*
+
+**Files created:**
+- `eval/a3/**`
+- `eval/a3/scorers.ts`
+- `eval/a3/judge.ts`
+
+**Acceptance Criteria:**
+1. `npm run eval:a3` runs deterministic + judge scorers
+2. Judge uses Sonnet, not the agent under test
+
+---
+
+### E13-S05 — CI Eval Jobs + Deployment Gate
+
+**Description:** Wire evals into GitHub Actions (staging + pre-release). Document promotion rule: both providers must pass all thresholds.
+
+**Prompt:**
+*"Add `.github/workflows/eval.yml` (or staging job in ci.yml): on push to `staging` and manual `workflow_dispatch`, run `npm run eval:all -- --provider=gemini` and `--provider=haiku` with Doppler secrets. Upload report artifact. Update docs/10-Engineering-Operations.md and docs/07 §7 'When to Run Evals'. Block production deploy doc checklist until eval gate passes."*
+
+**Files created:**
+- `.github/workflows/eval.yml`
+- Updates to `docs/10-Engineering-Operations.md`
+
+**Acceptance Criteria:**
+1. Staging workflow runs eval suite with secrets
+2. Failed gate fails the workflow
+3. README documents when to run evals locally vs CI
+
+---
+
 ## Build Sequence Summary
 
-**Total stories: 47 stories across 12 epics**
+**Total stories: 52 stories across 13 epics**
 
 | Epic | Stories | Duration estimate |
 |---|---|---|
@@ -2814,7 +2942,8 @@ backend/src/__tests__/unit/infrastructure/logger.test.ts
 | E10: Background Jobs & Push | 2 | 2-3 days |
 | E11: Account Management | 2 | 2-3 days |
 | E12: Launch Readiness | 4 | 3-4 days |
-| **Total** | **47** | **~39-51 Cursor sessions** |
+| E13: AI Eval Framework | 5 | 4-6 days |
+| **Total** | **52** | **~43-57 Cursor sessions** |
 
 ---
 

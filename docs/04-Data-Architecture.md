@@ -324,8 +324,9 @@ CREATE TABLE events (
   time_to_lock_seconds  INT,   -- seconds from event created_at to locked_at
   time_to_send_seconds  INT,   -- seconds from locked_at to messages_sent_at
 
-  tax_amount              NUMERIC(10,2),                       -- extracted by A1; NULL until parsed
-  tip_amount              NUMERIC(10,2),                       -- extracted by A1; NULL until parsed
+  tax_amount              NUMERIC(10,2),                       -- extracted by A1; NULL until parsed (government sales tax / VAT only)
+  tip_amount              NUMERIC(10,2),                       -- extracted by A1; NULL until parsed (voluntary gratuity only)
+  fees_amount             NUMERIC(10,2),                       -- sum of additional_charges from A1; NULL until parsed
   locale                  VARCHAR(10)  NOT NULL DEFAULT 'en-US', -- detected from receipt by A1 (e.g. 'en-US', 'ja-JP')
   last_parse_attempt_id   UUID,                                 -- set by A1 on scan; confirmed by POST /receipt/confirm; prevents stale confirmations
 
@@ -507,12 +508,28 @@ LetsSplyt stores names in two places: `users.display_name` (profile, source of t
 
 Line items extracted from a scanned receipt by A1, or entered manually by the payer.
 
+**Receipt financial model (A1 output):**
+
+| Receipt component | Stored where | Notes |
+|---|---|---|
+| Food / drink lines | `receipt_items` (`is_fee = false`) | Assigned per person in itemised splits |
+| Named surcharges (service charge, city fee, large party fee, …) | `events.fees_amount` **and** `receipt_items` (`is_fee = true`, one row per charge) | `fees_amount` is the sum for math; fee rows keep receipt labels for Item Review |
+| Sales tax / VAT | `events.tax_amount` | Prorated across participants — never a `receipt_items` row |
+| Voluntary gratuity | `events.tip_amount` | Prorated across participants — never a `receipt_items` row |
+| Total | `events.total_amount` | Printed receipt total |
+
+A1 may briefly duplicate a fee in both `items` and `additional_charges`; `dedupeFeeLineItems()` removes the food-line duplicate before persist.
+
+**Dev reset:** To wipe receipt scan data while keeping events and participants, run `supabase/scripts/reset-receipt-scans.sql` in the Supabase SQL Editor (MODE A).
+
 ```sql
 -- ─────────────────────────────────────────────────────────────────────────────
 -- receipt_items
 -- One row per line item on the bill. Created by A1 (receipt parsing) or
 -- manually by the payer when they skip the scan or correct AI output.
 -- line_total is a generated column — never set directly.
+-- Rows with is_fee = true are named surcharges (not food); they are prorated
+-- via events.fees_amount in split math, not assigned to one person.
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE receipt_items (
   id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -530,9 +547,10 @@ CREATE TABLE receipt_items (
   confidence_score  NUMERIC(3,2)  NOT NULL DEFAULT 1.00,   -- AI parse confidence 0.00–1.00
   is_low_confidence BOOLEAN       NOT NULL DEFAULT false,  -- true when confidence_score < 0.80
 
-  -- Flags that classify the item type for A2 tax/tip proration logic
+  -- Flags that classify the item type for A2 tax/tip/fee proration logic
   is_tax          BOOLEAN     NOT NULL DEFAULT FALSE,
   is_tip          BOOLEAN     NOT NULL DEFAULT FALSE,
+  is_fee          BOOLEAN     NOT NULL DEFAULT FALSE, -- TRUE = named surcharge row (SVC Fee, City Fee, …)
   is_shared       BOOLEAN     NOT NULL DEFAULT FALSE, -- TRUE = split equally among assigned participants
 
   -- FALSE if the payer manually added or corrected this item

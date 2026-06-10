@@ -503,16 +503,23 @@ const result = await provider.complete(messages, { timeout: 30000, maxTokens: 10
 import { z } from 'zod';
 
 export const ReceiptItemSchema = z.object({
-  id: z.string().uuid(),
+  id: z.string().uuid().optional(),
   name: z.string().min(1).max(60),
-  unit_price: z.number().positive().multipleOf(0.01),
+  unit_price: z.number().positive(),
   quantity: z.number().int().positive().default(1),
   confidence_score: z.number().min(0).max(1),
-  is_low_confidence: z.boolean(),
+  is_low_confidence: z.boolean().optional(),
+});
+
+export const AdditionalChargeSchema = z.object({
+  name: z.string().min(1).max(60),
+  amount: z.number().positive(),
+  confidence_score: z.number().min(0).max(1).optional(),
 });
 
 export const ReceiptParseResultSchema = z.object({
   items: z.array(ReceiptItemSchema).min(1),
+  additional_charges: z.array(AdditionalChargeSchema).default([]),
   subtotal: z.number().nonnegative(),
   tax: z.number().nonnegative(),
   tip: z.number().nonnegative(),
@@ -542,42 +549,33 @@ export type ReceiptParseOutput = z.infer<typeof ReceiptParseOutputSchema>;
 ```typescript
 // src/modules/ai/receipt-parser/receipt-parser.prompt.ts
 
-export function buildReceiptParserPrompt(): string {
-  return `You are a receipt parsing assistant. Extract every line item from this receipt image.
-
-Return ONLY valid JSON matching this exact schema — no markdown, no explanation, no extra fields:
-
-{
-  "items": [
-    {
-      "id": "string (uuid v4 — generate a new uuid for each item)",
-      "name": "string (item name as printed on receipt, max 60 chars)",
-      "unit_price": "number (unit price in the receipt's currency, 2 decimal places, positive)",
-      "quantity": "number (integer quantity, default 1 if not specified)",
-      "confidence_score": "number (0.0 to 1.0 — your confidence this item is correctly read)"
-    }
-  ],
-  "subtotal": "number (sum of all items before tax and tip)",
-  "tax": "number (total tax charged, 0.00 if none shown)",
-  "tip": "number (tip or gratuity amount, 0.00 if none shown)",
-  "total": "number (the final total as printed at the bottom of the receipt)",
-  "currency": "string (ISO 4217 3-letter code: USD, GBP, EUR, INR, AUD, CAD, SGD, etc.)",
-  "parse_confidence": "number (0.0 to 1.0 — your overall confidence in this parse)"
-}
-
-Rules:
-1. If a line shows quantity and total (e.g. "2x Burger $18.00"), split into quantity=2, price=9.00.
-2. Do not merge separate items into one.
-3. Do not invent items not visible on the receipt.
-4. Tax and tip must appear in their own fields — never as entries in the items array.
-5. Service charges labeled as gratuity or service fee belong in "tip", not "tax".
-6. If the receipt uses a symbol (£, €, ¥, ₹) identify the correct ISO code.
-7. If the receipt is too blurry, torn, or obscured to read reliably, return:
-   {"error": "unreadable", "reason": "brief description of why"}
-8. Set confidence < 0.75 on any item where the price or name is unclear.
-9. Set parse_confidence < 0.80 if any item has low confidence or the total is uncertain.`;
-}
+// Canonical prompt lives in backend/src/modules/ai/receipt-parser/receipt-parser.prompt.ts
+// Key rules (keep in sync with that file):
+// - items[] = food/drink only
+// - additional_charges[] = service charge, auto-gratuity, city fee, large party fee, delivery fee, etc.
+// - tax = government sales tax / VAT only; tip = voluntary gratuity only
+// - Never duplicate a surcharge in both items and additional_charges
+// - subtotal + tax + sum(additional_charges.amount) + tip ≈ total (within 0.02)
+export function buildReceiptParserPrompt(): string { /* see receipt-parser.prompt.ts */ }
 ```
+
+### Fee deduplication (post-parse)
+
+A1 sometimes returns the same surcharge in both `items` and `additional_charges` (e.g. "SVC Fees" in items and "SVC Fee" in additional_charges). Before DB persist, `dedupeFeeLineItems()` in `receipt-parser.dedupe.ts` removes food-line duplicates when amount and label fuzzy-match an `additional_charges` entry.
+
+```typescript
+// backend/src/modules/ai/receipt-parser/receipt-parser.dedupe.ts
+export function dedupeFeeLineItems(result: ReceiptParseResult): ReceiptParseResult;
+```
+
+### A1 persistence
+
+On successful parse, `persistParseResult()`:
+
+1. Deletes existing `receipt_items` for the event.
+2. Inserts food rows (`is_fee = false`) from `result.items` (after dedupe).
+3. Inserts fee rows (`is_fee = true`) from `result.additional_charges` (name + amount as `unit_price`, `quantity = 1`).
+4. Updates `events`: `tax_amount`, `tip_amount`, `fees_amount` (sum of charges), `total_amount`, `ai_stage = 'parsed'`.
 
 ### Image Pipeline
 
@@ -723,39 +721,30 @@ When the idempotency guard detects the event is already past `'none'` (and not `
 // src/modules/ai/ai-idempotency.ts (continued)
 
 // NOTE: The following columns must exist on the `events` table:
-// total_amount, tax_amount, tip_amount, currency, locale
-// See 04-Data-Architecture.md Section 3 if these columns are not yet present.
+// total_amount, tax_amount, tip_amount, fees_amount, currency, locale
+// See 04-Data-Architecture.md Section 3.4 / 3.7 if these columns are not yet present.
 
 export async function getCachedReceiptResult(eventId: string): Promise<ReceiptParseResult> {
-  // Get event-level data (tax, tip, total, currency) from events table
-  const { data: event, error: eventError } = await supabase
+  const { data: event } = await supabase
     .from('events')
-    .select('total_amount, tax_amount, tip_amount, currency, locale')
+    .select('total_amount, tax_amount, tip_amount, fees_amount, currency, locale')
     .eq('id', eventId)
     .single();
-  
-  if (eventError || !event) {
-    throw new Error(`Cannot retrieve cached receipt for event ${eventId}: ${eventError?.message}`);
-  }
 
-  // Get line items from receipt_items table
-  const { data: items, error: itemsError } = await supabase
+  const { data: rows } = await supabase
     .from('receipt_items')
-    .select('id, name, unit_price, quantity, confidence_score, is_low_confidence')
+    .select('id, name, unit_price, quantity, confidence_score, is_low_confidence, is_fee')
     .eq('event_id', eventId)
     .order('created_at');
-  
-  if (itemsError) {
-    throw new Error(`Cannot retrieve receipt items for event ${eventId}: ${itemsError?.message}`);
-  }
 
-  const mappedItems = (items ?? []).map(item => ({
-    id: item.id,
-    name: item.name,
-    unit_price: item.unit_price,
-    quantity: item.quantity,
-    confidence_score: item.confidence_score,
-    is_low_confidence: item.is_low_confidence,
+  const foodRows = (rows ?? []).filter((row) => !row.is_fee);
+  const feeRows = (rows ?? []).filter((row) => row.is_fee);
+
+  const mappedItems = foodRows.map(/* ... */);
+  const additionalCharges = feeRows.map((fee) => ({
+    name: fee.name,
+    amount: fee.unit_price,
+    confidence_score: fee.confidence_score,
   }));
 
   const subtotal = mappedItems.reduce(
@@ -764,6 +753,7 @@ export async function getCachedReceiptResult(eventId: string): Promise<ReceiptPa
 
   return {
     items: mappedItems,
+    additional_charges: additionalCharges,
     subtotal: parseFloat(subtotal.toFixed(2)),
     tax: event.tax_amount ?? 0,
     tip: event.tip_amount ?? 0,
@@ -1324,10 +1314,11 @@ export function calculateSplits(
     );
   }
 
-  // Step 3: Proportional tax + tip allocation
-  // person_tax = (person_subtotal / event_subtotal) × total_tax
-  // person_tip = (person_subtotal / event_subtotal) × total_tip
-  const taxAndTipMinor = toMinorUnits(totals.tax + totals.tip, currencyCode);
+  // Step 3: Proportional tax + fees + tip allocation
+  // person_tax  = (person_subtotal / event_subtotal) × total_tax
+  // person_fees = (person_subtotal / event_subtotal) × total_fees  // events.fees_amount
+  // person_tip  = (person_subtotal / event_subtotal) × total_tip
+  const taxFeesAndTipMinor = toMinorUnits(totals.tax + totals.fees + totals.tip, currencyCode);
   const finalAmounts = new Map<string, number>();
 
   for (const [name, itemMinor] of rawAmountsMinor) {
@@ -1336,7 +1327,7 @@ export function calculateSplits(
         ? itemMinor / assignedSubtotalMinor
         : 1 / participantNames.length;
     // Convert back to major units for output
-    const total = fromMinorUnits(itemMinor + taxAndTipMinor * proportion, currencyCode);
+    const total = fromMinorUnits(itemMinor + taxFeesAndTipMinor * proportion, currencyCode);
     finalAmounts.set(name, total);
   }
 
@@ -2575,19 +2566,20 @@ Across 45 test receipts, what percentage of line items are correctly identified?
 
 ---
 
-#### A1 Eval 3 — Tax and Tip Correctly Separated
+#### A1 Eval 3 — Tax, Fees, and Tip Correctly Separated
 **Type:** Deterministic | **Threshold:** 100% (both providers)
 
-Tax must appear in `output.tax`. Tip must appear in `output.tip`. Neither may appear as an entry in `output.items`.
+Tax must appear in `output.tax`. Tip must appear in `output.tip` (voluntary gratuity only). Service charges and other surcharges must appear in `output.additional_charges`, not in `output.items` or `output.tip`. Neither tax nor tip may appear as entries in `output.items`.
 
-**Why this matters:** If tax appears as a line item, A2 assigns it to a specific person instead of prorating it. This breaks split calculations.
+**Why this matters:** If tax or a fee appears as a food line item, A2 may assign it to one person instead of prorating it. This breaks split calculations.
 
 **Test cases:**
 - Receipt with explicit "Tax" line
-- Receipt with "Service Charge" (is this tax or gratuity?)
-- Receipt with auto-added 18% gratuity
+- Receipt with "Service Charge" or "SVC Fee" → `additional_charges`, not `items` or `tip`
+- Receipt with auto-added 18% gratuity → `additional_charges` if auto-applied; `tip` only if customer-added
 - Receipt with tax included in item prices (tax = 0)
 - Receipt with both tax and tip separately shown
+- Receipt with city fee + service charge → two `additional_charges` entries
 
 ---
 

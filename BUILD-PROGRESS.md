@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
 **Last updated:** 2026-06-10
-**Current story:** E07-S02 — A1 Receipt Parsing (AI Agent — atomic idempotency, Zod validation)
+**Current story:** E07-S03 — Item Review Screen (mobile — editable items, low-confidence highlight)
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -51,7 +51,7 @@
 
 ### Epic 7: AI Receipt Pipeline
 - [x] E07-S01 — Receipt Image Upload (native doc scanner → preview confirm → compress → Supabase Storage signed URL) (2026-06-10)
-- [ ] E07-S02 — A1 Receipt Parsing (AI Agent — atomic idempotency, Zod validation)
+- [x] E07-S02 — A1 Receipt Parsing (AI Agent — atomic idempotency, Zod validation, additional_charges/fees, dedupe) (2026-06-10)
 - [ ] E07-S03 — Item Review Screen (mobile — editable items, low-confidence highlight)
 - [ ] E07-S04 — Split Calculator (getCurrencyMinorUnits, largest-remainder, 100% coverage)
 - [ ] E07-S05 — A2 NLP Assignment Agent (sanitizePromptInput, delegates math to calculator)
@@ -89,6 +89,13 @@
 - [ ] E12-S03 — EAS Build Configuration + CI/CD Completion
 - [ ] E12-S04 — End-to-End Test Suite (Maestro)
 
+### Epic 13: AI Eval Framework (last epic — after E12)
+- [ ] E13-S01 — Eval runner infrastructure (`eval:all`, provider flags, report)
+- [ ] E13-S02 — A1 golden dataset (45+ receipts) + Evals 1–6
+- [ ] E13-S03 — A2 golden dataset + eval suite
+- [ ] E13-S04 — A3 golden dataset + LLM-judge evals
+- [ ] E13-S05 — CI eval jobs + deployment gate
+
 ---
 
 ## Completion Summary
@@ -96,9 +103,9 @@
 | Tier | Epics | Stories | Done | Remaining |
 |---|---|---|---|---|
 | Tier 1 — Foundation | 4 | 16 | 16 | 0 |
-| Tier 2 — Core Flow | 5 | 23 | 5 | 18 |
-| Tier 3 — Operations | 3 | 8 | 0 | 8 |
-| **Total** | **12** | **47** | **18** | **29** |
+| Tier 2 — Core Flow | 5 | 23 | 11 | 12 |
+| Tier 3 — Operations | 4 | 13 | 0 | 13 |
+| **Total** | **13** | **52** | **21** | **31** |
 
 ---
 
@@ -120,4 +127,5 @@
 - [2026-06-09] — Fix: event member lists show **live** profile names for registered members — `GET /events/:id` resolves `users.display_name` for linked participants; `PATCH /users/me` syncs all `participants.display_name` rows for that user (Realtime + SMS/split consistency). Tests: `participant-display-name` unit, profile sync unit, events integration. Docs: 01, 02, 03, 04, 05, 08, 09, 12.
 - [2026-06-09] — E06-S03 — Deep Link Infrastructure: AASA + assetlinks served from backend/public, Expo associatedDomains/intentFilters. 155 backend tests passing at sign-off.
 - [2026-06-09] — E06-S02 — In-App Join + Deep Link Handler: join preview/app-join API, AppJoin/AppJoined/AppLocked screens, linking + pending token through auth, DevJoinTestPanel for Expo Go. 155 backend + 94 mobile tests passing at sign-off.
+- [2026-06-10] — Planning — Epic 13 (AI Eval Framework) added as **last** epic in `docs/12-Build-Sequence.md` (after E12). Spec remains in `docs/07-AI-Agent-Specification.md` §7; implementation deferred until E07–E12 agents exist.
 - [2026-06-08] — E03-S04 + auth hardening. Session creation via `backend/src/infrastructure/supabase-auth.ts` (`generateLink` + `verifyOtp` + internal email `{userId}@letssplyt.internal`) — NOT `createSession()` or REST `/admin/users/{id}/sessions` (404). Registration writes `public.users` via `upsert_user_profile_on_auth` SECURITY DEFINER RPC + `users_service_role_all` policy — migration `20260608000000_users_auth_registration.sql`. Login OTP requires `public.users` row (orphan `auth.users` → `ACCOUNT_NOT_FOUND`). Mobile: duck-typed `isApiRequestError()` in `api.ts` (Metro breaks `instanceof`); E.164 normalization in `phone.ts`; Register CTA + logout on Home. Dev cleanup: `cd backend && doppler run -- npm run cleanup:phone -- +1XXXXXXXXXX`. If schema already applied: `npx supabase migration repair 20260601000000 --status applied` before `db push`.

@@ -56,7 +56,7 @@ export async function getAiStage(eventId: string): Promise<AiStage> {
 export async function getCachedReceiptResult(eventId: string): Promise<ReceiptParseResult> {
   const { data: event, error: eventError } = await supabaseAdmin
     .from('events')
-    .select('total_amount, tax_amount, tip_amount, currency, locale')
+    .select('total_amount, tax_amount, tip_amount, fees_amount, currency, locale')
     .eq('id', eventId)
     .single();
 
@@ -66,9 +66,11 @@ export async function getCachedReceiptResult(eventId: string): Promise<ReceiptPa
     );
   }
 
-  const { data: items, error: itemsError } = await supabaseAdmin
+  const { data: rows, error: itemsError } = await supabaseAdmin
     .from('receipt_items')
-    .select('id, name, unit_price, quantity, confidence_score, is_low_confidence')
+    .select(
+      'id, name, unit_price, quantity, confidence_score, is_low_confidence, is_fee',
+    )
     .eq('event_id', eventId)
     .order('created_at');
 
@@ -78,13 +80,23 @@ export async function getCachedReceiptResult(eventId: string): Promise<ReceiptPa
     );
   }
 
-  const mappedItems = (items ?? []).map((item) => ({
+  const allRows = rows ?? [];
+  const foodRows = allRows.filter((row) => !row.is_fee);
+  const feeRows = allRows.filter((row) => row.is_fee);
+
+  const mappedItems = foodRows.map((item) => ({
     id: item.id as string,
     name: item.name as string,
     unit_price: Number(item.unit_price),
     quantity: Number(item.quantity),
     confidence_score: Number(item.confidence_score),
     is_low_confidence: Boolean(item.is_low_confidence),
+  }));
+
+  const additionalCharges = feeRows.map((fee) => ({
+    name: fee.name as string,
+    amount: Number(fee.unit_price),
+    confidence_score: Number(fee.confidence_score),
   }));
 
   const subtotal = mappedItems.reduce(
@@ -94,6 +106,7 @@ export async function getCachedReceiptResult(eventId: string): Promise<ReceiptPa
 
   return {
     items: mappedItems,
+    additional_charges: additionalCharges,
     subtotal: Number(subtotal.toFixed(2)),
     tax: Number(event.tax_amount ?? 0),
     tip: Number(event.tip_amount ?? 0),

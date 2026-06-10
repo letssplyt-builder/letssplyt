@@ -6,16 +6,21 @@ import { writeAuditLog } from '../../infrastructure/llm/ai-audit';
 import type { LLMMessage } from '../../infrastructure/llm/llm.provider';
 import { sanitizePromptInput } from '../../infrastructure/security/sanitize';
 import { supabaseAdmin } from '../../infrastructure/supabase';
+import { buildA1DevStubResult, isA1DevStubEnabled } from './a1-dev-stub';
+import { isAiQuotaError, toA1AppError } from './a1-llm-errors';
 import {
   claimParsingSlot,
   getAiStage,
   getCachedReceiptResult,
   setAiStage,
 } from './a1-idempotency';
+import { dedupeFeeLineItems } from './receipt-parser/receipt-parser.dedupe';
 import { preprocessReceiptImage } from './receipt-parser/receipt-parser.preprocess';
 import { buildReceiptParserPrompt } from './receipt-parser/receipt-parser.prompt';
 import {
   ReceiptParseOutputSchema,
+  sumAdditionalCharges,
+  type AdditionalCharge,
   type ReceiptParseResult,
 } from './receipt-parser/receipt-parser.schema';
 
@@ -40,7 +45,13 @@ function isPastParsing(stage: string): boolean {
   return stage !== 'none' && stage !== 'failed' && stage !== 'parsing';
 }
 
+function mapChargeConfidence(charge: AdditionalCharge): 'high' | 'low' {
+  const score = charge.confidence_score ?? 1;
+  return score < LOW_CONFIDENCE_THRESHOLD ? 'low' : 'high';
+}
+
 function toApiResponse(result: ReceiptParseResult, storagePath: string): ReceiptParseResponse {
+  const feesAmount = sumAdditionalCharges(result.additional_charges);
   return {
     items: result.items.map((item) => ({
       name: item.name,
@@ -48,8 +59,14 @@ function toApiResponse(result: ReceiptParseResult, storagePath: string): Receipt
       quantity: item.quantity,
       confidence: item.is_low_confidence ? 'low' : 'high',
     })),
+    additional_charges: result.additional_charges.map((charge) => ({
+      name: charge.name,
+      amount: charge.amount,
+      confidence: mapChargeConfidence(charge),
+    })),
     tax_amount: result.tax,
     tip_amount: result.tip,
+    fees_amount: feesAmount,
     total_amount: result.total,
     currency: result.currency,
     storage_path: storagePath,
@@ -112,7 +129,7 @@ async function persistParseResult(
 
   await supabaseAdmin.from('receipt_items').delete().eq('event_id', eventId);
 
-  const rows = itemsWithFlags.map((item) => ({
+  const itemRows = itemsWithFlags.map((item) => ({
     id: item.id,
     event_id: eventId,
     name: item.name,
@@ -122,10 +139,34 @@ async function persistParseResult(
     is_low_confidence: item.is_low_confidence,
     is_tax: false,
     is_tip: false,
+    is_fee: false,
     is_shared: false,
     ai_extracted: true,
     receipt_s3_key: storagePath,
   }));
+
+  const feeRows = result.additional_charges.map((charge) => {
+    const confidenceScore = charge.confidence_score ?? 1;
+    const isLow = confidenceScore < LOW_CONFIDENCE_THRESHOLD;
+    return {
+      id: randomUUID(),
+      event_id: eventId,
+      name: charge.name,
+      unit_price: charge.amount,
+      quantity: 1,
+      confidence_score: confidenceScore,
+      is_low_confidence: isLow,
+      is_tax: false,
+      is_tip: false,
+      is_fee: true,
+      is_shared: false,
+      ai_extracted: true,
+      receipt_s3_key: storagePath,
+    };
+  });
+
+  const rows = [...itemRows, ...feeRows];
+  const feesAmount = sumAdditionalCharges(result.additional_charges);
 
   const { error: insertError } = await supabaseAdmin.from('receipt_items').insert(rows);
   if (insertError) {
@@ -141,6 +182,7 @@ async function persistParseResult(
       ai_parse_confidence: result.parse_confidence,
       tax_amount: result.tax,
       tip_amount: result.tip,
+      fees_amount: feesAmount,
       total_amount: result.total,
       currency: result.currency,
       locale: result.locale ?? 'en-US',
@@ -219,9 +261,15 @@ async function callA1Model(
         is_low_confidence: item.confidence_score < LOW_CONFIDENCE_THRESHOLD,
       }));
 
+      const additionalCharges = validated.additional_charges.map((charge) => ({
+        ...charge,
+        confidence_score: charge.confidence_score ?? 1,
+      }));
+
       const result: ReceiptParseResult = {
         ...validated,
         items,
+        additional_charges: additionalCharges,
       };
 
       writeAuditLog({
@@ -245,6 +293,10 @@ async function callA1Model(
         throw err;
       }
 
+      if (isAiQuotaError(err)) {
+        throw toA1AppError(err);
+      }
+
       writeAuditLog({
         agent: 'A1',
         eventId,
@@ -265,11 +317,7 @@ async function callA1Model(
     }
   }
 
-  throw new AppError(
-    'PARSE_FAILED',
-    `Failed after ${MAX_RETRIES} attempts: ${lastError?.message ?? 'unknown error'}`,
-    500,
-  );
+  throw toA1AppError(lastError);
 }
 
 /**
@@ -305,10 +353,15 @@ export async function runA1ReceiptParse(
   }
 
   try {
-    const { base64, mimeType } = await fetchReceiptImageBase64(storagePath);
-    const result = await callA1Model(eventId, base64, mimeType, eventTitle);
-    await persistParseResult(eventId, storagePath, result);
-    return toApiResponse(result, storagePath);
+    const result = isA1DevStubEnabled()
+      ? buildA1DevStubResult()
+      : await (async () => {
+          const { base64, mimeType } = await fetchReceiptImageBase64(storagePath);
+          return callA1Model(eventId, base64, mimeType, eventTitle);
+        })();
+    const normalized = dedupeFeeLineItems(result);
+    await persistParseResult(eventId, storagePath, normalized);
+    return toApiResponse(normalized, storagePath);
   } catch (err) {
     if (err instanceof AppError && err.code === 'RECEIPT_UNREADABLE') {
       await setAiStage(eventId, 'failed');
@@ -316,9 +369,6 @@ export async function runA1ReceiptParse(
     }
 
     await setAiStage(eventId, 'failed');
-    if (err instanceof AppError) {
-      throw err;
-    }
-    throw new AppError('PARSE_FAILED', err instanceof Error ? err.message : 'Parse failed', 500);
+    throw toA1AppError(err);
   }
 }

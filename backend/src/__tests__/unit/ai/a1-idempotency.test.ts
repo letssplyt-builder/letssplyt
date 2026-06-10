@@ -45,6 +45,7 @@ describe('a1-idempotency', () => {
         total_amount: 52,
         tax_amount: 4,
         tip_amount: 3,
+        fees_amount: 5,
         currency: 'USD',
         locale: 'en-US',
       },
@@ -59,6 +60,16 @@ describe('a1-idempotency', () => {
           quantity: 2,
           confidence_score: 0.9,
           is_low_confidence: false,
+          is_fee: false,
+        },
+        {
+          id: 'fee-1',
+          name: 'Service charge',
+          unit_price: 5,
+          quantity: 1,
+          confidence_score: 0.95,
+          is_low_confidence: false,
+          is_fee: true,
         },
       ],
       error: null,
@@ -70,5 +81,10 @@ describe('a1-idempotency', () => {
     expect(result.tip).toBe(3);
     expect(result.total).toBe(52);
     expect(result.items[0].name).toBe('Burger');
+    expect(result.additional_charges).toEqual([
+      { name: 'Service charge', amount: 5, confidence_score: 0.95 },
+    ]);
+    expect(result.items.every((item) => item.name !== 'Service charge')).toBe(true);
+    expect(result.subtotal).toBe(20);
   });
 });

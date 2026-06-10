@@ -452,6 +452,7 @@ interface Event {
   locale: string;
   tax_amount: number | null;
   tip_amount: number | null;
+  fees_amount: number | null;
   ai_stage: 'none' | 'parsing' | 'parsed' | 'calculating' | 'calculated' | 'messaging' | 'complete' | 'failed';
 }
 
@@ -1094,10 +1095,11 @@ This applies to both the joining phase (channel `event-members:{eventId}`, subsc
 
 #### ItemReviewScreen
 
-- Editable list of parsed items (name + price, swipe to delete, tap to edit inline)
-- "Add item" button at bottom of list
-- Tax field + Tip field (pre-filled from parse, editable)
-- Total (computed live from items + tax + tip)
+- Editable list of food/drink items from parse (`items`; `is_fee = false` in DB)
+- Separate editable fee rows from `additional_charges` / `is_fee = true` rows (SVC Fee, City Fee, …)
+- "Add item" button at bottom of food list
+- Tax + Fees + Tip fields (pre-filled from parse, editable)
+- Total (computed live: sum(food items) + tax + fees + tip)
 - Low-confidence items shown with amber highlight and a small warning icon
 - CTA: "Confirm items →" → POST `/api/v1/events/:eventId/receipt/confirm` (with `parse_attempt_id` from the scan response stored in eventStore) → navigate to SplitEntryScreen
 

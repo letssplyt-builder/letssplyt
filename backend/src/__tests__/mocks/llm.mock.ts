@@ -16,6 +16,7 @@ const DEFAULT_PARSE_JSON = {
       confidence_score: 0.95,
     },
   ],
+  additional_charges: [],
   subtotal: 10.0,
   tax: 1.0,
   tip: 2.0,

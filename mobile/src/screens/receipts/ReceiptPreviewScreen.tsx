@@ -19,6 +19,24 @@ type Props = NativeStackScreenProps<EventsStackParamList, 'ReceiptPreview'>;
 
 type UploadState = 'idle' | 'processing' | 'error';
 
+function receiptFlowErrorMessage(err: unknown, phase: 'upload' | 'parse'): string {
+  if (!isApiRequestError(err)) {
+    return phase === 'upload'
+      ? 'Upload failed. Check your connection and try again.'
+      : 'We could not read this receipt. Try again or enter the total manually.';
+  }
+
+  if (err.code === 'AI_QUOTA_EXCEEDED') {
+    return 'Receipt AI is temporarily unavailable (provider quota). Try again later or enter the total manually.';
+  }
+
+  if (err.code === 'PARSE_FAILED' || err.code === 'RECEIPT_UNREADABLE') {
+    return err.message;
+  }
+
+  return err.message;
+}
+
 export function ReceiptPreviewScreen({ navigation, route }: Props) {
   const { eventId, imageUri } = route.params;
   const insets = useSafeAreaInsets();
@@ -30,6 +48,7 @@ export function ReceiptPreviewScreen({ navigation, route }: Props) {
     storagePath: string;
     uploadToken: string;
   } | null>(null);
+  const [uploadedStoragePath, setUploadedStoragePath] = useState<string | null>(null);
 
   const finishAfterParse = useCallback(
     async (
@@ -62,7 +81,6 @@ export function ReceiptPreviewScreen({ navigation, route }: Props) {
     ) => {
       setUploadState('processing');
       setErrorMessage(null);
-
       try {
         await receiptsService.uploadReceiptToSignedUrl(
           uploadUrl,
@@ -71,15 +89,20 @@ export function ReceiptPreviewScreen({ navigation, route }: Props) {
           uploadToken,
         );
         setPendingUpload(null);
-        await runParse(storagePath);
+        setUploadedStoragePath(storagePath);
       } catch (err) {
         setUploadState('error');
         setPendingUpload({ uploadUrl, fileUri, storagePath, uploadToken });
-        setErrorMessage(
-          isApiRequestError(err)
-            ? err.message
-            : 'Upload failed. Check your connection and try again.',
-        );
+        setErrorMessage(receiptFlowErrorMessage(err, 'upload'));
+        return;
+      }
+
+      try {
+        await runParse(storagePath);
+      } catch (err) {
+        setUploadState('error');
+        setUploadedStoragePath(storagePath);
+        setErrorMessage(receiptFlowErrorMessage(err, 'parse'));
       }
     },
     [runParse],
@@ -90,6 +113,7 @@ export function ReceiptPreviewScreen({ navigation, route }: Props) {
 
     setUploadState('processing');
     setErrorMessage(null);
+    setUploadedStoragePath(null);
 
     try {
       const compressedUri = await receiptsService.compressReceiptImage(imageUri);
@@ -121,6 +145,16 @@ export function ReceiptPreviewScreen({ navigation, route }: Props) {
       pendingUpload.uploadToken,
     );
   }, [pendingUpload, runUpload]);
+
+  const handleRetryParse = useCallback(() => {
+    if (!uploadedStoragePath) return;
+    setUploadState('processing');
+    setErrorMessage(null);
+    void runParse(uploadedStoragePath).catch((err) => {
+      setUploadState('error');
+      setErrorMessage(receiptFlowErrorMessage(err, 'parse'));
+    });
+  }, [uploadedStoragePath, runParse]);
 
   const handleRetake = useCallback(() => {
     navigation.replace('ReceiptScan', { eventId });
@@ -190,14 +224,20 @@ export function ReceiptPreviewScreen({ navigation, route }: Props) {
       {uploadState === 'processing' ? (
         <View style={styles.overlay}>
           <ActivityIndicator color="#fff" size="large" />
-          <Text style={styles.overlayText}>Uploading receipt…</Text>
+          <Text style={styles.overlayText}>
+            {uploadedStoragePath ? 'Reading receipt…' : 'Uploading receipt…'}
+          </Text>
         </View>
       ) : null}
 
       {uploadState === 'error' && errorMessage ? (
         <View style={[styles.errorBanner, { bottom: insets.bottom + 160 }]}>
           <Text style={styles.errorText}>{errorMessage}</Text>
-          {pendingUpload ? (
+          {uploadedStoragePath ? (
+            <Pressable onPress={handleRetryParse} style={styles.retryLink}>
+              <Text style={styles.retryText}>Retry reading receipt</Text>
+            </Pressable>
+          ) : pendingUpload ? (
             <Pressable onPress={handleRetryUpload} style={styles.retryLink}>
               <Text style={styles.retryText}>Retry upload</Text>
             </Pressable>

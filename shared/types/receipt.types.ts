@@ -14,11 +14,18 @@ export interface ReceiptParseResultItem {
   confidence?: 'high' | 'low';
 }
 
-/** Placeholder parse response until E07-S02 A1 agent fills real items. */
+export interface ReceiptAdditionalCharge {
+  name: string;
+  amount: number;
+  confidence?: 'high' | 'low';
+}
+
 export interface ReceiptParseResponse {
   items: ReceiptParseResultItem[];
+  additional_charges: ReceiptAdditionalCharge[];
   tax_amount: number;
   tip_amount: number;
+  fees_amount: number;
   total_amount: number;
   currency: string;
   storage_path: string;
@@ -35,6 +42,7 @@ export interface ReceiptItem {
   is_low_confidence: boolean;
   is_tax: boolean;
   is_tip: boolean;
+  is_fee: boolean;
   is_shared: boolean;
   ai_extracted: boolean;
 }

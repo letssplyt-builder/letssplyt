@@ -9,8 +9,15 @@ export const ReceiptItemSchema = z.object({
   is_low_confidence: z.boolean().optional(),
 });
 
+export const AdditionalChargeSchema = z.object({
+  name: z.string().min(1).max(60),
+  amount: z.number().positive(),
+  confidence_score: z.number().min(0).max(1).optional(),
+});
+
 export const ReceiptParseResultSchema = z.object({
   items: z.array(ReceiptItemSchema).min(1),
+  additional_charges: z.array(AdditionalChargeSchema).default([]),
   subtotal: z.number().nonnegative(),
   tax: z.number().nonnegative(),
   tip: z.number().nonnegative(),
@@ -30,5 +37,12 @@ export const ReceiptParseOutputSchema = z.union([
   ReceiptParseErrorSchema,
 ]);
 
+export type AdditionalCharge = z.infer<typeof AdditionalChargeSchema>;
 export type ReceiptParseResult = z.infer<typeof ReceiptParseResultSchema>;
 export type ReceiptParseOutput = z.infer<typeof ReceiptParseOutputSchema>;
+
+/** Sum of all additional_charges — stored as events.fees_amount. */
+export function sumAdditionalCharges(charges: AdditionalCharge[]): number {
+  const total = charges.reduce((sum, charge) => sum + charge.amount, 0);
+  return Number(total.toFixed(2));
+}

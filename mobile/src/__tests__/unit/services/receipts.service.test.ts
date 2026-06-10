@@ -98,8 +98,10 @@ describe('receipts.service', () => {
         status: 200,
         json: async () => ({
           items: [],
+          additional_charges: [],
           tax_amount: 0,
           tip_amount: 0,
+          fees_amount: 0,
           total_amount: 0,
           currency: 'USD',
           storage_path: `${EVENT_ID}/receipt.jpg`,
@@ -128,8 +130,10 @@ describe('receipts.service', () => {
       status: 200,
       json: async () => ({
         items: [{ name: 'Burger', unit_price: 12, quantity: 1 }],
+        additional_charges: [],
         tax_amount: 1,
         tip_amount: 2,
+        fees_amount: 0,
         total_amount: 15,
         currency: 'USD',
         storage_path: `${EVENT_ID}/receipt.jpg`,

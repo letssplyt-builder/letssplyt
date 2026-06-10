@@ -57,10 +57,11 @@ describe('a1-receipt-parser', () => {
             confidence_score: 0.95,
           },
         ],
+        additional_charges: [{ name: 'City fee', amount: 1.5, confidence_score: 0.9 }],
         subtotal: 10,
         tax: 1,
         tip: 2,
-        total: 13,
+        total: 14.5,
         currency: 'USD',
         parse_confidence: 0.95,
       }),
@@ -72,6 +73,124 @@ describe('a1-receipt-parser', () => {
       ok: true,
       arrayBuffer: async () => Uint8Array.from([0xff, 0xd8, 0xff, 0xe0]).buffer,
     } as Response);
+  });
+
+  it('drops duplicate SVC fee from items when also in additional_charges', async () => {
+    mockLLMProvider.complete.mockResolvedValue({
+      text: JSON.stringify({
+        items: [
+          {
+            id: '00000000-0000-0000-0000-000000000001',
+            name: 'Burger',
+            unit_price: 10,
+            quantity: 1,
+            confidence_score: 0.95,
+          },
+          {
+            id: '00000000-0000-0000-0000-000000000002',
+            name: 'SVC Fees',
+            unit_price: 3.5,
+            quantity: 1,
+            confidence_score: 0.9,
+          },
+        ],
+        additional_charges: [{ name: 'SVC Fee', amount: 3.5, confidence_score: 0.9 }],
+        subtotal: 13.5,
+        tax: 1,
+        tip: 0,
+        total: 14.5,
+        currency: 'USD',
+        parse_confidence: 0.95,
+      }),
+      usage: { inputTokens: 10, outputTokens: 20 },
+      modelUsed: 'mock-model',
+    });
+
+    const insertMock = jest.fn(() => Promise.resolve({ error: null }));
+    mockSupabase.from.mockImplementation((table: string) => {
+      if (table === 'events') {
+        return {
+          ...mockGetAiStage('none'),
+          ...mockClaimUpdate(true),
+        } as never;
+      }
+      if (table === 'receipt_items') {
+        return {
+          ...mockClaimUpdate(true),
+          insert: insertMock,
+        } as never;
+      }
+      return mockClaimUpdate(true) as never;
+    });
+
+    const { runA1ReceiptParse } = await import('../../../modules/ai/a1-receipt-parser');
+    const result = await runA1ReceiptParse(EVENT_ID, STORAGE_PATH);
+
+    expect(result.items).toHaveLength(1);
+    expect(result.items[0].name).toBe('Burger');
+    expect(result.fees_amount).toBe(3.5);
+
+    const insertedRows = (insertMock.mock.calls[0] as unknown as [Array<{ name: string; is_fee: boolean }>])[0];
+    expect(insertedRows.filter((row) => !row.is_fee)).toHaveLength(1);
+    expect(insertedRows.filter((row) => row.is_fee)).toHaveLength(1);
+    expect(insertedRows.find((row) => row.is_fee)?.name).toBe('SVC Fee');
+  });
+
+  it('persists multiple additional_charges as separate is_fee rows', async () => {
+    mockLLMProvider.complete.mockResolvedValue({
+      text: JSON.stringify({
+        items: [
+          {
+            id: '00000000-0000-0000-0000-000000000001',
+            name: 'Burger',
+            unit_price: 10,
+            quantity: 1,
+            confidence_score: 0.95,
+          },
+        ],
+        additional_charges: [
+          { name: 'SVC Fee', amount: 2, confidence_score: 0.9 },
+          { name: 'City Fee', amount: 1, confidence_score: 0.88 },
+        ],
+        subtotal: 10,
+        tax: 1,
+        tip: 0,
+        total: 13,
+        currency: 'USD',
+        parse_confidence: 0.95,
+      }),
+      usage: { inputTokens: 10, outputTokens: 20 },
+      modelUsed: 'mock-model',
+    });
+
+    const insertMock = jest.fn(() => Promise.resolve({ error: null }));
+    mockSupabase.from.mockImplementation((table: string) => {
+      if (table === 'events') {
+        return {
+          ...mockGetAiStage('none'),
+          ...mockClaimUpdate(true),
+        } as never;
+      }
+      if (table === 'receipt_items') {
+        return {
+          ...mockClaimUpdate(true),
+          insert: insertMock,
+        } as never;
+      }
+      return mockClaimUpdate(true) as never;
+    });
+
+    const { runA1ReceiptParse } = await import('../../../modules/ai/a1-receipt-parser');
+    const result = await runA1ReceiptParse(EVENT_ID, STORAGE_PATH);
+
+    expect(result.fees_amount).toBe(3);
+    expect(result.additional_charges).toHaveLength(2);
+
+    const insertedRows = (insertMock.mock.calls[0] as unknown as [
+      Array<{ name: string; is_fee: boolean }>,
+    ])[0];
+    const feeRows = insertedRows.filter((row) => row.is_fee);
+    expect(feeRows.map((row) => row.name)).toEqual(['SVC Fee', 'City Fee']);
   });
 
   it('calls LLM factory for vision parse', async () => {
@@ -94,7 +213,9 @@ describe('a1-receipt-parser', () => {
     expect(createLLMProvider).toHaveBeenCalledWith('A1');
     expect(mockLLMProvider.complete).toHaveBeenCalled();
     expect(result.items[0].name).toBe('Burger');
-    expect(result.total_amount).toBe(13);
+    expect(result.fees_amount).toBe(1.5);
+    expect(result.additional_charges[0].name).toBe('City fee');
+    expect(result.total_amount).toBe(14.5);
   });
 
   it('returns cached result without calling AI when already parsed', async () => {

@@ -127,7 +127,7 @@ letssplyt/
 | `files/08-Mobile-App-Specification.md` | Navigation, all screen specs, Zustand stores |
 | `files/09-Security-And-Privacy.md` | PII model, encryption implementations |
 | `files/10-Engineering-Operations.md` | CI/CD, EAS builds, local startup, monitoring |
-| `files/12-Build-Sequence.md` | **YOUR BUILD GUIDE** — 47 stories with prompts, acceptance criteria, tests |
+| `files/12-Build-Sequence.md` | **YOUR BUILD GUIDE** — 52 stories with prompts, acceptance criteria, tests |
 | `prototype/` | HTML mockups — match visual design for every screen |
 
 ---
