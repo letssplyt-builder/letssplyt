@@ -12,6 +12,7 @@ import {
   handleAddManualParticipant,
   handleDeleteParticipant,
 } from './participant.controller';
+import splitsRouter from '../splits/splits.router';
 
 const router = Router();
 
@@ -25,5 +26,7 @@ router.delete('/:id/participants/:participantId', handleDeleteParticipant);
 router.post('/:id/lock', handleLockEvent);
 router.post('/:id/reopen', handleReopenEvent);
 router.post('/:id/join-token/regenerate', handleRegenerateJoinToken);
+
+router.use('/', splitsRouter);
 
 export default router;
