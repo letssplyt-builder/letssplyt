@@ -1583,9 +1583,9 @@ Payer disputes a self-reported payment. Resets status to pending. Notifies parti
 ---
 
 ### POST `/events/:eventId/settlement/cash/:participantId`
-**Auth:** `[AUTH]` | `[PAYER]`
+**Auth:** `[AUTH]` | `[PAYER]` | **Built in:** E09-S01 (remaining)
 
-Payer marks a participant as paid (cash, Zelle, or any external method). Immediately settles.
+Payer marks a participant as paid (cash, Zelle, or any external method). `pending` → `payer_marked` → `confirmed`.
 
 **Request body:**
 ```typescript
@@ -1603,6 +1603,79 @@ Payer marks a participant as paid (cash, Zelle, or any external method). Immedia
   event_fully_settled: boolean;
 }
 ```
+
+---
+
+### Counterparty bulk settlement (E09-S02)
+
+One-tap actions across **all direct outstanding participant rows** for a registered member or phone guest. Each updated row writes its own `settlement_log` entry. Skips rows whose status no longer matches (partial success; no whole-batch 500).
+
+#### POST `/settlement/member/:userId/self-report-all`
+**Auth:** `[AUTH]` | **Participant** owes counterparty `:userId`
+
+Bulk `pending` → `self_reported` for every `outstanding[]` row where `direction=i_owe`.
+
+**Request body:** same as per-event self-report (`payment_method`, optional `note`).
+
+**Response `200`:**
+```typescript
+{
+  updated_count: number;
+  results: Array<{
+    event_id: string;
+    participant_id: string;
+    payment_status: "self_reported";
+  }>;
+}
+```
+
+#### POST `/settlement/member/:userId/confirm-all`
+**Auth:** `[AUTH]` | `[PAYER]` — counterparty owes viewer
+
+Bulk `self_reported` → `confirmed` for all `owed_to_me` rows; runs event settle check per affected event.
+
+**Response `200`:**
+```typescript
+{
+  updated_count: number;
+  events_fully_settled: string[];
+  results: Array<{ event_id: string; participant_id: string; payment_status: "confirmed" }>;
+}
+```
+
+#### POST `/settlement/member/:userId/dispute-all`
+**Auth:** `[AUTH]` | `[PAYER]`
+
+Bulk `self_reported` → `pending` for all rows from that member.
+
+**Request body:** `{ note?: string }`
+
+**Response `200`:**
+```typescript
+{ updated_count: number; results: Array<{ event_id: string; participant_id: string; payment_status: "pending" }> }
+```
+
+#### POST `/settlement/member/:userId/mark-paid-all`
+**Auth:** `[AUTH]` | `[PAYER]`
+
+Bulk mark paid for every `pending` `owed_to_me` row (`payer_marked` → `confirmed`).
+
+**Request body:** `{ payment_method: "cash" | "zelle" | "bank_transfer" | "other"; note?: string }`
+
+**Response `200`:**
+```typescript
+{
+  updated_count: number;
+  events_fully_settled: string[];
+  results: Array<{ event_id: string; participant_id: string; payment_status: "confirmed" }>;
+}
+```
+
+#### POST `/settlement/guest/:phoneHash/confirm-all`
+#### POST `/settlement/guest/:phoneHash/dispute-all`
+#### POST `/settlement/guest/:phoneHash/mark-paid-all`
+
+Same semantics as member bulk endpoints; viewer must be payer on all rows; match `phone_hash`. No `self-report-all` (guests without app accounts).
 
 ---
 
@@ -1805,6 +1878,13 @@ Android Digital Asset Links JSON. Required for App Links (Android). The backend 
 | POST | /events/:id/settlement/:pid/confirm | AUTH PAYER | — |
 | POST | /events/:id/settlement/:pid/dispute | AUTH PAYER | — |
 | POST | /events/:id/settlement/cash/:pid | AUTH PAYER | — |
+| POST | /settlement/member/:userId/self-report-all | AUTH PARTICIPANT | — |
+| POST | /settlement/member/:userId/confirm-all | AUTH PAYER | — |
+| POST | /settlement/member/:userId/dispute-all | AUTH PAYER | — |
+| POST | /settlement/member/:userId/mark-paid-all | AUTH PAYER | — |
+| POST | /settlement/guest/:phoneHash/confirm-all | AUTH PAYER | — |
+| POST | /settlement/guest/:phoneHash/dispute-all | AUTH PAYER | — |
+| POST | /settlement/guest/:phoneHash/mark-paid-all | AUTH PAYER | — |
 | POST | /analytics/events | AUTH or ANON | 200/session/min |
 | POST | /webhooks/twilio/opt-out | TWILIO SIG | — |
 | POST | /webhooks/twilio/delivery | TWILIO SIG | — |

@@ -70,7 +70,7 @@ Actions marked **Critical Path** are the minimum required for the app to be usab
 
 ### Settlement & Tracking
 
-Settlement tracking lives entirely inside **Event Detail** — there is no separate settlement dashboard. Payer navigates: Events tab → tap event card → Event Detail.
+Settlement actions run at **two levels:** (1) **Event Detail** — per-participant Confirm, Nudge, Dispute, Mark cash, I've paid; (2) **Member/Guest detail** — one-tap **Settle all** across every outstanding event with that counterparty (bulk APIs). Home lists counterparties and routes to detail screens; there is no separate Settlement tab.
 
 | ID | Action | Description | Why This Exists |
 |----|--------|-------------|-----------------|
@@ -82,7 +82,7 @@ Settlement tracking lives entirely inside **Event Detail** — there is no separ
 
 ### Dashboard Views (Home tab)
 
-Home is the **financial overview**. Settlement actions (Confirm, Nudge, Cash, I've paid) still execute in **Event Detail** — Home routes the user to the right event.
+Home is the **financial overview**. Settlement actions execute in **Event Detail** (per event) or **Member/Guest detail** (**Settle all** for that person). Home routes to the right counterparty or event.
 
 **Layout:** Net balance hero (unchanged) → **Members | Guests** toggle → list(s) → FAB **＋ New event**.
 
@@ -91,8 +91,8 @@ Home is the **financial overview**. Settlement actions (Confirm, Nudge, Cash, I'
 | P29 | View Home — net balance hero | Top card: net USD balance (green / red / grey). Calls `GET /users/me/balance`. **Owed to you** sums all outstanding on events the user created — registered members **and** pure guests (not just the Members toggle). **You owe** sums registered counterparties only. Same card for all users. | One number for total exposure across all events without splitting the hero by toggle. **MVP** |
 | P30 | Home — Members toggle | **People who owe you** (net **> 0** per registered user) and **People you owe** (net **< 0**). One row per person; row shows **name + net amount only**. Net = Σ(they owe you) − Σ(you owe them) across events with a direct payer↔participant link. **Net = 0** → hidden. Tap row → **Member detail** (P32). | Registered counterparties in one place without opening every event. Net aggregation avoids duplicate rows when you and Alex owe each other on different dinners. **MVP** |
 | P31 | Home — Guests toggle | Lists **pure guests** (`user_id` null) who **still owe the logged-in user** on events they created. Settled guests hidden. **With phone:** aggregate by `phone_hash` → one row, total outstanding. **Name only:** one row per participant (names may repeat). Row shows name + amount. Tap **phone guest** → Guest detail (P33). Tap **name-only guest** → **Event Detail directly** (single event). Guests never appear in "you owe". | Creators need to see SMS-only guests who haven't paid. Phone aggregation matches how guests are identified in `guest_pii`. Name-only guests skip detail screen — only one event. **MVP** |
-| P32 | Member detail screen | Header: counterparty name + net amount. **Outstanding** events (direct payer↔participant relationship, non-zero balance) listed first. **"See more events"** expands **settled / $0** shared history. Tap event → Event Detail. | Drill-down without a global settlement tab. History available on demand. **MVP** |
-| P33 | Guest detail screen (phone guests) | Same pattern as P32 but only events where viewer is **payer** and guest owes them. Outstanding on top; settled/$0 behind "See more events". Tap event → Event Detail. | Multi-event phone guests need an intermediate list; name-only guests skip this (P31). **MVP** |
+| P32 | Member detail screen | Header: counterparty name + net amount. Primary CTA when applicable: **Settle all** (payer: Confirm all / Mark all paid / Dispute all self-reported; participant: **I've paid all** via `self-report-all`). **Outstanding** events listed first; **"See more events"** expands history. Per-event **Pay now** on rows you owe. Tap event → Event Detail for per-row actions. | One-tap clears net balance with a registered member across events; event-level granularity still available. **MVP** |
+| P33 | Guest detail screen (phone guests) | Same pattern as P32 but payer-only (guest owes viewer). Bulk CTAs: **Mark all paid**, **Confirm all**, **Dispute all** (no self-report-all — guests without app). Tap event → Event Detail. | Multi-event phone guests; name-only guests skip this screen (P31). **MVP** |
 | P34 | Delete account & data | GDPR right to erasure. Removes user, anonymises participant history, deletes payment handles. | Legally required. **Legally Required** |
 
 ---
@@ -121,7 +121,7 @@ The join flow splits into two distinct paths based on whether the person has Let
 | R04 | Receive split message | Gets image (their row highlighted) + payment deep links + soft app download nudge at bottom (suppressed if already registered). | The core recipient experience. Highlighted row removes the need to scan a table looking for their name. Pre-filled payment links remove calculation friction. Nudge only for non-registered — registered users already have the app. **Critical Path** |
 | R04a | Receive revised split message | If payer edits after sending — receives "your revised share is $X (was $Y)" only if their amount changed. Same channel as original. | Transparency is trust. Silent amount changes destroy trust. Explicit revision message with old vs new amount makes the correction clear and professional. **MVP** |
 | R05 | Tap payment deep link | Venmo/PayPal/Cash App opens with handle + amount pre-filled. Pays externally. | The moment of payment. Deep links pre-fill both the recipient (payer's handle) and amount — two fewer steps vs opening the app and entering manually. **Critical Path** |
-| R06 | Self-report payment in app | After paying externally → Home **Members** toggle (find payer under "People you owe") or **Events you joined** → Member detail or Event Detail → "I've paid" → select payment method → confirm. Push to creator. Creator confirms in Event Detail. | Self-report stays event-scoped; Home is the entry router. **MVP** |
+| R06 | Self-report payment in app | After paying externally → Home **Members** → Member detail → **Settle all** (all events with that payer) **or** Event Detail → per-event "I've paid" → payment method → confirm. Push to creator. Creator confirms in Event Detail or **Confirm all** on Member detail. | Participant can clear entire net balance with one payer in one tap, or settle one dinner at a time. **MVP** |
 | R07 | View Home (participant) | Same Home as payer: net hero + **Members** toggle. Participant sees net **< 0** rows under **People you owe**; net **> 0** under **People who owe you** if they also created events. **Guests** toggle only relevant when user is a creator with outstanding guest debtors. | One Home screen for all roles; data reflects both creator and participant obligations. **MVP** |
 | R08 | View event detail (participant) | **Events you joined** → tap card → participant Event Detail (share hero, split breakdown, roster). Or Home → Member detail → tap event. | Transparency on what they owe and event context. **MVP** |
 
@@ -200,7 +200,7 @@ The minimum viable sequence for the app to work end-to-end:
 
 **Note on P14:** The "Lock group" action is the hard gate between group formation and split calculation. No split can begin until the payer explicitly locks. This is enforced in the UI (Scan receipt button disabled) and in the API (split endpoints check group lock status).
 
-**Note on P24–P27:** There is no separate Settlement tab. Home lists counterparties (Members/Guests) and routes to Event Detail; Events tab lists events by Created/Joined. All settlement **actions** (confirm, dispute, nudge, mark cash, I've paid) happen in **Event Detail** only.
+**Note on P24–P27 / P32–P33:** No separate Settlement tab. Home lists counterparties; Member/Guest detail offers **Settle all** bulk actions; Event Detail offers per-participant actions. Events tab lists by Created/Joined.
 
 Everything else is recovery paths, edge cases, or quality-of-life improvements.
 

@@ -20,6 +20,13 @@ import {
   handleRetryMessage,
   handleSendMessages,
 } from '../messages/messages.controller';
+import {
+  handleConfirmPayment,
+  handleDisputePayment,
+  handleMarkParticipantPaid,
+  handleNudgeParticipant,
+  handleSelfReportPayment,
+} from '../settlement/settlement.controller';
 
 const router = Router();
 
@@ -37,7 +44,12 @@ router.post('/:id/join-token/regenerate', handleRegenerateJoinToken);
 router.get('/:id/messages/preview', handlePreviewMessages);
 router.post('/:id/messages/send', handleSendMessages);
 router.post('/:id/messages/retry/:participantId', handleRetryMessage);
+router.post('/:id/messages/nudge/:participantId', handleNudgeParticipant);
 router.post('/:id/splits/resend', handleResendRevisionMessages);
+router.post('/:id/settlement/:participantId/self-report', handleSelfReportPayment);
+router.post('/:id/settlement/:participantId/confirm', handleConfirmPayment);
+router.post('/:id/settlement/:participantId/dispute', handleDisputePayment);
+router.post('/:id/settlement/cash/:participantId', handleMarkParticipantPaid);
 
 router.use('/', splitsRouter);
 

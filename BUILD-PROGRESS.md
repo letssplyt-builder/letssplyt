@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
 **Last updated:** 2026-06-07
-**Current story:** E09-S01 — Settlement API (self-report, confirm, dispute, nudge)
+**Current story:** E09-S02 — Counterparty bulk settlement API (settle-all per member/guest)
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -67,9 +67,10 @@
 - [x] E08-S07 — Post-Send Split Edit (P20a) (2026-06-07)
 
 ### Epic 9: Settlement Tracking
-- [ ] E09-S01 — Settlement API (self-report, confirm, dispute, nudge with 24h cooldown)
-- [ ] E09-S02 — Settlement Ledger API (balance, counterparties, member/guest detail, owed-to-me, i-owe)
-- [ ] E09-S03 — Dashboard & Settlement Mobile (Home Members/Guests, Member/Guest detail, Events Active|Settled + Created/Joined, PayNow, Event Detail settlement — 3-tab nav)
+- [x] E09-S01 — Per-event settlement API (self-report, confirm, dispute, nudge, mark-paid/cash + `smoke:settlement`) (2026-06-07)
+- [ ] E09-S02 — Counterparty bulk settlement API (settle-all per member/guest: self-report-all, confirm-all, dispute-all, mark-paid-all)
+- [ ] E09-S03 — Settlement ledger API (balance, counterparties, member/guest detail — **shipped E07-S03**; owed-to-me, i-owe, ledger tests **remaining**)
+- [ ] E09-S04 — Settlement mobile UI (Home/Events lists — **shipped E07-S03**; Event Detail actions, Member/Guest Settle all, PayNow **remaining**)
 
 ---
 
@@ -103,9 +104,9 @@
 | Tier | Epics | Stories | Done | Remaining |
 |---|---|---|---|---|
 | Tier 1 — Foundation | 4 | 16 | 16 | 0 |
-| Tier 2 — Core Flow | 5 | 23 | 19 | 4 |
+| Tier 2 — Core Flow | 5 | 24 | 20 | 4 |
 | Tier 3 — Operations | 4 | 13 | 0 | 13 |
-| **Total** | **13** | **52** | **29** | **23** |
+| **Total** | **13** | **53** | **30** | **23** |
 
 ---
 
@@ -137,3 +138,6 @@
 - [2026-06-07] — E08-S06 — Twilio STOP webhook: `processSmsStopOptOut` (sms_opt_outs, users, participants, settlement_log), `/webhooks/twilio/stop` + `/opt-out`, TwiML confirmation; 264 backend tests. No mobile UI.
 - [2026-06-07] — **SMS delivery strategy change** — Retired MMS `mediaUrl` on send/preview. Each participant gets `participants.breakdown_token` + `See full split: https://{APP_DOMAIN}/split/{token}` in SMS body; `GET /split/:token` serves HTML (all rows including organiser; viewer highlighted). Preview API field `breakdown_url`; mobile MessagePreview opens link in browser. `POST /split/confirm` allowed when `events.status` is `locked` or `sent`. Migration #18. Legacy `split-image.generator.ts` not on delivery path. Docs: CLAUDE, 01–08, 12, MIGRATIONS. Tests: breakdown-page integration, message-assembler, confirm-split, send.service (no MMS), messages-send integration, MessagePreviewScreen 4/4, smoke script breakdown checks; 262 backend tests.
 - [2026-06-07] — E08-S07 (revised, pending sign-off) — Post-send split edit via existing **Edit share** → Review split → **Save and notify** (no EditSplitModal). `POST /split/confirm` post-send revisions + `POST /splits/resend` selective SMS. Edit locked on `self_reported` / `confirmed` / `settled`; dispute→`pending` re-opens. Docs: 01, 02, 05, 08, 10, 12. Smoke `smoke:split-revision` 20/20; 265 backend + 192 mobile tests.
+- [2026-06-07] — E09-S01 — Per-event settlement API complete: mark-paid/cash, migrations #19–#20 (`settlement_log` audit columns + `disputed` action), `smoke:settlement` 22/22, backend 277 tests.
+- [2026-06-07] — E09-S01 — Per-event settlement API: mark-paid/cash endpoint, migrations #19–#20 (`settlement_log` audit + `disputed` action), `npm run smoke:settlement` 22/22, backend 277 tests.
+- [2026-06-07] — Product/docs — Epic 9 realigned to 4 stories: E09-S01 per-event API, **E09-S02 bulk settle-all**, E09-S03 ledger (partial E07-S03), E09-S04 mobile actions (partial E07-S03). Total stories 53.

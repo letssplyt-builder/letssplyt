@@ -124,9 +124,10 @@ All 38 stories are in `docs/12-Build-Sequence.md`. Each story has:
 | E08-S02 | Send Messages + Twilio | Messages |
 | E08-S03 | Hosted Split Breakdown Page (SMS link) | Messages |
 | E08-S04 | Message Preview + Sending | Messages |
-| E09-S01 | Settlement API | Settlement |
-| E09-S02 | Settlement Ledger API | Settlement |
-| E09-S03 | Settlement Mobile Screens | Settlement |
+| E09-S01 | Per-event settlement API | Settlement |
+| E09-S02 | Bulk settle-all (member/guest) | Settlement |
+| E09-S03 | Settlement ledger API | Settlement |
+| E09-S04 | Settlement mobile UI | Settlement |
 | E10-S01 | QStash Job Handlers | Background Jobs |
 | E10-S02 | Push Notifications | Background Jobs |
 | E11-S01 | Biometric Authentication | Account |

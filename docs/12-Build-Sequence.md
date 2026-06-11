@@ -6,7 +6,7 @@
 
 ## How to Use This Document
 
-This document is your daily build companion. Each of the 52 stories in this document maps to a single Cursor session. Here is the exact workflow for every story, without exception.
+This document is your daily build companion. Each of the 53 stories in this document maps to a single Cursor session. Here is the exact workflow for every story, without exception.
 
 First, confirm that all dependencies listed at the top of the epic are fully complete — meaning you have verified every acceptance criterion in those stories on your phone or in your terminal. Do not skip this check. A broken foundation cascades into hours of debugging later.
 
@@ -1550,7 +1550,7 @@ backend/src/__tests__/integration/events/participants.test.ts
 **Description:** Build CreateEventModal, QRDisplayModal, EventDetailScreen (joining phase with Realtime), HomeScreen, and EventsScreen. The EventDetailScreen uses Supabase Realtime to update the member list automatically when new participants join — the creator should see new members appear without refreshing.
 
 **Prompt:**
-*"Build the complete event creation and management screens for LetsSplyt mobile. IMPORTANT: The event title field from the API is `event.title` (not `event.name`) — use `event.title` in all TypeScript component code, Zustand store, and API calls. (1) HomeScreen: net balance hero card (green if positive 'You're owed $X', red if negative 'You owe $X', grey if zero), Needs attention section (pending confirmations), recent events list (last 3 — display `event.title` for each), FAB '+ New event' → CreateEventModal. Balance fetched from GET /api/v1/users/me/balance (built in E09-S02 — see E05-S03 acceptance criteria for graceful degradation). (2) EventsScreen: segmented control Active|Settled, paginated list of event cards (`event.title`, date, participant count, status chip, outstanding amount), FAB → CreateEventModal, tap card → EventDetailScreen. (3) CreateEventModal (bottom sheet): title input autofocused (label 'Event title'), Create button → POST /events with body `{ title }`, on success dismiss modal then open QRDisplayModal. (4) QRDisplayModal (fullscreen): large QR code using react-native-qrcode-svg, `event.title` above, Copy link + Share buttons below, Expired state shows 'Regenerate' button that calls POST /events/:id/join-token/regenerate. (5) EventDetailScreen (joining phase, refer to prototype/participant.html): display `event.title` at top, QR below (tap → fullscreen QRDisplayModal), live member list via Supabase Realtime channel 'event-members:[eventId]', each member shows display_name + join_method chip (QR Web / App / Manual), '+Add manually' button → AddParticipantModal (bottom sheet: name field + optional phone with country picker, or 'Name only' toggle), 'Lock group →' button disabled if fewer than 2 members with count badge '3 members'. On Realtime event: subscribe to channel 'event-members:[eventId]', on ANY change re-fetch GET /events/:id (never use payload.new directly to update state). Zustand eventStore: events list, currentEvent, participants list — actions: createEvent, loadEvents, loadParticipants, lockEvent."*
+*"Build the complete event creation and management screens for LetsSplyt mobile. IMPORTANT: The event title field from the API is `event.title` (not `event.name`) — use `event.title` in all TypeScript component code, Zustand store, and API calls. (1) HomeScreen: net balance hero card (green if positive 'You're owed $X', red if negative 'You owe $X', grey if zero), Needs attention section (pending confirmations), recent events list (last 3 — display `event.title` for each), FAB '+ New event' → CreateEventModal. Balance fetched from GET /api/v1/users/me/balance (built in E09-S03 — see E05-S03 acceptance criteria for graceful degradation). (2) EventsScreen: segmented control Active|Settled, paginated list of event cards (`event.title`, date, participant count, status chip, outstanding amount), FAB → CreateEventModal, tap card → EventDetailScreen. (3) CreateEventModal (bottom sheet): title input autofocused (label 'Event title'), Create button → POST /events with body `{ title }`, on success dismiss modal then open QRDisplayModal. (4) QRDisplayModal (fullscreen): large QR code using react-native-qrcode-svg, `event.title` above, Copy link + Share buttons below, Expired state shows 'Regenerate' button that calls POST /events/:id/join-token/regenerate. (5) EventDetailScreen (joining phase, refer to prototype/participant.html): display `event.title` at top, QR below (tap → fullscreen QRDisplayModal), live member list via Supabase Realtime channel 'event-members:[eventId]', each member shows display_name + join_method chip (QR Web / App / Manual), '+Add manually' button → AddParticipantModal (bottom sheet: name field + optional phone with country picker, or 'Name only' toggle), 'Lock group →' button disabled if fewer than 2 members with count badge '3 members'. On Realtime event: subscribe to channel 'event-members:[eventId]', on ANY change re-fetch GET /events/:id (never use payload.new directly to update state). Zustand eventStore: events list, currentEvent, participants list — actions: createEvent, loadEvents, loadParticipants, lockEvent."*
 
 **Files created:**
 - `mobile/src/screens/HomeScreen.tsx`
@@ -1571,10 +1571,10 @@ backend/src/__tests__/integration/events/participants.test.ts
 4. When the browser device joins, the member list on the creator's phone updates AUTOMATICALLY within 2 seconds (Realtime working)
 5. Lock group button is disabled when 0 members are shown, enabled when 1 or more members are present
 6. Tap Lock → event status transitions → screen moves to settlement phase view
-7. Balance card calls `GET /api/v1/users/me/balance` but gracefully degrades: if the endpoint returns 404 or the call fails, show 'Balance unavailable' placeholder. Do NOT hard-fail. The endpoint is built in E09-S02.
+7. Balance card calls `GET /api/v1/users/me/balance` but gracefully degrades: if the endpoint returns 404 or the call fails, show 'Balance unavailable' placeholder. Do NOT hard-fail. The endpoint is built in E09-S03.
 8. Do NOT call any settlement endpoint that isn't built yet. Use a stub response shape for the balance card.
 
-> **Placeholder UI (superseded in E09-S03):** E05-S03 shipped a **placeholder** HomeScreen (Needs attention + recent events) and EventsScreen (single Active|Settled list). The **final** dashboard design — Home **Members | Guests** toggle, Member/Guest detail, Events **Active | Settled** toggle with **Created / Joined** sections under each — is specified in `docs/01-PRD.md`, `docs/02-User-Flows.md` (P28–P34), `docs/08-Mobile-App-Specification.md`, and built in **E09-S03** (partially shipped ahead in E07-S03 for Home + Events list layout). E05-S03 only needs the net balance hero + graceful degradation; list areas may remain placeholder until E09.
+> **Placeholder UI (superseded in E09-S04):** E05-S03 shipped a **placeholder** HomeScreen (Needs attention + recent events) and EventsScreen (single Active|Settled list). The **final** dashboard design — Home **Members | Guests** toggle, Member/Guest detail, Events **Active | Settled** toggle with **Created / Joined** sections — is specified in product docs and **partially shipped in E07-S03**; settlement **action** wiring remains **E09-S04**.
 
 > **Deferred to E05-S04:** Native contact picker ("From contacts"), remove-participant UI (before lock), and "Reopen join window" UI (after lock). E05-S03 shipped manual entry only; APIs for delete/reopen already exist from E05-S01/E05-S02.
 
@@ -2432,11 +2432,23 @@ Read CLAUDE.md, BUILD-PROGRESS.md, and this story. Read `docs/05-API-Specificati
 
 ## EPIC 9 — Settlement Tracking
 **Depends on:** E08 complete (messages sent, participants have amounts)
-**Delivers:** Full payment lifecycle — self-report, confirm, dispute, nudge, cash payments, per-event settlement in Event Detail, and cross-event counterparty aggregation on Home (Members/Guests)
+**Delivers:** Full payment lifecycle — per-event and **per-member bulk** settlement (self-report, confirm, dispute, nudge, mark-paid), ledger aggregation on Home (Members/Guests), and mobile wiring in Event Detail + Member/Guest detail.
 
-### E09-S01 — Settlement API (Self-Report, Confirm, Dispute, Nudge)
+> **Overlap with earlier epics (do not rebuild):** Parts of **E09-S03** (ledger) and **E09-S04** (mobile dashboard) were shipped ahead in **E07-S03** (Home Members|Guests, counterparties + member/guest detail APIs, Events Active|Settled + Created/Joined, `settlementStore` loaders) and **E08-S04** (settlement summary footer on Event Detail). See each story’s **Already shipped** section before implementing.
 
-**Description:** Build the four settlement action endpoints that drive the payment state machine. All transitions are atomic database updates with settlement_log audit entries written for every change.
+### E09-S01 — Per-Event Settlement API
+
+**Description:** Build **per-event, per-participant** settlement mutation endpoints. All transitions are atomic database updates with `settlement_log` audit entries. Push notifications deferred to E10-S02.
+
+**Already shipped (backend — verify with `npm run smoke:settlement`):**
+- `POST /events/:eventId/settlement/:participantId/self-report`
+- `POST /events/:eventId/settlement/:participantId/confirm`
+- `POST /events/:eventId/settlement/:participantId/dispute`
+- `POST /events/:eventId/settlement/cash/:participantId` (mark-paid)
+- `POST /events/:eventId/messages/nudge/:participantId` (48h cooldown)
+- `settlement.service.ts`, `settlement.state-machine.ts`, unit + integration tests, `scripts/smoke-settlement.ts`
+
+**Remaining in this story:** none (all endpoints below shipped; verify with `npm run smoke:settlement`).
 
 **Prompt:**
 *"Build backend/src/modules/settlement/settlement.service.ts and settlement.controller.ts with four endpoints, all requiring authenticate middleware. Payment state machine (from docs/04-Data-Architecture.md): PENDING → SELF_REPORTED (participant reports), SELF_REPORTED → CONFIRMED (creator confirms) or DISPUTED (creator disputes), DISPUTED → PENDING (participant must re-pay). The `eventId` in every route path is used for authorization — verify the authenticated user is the payer of that event before executing the action. (1) POST /api/v1/events/:eventId/settlement/:participantId/self-report: called by participant (verifies req.user.id matches participant.user_id). Validates current payment_status is 'pending'. Uses supabaseAdmin to UPDATE participants SET payment_status='self_reported' WHERE id=participantId AND payment_status='pending' — must be atomic (use RETURNING to verify update happened). Writes settlement_log row { event_id, participant_id, action:'self_reported', actor_id:req.user.id, amount_at_time:participant.amount_owed }. Returns { updated: true, new_status: 'self_reported' }. (2) POST /api/v1/events/:eventId/settlement/:participantId/confirm: called by event creator (verifies event.payer_id=req.user.id). Validates current status is 'self_reported'. Atomic UPDATE SET payment_status='confirmed'. Writes settlement_log action:'confirmed'. Checks if ALL participants for this event are now confirmed or opted_out — if yes, UPDATE events SET status='settled'. Returns { updated: true, event_settled: boolean }. (3) POST /api/v1/events/:eventId/settlement/:participantId/dispute: creator only. Validates status is 'self_reported'. Atomic UPDATE SET payment_status='pending' (resets to pending, NOT self_reported). Writes settlement_log action:'disputed'. (4) POST /api/v1/events/:eventId/messages/nudge/:participantId: creator only. Checks last_nudged_at — if set and NOW() < last_nudged_at + 48 hours, return 429 { error: 'NUDGE_COOLDOWN', retry_after: ISO timestamp }. Otherwise: UPDATE participants SET last_nudged_at=NOW(). Send Twilio SMS via twilio.messages.create with nudge message. Write notification_log. Return { sent: true, next_nudge_after: ISO timestamp }."*
@@ -2447,13 +2459,14 @@ Read CLAUDE.md, BUILD-PROGRESS.md, and this story. Read `docs/05-API-Specificati
 - `backend/src/modules/settlement/settlement.routes.ts`
 
 **Acceptance Criteria:**
-1. POST self-report → `SELECT payment_status FROM participants WHERE id=...` returns `self_reported`
-2. POST confirm → `SELECT payment_status` returns `confirmed`; when last participant confirmed, `SELECT status FROM events` returns `settled`
-3. POST dispute → payment_status resets to `pending` (not `self_reported`)
-4. POST nudge twice within 48 hours → second call returns 429 with `retry_after` timestamp (rate limit: 1 per participant per 48 hours)
-5. Participant cannot call confirm on their own payment (403 — only creator can confirm)
+1. POST self-report → `payment_status` = `self_reported` (shipped)
+2. POST confirm → `payment_status` = `confirmed`; last participant confirmed → `events.status` = `settled` (shipped)
+3. POST dispute → `payment_status` resets to `pending` (shipped)
+4. POST nudge twice within 48h → 429 with `details.next_nudge_available_at` (shipped)
+5. Participant cannot confirm own payment → 403 (shipped)
+6. POST cash/mark-paid → `pending` → `payer_marked` → `confirmed`; `event_fully_settled` when applicable (shipped)
 
-> **Note:** Push notification to creator on self-report is added in E10-S02 (after push infrastructure is built). Do NOT wire push.service.ts in this story.
+> **Note:** Push notification to creator on self-report is added in E10-S02. Do NOT wire `push.service.ts` in this story.
 
 **Tests required:**
 ```
@@ -2464,6 +2477,7 @@ backend/src/__tests__/unit/settlement/settlement.service.test.ts
   - dispute: resets to 'pending' (not 'self_reported')
   - nudge: rejects within 48h cooldown with retry_after timestamp
   - nudge: calls Twilio after cooldown expires
+  - mark-paid: pending → confirmed; event settles when last participant
 
 backend/src/__tests__/integration/settlement/settlement.test.ts
   - full lifecycle: pending → self_reported → confirmed
@@ -2471,13 +2485,65 @@ backend/src/__tests__/integration/settlement/settlement.test.ts
   - event settles when all participants confirmed or opted_out
   - 429 on second nudge within 48h
   - Participant cannot confirm own payment (403)
+
+backend/scripts/smoke-settlement.ts (live — backend running)
+  npm run smoke:settlement
+  - self-report → dispute → self-report → confirm lifecycle
+  - participant confirm → 403
+  - nudge → 429 cooldown
+  - mark-paid (cash) → event settled
 ```
 
 ---
 
-### E09-S02 — Settlement Ledger API (Balance, Counterparties, Member/Guest Detail)
+### E09-S02 — Counterparty Bulk Settlement API (Settle All per Member / Guest)
 
-**Description:** Build cross-event aggregation endpoints that power the Home dashboard (Members | Guests toggle) and drill-down screens. Also retains per-event ledger helpers (`owed-to-me`, `i-owe`) for Event Detail settlement phase. **No separate Settlement tab** — Home is the cross-event router; settlement actions stay in Event Detail.
+**Description:** One-tap settlement across **all outstanding participant rows** for a registered member or phone guest, alongside the per-event APIs in E09-S01. Uses the same state machine and `settlement_log` (one log row per participant row updated). Authorization derives from direct payer↔participant links — same rules as `GET /settlement/member/:userId` and `GET /settlement/guest/:phoneHash`.
+
+**Prompt:**
+*"Extend `settlement.service.ts` with bulk endpoints. All require `authenticate`. (1) `POST /api/v1/settlement/member/:userId/self-report-all` — **participant** owes counterparty `:userId` (counterparty is payer). For every outstanding row in `GET /settlement/member/:userId` where `direction=i_owe` and `payment_status=pending`, atomically apply the same logic as per-event self-report. Body: `{ payment_method, note? }`. Return `{ updated_count, results: [{ event_id, participant_id, payment_status }] }`. Skip rows not `pending`; do not fail whole batch if one row races. (2) `POST /api/v1/settlement/member/:userId/confirm-all` — **viewer is payer**; counterparty `:userId` owes viewer. Bulk `self_reported` → `confirmed` across all direct rows; run `checkAndMarkEventSettled` per affected event. (3) `POST /api/v1/settlement/member/:userId/dispute-all` — payer disputes all `self_reported` rows for that member → `pending`. Body: `{ note? }`. (4) `POST /api/v1/settlement/member/:userId/mark-paid-all` — payer marks all `pending` rows for that member via mark-paid path (`payer_marked` → `confirmed`). Body: `{ payment_method, note? }`. (5) `POST /api/v1/settlement/guest/:phoneHash/confirm-all`, `/dispute-all`, `/mark-paid-all` — same for phone guests (viewer must be payer on all rows; match `phone_hash`). No `self-report-all` for guests without app accounts. Each bulk action writes one `settlement_log` row per participant updated. Return counts + per-event settle flags."*
+
+**Files created:**
+- Updates to `settlement.service.ts`, `settlement.controller.ts`, `settlement.routes.ts`
+
+**Acceptance Criteria:**
+1. Member self-report-all updates every `pending` `i_owe` row for that counterparty; unchanged rows skipped
+2. Member confirm-all updates every `self_reported` `owed_to_me` row; events auto-settle when last owing participant confirms
+3. Member dispute-all resets every `self_reported` row to `pending`
+4. Member mark-paid-all marks every `pending` `owed_to_me` row paid
+5. Guest bulk endpoints only affect rows where viewer is payer and `phone_hash` matches
+6. Partial race (row status changed mid-batch) returns `updated_count` < total without 500
+
+**Tests required:**
+```
+backend/src/__tests__/unit/settlement/bulk-settlement.service.test.ts
+  - self-report-all across two events same payer
+  - confirm-all settles both events when last participant
+  - mark-paid-all skips self_reported rows
+  - guest mark-paid-all aggregates phone_hash rows only
+
+backend/src/__tests__/integration/settlement/bulk-settlement.test.ts
+  - member bulk lifecycle across two events
+  - 403 when viewer is not payer for confirm-all
+```
+
+---
+
+### E09-S03 — Settlement Ledger API (Balance, Counterparties, Member/Guest Detail)
+
+**Description:** **Read-only** cross-event aggregation for Home and drill-down screens. Per-event mutation APIs live in E09-S01/E09-S02.
+
+**Already shipped (E07-S03 — do not rebuild):**
+- `GET /api/v1/users/me/balance` (`balance.service.ts`)
+- `GET /api/v1/users/me/counterparties?kind=members|guests` (`counterparties.service.ts`)
+- `GET /api/v1/settlement/member/:userId` (`member-detail.service.ts`)
+- `GET /api/v1/settlement/guest/:phoneHash` (`guest-detail.service.ts`)
+- Unit tests: `balance.service.test.ts`, `counterparties.service.test.ts`; integration: `profile.test.ts` balance
+
+**Remaining in this story:**
+- `GET /settlement/owed-to-me`, `GET /settlement/i-owe` (i-owe decrypts payer handles for PayNow)
+- `GET /settlement/person/:userId` alias
+- Ledger integration tests (`ledger.test.ts`)
 
 **Prompt:**
 *"Build settlement ledger endpoints in settlement.service.ts per docs/05-API-Specification.md. (1) GET /api/v1/users/me/balance — net balance hero: `{ net_balance_minor_units, currency: 'USD', owed_to_you, you_owe }`. MVP: always USD. (2) GET /api/v1/users/me/counterparties?kind=members|guests — powers Home toggle. Members: net aggregate per registered user across direct payer↔participant links; split into `owe_you[]` (net>0) and `you_owe[]` (net<0); omit net=0. Guests: only pure guests (`user_id` null) who still owe viewer (viewer is payer); phone guests aggregated by `phone_hash`; name-only one row per `participant_id` with `event_id` for direct Event Detail navigation. (3) GET /api/v1/settlement/member/:userId — MemberDetailScreen: `outstanding[]` + `history[]` (settled/$0 direct relationships). Alias GET /settlement/person/:userId. (4) GET /api/v1/settlement/guest/:phoneHash — GuestDetailScreen for phone guests only. (5) GET /api/v1/settlement/owed-to-me and GET /api/v1/settlement/i-owe — grouped-by-event helpers for Event Detail settlement UI; i-owe decrypts payer handles. All amounts in minor units via getCurrencyMinorUnits (USD MVP). Never return raw phone numbers."*
@@ -2516,9 +2582,9 @@ backend/src/__tests__/integration/settlement/ledger.test.ts
 
 ---
 
-### E09-S03 — Dashboard & Settlement Mobile Screens (Home Members/Guests + Events Created/Joined)
+### E09-S04 — Settlement Mobile UI (Event Detail + Member/Guest Bulk + PayNow)
 
-**Description:** Replace E05-S03 placeholder Home/Events UI with the final dashboard design. **3-tab bottom nav** (Home, Events, Profile) — no Settlement tab. Home routes to counterparty drill-down; settlement **actions** (Confirm, Nudge, I've paid, Cash) remain in EventDetailScreen only.
+**Description:** Wire settlement **actions** at event level (Event Detail) and member/guest level (**Settle all** bulk CTAs). Dashboard lists shipped in E07-S03 — regression only. **Already shipped:** Home, Member/Guest detail, Events layout, settlement summary on Event Detail. **Remaining:** PayNow, action buttons, bulk CTAs, settlementStore mutations.
 
 **Prompt:**
 *"Build dashboard and settlement mobile screens per docs/08-Mobile-App-Specification.md and prototype/home.html. (1) **RootNavigator:** confirm 3 tabs only — remove SettlementTab if present. (2) **HomeScreen:** keep net balance hero (`GET /users/me/balance`); replace placeholder lists with **Members | Guests** segmented toggle below hero. Members: `GET /users/me/counterparties?kind=members` → sections 'People who owe you' / 'People you owe' — one row per registered user, name + net amount only; tap → MemberDetailScreen. Guests: `kind=guests` — phone guests tap → GuestDetailScreen; name-only tap → EventDetailScreen directly (`event_id` on row). Hide empty sections. FAB '+ New event'. (3) **MemberDetailScreen** + **GuestDetailScreen** in HomeStack: `GET /settlement/member/:userId` and `GET /settlement/guest/:phoneHash`; outstanding events top, 'See more events' expands history; tap event → EventDetailScreen. No inline Confirm/Nudge on these screens. (4) **PayNowScreen** in HomeStack: payment handle deep links + 'I've paid' self-report (refer prototype/ledger.html `pay_now`). (5) **EventsScreen:** replace Active|Settled control with two sections — 'Events you created' (`GET /events?role=creator`) and 'Events you joined' (`role=participant'); settled collapsed under 'Settled (N)' per section. (6) **EventDetailScreen settlement phase:** per-participant Confirm/Nudge/Dispute/Mark cash; summary bar; progress bar; participant view shows share + 'I've paid'. (7) **settlementStore:** loadCounterparties, loadMemberDetail, loadGuestDetail, plus event-scoped owed-to-me/i-owe for Event Detail. Refer docs/02-User-Flows P28–P34."*
@@ -2535,14 +2601,13 @@ backend/src/__tests__/integration/settlement/ledger.test.ts
 - Updates to `mobile/src/screens/events/EventDetailScreen.tsx` (settlement phase actions)
 
 **Acceptance Criteria:**
-1. Bottom navigation has exactly 3 tabs: Home, Events, Profile (no Settlement tab)
-2. Home Members toggle shows net-aggregated counterparties; net=0 hidden; tap opens MemberDetailScreen
-3. Home Guests toggle shows only guests who owe viewer; phone → GuestDetailScreen; name-only → Event Detail directly
-4. MemberDetailScreen shows outstanding events + expandable history; no Confirm/Nudge buttons on this screen
-5. EventsScreen shows Active|Settled toggle; under each toggle, Created and Joined sections (lifecycle-filtered)
-6. EventDetailScreen settlement phase has Confirm, Nudge, I've paid, Mark cash — not on Home lists
-7. PayNowScreen opens Venmo/PayPal deep links via `Linking.openURL`
-8. E05-S03 balance hero graceful degradation still works if balance endpoint fails
+1. Home Members/Guests lists + Events Created/Joined layout (shipped E07-S03 — regression only)
+2. EventDetailScreen settlement phase: Confirm, Nudge, Dispute, Mark cash per row; progress bar; participant I've paid
+3. MemberDetailScreen: **Settle all** (self-report-all when you owe) OR payer bulk actions (confirm-all / mark-paid-all / dispute-all); per-event Pay now still available
+4. GuestDetailScreen: payer bulk mark-paid-all / confirm-all / dispute-all for phone guests
+5. PayNowScreen opens Venmo/PayPal deep links via `Linking.openURL`; I've paid calls per-event self-report
+6. Bulk settle all updates all applicable rows and refreshes member detail + balance hero
+7. E05-S03 balance hero graceful degradation still works if balance endpoint fails
 
 **Tests required:**
 ```
@@ -2559,7 +2624,8 @@ mobile/src/__tests__/components/HomeScreen.test.tsx
 mobile/src/__tests__/components/MemberDetailScreen.test.tsx
   - renders outstanding events
   - See more events expands history
-  - no Confirm/Nudge buttons rendered
+  - Settle all CTA calls bulk self-report-all when viewer owes
+  - Confirm all CTA calls bulk confirm-all when payer has self-reported rows
 
 mobile/src/__tests__/components/events/EventsScreen.test.tsx
   - renders Active|Settled toggle and Created/Joined sections
@@ -3007,7 +3073,7 @@ backend/src/__tests__/unit/infrastructure/logger.test.ts
 
 ## Build Sequence Summary
 
-**Total stories: 52 stories across 13 epics**
+**Total stories: 53 stories across 13 epics**
 
 | Epic | Stories | Duration estimate |
 |---|---|---|

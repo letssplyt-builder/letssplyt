@@ -152,7 +152,7 @@ Payer previews what each person's message will look like, then taps "Send to all
 Each person receives a WhatsApp or SMS with the full group split table, their exact amount, and direct payment links (Venmo/PayPal/etc — US MVP uses US payment apps). App members also see outstanding balances on the **Home** dashboard (Members toggle).
 
 **Step 9 — Settlement.**
-People pay via their preferred app (Venmo, PayPal, etc.). Registered participants return to the event in LetsSplyt, tap "I've paid", select the payment method, and confirm — the creator gets notified. The creator tracks and confirms payments from **Event Detail** (Confirm, Dispute, Nudge, Mark cash). **Home** is a counterparty router (net balance hero → Members or Guests lists → optional detail screen → Event Detail), not a second settlement workspace. **Events** tab lists events by role (Created / Joined). There is no separate Settlement bottom tab.
+People pay via their preferred app (Venmo, PayPal, etc.). Registered participants tap **I've paid** (per event in Event Detail, or **Settle all** on Member detail for every outstanding event with that payer). The creator confirms from **Event Detail** (per row) or **Member detail** (**Confirm all** / **Mark all paid** / **Dispute all**). **Home** routes to Members/Guests lists and detail screens; **Events** tab lists by Created/Joined. No separate Settlement tab.
 
 ### The Key Design Principles
 - **Recipients never need an account.** They receive a self-contained message. Everything they need is in it.
@@ -453,7 +453,7 @@ iOS and Android both prevent apps from silently sending SMS or WhatsApp messages
 - One-tap "Send to all" via Twilio Programmable Messaging (WhatsApp-first, SMS fallback) with in-app per-person delivery tracking
 - Event Detail screen with inline settlement tracking (segmented progress bar, per-member confirm/dispute/nudge/cash actions)
 - Home dashboard: net balance hero; **Members | Guests** toggle; Members shows net counterparty rows (People who owe you / People you owe); Guests shows outstanding pure guests who owe the creator (phone guests aggregated, name-only guests per-event)
-- Member/Guest detail screens route to Event Detail; settlement actions execute in Event Detail only
+- Member/Guest detail screens: **Settle all** bulk actions + per-event drill-down to Event Detail
 - Events tab: **Active | Settled** toggle; under each, **Events you created** and **Events you joined**
 - Post-send edit with selective resend
 - US market MVP — USD only; US payment apps in messages

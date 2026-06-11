@@ -1,8 +1,16 @@
 import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
+import { AppError } from '../../infrastructure/errors';
 import { getGuestCounterparties, getMemberCounterparties } from './counterparties.service';
 import { getGuestDetail } from './guest-detail.service';
 import { getMemberDetail } from './member-detail.service';
+import {
+  confirmPayment,
+  disputePayment,
+  markParticipantPaid,
+  nudgeParticipant,
+  selfReportPayment,
+} from './settlement.service';
 
 const counterpartiesQuerySchema = z.object({
   kind: z.enum(['members', 'guests']),
@@ -52,6 +60,152 @@ export async function handleGetGuestDetail(
   try {
     const phoneHash = req.params.phoneHash as string;
     const result = await getGuestDetail(req.user!.id, phoneHash);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+const selfReportBodySchema = z.object({
+  payment_method: z.enum([
+    'venmo',
+    'paypal',
+    'cashapp',
+    'zelle',
+    'wise',
+    'cash',
+    'bank_transfer',
+    'other',
+  ]),
+  note: z.string().max(200).optional(),
+});
+
+const disputeBodySchema = z.object({
+  note: z.string().max(200).optional(),
+});
+
+const markPaidBodySchema = z.object({
+  payment_method: z.enum(['cash', 'zelle', 'bank_transfer', 'other']),
+  note: z.string().max(200).optional(),
+});
+
+export async function handleSelfReportPayment(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new AppError('AUTH_REQUIRED', 'Unauthorized', 401);
+    }
+
+    const eventId = req.params.eventId ?? req.params.id;
+    const participantId = req.params.participantId;
+    if (!eventId || !participantId) {
+      throw new AppError('VALIDATION_ERROR', 'Event id and participant id are required', 400);
+    }
+
+    const body = selfReportBodySchema.parse(req.body);
+    const result = await selfReportPayment(userId, eventId, participantId, body);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleConfirmPayment(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new AppError('AUTH_REQUIRED', 'Unauthorized', 401);
+    }
+
+    const eventId = req.params.eventId ?? req.params.id;
+    const participantId = req.params.participantId;
+    if (!eventId || !participantId) {
+      throw new AppError('VALIDATION_ERROR', 'Event id and participant id are required', 400);
+    }
+
+    const result = await confirmPayment(userId, eventId, participantId);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleDisputePayment(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new AppError('AUTH_REQUIRED', 'Unauthorized', 401);
+    }
+
+    const eventId = req.params.eventId ?? req.params.id;
+    const participantId = req.params.participantId;
+    if (!eventId || !participantId) {
+      throw new AppError('VALIDATION_ERROR', 'Event id and participant id are required', 400);
+    }
+
+    const body = disputeBodySchema.parse(req.body ?? {});
+    const result = await disputePayment(userId, eventId, participantId, body);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleMarkParticipantPaid(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new AppError('AUTH_REQUIRED', 'Unauthorized', 401);
+    }
+
+    const eventId = req.params.eventId ?? req.params.id;
+    const participantId = req.params.participantId;
+    if (!eventId || !participantId) {
+      throw new AppError('VALIDATION_ERROR', 'Event id and participant id are required', 400);
+    }
+
+    const body = markPaidBodySchema.parse(req.body);
+    const result = await markParticipantPaid(userId, eventId, participantId, body);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleNudgeParticipant(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new AppError('AUTH_REQUIRED', 'Unauthorized', 401);
+    }
+
+    const eventId = req.params.eventId ?? req.params.id;
+    const participantId = req.params.participantId;
+    if (!eventId || !participantId) {
+      throw new AppError('VALIDATION_ERROR', 'Event id and participant id are required', 400);
+    }
+
+    const result = await nudgeParticipant(userId, eventId, participantId);
     res.status(200).json(result);
   } catch (err) {
     next(err);

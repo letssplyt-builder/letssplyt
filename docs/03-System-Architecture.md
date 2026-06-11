@@ -155,7 +155,7 @@ The backend is organised into 7 logical services (modules), each with a defined 
 ---
 
 ### Settlement Service
-**Owns:** The participant payment state machine (all valid state transitions), settlement log writes, dispute handling, the two-party confirmation model (participant self-reports, payer confirms or disputes), nudge job scheduling via QStash, and **cross-event counterparty aggregation** for the Home dashboard (`GET /users/me/balance` — members + guest obligations in `owed_to_you`; `GET /users/me/counterparties` — split by kind for toggle lists; `GET /settlement/member/:userId`, `GET /settlement/guest/:phoneHash`).
+**Owns:** The participant payment state machine (per-event and **bulk counterparty** mutations), settlement log writes, dispute handling, the two-party confirmation model, nudge delivery, and **read-only cross-event aggregation** for Home (`balance`, `counterparties`, member/guest detail, `owed-to-me`, `i-owe`).
 
 **Does NOT own:** Delivery of notifications (Notification Service), event-level status aggregation (Event Service computes `events.status = 'settled'` when all participants reach `settled`). Settlement **actions** (confirm, nudge, self-report) are invoked from Event Detail — Home is a read-only router to counterparties and events.
 

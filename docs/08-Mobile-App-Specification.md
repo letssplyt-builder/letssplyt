@@ -947,8 +947,10 @@ Refer to `prototype/home.html` (dashboard states). **MVP: USD only.**
 - **Outstanding** events (from `outstanding[]`): event title, per-event amount, direction chip (`They owe you` / `You owe`), payment status chip
 - **"See more events"** button at bottom → expands `history[]` (settled / $0 direct relationships only)
 - Tap event row → `EventDetailScreen` (`eventId`) — payer or participant view per role
-- **No inline Confirm/Nudge/Pay** on this screen — actions in Event Detail only
-- Optional: "Pay now" on `i_owe` outstanding rows → `PayNowScreen` with decrypted handles from event context
+- **Primary bulk CTA** (when outstanding rows exist):
+  - Viewer owes counterparty: **Settle all** → payment method sheet → `POST /settlement/member/:userId/self-report-all`
+  - Viewer is payer, counterparty owes: **Confirm all** (self-reported rows), **Mark all paid** (pending rows), **Dispute all** (self-reported rows) — E09-S02 bulk endpoints
+- Per-event **Pay now** on `i_owe` rows → `PayNowScreen` with decrypted handles
 
 **Back:** pops to `HomeScreen`.
 
@@ -960,6 +962,7 @@ Refer to `prototype/home.html` (dashboard states). **MVP: USD only.**
 - **Data:** `GET /api/v1/settlement/guest/:phoneHash`
 - Header: guest display name, total outstanding
 - Same outstanding / "See more events" / history pattern as Member detail
+- Payer bulk CTAs: **Mark all paid**, **Confirm all**, **Dispute all** (`POST /settlement/guest/:phoneHash/...-all`)
 - Tap event → `EventDetailScreen` (payer settlement view)
 
 **Not used for name-only guests** — those navigate straight from `HomeScreen`.
@@ -1068,7 +1071,7 @@ Event Detail **refetches on focus** (`useFocusEffect`) except immediately after 
   - Confirmed: name | amount | green check
   - Opted out: name | "opted out" chip | no action buttons
 
-Note: EventDetailScreen is where all settlement **actions** execute. Cross-event counterparty summary lives on **Home** (Members/Guests toggle + detail screens).
+Note: Settlement **actions** execute in **Event Detail** (per participant) and **Member/Guest detail** (**Settle all** bulk). Cross-event summary lives on **Home** (Members/Guests toggle + detail screens).
 
 Back button: pops to previous screen (`EventsScreen`, `HomeScreen`, or `MemberDetailScreen` / `GuestDetailScreen`).
 

@@ -13,7 +13,7 @@
 
 ---
 
-## Apply order (18 migrations)
+## Apply order (20 migrations)
 
 Run from **repository root** (`letssplyt/`), not `supabase/`:
 
@@ -55,6 +55,8 @@ If CLI reports *"Found local migration files to be inserted before the last migr
 | 16 | `20260614000000_events_ai_stage_parsed_confirmed.sql` | E07-S03 | `ai_stage` includes `parsed_confirmed` | `DROP CONSTRAINT IF EXISTS` |
 | 17 | `20260615000000_reset_event_expenses_function.sql` | E07-S06 | `reset_event_expenses_data()` RPC | `CREATE OR REPLACE` |
 | 18 | `20260616000000_participants_breakdown_token.sql` | E08-S03 | `participants.breakdown_token` + unique partial index for SMS breakdown links | `ADD COLUMN IF NOT EXISTS` |
+| 19 | `20260617000000_settlement_log_audit_columns.sql` | E09-S01 | `settlement_log.from_status`, `to_status` (+ amount/note/metadata if missing) | `ADD COLUMN IF NOT EXISTS` |
+| 20 | `20260617000001_settlement_log_action_disputed.sql` | E09-S01 | `settlement_log.action` CHECK includes `disputed` | `DROP CONSTRAINT IF EXISTS` |
 
 ---
 
@@ -73,6 +75,7 @@ If CLI reports *"Found local migration files to be inserted before the last migr
 | Split calculate + NLP | #1, #6, #16 |
 | SMS breakdown link (`GET /split/:token`) | #18 |
 | Message preview/send with `breakdown_url` | #18 |
+| Settlement API (`settlement_log` writes) | #19, #20 |
 
 ---
 
