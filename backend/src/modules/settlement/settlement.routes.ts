@@ -2,7 +2,9 @@ import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
 import {
   handleGetGuestDetail,
+  handleGetIOwe,
   handleGetMemberDetail,
+  handleGetOwedToMe,
   handleGuestConfirmAll,
   handleGuestDisputeAll,
   handleGuestMarkPaidAll,
@@ -16,6 +18,9 @@ const router = Router();
 
 router.use(authenticate);
 
+router.get('/owed-to-me', handleGetOwedToMe);
+router.get('/i-owe', handleGetIOwe);
+router.get('/person/:userId', handleGetMemberDetail);
 router.get('/member/:userId', handleGetMemberDetail);
 router.post('/member/:userId/self-report-all', handleMemberSelfReportAll);
 router.post('/member/:userId/confirm-all', handleMemberConfirmAll);

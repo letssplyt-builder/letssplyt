@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AppError } from '../../infrastructure/errors';
 import { getGuestCounterparties, getMemberCounterparties } from './counterparties.service';
 import { getGuestDetail } from './guest-detail.service';
+import { getIOwe, getOwedToMe } from './ledger.service';
 import { getMemberDetail } from './member-detail.service';
 import {
   guestConfirmAll,
@@ -55,6 +56,32 @@ export async function handleGetMemberDetail(
   try {
     const userId = req.params.userId as string;
     const result = await getMemberDetail(req.user!.id, userId);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleGetOwedToMe(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const result = await getOwedToMe(req.user!.id);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleGetIOwe(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const result = await getIOwe(req.user!.id);
     res.status(200).json(result);
   } catch (err) {
     next(err);

@@ -22,6 +22,7 @@
     "smoke:split-revision": "ts-node scripts/smoke-split-revision.ts",
     "smoke:settlement": "ts-node scripts/smoke-settlement.ts",
     "smoke:bulk-settlement": "ts-node scripts/smoke-bulk-settlement.ts",
+    "smoke:ledger": "ts-node scripts/smoke-ledger.ts",
     "cleanup:phone": "ts-node scripts/cleanup-auth-by-phone.ts"
   },
   "dependencies": {

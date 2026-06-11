@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
 **Last updated:** 2026-06-07
-**Current story:** E09-S03 — Settlement ledger API (owed-to-me, i-owe, ledger tests)
+**Current story:** E09-S04 — Settlement mobile UI (Event Detail actions, Member/Guest Settle all, PayNow)
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -68,7 +68,7 @@
 
 ### Epic 9: Settlement Tracking
 - [x] E09-S01 — Per-event settlement API (self-report, confirm, dispute, nudge, mark-paid/cash + `smoke:settlement`) (2026-06-07)
-- [ ] E09-S02 — Counterparty bulk settlement API (settle-all per member/guest: self-report-all, confirm-all, dispute-all, mark-paid-all)
+- [x] E09-S02 — Counterparty bulk settlement API (settle-all per member/guest: self-report-all, confirm-all, dispute-all, mark-paid-all + `smoke:bulk-settlement`) (2026-06-07)
 - [ ] E09-S03 — Settlement ledger API (balance, counterparties, member/guest detail — **shipped E07-S03**; owed-to-me, i-owe, ledger tests **remaining**)
 - [ ] E09-S04 — Settlement mobile UI (Home/Events lists — **shipped E07-S03**; Event Detail actions, Member/Guest Settle all, PayNow **remaining**)
 
