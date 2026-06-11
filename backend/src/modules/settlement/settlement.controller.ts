@@ -5,6 +5,15 @@ import { getGuestCounterparties, getMemberCounterparties } from './counterpartie
 import { getGuestDetail } from './guest-detail.service';
 import { getMemberDetail } from './member-detail.service';
 import {
+  guestConfirmAll,
+  guestDisputeAll,
+  guestMarkPaidAll,
+  memberConfirmAll,
+  memberDisputeAll,
+  memberMarkPaidAll,
+  memberSelfReportAll,
+} from './bulk-settlement.service';
+import {
   confirmPayment,
   disputePayment,
   markParticipantPaid,
@@ -206,6 +215,137 @@ export async function handleNudgeParticipant(
     }
 
     const result = await nudgeParticipant(userId, eventId, participantId);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleMemberSelfReportAll(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new AppError('AUTH_REQUIRED', 'Unauthorized', 401);
+    }
+    const counterpartyUserId = req.params.userId as string;
+    const body = selfReportBodySchema.parse(req.body);
+    const result = await memberSelfReportAll(userId, counterpartyUserId, body);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleMemberConfirmAll(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new AppError('AUTH_REQUIRED', 'Unauthorized', 401);
+    }
+    const counterpartyUserId = req.params.userId as string;
+    const result = await memberConfirmAll(userId, counterpartyUserId);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleMemberDisputeAll(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new AppError('AUTH_REQUIRED', 'Unauthorized', 401);
+    }
+    const counterpartyUserId = req.params.userId as string;
+    const body = disputeBodySchema.parse(req.body ?? {});
+    const result = await memberDisputeAll(userId, counterpartyUserId, body);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleMemberMarkPaidAll(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new AppError('AUTH_REQUIRED', 'Unauthorized', 401);
+    }
+    const counterpartyUserId = req.params.userId as string;
+    const body = markPaidBodySchema.parse(req.body);
+    const result = await memberMarkPaidAll(userId, counterpartyUserId, body);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleGuestConfirmAll(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new AppError('AUTH_REQUIRED', 'Unauthorized', 401);
+    }
+    const phoneHash = req.params.phoneHash as string;
+    const result = await guestConfirmAll(userId, phoneHash);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleGuestDisputeAll(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new AppError('AUTH_REQUIRED', 'Unauthorized', 401);
+    }
+    const phoneHash = req.params.phoneHash as string;
+    const body = disputeBodySchema.parse(req.body ?? {});
+    const result = await guestDisputeAll(userId, phoneHash, body);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleGuestMarkPaidAll(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new AppError('AUTH_REQUIRED', 'Unauthorized', 401);
+    }
+    const phoneHash = req.params.phoneHash as string;
+    const body = markPaidBodySchema.parse(req.body);
+    const result = await guestMarkPaidAll(userId, phoneHash, body);
     res.status(200).json(result);
   } catch (err) {
     next(err);

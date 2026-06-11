@@ -21,6 +21,7 @@
     "smoke:messages-preview": "ts-node scripts/smoke-messages-preview.ts",
     "smoke:split-revision": "ts-node scripts/smoke-split-revision.ts",
     "smoke:settlement": "ts-node scripts/smoke-settlement.ts",
+    "smoke:bulk-settlement": "ts-node scripts/smoke-bulk-settlement.ts",
     "cleanup:phone": "ts-node scripts/cleanup-auth-by-phone.ts"
   },
   "dependencies": {

@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
 **Last updated:** 2026-06-07
-**Current story:** E09-S02 — Counterparty bulk settlement API (settle-all per member/guest)
+**Current story:** E09-S03 — Settlement ledger API (owed-to-me, i-owe, ledger tests)
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
