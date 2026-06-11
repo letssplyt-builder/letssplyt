@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
 **Last updated:** 2026-06-07
-**Current story:** E08-S06 — Twilio STOP Webhook Handler
+**Current story:** E08-S07 — Post-Send Split Edit (P20a)
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -63,7 +63,7 @@
 - [x] E08-S03 — Hosted split breakdown page + per-participant `breakdown_token` (SMS link replaces MMS split image on send) (2026-06-07)
 - [x] E08-S04 — Message Preview Screen (carousel, per-participant `breakdown_url` link card) (2026-06-11)
 - [x] E08-S05 — Send + Realtime Delivery Tracking (Supabase Realtime, status badges) (2026-06-07)
-- [ ] E08-S06 — Twilio STOP Webhook Handler
+- [x] E08-S06 — Twilio STOP Webhook Handler (2026-06-07)
 - [ ] E08-S07 — Post-Send Split Edit (P20a)
 
 ### Epic 9: Settlement Tracking
@@ -103,7 +103,7 @@
 | Tier | Epics | Stories | Done | Remaining |
 |---|---|---|---|---|
 | Tier 1 — Foundation | 4 | 16 | 16 | 0 |
-| Tier 2 — Core Flow | 5 | 23 | 18 | 5 |
+| Tier 2 — Core Flow | 5 | 23 | 19 | 4 |
 | Tier 3 — Operations | 4 | 13 | 0 | 13 |
 | **Total** | **13** | **52** | **28** | **24** |
 

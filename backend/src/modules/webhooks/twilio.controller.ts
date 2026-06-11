@@ -1,20 +1,24 @@
 import type { NextFunction, Request, Response } from 'express';
+import { processSmsStopOptOut } from '../../infrastructure/notification/process-sms-opt-out';
 import { validateTwilioWebhook } from '../../infrastructure/twilio-signature';
 import { hashPhone } from '../../infrastructure/security';
 import { supabaseAdmin } from '../../infrastructure/supabase';
 
-function webhookUrl(path: string): string {
+const OPT_OUT_TWIML =
+  '<Response><Message>You have been unsubscribed from LetsSplyt notifications. Reply START to resubscribe.</Message></Response>';
+
+function webhookUrl(req: Request): string {
   const base = process.env.APP_URL?.replace(/\/$/, '') ?? 'http://localhost:3000';
-  return `${base}${path}`;
+  return `${base}${req.baseUrl}${req.path}`;
 }
 
-function verifyTwilioSignature(req: Request, path: string): boolean {
+function verifyTwilioSignature(req: Request): boolean {
   const signature = req.headers['x-twilio-signature'];
   if (!signature || typeof signature !== 'string') {
     return false;
   }
 
-  return validateTwilioWebhook(signature, webhookUrl(path), req.body as Record<string, string>);
+  return validateTwilioWebhook(signature, webhookUrl(req), req.body as Record<string, string>);
 }
 
 function mapDeliveryStatus(messageStatus: string): 'sent' | 'delivered' | 'failed' | 'bounced' {
@@ -36,7 +40,7 @@ export async function handleTwilioOptOut(
   next: NextFunction,
 ): Promise<void> {
   try {
-    if (!verifyTwilioSignature(req, '/api/v1/webhooks/twilio/opt-out')) {
+    if (!verifyTwilioSignature(req)) {
       res.status(403).json({ error: 'Invalid Twilio signature' });
       return;
     }
@@ -47,21 +51,9 @@ export async function handleTwilioOptOut(
       return;
     }
 
-    const phoneHash = hashPhone(from);
-    const { error } = await supabaseAdmin.from('sms_opt_outs').upsert(
-      {
-        phone_hash: phoneHash,
-        opt_out_method: 'stop_reply',
-      },
-      { onConflict: 'phone_hash', ignoreDuplicates: true },
-    );
+    await processSmsStopOptOut(from);
 
-    if (error) {
-      res.status(500).send('DB error');
-      return;
-    }
-
-    res.status(200).type('text/xml').send('<Response></Response>');
+    res.status(200).type('text/xml').send(OPT_OUT_TWIML);
   } catch (err) {
     next(err);
   }
@@ -73,7 +65,7 @@ export async function handleTwilioDelivery(
   next: NextFunction,
 ): Promise<void> {
   try {
-    if (!verifyTwilioSignature(req, '/api/v1/webhooks/twilio/delivery')) {
+    if (!verifyTwilioSignature(req)) {
       res.status(403).json({ error: 'Invalid Twilio signature' });
       return;
     }

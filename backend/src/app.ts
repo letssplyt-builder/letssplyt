@@ -63,6 +63,7 @@ app.get('/health', (_req, res) => {
 });
 
 app.use('/api/v1/webhooks/twilio', twilioWebhookRouter);
+app.use('/webhooks/twilio', twilioWebhookRouter);
 
 app.use('/join', joinWebRoutes);
 app.use('/split', breakdownRoutes);

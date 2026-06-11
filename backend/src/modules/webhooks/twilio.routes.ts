@@ -7,6 +7,10 @@ twilioWebhookRouter.post('/opt-out', (req, res, next) => {
   void handleTwilioOptOut(req, res, next).catch(next);
 });
 
+twilioWebhookRouter.post('/stop', (req, res, next) => {
+  void handleTwilioOptOut(req, res, next).catch(next);
+});
+
 twilioWebhookRouter.post('/delivery', (req, res, next) => {
   void handleTwilioDelivery(req, res, next).catch(next);
 });
