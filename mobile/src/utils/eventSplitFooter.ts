@@ -92,3 +92,27 @@ export function canSendEventMessages(
 ): boolean {
   return hasEventExpensesEntered(aiStage) && !messagesSentAt;
 }
+
+const SPLIT_EDIT_BLOCK_STATUSES = new Set(['self_reported', 'confirmed', 'settled']);
+
+/** Whether any participant blocks split edit (self-reported or confirmed payment). */
+export function hasSettlementBlockingEdit(
+  participants: Array<{ payment_status: string }>,
+): boolean {
+  return participants.some((row) => SPLIT_EDIT_BLOCK_STATUSES.has(row.payment_status));
+}
+
+/**
+ * Post-send: Edit share allowed only when no self-reports or confirmed payments exist.
+ * Disputing a self-report (back to pending) re-opens edit if nothing else blocks it.
+ * Pre-send: always allowed while in the edit footer mode.
+ */
+export function canEditEventShare(
+  messagesSentAt: string | null,
+  participants: Array<{ payment_status: string }>,
+): boolean {
+  if (!messagesSentAt) {
+    return true;
+  }
+  return !hasSettlementBlockingEdit(participants);
+}

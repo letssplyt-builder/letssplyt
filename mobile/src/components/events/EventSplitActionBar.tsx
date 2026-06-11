@@ -5,6 +5,7 @@ import { PrimaryButton } from '../PrimaryButton';
 interface EventSplitActionBarProps {
   mode: EventSplitActionMode;
   canSendMessages: boolean;
+  canEditShare?: boolean;
   onScanReceipt: () => void;
   onEnterTotal: () => void;
   onReviewItems: () => void;
@@ -16,6 +17,7 @@ interface EventSplitActionBarProps {
 export function EventSplitActionBar({
   mode,
   canSendMessages,
+  canEditShare = true,
   onScanReceipt,
   onEnterTotal,
   onReviewItems,
@@ -52,20 +54,26 @@ export function EventSplitActionBar({
     if (canSendMessages) {
       return (
         <View style={[styles.container, styles.row]} pointerEvents="box-none">
-          <PrimaryButton
-            label="Edit share"
-            onPress={onEditShare}
-            accessibilityLabel="Edit split"
-            style={styles.button}
-          />
+          {canEditShare ? (
+            <PrimaryButton
+              label="Edit share"
+              onPress={onEditShare}
+              accessibilityLabel="Edit split"
+              style={styles.button}
+            />
+          ) : null}
           <PrimaryButton
             label="Send messages"
             onPress={onSendMessages}
             accessibilityLabel="Preview and send messages"
-            style={styles.button}
+            style={canEditShare ? styles.button : styles.stacked}
           />
         </View>
       );
+    }
+
+    if (!canEditShare) {
+      return null;
     }
 
     return (

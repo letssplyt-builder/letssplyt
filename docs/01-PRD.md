@@ -431,8 +431,8 @@ iOS and Android both prevent apps from silently sending SMS or WhatsApp messages
 **Rationale:** The payer is about to send financial messages to multiple people. A preview catches errors (wrong amount, wrong payment link) before they cause embarrassment or disputes. Particularly important for international participants (Mark) where payment options differ — payer should verify the message looks right before sending.
 
 ### Post-Send Edit with Selective Resend
-**Decision:** Allow edits after messages sent, but only resend to participants whose amount changed.
-**Rationale:** Editing is sometimes necessary (AI misread an item, someone forgot to mention a dish). But sending a revision message to everyone when only one person's amount changed creates confusion. Selective resend respects participants' attention and makes the revision message meaningful. Edit is blocked if any payments already confirmed, with an explicit warning if some (but not all) have paid.
+**Decision:** Reuse the existing **Edit share** flow after messages are sent (Split entry → Review split → **Save and notify**). Only participants whose amounts changed receive a revision SMS ("Your share has been updated."). No separate edit modal or overflow action.
+**Rationale:** Editing is sometimes necessary (AI misread an item, someone forgot to mention a dish). Selective resend avoids confusing unchanged participants. Edit is blocked when any participant has self-reported or confirmed payment; disputing a self-report (back to `pending`) re-opens edit if no other blockers remain.
 
 ### Payment Handles in Profile (Not at Send Time)
 **Decision:** Store payment handles in user profile, fetch at A3 composition time.

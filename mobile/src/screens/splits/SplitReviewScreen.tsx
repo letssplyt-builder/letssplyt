@@ -15,8 +15,12 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { splitActionBarFooterStyle } from '../../constants/layout';
 import { useAppInsets } from '../../hooks/useAppInsets';
 import type { EventsStackParamList } from '../../navigation/types';
-import { confirmEventSplit } from '../../services/messages.service';
+import {
+  confirmEventSplit,
+  resendRevisionMessages,
+} from '../../services/messages.service';
 import { isApiRequestError } from '../../services/api';
+import { useEventStore } from '../../store/eventStore';
 import { useSplitStore } from '../../store/splitStore';
 import { authColors, colors } from '../../theme/colors';
 import { glassStyles } from '../../theme/glassStyles';
@@ -31,6 +35,8 @@ type Props = NativeStackScreenProps<EventsStackParamList, 'SplitReview'>;
 export function SplitReviewScreen({ navigation, route }: Props) {
   const { eventId } = route.params;
   const { rawBottom } = useAppInsets();
+  const messagesSentAt = useEventStore((s) => s.currentEvent?.event.messages_sent_at);
+  const isPostSendRevision = Boolean(messagesSentAt);
   const splits = useSplitStore((s) => s.splits);
   const billTotal = useSplitStore((s) => s.billTotal);
   const currency = useSplitStore((s) => s.currency);
@@ -68,7 +74,7 @@ export function SplitReviewScreen({ navigation, route }: Props) {
       footerStyle={splitActionBarFooterStyle(rawBottom)}
       footer={
         <PrimaryButton
-          label="Preview messages →"
+          label={isPostSendRevision ? 'Save and notify →' : 'Preview messages →'}
           loading={confirming}
           disabled={!canSend || confirming}
           onPress={() => {
@@ -83,6 +89,16 @@ export function SplitReviewScreen({ navigation, route }: Props) {
                     amount_owed: row.amount_owed,
                   })),
                 );
+
+                if (isPostSendRevision) {
+                  const sendResult = await resendRevisionMessages(eventId);
+                  navigation.replace('DeliveryTracking', {
+                    eventId,
+                    sendResults: sendResult.results,
+                  });
+                  return;
+                }
+
                 navigation.navigate('MessagePreview', { eventId });
               } catch (err) {
                 setConfirmError(
@@ -95,7 +111,9 @@ export function SplitReviewScreen({ navigation, route }: Props) {
               }
             })();
           }}
-          accessibilityLabel="Preview messages"
+          accessibilityLabel={
+            isPostSendRevision ? 'Save split and notify affected members' : 'Preview messages'
+          }
           variant="inverse"
         />
       }

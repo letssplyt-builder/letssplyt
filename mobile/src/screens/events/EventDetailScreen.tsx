@@ -42,6 +42,7 @@ import { authColors } from '../../theme/colors';
 import { receiptReviewToParseResult } from '../receipts/itemReview.utils';
 import { formatMoney, isPayerParticipant } from '../../utils/events';
 import {
+  canEditEventShare,
   canResetEventExpenses,
   canSendEventMessages,
   resolveEventSplitActionMode,
@@ -194,11 +195,11 @@ export function EventDetailScreen({ navigation, route }: Props) {
     ? canSendEventMessages(event.ai_stage, event.messages_sent_at)
     : false;
   const showSplitActions = Boolean(isPayer && event && isSettlementEventStatus(event.status));
+  const canEditShare = Boolean(
+    event && canEditEventShare(event.messages_sent_at, participants),
+  );
   const showOverflowMenu = Boolean(
-    isPayer &&
-      event &&
-      !joining &&
-      (event.status === 'locked' || showResetExpenses),
+    isPayer && event && !joining && (event.status === 'locked' || showResetExpenses),
   );
 
   const openItemReview = () => {
@@ -215,6 +216,11 @@ export function EventDetailScreen({ navigation, route }: Props) {
   };
 
   const openEditShare = async () => {
+    if (event?.messages_sent_at && !canEditShare) {
+      setToast('Split is locked — resolve self-reported or confirmed payments first.');
+      return;
+    }
+
     let detail = currentEvent;
     if (!detail?.receipt_review) {
       try {
@@ -420,6 +426,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
           <EventSplitActionBar
             mode={splitActionMode}
             canSendMessages={showSendMessages}
+            canEditShare={canEditShare}
             onScanReceipt={() => navigateInEventFlow(navigation, 'ReceiptScan', { eventId })}
             onEnterTotal={() =>
               navigateInEventFlow(navigation, 'SplitEntry', { eventId, mode: 'manual' })

@@ -470,9 +470,9 @@ CREATE TABLE participants (
   nudge_count             SMALLINT    NOT NULL DEFAULT 0,
   last_nudged_at          TIMESTAMPTZ,
 
-  -- Revision tracking (when payer edits split after messages are sent)
-  original_amount_owed    NUMERIC(10,2), -- preserved when payer edits split
-  revision_count          SMALLINT    NOT NULL DEFAULT 0,
+  -- Revision tracking (post-send Edit share → split/confirm; splits/resend uses revision_count > 0)
+  original_amount_owed    NUMERIC(10,2), -- first amount before post-send correction
+  revision_count          SMALLINT    NOT NULL DEFAULT 0, -- incremented when amount changes after messages_sent_at
 
   -- Correction 10: opted_out column
   -- Set TRUE when Twilio STOP webhook fires for this participant's phone

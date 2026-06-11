@@ -89,8 +89,7 @@ RootNavigator (NativeStack)
     ├── QRDisplayModal          ← fullscreen QR, shown after event create or from EventDetail
     ├── AddParticipantModal     ← from EventDetail joining view
     ├── MessagePreviewModal     ← preview a single participant's message
-    ├── ConfirmPaymentModal     ← payer confirms a self-report
-    └── EditSplitModal          ← post-send split edit
+    └── ConfirmPaymentModal     ← payer confirms a self-report
 ```
 
 AppJoinScreen receives `token` as a route param from the deep link. It calls `POST /api/v1/join/:token` (the combined mobile join endpoint) with body `{ user_id: supabase_uid }` to join the event, then navigates to AppJoinedScreen on success.
@@ -1040,6 +1039,7 @@ Each section lists only events matching the selected toggle. Event card: title, 
 | `ai_stage = failed` | **Scan receipt** + **Enter total** (retry, stacked) |
 | `ai_stage = parsed` | **Review items** only |
 | `ai_stage = parsed_confirmed` or later AI stages (before messages sent) | **Edit share** (+ **Send messages** when expenses entered and `messages_sent_at` null) + optional **Reset expenses** |
+| After `messages_sent_at` set (`ai_stage = complete`) | **Edit share** only (full width) when `canEditEventShare()` — hidden if any participant is `self_reported`, `confirmed`, or `settled` |
 
 **Footer layout rules (non-negotiable — regression-tested):**
 - **Paired actions** (**Scan receipt** + **Enter total**, **Edit share** + **Send messages**) use a **row** (`flexDirection: 'row'`) with `flex: 1` on each `PrimaryButton`. The sticky footer has no fixed height; placing `flex: 1` buttons in a **column** collapses them to zero height on device (invisible CTAs).
@@ -1053,6 +1053,8 @@ Each section lists only events matching the selected toggle. Event card: title, 
 - `manual` for **Enter total** flows (`split_mode = equal|portion` or `ai_stage = calculated|messaging|complete` without receipt data)
 
 **Send messages** (when `canSendEventMessages()` — expenses entered, messages not sent) navigates to `MessagePreviewScreen` via `navigateInEventFlow()`.
+
+**Post-send edit (P20a):** Same **Edit share** CTA — no separate modal or overflow item. Gated by `canEditEventShare(messages_sent_at, participants)` in `eventSplitFooter.ts`. Blocked when any participant has `self_reported`, `confirmed`, or `settled`; re-opens after dispute returns that participant to `pending` and no other blockers exist. Toast: *"Split is locked — resolve self-reported or confirmed payments first."*
 
 **Reset expenses** shows a destructive confirmation alert, then calls `POST /events/:id/expenses/reset`. On success: optimistic store patch (`applyExpensesResetLocal`), clear split store, refetch event detail, toast success. Footer returns to **Scan receipt** + **Enter total**. Hidden when `messages_sent_at` is set (`canResetEventExpenses()`).
 
@@ -1175,18 +1177,17 @@ Entry: after `POST /receipts/parse` (`ReceiptPreviewScreen`) or from Event Detai
 
 #### SplitReviewScreen
 
-- Per-person breakdown table: name | items | subtotal | tax+tip share | **total**
-- Edit individual amounts inline (tapping a row opens a numeric input sheet)
-- Sum invariant display at bottom: "Total: $X.XX ✓" (turns red if out of balance)
-- "Preview messages" link → MessagePreviewModal for a selected participant
-- CTA: "Send to all →" → POST `/messages/send` → MessageSendingScreen
+- Per-person breakdown list: name, item names (if any), amount (tap row to edit in numeric sheet)
+- Sum invariant at bottom: "Total: $X.XX ✓" (red when out of balance)
+- **Pre-send** (`messages_sent_at` null): footer CTA **Preview messages →** → `POST /split/confirm` → `MessagePreviewScreen`
+- **Post-send:** footer CTA **Save and notify →** → `POST /split/confirm` → `POST /splits/resend` → `DeliveryTrackingScreen` (revision SMS to affected participants only; message includes "Your share has been updated.")
 
 **Loading state (skeleton):**
 - Four grey rows (height 60px each) with pulsing animation, representing per-person rows.
 
-**Error state:** If the POST to `/messages/send` fails: "Messages failed to send. Tap to retry." with a prominent retry button. Do not navigate away — keep the user on SplitReviewScreen with their data intact.
+**Error state:** Confirm or resend failure shows inline error on Review split; user data preserved on screen.
 
-**Accessibility:** Each person row: `accessibilityRole="button"`, `accessibilityLabel="[Name], owes [amount]"`, `accessibilityHint="Tap to edit this person's amount"`.
+**Accessibility:** Each person row: `accessibilityRole="button"`, `accessibilityLabel="[Name], owes [amount]"`, `accessibilityHint="Tap to edit this person's amount"`. Footer: `accessibilityLabel` **Preview messages** or **Save split and notify affected members**.
 
 ---
 
@@ -1301,11 +1302,6 @@ Both phone paths call `POST /events/:id/participants/manual` with `join_method='
 **Error state — confirm failure:** "Couldn't update. Check your connection."
 
 **Error state — dispute failure:** "Couldn't update. Check your connection."
-
-#### EditSplitModal (sheet)
-
-- Same as SplitReviewScreen but in modal presentation
-- Warning banner: "Some participants may have already paid. Only affected participants will be notified."
 
 ---
 

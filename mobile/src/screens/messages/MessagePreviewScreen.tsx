@@ -45,7 +45,6 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
   const [viewedIds, setViewedIds] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
-
   const loadPreviews = useCallback(async () => {
     setLoading(true);
     setError(null);

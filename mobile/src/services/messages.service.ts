@@ -74,6 +74,12 @@ export async function sendEventMessages(
   });
 }
 
+export async function resendRevisionMessages(
+  eventId: string,
+): Promise<SendMessagesResponse> {
+  return apiPostAuth<SendMessagesResponse>(`/events/${eventId}/splits/resend`, {});
+}
+
 export async function retryParticipantMessage(
   eventId: string,
   participantId: string,

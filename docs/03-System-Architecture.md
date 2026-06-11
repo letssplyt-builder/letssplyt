@@ -144,7 +144,7 @@ The backend is organised into 7 logical services (modules), each with a defined 
 ---
 
 ### Message Service
-**Owns:** Per-participant breakdown tokens and hosted HTML breakdown pages (`GET /split/:token`), payment deep link construction (country-filtered per-provider URLs), SMS message package assembly (text + breakdown URL — no MMS), the share queue, post-send edit coordination with selective resend logic.
+**Owns:** Per-participant breakdown tokens and hosted HTML breakdown pages (`GET /split/:token`), payment deep link construction (country-filtered per-provider URLs), SMS message package assembly (text + breakdown URL — no MMS), the share queue, post-send revision messages (`POST /splits/resend` after `split/confirm` from the Edit share flow — selective notify only).
 
 **Does NOT own:** AI text generation (AI Orchestrator), Twilio dispatch (Notification Service), payment handle storage (Profile Service).
 

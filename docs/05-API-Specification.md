@@ -1224,9 +1224,15 @@ Run A2. Provide item assignments (drag-and-drop, NLP, or even/custom mode).
 ### POST `/events/:eventId/split/confirm`
 **Auth:** `[AUTH]` | `[PAYER]`
 
-Payer reviews and confirms the calculated split. Writes `amount_owed` to all participant rows. Advances `ai_stage` to `"calculated"` (NOT `events.status` — use the `ai_stage` field to track AI processing progress).
+Payer reviews and confirms the calculated split. Writes `amount_owed` to all participant rows.
 
-**Allowed `events.status`:** `locked` (pre-send) or `sent` (post-send revision via Edit share → Review split → confirm). Returns `409 EVENT_NOT_LOCKED` for any other status.
+**Allowed `events.status`:** `locked` (pre-send) or `sent` (post-send revision via **Edit share** → Split entry → Review split → confirm). Returns `409 EVENT_NOT_LOCKED` for any other status.
+
+**Pre-send:** advances `ai_stage` to `"calculated"`.
+
+**Post-send** (`messages_sent_at` set): keeps `ai_stage` at `"complete"`. Participants whose amounts change (and are not already confirmed/settled) get `payment_status = pending`, `revision_count` incremented, and `original_amount_owed` set on first revision. Caller should then invoke `POST /splits/resend` (mobile does this automatically from Review split **Save and notify →**).
+
+**Edit lock (post-send):** Returns `409 SETTLEMENTS_IN_PROGRESS` if any participant has `payment_status` in `self_reported`, `confirmed`, or `settled`. Disputing a self-report (back to `pending`) clears the lock when no other blocking statuses remain.
 
 **Request body:**
 ```typescript
@@ -1242,33 +1248,29 @@ Payer reviews and confirms the calculated split. Writes `amount_owed` to all par
 ```typescript
 {
   confirmed: true;
-  event_status: "locked";   // events.status stays 'locked'; AI progress tracked via ai_stage
-  ai_stage: "calculated";   // use this (not event_status) to know split is confirmed
+  event_status: string;     // "locked" pre-send or "sent" post-send
+  ai_stage: "calculated" | "complete";
   splits: Array<{ participant_id: string; amount_owed: number; }>;
 }
 ```
 
+**Error codes:**
+- `SUM_MISMATCH` 400 — split total does not match event total
+- `PARTICIPANT_ALREADY_CONFIRMED` 409 — attempted to change amount for confirmed/settled participant
+- `SETTLEMENTS_IN_PROGRESS` 409 — post-send edit blocked (self-reported or confirmed payment exists)
+
 ---
 
-### PATCH `/events/:eventId/split`
-**Auth:** `[AUTH]` | `[PAYER]` | Event must be in "sent" status (edit after send)
+### POST `/events/:eventId/splits/resend`
+**Auth:** `[AUTH]` | `[PAYER]` | Event must be `sent` with `messages_sent_at` set
 
-Recalculate split after messages sent. Only affected participants get a revised message.
+Send revision SMS/WhatsApp to participants affected by a post-send `split/confirm`. Does **not** run A3 — uses `message-assembler` with lead-in **"Your share has been updated."**
 
-**Request body:** same shape as `POST /split/calculate`
+**Selection:** participants where `payment_status = pending` AND `revision_count > 0`, excluding the payer.
 
-**Response `200`:**
-```typescript
-{
-  updated_splits: Array<{
-    participant_id: string;
-    old_amount: number;
-    new_amount: number;
-    changed: boolean;
-  }>;
-  revision_messages_queued: number;   // count of participants who will receive revised SMS
-}
-```
+**Request body:** none
+
+**Response `200`:** same shape as `POST /messages/send` (`sent_count`, `skipped_count`, `failed_count`, `results`, `event_status: "sent"`).
 
 ---
 
@@ -1790,7 +1792,7 @@ Android Digital Asset Links JSON. Required for App Links (Android). The backend 
 | POST | /events/:id/receipt/confirm | AUTH PAYER | — |
 | POST | /events/:id/split/calculate | AUTH PAYER | — |
 | POST | /events/:id/split/confirm | AUTH PAYER | — |
-| PATCH | /events/:id/split | AUTH PAYER | — |
+| POST | /events/:id/splits/resend | AUTH PAYER | — |
 | GET | /events/:id/messages/preview | AUTH PAYER | — |
 | POST | /events/:id/messages/send | AUTH PAYER | 3/event/24hr |
 | POST | /events/:id/messages/nudge/:pid | AUTH PAYER | 1/participant/48hr |

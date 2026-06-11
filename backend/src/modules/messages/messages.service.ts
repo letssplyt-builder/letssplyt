@@ -5,6 +5,8 @@ import { getPaymentConfigForPhone } from '../../config/payment-methods.config';
 import { getHandles } from '../profile/profile.service';
 import { assertEventOwner, fetchEventRow } from '../events/event.service';
 import { composeParticipantMessage } from './a3.agent';
+import { assembleParticipantMessage } from './message-assembler';
+import type { PayerHandleInput } from './deepLinks';
 import { resolveParticipantPhoneContext } from './participant-phone';
 import { ensureParticipantBreakdownUrl } from './breakdown-token.service';
 
@@ -224,4 +226,100 @@ export async function previewEventMessages(
   await ensureMessagingStage(eventId, eventRow.ai_stage);
   const previews = await buildMessagePreviewsForEvent(eventId, eventRow.payer_id);
   return { previews };
+}
+
+export interface RevisionMessagePackage {
+  participant_id: string;
+  message_text: string;
+  channel: 'whatsapp' | 'sms';
+}
+
+export async function buildRevisionMessagesForParticipants(
+  eventId: string,
+  payerId: string,
+  participantIds: string[],
+): Promise<RevisionMessagePackage[]> {
+  if (participantIds.length === 0) {
+    return [];
+  }
+
+  const eventRow = await fetchEventRow(eventId);
+
+  const { data: payer, error: payerError } = await supabaseAdmin
+    .from('users')
+    .select('display_name')
+    .eq('id', eventRow.payer_id)
+    .maybeSingle();
+
+  if (payerError || !payer) {
+    throw new AppError('PAYER_FETCH_FAILED', 'Could not load payer profile', 500);
+  }
+
+  const payerHandles = await getHandles(payerId);
+  const payerHandleInputs: PayerHandleInput[] = payerHandles.map((handle) => ({
+    provider: handle.provider,
+    handle_value: handle.handle_value,
+  }));
+
+  const { data: participantRows, error: participantsError } = await supabaseAdmin
+    .from('participants')
+    .select(
+      'id, user_id, display_name, amount_owed, guest_pii_token, country_code, join_method',
+    )
+    .eq('event_id', eventId)
+    .in('id', participantIds);
+
+  if (participantsError) {
+    throw new AppError('PARTICIPANTS_FETCH_FAILED', 'Could not load participants', 500);
+  }
+
+  const currency = eventRow.currency ?? 'USD';
+  const locale = eventRow.locale ?? 'en-US';
+  const eventName = eventRow.title;
+  const packages: RevisionMessagePackage[] = [];
+
+  for (const row of participantRows ?? []) {
+    const participantId = row.id as string;
+    if (row.amount_owed === null) {
+      continue;
+    }
+
+    const amountOwed = Number(row.amount_owed);
+    const displayName = row.display_name as string;
+    const phoneContext = await resolveParticipantPhoneContext({
+      user_id: row.user_id as string | null,
+      guest_pii_token: row.guest_pii_token as string | null,
+      country_code: row.country_code as string | null,
+      join_method: row.join_method as string,
+    });
+
+    const paymentConfig = phoneContext.phoneE164
+      ? getPaymentConfigForPhone(phoneContext.phoneE164, phoneContext.resolvedCountry)
+      : getPaymentConfigForPhone('+1', phoneContext.resolvedCountry);
+
+    const breakdownUrl = await ensureParticipantBreakdownUrl(participantId);
+
+    const composed = assembleParticipantMessage({
+      revisionLeadIn: 'Your share has been updated.',
+      aiGreeting: `Hi ${displayName}!`,
+      displayName,
+      amountOwed,
+      currency,
+      locale,
+      eventName,
+      payerHandles: payerHandleInputs,
+      supportedMethods: paymentConfig.supportedMethods,
+      channel: phoneContext.channel,
+      isRegistered: Boolean(row.user_id),
+      breakdownUrl,
+    });
+
+    packages.push({
+      participant_id: participantId,
+      message_text: composed.messageText,
+      channel: composed.channel,
+    });
+  }
+
+  return packages;
 }

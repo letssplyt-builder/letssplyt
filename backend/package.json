@@ -19,6 +19,7 @@
     "smoke:receipts-confirm": "ts-node scripts/smoke-receipts-confirm.ts",
     "smoke:splits": "ts-node scripts/smoke-splits.ts",
     "smoke:messages-preview": "ts-node scripts/smoke-messages-preview.ts",
+    "smoke:split-revision": "ts-node scripts/smoke-split-revision.ts",
     "cleanup:phone": "ts-node scripts/cleanup-auth-by-phone.ts"
   },
   "dependencies": {

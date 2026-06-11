@@ -1,8 +1,10 @@
 import { describe, expect, it } from '@jest/globals';
 import {
+  canEditEventShare,
   canResetEventExpenses,
   canSendEventMessages,
   getEventSplitActionMode,
+  hasSettlementBlockingEdit,
   hasEventExpensesEntered,
   resolveEventSplitActionMode,
   resolveSplitEntryMode,
@@ -96,5 +98,62 @@ describe('canSendEventMessages', () => {
 
   it('blocks send after messages sent', () => {
     expect(canSendEventMessages('calculated', '2026-01-01T00:00:00.000Z')).toBe(false);
+  });
+});
+
+describe('hasSettlementBlockingEdit', () => {
+  it('detects self-reported, confirmed, or settled participants', () => {
+    expect(
+      hasSettlementBlockingEdit([
+        { payment_status: 'pending' },
+        { payment_status: 'confirmed' },
+      ]),
+    ).toBe(true);
+    expect(hasSettlementBlockingEdit([{ payment_status: 'settled' }])).toBe(true);
+    expect(hasSettlementBlockingEdit([{ payment_status: 'self_reported' }])).toBe(true);
+    expect(hasSettlementBlockingEdit([{ payment_status: 'pending' }])).toBe(false);
+    expect(hasSettlementBlockingEdit([{ payment_status: 'disputed' }])).toBe(false);
+  });
+});
+
+describe('canEditEventShare', () => {
+  it('allows edit before messages are sent', () => {
+    expect(canEditEventShare(null, [{ payment_status: 'confirmed' }])).toBe(true);
+  });
+
+  it('allows post-send edit when all participants are pending', () => {
+    expect(
+      canEditEventShare('2026-01-01T00:00:00.000Z', [
+        { payment_status: 'pending' },
+        { payment_status: 'pending' },
+      ]),
+    ).toBe(true);
+  });
+
+  it('blocks post-send edit when a payment is self-reported', () => {
+    expect(
+      canEditEventShare('2026-01-01T00:00:00.000Z', [
+        { payment_status: 'pending' },
+        { payment_status: 'self_reported' },
+      ]),
+    ).toBe(false);
+  });
+
+  it('blocks post-send edit after a payment is confirmed', () => {
+    expect(
+      canEditEventShare('2026-01-01T00:00:00.000Z', [
+        { payment_status: 'pending' },
+        { payment_status: 'confirmed' },
+      ]),
+    ).toBe(false);
+  });
+
+  it('allows post-send edit after disputed self-report returns to pending', () => {
+    expect(
+      canEditEventShare('2026-01-01T00:00:00.000Z', [
+        { payment_status: 'pending' },
+        { payment_status: 'pending' },
+      ]),
+    ).toBe(true);
   });
 });

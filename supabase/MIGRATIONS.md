@@ -95,6 +95,8 @@ After `supabase db push` on staging or production:
    doppler run -- npm run smoke:receipts-confirm
    doppler run -- npm run smoke:splits
    doppler run -- npm run smoke:expenses-reset
+   doppler run -- npm run smoke:messages-preview
+   doppler run -- npm run smoke:split-revision
    ```
 
 4. **Manual** — create event → lock → enter total → reset expenses → scan/enter total again.

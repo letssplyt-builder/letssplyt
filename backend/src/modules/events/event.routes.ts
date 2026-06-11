@@ -16,6 +16,7 @@ import {
 import splitsRouter from '../splits/splits.router';
 import {
   handlePreviewMessages,
+  handleResendRevisionMessages,
   handleRetryMessage,
   handleSendMessages,
 } from '../messages/messages.controller';
@@ -36,6 +37,7 @@ router.post('/:id/join-token/regenerate', handleRegenerateJoinToken);
 router.get('/:id/messages/preview', handlePreviewMessages);
 router.post('/:id/messages/send', handleSendMessages);
 router.post('/:id/messages/retry/:participantId', handleRetryMessage);
+router.post('/:id/splits/resend', handleResendRevisionMessages);
 
 router.use('/', splitsRouter);
 

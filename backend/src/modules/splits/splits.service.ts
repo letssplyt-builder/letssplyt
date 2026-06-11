@@ -334,6 +334,10 @@ export async function calculateEventSplits(
   const eventRow = await fetchEventRow(eventId);
   await assertEventOwner(eventRow, userId);
 
+  if (eventRow.messages_sent_at) {
+    await assertSplitEditAllowed(eventId);
+  }
+
   const participants = await loadParticipants(eventId);
   if (participants.length === 0) {
     throw new AppError('VALIDATION_ERROR', 'Event has no participants', 400);
@@ -510,12 +514,37 @@ export interface ConfirmSplitBody {
 export interface ConfirmSplitResponse {
   confirmed: true;
   event_status: string;
-  ai_stage: 'calculated';
+  ai_stage: 'calculated' | 'complete';
   splits: Array<{ participant_id: string; amount_owed: number }>;
 }
 
 function isSumWithinTolerance(sum: number, expected: number): boolean {
   return Math.abs(sum - expected) <= 0.01;
+}
+
+/** Blocks split edit until disputed self-reports are cleared and no payments are confirmed. */
+const SPLIT_EDIT_BLOCK_STATUSES = ['self_reported', 'confirmed', 'settled'] as const;
+
+const LOCKED_PARTICIPANT_AMOUNT_STATUSES = new Set<string>(SPLIT_EDIT_BLOCK_STATUSES);
+
+async function assertSplitEditAllowed(eventId: string): Promise<void> {
+  const { data, error } = await supabaseAdmin
+    .from('participants')
+    .select('id')
+    .eq('event_id', eventId)
+    .in('payment_status', [...SPLIT_EDIT_BLOCK_STATUSES]);
+
+  if (error) {
+    throw new AppError('PARTICIPANTS_FETCH_FAILED', 'Could not load participants', 500);
+  }
+
+  if ((data ?? []).length > 0) {
+    throw new AppError(
+      'SETTLEMENTS_IN_PROGRESS',
+      'Cannot edit split while a payment is self-reported or confirmed',
+      409,
+    );
+  }
 }
 
 /** Split can be confirmed while joining is closed — including post-send revisions (E08-S07). */
@@ -539,6 +568,11 @@ export async function confirmEventSplit(
   await assertEventOwner(eventRow, userId);
 
   assertEventAllowsSplitConfirm(eventRow.status);
+
+  const isPostSend = eventRow.status === 'sent' && Boolean(eventRow.messages_sent_at);
+  if (isPostSend) {
+    await assertSplitEditAllowed(eventId);
+  }
 
   if (!body.splits.length) {
     throw new AppError('VALIDATION_ERROR', 'splits array is required', 400);
@@ -578,10 +612,56 @@ export async function confirmEventSplit(
     );
   }
 
+  const currency = eventRow.currency ?? 'USD';
+
+  const { data: currentParticipantRows, error: currentRowsError } = await supabaseAdmin
+    .from('participants')
+    .select('id, amount_owed, payment_status, revision_count, original_amount_owed')
+    .eq('event_id', eventId);
+
+  if (currentRowsError) {
+    throw new AppError('PARTICIPANTS_FETCH_FAILED', 'Could not load participants', 500);
+  }
+
+  const currentById = new Map(
+    (currentParticipantRows ?? []).map((row) => [
+      row.id as string,
+      {
+        amount_owed: row.amount_owed as number | null,
+        payment_status: row.payment_status as string,
+        revision_count: Number(row.revision_count ?? 0),
+        original_amount_owed: row.original_amount_owed as number | null,
+      },
+    ]),
+  );
+
   for (const split of body.splits) {
+    const current = currentById.get(split.participant_id);
+    const updatePayload: Record<string, unknown> = { amount_owed: split.amount_owed };
+
+    if (isPostSend && current) {
+      const oldAmount = current.amount_owed ?? 0;
+      const amountChanged = toMinorUnits(oldAmount, currency) !== toMinorUnits(split.amount_owed, currency);
+
+      if (amountChanged && LOCKED_PARTICIPANT_AMOUNT_STATUSES.has(current.payment_status)) {
+        throw new AppError(
+          'PARTICIPANT_ALREADY_CONFIRMED',
+          `Cannot change split for participant ${split.participant_id} — payment already confirmed`,
+          409,
+        );
+      }
+
+      if (amountChanged && !LOCKED_PARTICIPANT_AMOUNT_STATUSES.has(current.payment_status)) {
+        updatePayload.payment_status = 'pending';
+        updatePayload.revision_count = current.revision_count + 1;
+        updatePayload.original_amount_owed =
+          current.original_amount_owed !== null ? current.original_amount_owed : oldAmount;
+      }
+    }
+
     const { error } = await supabaseAdmin
       .from('participants')
-      .update({ amount_owed: split.amount_owed })
+      .update(updatePayload)
       .eq('id', split.participant_id)
       .eq('event_id', eventId);
 
@@ -600,12 +680,16 @@ export async function confirmEventSplit(
     }
   }
 
-  await setAiStage(eventId, 'calculated');
+  if (isPostSend) {
+    await setAiStage(eventId, 'complete');
+  } else {
+    await setAiStage(eventId, 'calculated');
+  }
 
   return {
     confirmed: true,
     event_status: eventRow.status,
-    ai_stage: 'calculated',
+    ai_stage: isPostSend ? 'complete' : 'calculated',
     splits: body.splits.map((row) => ({
       participant_id: row.participant_id,
       amount_owed: row.amount_owed,

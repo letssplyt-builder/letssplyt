@@ -24,6 +24,7 @@ export interface AssembleMessageParams {
   channel: 'whatsapp' | 'sms';
   isRegistered: boolean;
   breakdownUrl?: string;
+  revisionLeadIn?: string;
 }
 
 export function assembleParticipantMessage(params: AssembleMessageParams): AssembledParticipantMessage {
@@ -54,12 +55,13 @@ export function assembleParticipantMessage(params: AssembleMessageParams): Assem
     : '';
 
   const messageText = [
+    params.revisionLeadIn,
     params.aiGreeting,
     `Your share is ${formattedAmount}.`,
     breakdownLine,
     paymentBlock,
   ]
-    .filter((line) => line.length > 0)
+    .filter((line): line is string => Boolean(line))
     .join('\n\n')
     .concat(nudge);
 

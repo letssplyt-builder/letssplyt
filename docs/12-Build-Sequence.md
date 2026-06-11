@@ -2389,28 +2389,44 @@ Read CLAUDE.md, BUILD-PROGRESS.md, and this story. Read `docs/06-Integration-Con
 
 ### E08-S07 — Post-Send Split Edit (P20a — MVP Feature)
 
-**What:** After splits are sent, the Creator discovers a mistake (wrong item assignment, missed participant). Allow the Creator to re-open the split editor, make corrections, and selectively re-send ONLY to affected participants.
+**What:** After payment messages are sent, the Creator may correct a mistake using the **same Edit share flow** as pre-send (no separate modal or overflow action). Only participants whose amounts changed receive a revision SMS.
+
+**Mobile flow (Creator):**
+1. Event Detail footer **Edit share** (still visible after send when edits are allowed) → `SplitEntryScreen` → **Review split**.
+2. Pre-send: Review split CTA **Preview messages →** → `MessagePreviewScreen` → Send to all.
+3. Post-send: Review split CTA **Save and notify →** → `POST /split/confirm` → `POST /splits/resend` → `DeliveryTrackingScreen` (affected participants only).
+4. **Edit lock:** `canEditEventShare()` hides **Edit share** when any participant has `payment_status` in `self_reported`, `confirmed`, or `settled`. Disputing a self-report (status back to `pending`) re-opens edit if no other blockers remain. Toast if tapped while locked.
 
 **Acceptance Criteria:**
-- `PATCH /api/v1/events/:eventId/splits` endpoint: allows updating individual participant share amounts AFTER messaging is complete (`ai_stage = 'complete'`).
-- Request body: `{ corrections: [{ participant_id: uuid, new_amount_minor_units: number }] }`. Sum of all participant amounts (including uncorrected) must still equal the event total ± 1 minor unit.
-- After split update: marks affected participants' `payment_status` back to `pending`. Does NOT touch already-confirmed participants.
-- `POST /api/v1/events/:eventId/splits/resend` endpoint: re-sends messages ONLY to participants whose `payment_status` is `pending` AND who were affected by the correction. Does NOT resend to already-confirmed participants.
-- The re-sent message includes the updated amount and a note: "Your share has been updated."
-- Creator app: after the event is in `ai_stage = 'complete'`, EventDetailScreen (settlement phase) shows an "Edit split" button. Tapping opens EditSplitModal allowing amount corrections per participant.
-- Test: update one participant's amount, verify sum invariant holds, verify only affected participant receives new SMS.
-- Test: attempt to over-correct (amounts don't sum to total) — returns 422.
+- `POST /api/v1/events/:eventId/split/confirm` accepts post-send revisions when `events.status = sent` and `messages_sent_at` is set. Sum invariant enforced (±1 minor unit). Affected non-confirmed participants: `payment_status = pending`, `revision_count` incremented, `original_amount_owed` preserved on first change. `ai_stage` stays `complete`.
+- `POST /api/v1/events/:eventId/splits/resend` sends revision SMS only to participants with `payment_status = pending` AND `revision_count > 0` (non-payer). Message includes **"Your share has been updated."** and updated amount + breakdown link.
+- `POST /split/calculate` and `POST /split/confirm` return `409 SETTLEMENTS_IN_PROGRESS` when any participant is `self_reported`, `confirmed`, or `settled` (post-send edit path).
+- No `PATCH /events/:id/splits` endpoint — corrections go through confirm + existing split entry UI.
+- Creator app: **no** `EditSplitModal` or overflow **Edit split amounts** — reuse **Edit share** footer CTA only.
+
+**Tests required:**
+```
+backend/src/__tests__/unit/splits/confirm-split.test.ts
+  - confirm allowed when status is sent + messages_sent_at set
+backend/src/__tests__/unit/messages/message-assembler.test.ts
+  - revisionLeadIn "Your share has been updated."
+backend/scripts/smoke-split-revision.ts (live)
+  - confirm + resend selective; self_report blocks; dispute→pending re-allows; confirmed blocks
+mobile/src/__tests__/unit/utils/eventSplitFooter.test.ts
+  - canEditEventShare blocks self_reported / confirmed; allows all pending
+```
 
 **Prompt:**
-Read CLAUDE.md, BUILD-PROGRESS.md, and this story. Read `docs/05-API-Specification.md` (splits section), `docs/07-AI-Agent-Specification.md` (largestRemainderRound, splitCalculator), and `docs/08-Mobile-App-Specification.md` (EventDetailScreen settlement phase + EditSplitModal). Then implement:
+Read CLAUDE.md, BUILD-PROGRESS.md, and this story. Read `docs/05-API-Specification.md` (split confirm + splits/resend), `docs/08-Mobile-App-Specification.md` (EventSplitActionBar, SplitReviewScreen). Implement post-send revision on `confirmEventSplit`, `POST /splits/resend`, mobile `SplitReviewScreen` post-send CTA, and `canEditEventShare` gating on Event Detail **Edit share**.
 
-1. `PATCH /events/:eventId/splits` with sum validation using `splitCalculator.ts`.
-2. `POST /events/:eventId/splits/resend` — builds new messages and sends via Twilio to affected participants only.
-3. Update EventDetailScreen in mobile: add "Edit split" button (visible only to Creator when `ai_stage = 'complete'`) → EditSplitModal.
-
-**Files created:**
-- Updates to `backend/src/modules/splits/splits.router.ts` (add PATCH and resend endpoints)
-- Updates to `mobile/src/screens/events/EventDetailScreen.tsx` and `mobile/src/components/events/EditSplitModal.tsx` (add "Edit split" button)
+**Files touched:**
+- `backend/src/modules/splits/splits.service.ts` (post-send confirm + edit lock)
+- `backend/src/modules/messages/send.service.ts` (`resendRevisionMessages`)
+- `backend/src/modules/events/event.routes.ts` (`POST /:id/splits/resend`)
+- `mobile/src/screens/splits/SplitReviewScreen.tsx`
+- `mobile/src/utils/eventSplitFooter.ts` (`canEditEventShare`)
+- `mobile/src/components/events/EventSplitActionBar.tsx`
+- `mobile/scripts/smoke-split-revision.ts`
 
 ---
 
