@@ -518,6 +518,18 @@ function isSumWithinTolerance(sum: number, expected: number): boolean {
   return Math.abs(sum - expected) <= 0.01;
 }
 
+/** Split can be confirmed while joining is closed — including post-send revisions (E08-S07). */
+function assertEventAllowsSplitConfirm(status: string): void {
+  if (status === 'locked' || status === 'sent') {
+    return;
+  }
+  throw new AppError(
+    'EVENT_NOT_LOCKED',
+    'Event must be locked before confirming split',
+    409,
+  );
+}
+
 export async function confirmEventSplit(
   userId: string,
   eventId: string,
@@ -526,9 +538,7 @@ export async function confirmEventSplit(
   const eventRow = await fetchEventRow(eventId);
   await assertEventOwner(eventRow, userId);
 
-  if (eventRow.status !== 'locked') {
-    throw new AppError('EVENT_NOT_LOCKED', 'Event must be locked before confirming split', 409);
-  }
+  assertEventAllowsSplitConfirm(eventRow.status);
 
   if (!body.splits.length) {
     throw new AppError('VALIDATION_ERROR', 'splits array is required', 400);

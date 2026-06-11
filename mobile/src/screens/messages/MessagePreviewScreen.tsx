@@ -2,7 +2,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
+  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -43,7 +43,6 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [viewedIds, setViewedIds] = useState<Set<string>>(new Set());
-  const [imageLoading, setImageLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
 
@@ -84,7 +83,6 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
     if (participantId) {
       setViewedIds((prev) => new Set(prev).add(participantId));
     }
-    setImageLoading(Boolean(previews[index]?.split_image_url));
   };
 
   const handleSendAll = async () => {
@@ -235,30 +233,29 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
                 </View>
               </View>
 
-              <View style={styles.imageWrap}>
-                {selected.split_image_url ? (
-                  <>
-                    <Image
-                      source={{ uri: selected.split_image_url }}
-                      style={styles.splitImage}
-                      resizeMode="contain"
-                      accessibilityLabel={`Split breakdown for ${selected.display_name}`}
-                      onLoadStart={() => setImageLoading(true)}
-                      onLoadEnd={() => setImageLoading(false)}
-                      onError={() => setImageLoading(false)}
-                    />
-                    {imageLoading ? (
-                      <View style={styles.imagePlaceholder}>
-                        <ActivityIndicator color={colors.primary} />
-                      </View>
-                    ) : null}
-                  </>
-                ) : (
-                  <View style={styles.imagePlaceholder}>
-                    <Text style={styles.imagePlaceholderText}>Split image unavailable</Text>
-                  </View>
-                )}
-              </View>
+              {selected.breakdown_url ? (
+                <Pressable
+                  accessibilityRole="link"
+                  accessibilityLabel={`Open split breakdown for ${selected.display_name}`}
+                  onPress={() => Linking.openURL(selected.breakdown_url!)}
+                  style={({ pressed }) => [
+                    styles.breakdownLinkCard,
+                    pressed && styles.breakdownLinkCardPressed,
+                  ]}
+                >
+                  <Text style={styles.breakdownLinkTitle}>Split breakdown</Text>
+                  <Text style={styles.breakdownLinkSubtitle}>
+                    Opens the same table guests see in SMS — your row highlighted.
+                  </Text>
+                  <Text style={styles.breakdownLinkUrl} numberOfLines={2}>
+                    {selected.breakdown_url}
+                  </Text>
+                </Pressable>
+              ) : (
+                <View style={styles.breakdownLinkCard}>
+                  <Text style={styles.breakdownLinkSubtitle}>Breakdown link unavailable</Text>
+                </View>
+              )}
 
               <Text style={styles.messageText}>{selected.message_text}</Text>
 
@@ -412,26 +409,33 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: colors.primary,
   },
-  imageWrap: {
+  breakdownLinkCard: {
     borderRadius: 14,
-    overflow: 'hidden',
     backgroundColor: '#F8F7FF',
+    borderWidth: 1,
+    borderColor: '#E0DDFF',
+    padding: 14,
     marginBottom: 14,
-    minHeight: 120,
   },
-  splitImage: {
-    width: '100%',
-    height: 200,
+  breakdownLinkCardPressed: {
+    opacity: 0.92,
   },
-  imagePlaceholder: {
-    minHeight: 120,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
+  breakdownLinkTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.text,
+    marginBottom: 4,
   },
-  imagePlaceholderText: {
-    fontSize: 13,
+  breakdownLinkSubtitle: {
+    fontSize: 12,
     color: colors.textMuted,
+    lineHeight: 18,
+    marginBottom: 8,
+  },
+  breakdownLinkUrl: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: '600',
   },
   messageText: {
     fontSize: 14,

@@ -74,6 +74,7 @@ export interface ComposeParticipantMessageParams {
   supportedMethods: PaymentProvider[];
   channel: 'whatsapp' | 'sms';
   isRegistered: boolean;
+  breakdownUrl?: string;
 }
 
 export async function composeParticipantMessage(
@@ -115,6 +116,7 @@ export async function composeParticipantMessage(
         supportedMethods: params.supportedMethods,
         channel: params.channel,
         isRegistered: params.isRegistered,
+        breakdownUrl: params.breakdownUrl,
       });
 
       validateMessageContainsAmount(
@@ -178,6 +180,7 @@ export async function composeParticipantMessage(
     supportedMethods: params.supportedMethods,
     channel: params.channel,
     isRegistered: params.isRegistered,
+    breakdownUrl: params.breakdownUrl,
   });
 
   validateMessageContainsAmount(

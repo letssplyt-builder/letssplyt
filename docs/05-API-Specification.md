@@ -217,7 +217,7 @@ Update display name or avatar colour. Push token registration is a separate conc
 
 **Response `200`:** updated user object (same shape as GET /users/me)
 
-**Display name side effects:** When `display_name` is provided, the backend updates `users.display_name` then syncs **all** `participants` rows where `user_id = req.user.id` to the same value (service role). This keeps stored participant names aligned for SMS, split images, and Supabase Realtime member-list updates. Event detail APIs also resolve live `users.display_name` for linked participants on read — see canonical participant shape below.
+**Display name side effects:** When `display_name` is provided, the backend updates `users.display_name` then syncs **all** `participants` rows where `user_id = req.user.id` to the same value (service role). This keeps stored participant names aligned for SMS, breakdown pages, and Supabase Realtime member-list updates. Event detail APIs also resolve live `users.display_name` for linked participants on read — see canonical participant shape below.
 
 ---
 
@@ -1224,7 +1224,9 @@ Run A2. Provide item assignments (drag-and-drop, NLP, or even/custom mode).
 ### POST `/events/:eventId/split/confirm`
 **Auth:** `[AUTH]` | `[PAYER]`
 
-Payer reviews and confirms the calculated split. Writes `amount_owed` to all participant rows. Advances `ai_stage` to `"calculated"` (NOT `events.status` — use the `ai_stage` field to track AI processing progress; `events.status` remains `"locked"`).
+Payer reviews and confirms the calculated split. Writes `amount_owed` to all participant rows. Advances `ai_stage` to `"calculated"` (NOT `events.status` — use the `ai_stage` field to track AI processing progress).
+
+**Allowed `events.status`:** `locked` (pre-send) or `sent` (post-send revision via Edit share → Review split → confirm). Returns `409 EVENT_NOT_LOCKED` for any other status.
 
 **Request body:**
 ```typescript
@@ -1275,7 +1277,7 @@ Recalculate split after messages sent. Only affected participants get a revised 
 ### GET `/events/:eventId/messages/preview`
 **Auth:** `[AUTH]` | `[PAYER]` | Split must be confirmed
 
-Generate per-participant message previews (without sending). Runs A3 composition but does not trigger Twilio.
+Generate per-participant message previews (without sending). Runs A3 composition but does not trigger Twilio. Ensures each participant has a `breakdown_token` and returns the assembled URL.
 
 **Response `200`:**
 ```typescript
@@ -1284,8 +1286,9 @@ Generate per-participant message previews (without sending). Runs A3 composition
     participant_id: string;
     display_name: string;
     amount_owed: number;
-    message_text: string;    // full composed message
+    message_text: string;    // full composed SMS body (includes See full split: line)
     channel: "whatsapp" | "sms";
+    breakdown_url: string;   // https://{APP_DOMAIN}/split/{breakdown_token}
     payment_links: Array<{
       provider: string;
       url: string;
@@ -1300,7 +1303,7 @@ Generate per-participant message previews (without sending). Runs A3 composition
 ### POST `/events/:eventId/messages/send`
 **Auth:** `[AUTH]` | `[PAYER]` | **Rate limit:** 3 per event per 24 hours
 
-Send all participant messages via Twilio. Checks opt-out for every number before sending.
+Send all participant messages via Twilio as **text-only SMS/WhatsApp** (no `mediaUrl` / MMS). Each body includes the participant's `breakdown_url` line. Checks opt-out for every number before sending.
 
 **Request body:** none (uses confirmed split data)
 
@@ -1342,6 +1345,19 @@ Send a reminder message to a specific participant. Checks opt-out before sending
 - `NUDGE_COOLDOWN` 429 — still within 48-hour cooldown; includes `next_nudge_available_at` in body (NOT `next_available_at`) — TTL is 48 hours
 - `PARTICIPANT_OPTED_OUT` 403 — cannot nudge opted-out number
 - `PARTICIPANT_SETTLED` 409 — participant already confirmed paid
+
+---
+
+### GET `/split/:token`
+**Auth:** none (public capability URL — unguessable per-participant token)
+
+Server-rendered HTML breakdown page linked from SMS (`See full split: …`). Registered on Express at `/split` (not under `/api/v1`).
+
+**Response `200`:** HTML document with event title, payer name, table of **all** participants (including organiser), item summaries, formatted amounts. Token holder's row marked `(you)` and highlighted; payer row marked `(organiser)`. No phone numbers.
+
+**Response `404`:** Friendly HTML "not found" page for invalid token, deleted event, or missing data.
+
+**Security:** Token is 18-byte `base64url` stored in `participants.breakdown_token`. Do not log full URLs in analytics. Cleared on expenses reset.
 
 ---
 
@@ -1769,6 +1785,7 @@ Android Digital Asset Links JSON. Required for App Links (Android). The backend 
 | POST | /join/:token/otp/verify | NO AUTH | 3/phone/10min |
 | GET | /join/:token/preview | NO AUTH | — |
 | POST | /join/:token/app-join | AUTH | — |
+| GET | /split/:token | NO AUTH | — |
 | POST | /events/:id/receipt/scan | AUTH PAYER | 5/event/hr |
 | POST | /events/:id/receipt/confirm | AUTH PAYER | — |
 | POST | /events/:id/split/calculate | AUTH PAYER | — |

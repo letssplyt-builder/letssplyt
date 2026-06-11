@@ -2214,74 +2214,109 @@ backend/src/__tests__/unit/webhooks/twilio.webhook.test.ts
 
 ---
 
-### E08-S03 — Split Image Generator
+### E08-S03 — Hosted Split Breakdown Page (SMS link)
 
-**Description:** The personalised split image is sent with every payment request message — it is the core visual differentiator of LetsSplyt. Each participant receives an image with their name highlighted and their specific items shown. Generated server-side using @napi-rs/canvas (Node.js canvas implementation).
+**Description:** Payment requests are **text-only SMS/WhatsApp** — no MMS. Each participant receives a secret link (`See full split: https://{APP_DOMAIN}/split/{token}`) to a server-rendered HTML page showing the full group split table with their row highlighted. Lower cost than MMS, fewer carrier failures, and the page reflects post-send split edits without re-uploading images.
+
+**Strategy change (June 2026):** Original E08-S03 built `@napi-rs/canvas` split images attached via Twilio `mediaUrl`. That path is **retired for production send/preview**. Legacy `split-image.generator.ts` may remain in the repo with unit tests but must not be invoked from `send.service.ts` or preview.
 
 **Prompt:**
-*"Build the split image generator as specified in docs/08-Mobile-App-Specification.md Section 10. Create backend/src/modules/messages/split-image.generator.ts. Install @napi-rs/canvas (the Node.js canvas implementation that works without native dependencies). The generator function: generateSplitImage(params: SplitImageParams): Promise<Buffer> where SplitImageParams = { eventName: string, payerDisplayName: string, participants: ParticipantSplitRow[], highlightedParticipantId: string, currency: string, locale: string }. Layout (from docs/08-Mobile-App-Specification.md Section 10): 600×400px canvas, dark background (#1a1a2e), event name at top in white bold font, horizontal divider, table of participants (name | items | amount), highlighted participant row uses accent color (#6366F1), all others use subtle row alternation. Font registration: use canvas.registerFont() with a system font — on Railway use '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf' as fallback. Return the canvas as a PNG Buffer. In send.service.ts: after A3 generates message text for each participant, call generateSplitImage({ ...event, highlightedParticipantId: participant.id }), upload the PNG to Supabase Storage as receipts/[eventId]/split-[participantId].png, get a signed URL, pass the URL to Twilio as mediaUrl parameter in messages.create(). Handle image generation failure gracefully: if generateSplitImage throws, log the error and send the message without the image (never block message delivery for image failure)."*
+*"Implement SMS breakdown links per docs/08-Mobile-App-Specification.md Section 10 and docs/05-API-Specification.md `GET /split/:token`. (1) Migration: `participants.breakdown_token TEXT` + unique partial index. (2) `breakdown-url.ts`: `generateBreakdownTokenValue()`, `buildBreakdownUrl(token)`. (3) `breakdown-token.service.ts`: `ensureParticipantBreakdownToken/Url()`. (4) `breakdown-page.service.ts` + `templates/breakdown.html.ts`: render HTML with ALL participants including organiser; token holder `(you)` highlighted; payer `(organiser)`. (5) `breakdown.controller.ts` + `breakdown.routes.ts`; register `app.use('/split', breakdownRoutes)`. (6) `message-assembler.ts`: insert `See full split: {url}` between amount and payment block. (7) Preview API returns `breakdown_url`; ensure token on preview. (8) `send.service.ts`: Twilio `messages.create({ body })` only — no `mediaUrl`. (9) Clear `breakdown_token` on expenses reset."*
 
 **Files created:**
-- `backend/src/modules/messages/split-image.generator.ts`
-- Updates to `backend/src/modules/messages/send.service.ts` (add mediaUrl to Twilio call)
+- `supabase/migrations/20260616000000_participants_breakdown_token.sql`
+- `backend/src/modules/messages/breakdown-url.ts`
+- `backend/src/modules/messages/breakdown-token.service.ts`
+- `backend/src/modules/messages/breakdown-page.service.ts`
+- `backend/src/modules/messages/breakdown.controller.ts`
+- `backend/src/modules/messages/breakdown.routes.ts`
+- `backend/src/modules/messages/templates/breakdown.html.ts`
+- Updates to `message-assembler.ts`, `messages.service.ts`, `send.service.ts`, `expenses.reset.ts`, `app.ts`
 
 **Acceptance Criteria:**
-1. After sending messages, Supabase Storage shows PNG files at `receipts/[eventId]/split-[participantId].png`
-2. The highlighted participant's row is visually distinct (different background colour) in the image
-3. Twilio message includes a `mediaUrl` pointing to the image (check Twilio console → Message logs → Media)
-4. If canvas generation throws an error, message is still sent (graceful degradation — no blocked delivery)
-5. Image dimensions are 600×400px and file size is under 200KB (check Supabase Storage metadata)
+1. `GET /split/:token` returns `200` HTML with event title, all participant rows (including organiser), viewer `(you)` highlight
+2. `GET /split/:token` returns `404` HTML for unknown token
+3. Preview API includes `breakdown_url` per participant; `message_text` contains `See full split:` line
+4. Twilio send uses **body only** — no `mediaUrl` in `messages.create()`
+5. `POST /events/:id/split/confirm` succeeds when `events.status` is `locked` or `sent` (post-send edit flow)
+6. `breakdown_token` cleared when expenses are reset
 
 **Tests required:**
 ```
-backend/src/__tests__/unit/messages/split-image.generator.test.ts
-  - returns a non-empty Buffer
-  - highlighted participant row exists in generated image (check pixel colours at expected row position)
-  - handles missing font gracefully (falls back to system default)
-  - generates correct filename: split-[participantId].png
-  - formatCurrency used for amounts (not hardcoded $)
-  - getCurrencyMinorUnits used for amount conversion
+backend/src/__tests__/unit/messages/message-assembler.test.ts
+  - includes See full split: line when breakdownUrl provided
+  - omits breakdown line when breakdownUrl missing
+  - message order: greeting → amount → breakdown → payment block
 
-backend/src/__tests__/unit/messages/send.service.test.ts (extend)
-  - mediaUrl is passed to Twilio messages.create()
-  - if generateSplitImage throws: message still sent, error logged
-  - upload to Supabase Storage called before Twilio
+backend/src/__tests__/integration/messages/breakdown-page.test.ts
+  - GET /split/:token returns 200 HTML with Team Dinner, Jordan (you), Alex (organiser)
+  - GET /split/:token returns 404 HTML for unknown token
+  - content-type is html
+
+backend/src/__tests__/unit/messages/send.service.test.ts
+  - sends SMS body without MMS mediaUrl
+  - message_text includes breakdown URL from preview package
+
+backend/src/__tests__/integration/messages/messages-send.test.ts
+  - POST /events/:id/messages/send returns sent_count without MMS upload
+  - preview includes breakdown_url
+
+backend/src/__tests__/unit/splits/confirm-split.test.ts
+  - confirm succeeds when event status is sent (post-send revision)
+  - confirm rejects when event status is open
+
+backend/src/__tests__/unit/migrations/migration-manifest.test.ts
+  - includes 20260616000000_participants_breakdown_token.sql
+
+backend/scripts/smoke-messages-preview.ts (manual smoke)
+  - previews have breakdown_url
+  - GET /split/:token returns Who owes what and (you)
+
+Optional legacy (not on send path):
+backend/src/__tests__/unit/messages/split-image.generator.test.ts
 ```
 
 ---
 
 ### E08-S04 — Message Preview Screen
 
-**What this builds:** The carousel screen showing each participant's personalised message and split image before sending.
+**What this builds:** The carousel screen showing each participant's personalised SMS body and tappable breakdown link before sending.
 
 **Prompt:**
-Read docs/08-Mobile-App-Specification.md for the MessagePreview screen spec. Read `prototype/send-messages.html` for the visual design. Build `mobile/src/screens/messages/MessagePreviewScreen.tsx`:
+Read docs/08-Mobile-App-Specification.md Section 10 and MessagePreview sections. Read `prototype/send-messages.html` for the visual design. Build `mobile/src/screens/messages/MessagePreviewScreen.tsx`:
 
-1. Horizontal scroll carousel — one card per participant
-2. Each card shows: participant name, their share amount (formatted with `formatCurrency`), payment links (Venmo/PayPal/etc.), and their personalised split image (fetched from Supabase Storage signed URL)
-3. "Edit" button on each card navigates back to split entry for adjustments
-4. Sticky "Send to All" button at bottom — disabled until all cards have been previewed (track scroll position or card visibility)
-5. Split image displayed as an `<Image>` component — show placeholder while loading
-6. Use `eventStore` to get participants and their calculated shares
+1. Horizontal scroll carousel — one card per participant (avatar row + selected card)
+2. Each card shows: participant name, share amount (`formatCurrency`), full `message_text`, payment links, and a **breakdown link card** using `breakdown_url` from `GET /events/:id/messages/preview`
+3. Tapping breakdown card opens URL via `Linking.openURL(breakdown_url)` — do **not** use `<Image>` or Supabase Storage PNGs
+4. Sticky "Send to All" button — calls `POST /events/:id/messages/send` then navigates to delivery tracking
+5. Use `eventStore` / messages service for preview data; type includes `breakdown_url: string | null`
 
-Match the design in `prototype/send-messages.html` exactly.
+Match the design in `prototype/send-messages.html` where applicable (replace image preview area with link card).
 
 **Files created:**
 - `mobile/src/screens/messages/MessagePreviewScreen.tsx`
+- `mobile/src/services/messages.service.ts` (preview type with `breakdown_url`)
 
 **Acceptance criteria:**
 - [ ] Carousel renders one card per participant
-- [ ] Split image loads from signed URL with placeholder fallback
-- [ ] "Send to All" button disabled until all cards previewed
+- [ ] Breakdown link card visible when `breakdown_url` present; opens browser on press
+- [ ] No split image `<Image>` from Storage on send path
 - [ ] Share amount formatted correctly per currency
-- [ ] "Edit" navigates back to split entry
+- [ ] Message text shows `See full split:` line
 
 **Tests to run:**
 ```bash
 cd mobile && npm test src/screens/messages/MessagePreviewScreen.test.tsx
 ```
 
-**Expected output:** Component renders with mocked participants and images, Send button behaviour tested.
+**Expected output:**
+```
+MessagePreviewScreen.test.tsx
+  - renders breakdown link card when breakdown_url provided
+  - opens Linking.openURL with breakdown_url on press
+  - renders message_text including See full split line
+  - does not render split image Image component
+```
 
 ---
 

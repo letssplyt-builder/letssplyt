@@ -1289,7 +1289,7 @@ Both phone paths call `POST /events/:id/participants/manual` with `join_method='
 #### MessagePreviewModal (sheet, tall)
 
 - Shows one participant's full message text
-- Highlighted split image preview
+- Tappable breakdown link card (`breakdown_url` → opens browser)
 - Payment link buttons (non-tappable in preview mode, greyed)
 - "← Back" | "→ Next participant" navigation
 
@@ -2122,277 +2122,84 @@ const handleCapture = async (photo: CameraPhoto) => {
 
 ---
 
-## 10. Split Image Specification
+## 10. Hosted Split Breakdown Page (SMS Delivery)
 
-### What It Is
+### Strategy (June 2026)
 
-A PNG image generated for each participant. Each participant gets their own version — their row is highlighted. This image is attached to the SMS/WhatsApp payment message.
+Payment request messages are **SMS or WhatsApp text only** — no MMS `mediaUrl`. Each participant receives a personalised SMS body that includes a **secret link** to a server-rendered HTML breakdown page. The recipient opens the link in any mobile browser and sees the full group split table with **their row highlighted**. This replaces the earlier MMS split-image approach (lower cost, fewer carrier failures, breakdown stays current when the payer edits after send).
 
-### Generation
+### What Each Participant Receives
 
-**Library:** `react-native-skia` (on mobile, for the sending flow) or `node-canvas` (`@napi-rs/canvas`) on the backend if generating server-side.
+1. A3-generated greeting (participant name inserted **after** the AI call — never in the prompt)
+2. `Your share is {formattedAmount}.`
+3. `See full split: https://{APP_DOMAIN}/split/{breakdown_token}`
+4. `Pay here:` block with country-filtered deep links
+5. Optional app nudge for non-registered participants only
 
-**Recommendation:** Generate on the **backend** at message composition time. Saves mobile bandwidth, ensures consistent rendering, and makes the image reusable if the message is resent. Store the generated PNG in Supabase Storage. Use the URL in the Twilio message.
+### Per-Participant Token
 
-**Image dimensions:** 640px wide × variable height (min 300px, max 1200px). Height = header + (52px × participant count) + footer. Design for SMS preview thumbnail at 320px width — text must be legible at half size.
+| Field | Table | Notes |
+|-------|-------|-------|
+| `breakdown_token` | `participants` | 18-byte `base64url` secret; unique partial index |
+| URL | assembled | `buildBreakdownUrl(token)` → `https://{APP_DOMAIN}/split/{token}` |
 
-### Layout
+- Created on first `GET /events/:id/messages/preview` or send via `ensureParticipantBreakdownToken()`
+- Cleared when expenses are reset (`expenses.reset.ts` / `reset_event_expenses_data`)
+- Unguessable — treat like a capability URL; do not log full URLs in analytics
 
-```
-┌─────────────────────────────────────────────┐
-│  [Event name]                    [Date]      │  ← Header, 60px tall
-│  Paid by [Payer name]                        │
-├──────────────┬────────────────────┬──────────┤
-│  Name        │  Items             │  Amount  │  ← Column headers, 40px
-├──────────────┼────────────────────┼──────────┤
-│  Alice       │  Pasta, Wine       │  $24.50  │  ← Normal row, 52px
-├──────────────┼────────────────────┼──────────┤
-│▌ Bob         │  Steak, Beer       │  $38.00  │  ← HIGHLIGHTED row (recipient), 52px
-├──────────────┼────────────────────┼──────────┤
-│  Carlos      │  Salad             │  $12.50  │  ← Normal row
-├──────────────┼────────────────────┼──────────┤
-│              │  Tax + Tip         │  $10.20  │  ← Tax/tip row, 44px
-├──────────────┼────────────────────┼──────────┤
-│              │  TOTAL             │  $85.20  │  ← Total row, bold, 48px
-└──────────────┴────────────────────┴──────────┤
-│  LetsSplyt • letssplyt.app                   │  ← Footer, 36px
-└─────────────────────────────────────────────┘
-```
+### Public HTTP Route
 
-### Colors
+**`GET /split/:token`** — registered on the Express app at `/split` (not under `/api/v1`).
 
-| Element | Hex |
-|---------|-----|
-| Background | `#FFFFFF` |
-| Header background | `#6366F1` (indigo) |
-| Header text | `#FFFFFF` |
-| Column header background | `#F1F5F9` |
-| Column header text | `#64748B` |
-| Normal row background | `#FFFFFF` |
-| Normal row text | `#1E293B` |
-| Highlighted row background | `#EEF2FF` (indigo-50) |
-| Highlighted row left accent bar | `#6366F1` (4px wide) |
-| Highlighted row text | `#3730A3` (indigo-800) |
-| Highlighted row amount | `#3730A3`, bold |
-| Tax/tip row background | `#F8FAFC` |
-| Total row background | `#F1F5F9` |
-| Total row text | `#0F172A`, bold |
-| Row divider | `#E2E8F0` |
-| Footer background | `#F8FAFC` |
-| Footer text | `#94A3B8` |
+| Response | When |
+|----------|------|
+| `200` HTML | Valid token, event not deleted |
+| `404` HTML | Unknown token, deleted event, or missing data |
 
-### Typography
+**Security:** No authentication required (guests have no account). **Never** render phone numbers on this page. Only `display_name`, item summaries, and formatted amounts.
 
-| Element | Font | Size | Weight |
-|---------|------|------|--------|
-| Event name | System default (SF Pro / Roboto) | 18px | 700 |
-| "Paid by" subtitle | System default | 13px | 400 |
-| Column headers | System default | 12px | 600 |
-| Participant names | System default | 14px | 500 |
-| Item names | System default | 12px | 400 |
-| Amounts | Monospace (Courier / Roboto Mono) | 14px | 600 |
-| Highlighted name | System default | 14px | 700 |
-| Highlighted amount | Monospace | 14px | 700 |
-| Total amount | Monospace | 16px | 700 |
-| Footer | System default | 11px | 400 |
+### Page Layout (`templates/breakdown.html.ts`)
 
-### Content Rules
+- Header: event title, payer display name
+- Table columns: **Name** | **Items** | **Amount**
+- **All participants** appear, including the organiser/payer row (required so row totals match the bill total)
+- Row labels: `(you)` for the token holder, `(organiser)` for `participants.user_id === events.payer_id`
+- Viewer row: indigo highlight (`#EEF2FF` background, `#6366F1` left accent)
+- Footer: bill total formatted with `formatCurrency` using event `currency` + `locale`
 
-- **Item names:** truncate to 25 characters, add "..." if longer. For multiple items: "Pasta, Wine, Dessert" — truncate the list at 3 items: "Pasta, Wine +2 more"
-- **Name column width:** 30% of image width
-- **Items column width:** 45% of image width
-- **Amount column width:** 25% of image width, right-aligned
-- **Long names:** truncate display name to 16 chars
-- **Amounts:** always show 2 decimal places, always prefix with currency symbol ($, £, €)
-- **Highlighted row accent:** 4px solid indigo bar on the left edge of the row
-- **Maximum participants shown:** 12. If group is larger, show top 12 by amount_owed descending, add a final row "＋N more participants"
-- **If participant had no items** (even split, or all shared): Items column shows "Even split"
+### Mobile — MessagePreviewScreen
 
-### Generation Code (Backend — Node.js with @napi-rs/canvas)
+- Preview API field: **`breakdown_url`** (not `split_image_url`)
+- UI: tappable card "View split breakdown" — opens `breakdown_url` via `Linking.openURL`
+- Do **not** fetch Supabase Storage PNGs or use `<Image>` for split preview on the send path
 
-```typescript
-// src/modules/ai/message-composer/split-image.generator.ts
-import { createCanvas, GlobalFonts } from '@napi-rs/canvas';
-import { uploadToStorage } from '../../../infrastructure/supabase';
+#### MessagePreviewModal (sheet, tall)
 
-interface SplitRow {
-  participantId: string;
-  displayName: string;
-  itemNames: string[];
-  amountOwed: number;
-  isRecipient: boolean;
-}
+- Shows one participant's full `message_text`
+- Tappable breakdown link card (same `breakdown_url` behaviour as MessagePreviewScreen)
+- Payment link buttons non-tappable in preview mode (greyed)
 
-export interface SplitImageConfig {
-  eventTitle: string;
-  eventDate: string | null;
-  payerName: string;
-  currency: string;
-  rows: SplitRow[];
-  taxAndTip: number;
-  total: number;
-}
+### Backend Module Map
 
-const W = 640;
-const HEADER_H = 68;
-const COL_HEADER_H = 40;
-const ROW_H = 52;
-const TAX_ROW_H = 44;
-const TOTAL_ROW_H = 48;
-const FOOTER_H = 36;
-const COL_NAME_W = Math.floor(W * 0.30);   // 192px
-const COL_ITEMS_W = Math.floor(W * 0.45);  // 288px
-const COL_AMT_W = W - COL_NAME_W - COL_ITEMS_W; // 160px
+| File | Role |
+|------|------|
+| `breakdown-url.ts` | Token generation + `buildBreakdownUrl()` |
+| `breakdown-token.service.ts` | `ensureParticipantBreakdownToken/Url()` |
+| `breakdown-page.service.ts` | Load event/participants, render HTML |
+| `breakdown.controller.ts` | `GET /split/:token` handler |
+| `breakdown.routes.ts` | Route registration |
+| `templates/breakdown.html.ts` | Server-rendered table template |
+| `message-assembler.ts` | Inserts `See full split: {url}` line |
 
-export async function generateSplitImage(
-  config: SplitImageConfig,
-  recipientParticipantId: string,
-): Promise<string> {
-  const rows = config.rows.map(r => ({ ...r, isRecipient: r.participantId === recipientParticipantId }));
-  const visibleRows = rows.slice(0, 12);
-  const extraCount = rows.length > 12 ? rows.length - 12 : 0;
+### Legacy: Canvas Split Image Generator
 
-  const H = HEADER_H + COL_HEADER_H + (visibleRows.length * ROW_H)
-          + (extraCount > 0 ? ROW_H : 0)
-          + TAX_ROW_H + TOTAL_ROW_H + FOOTER_H;
+`split-image.generator.ts` and `@napi-rs/canvas` remain from the original E08-S03 MMS implementation. They are **not** invoked on preview or send. Unit tests may still run; production delivery uses SMS + breakdown link only.
 
-  const canvas = createCanvas(W, H);
-  const ctx = canvas.getContext('2d');
+### Web Routes Table Addition
 
-  // --- Header ---
-  ctx.fillStyle = '#6366F1';
-  ctx.fillRect(0, 0, W, HEADER_H);
-  ctx.fillStyle = '#FFFFFF';
-  ctx.font = 'bold 18px system-ui';
-  ctx.fillText(truncate(config.eventTitle, 35), 16, 26);
-  ctx.font = '13px system-ui';
-  const dateStr = config.eventDate ? ` • ${config.eventDate}` : '';
-  ctx.fillText(`Paid by ${config.payerName}${dateStr}`, 16, 50);
-
-  // --- Column headers ---
-  let y = HEADER_H;
-  ctx.fillStyle = '#F1F5F9';
-  ctx.fillRect(0, y, W, COL_HEADER_H);
-  ctx.fillStyle = '#64748B';
-  ctx.font = 'bold 12px system-ui';
-  ctx.fillText('NAME', 16, y + 26);
-  ctx.fillText('ITEMS', COL_NAME_W + 12, y + 26);
-  ctx.textAlign = 'right';
-  ctx.fillText('AMOUNT', W - 12, y + 26);
-  ctx.textAlign = 'left';
-
-  // --- Participant rows ---
-  y += COL_HEADER_H;
-  for (const row of visibleRows) {
-    drawRow(ctx, y, row, config.currency);
-    y += ROW_H;
-  }
-
-  if (extraCount > 0) {
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, y, W, ROW_H);
-    drawDivider(ctx, y, W);
-    ctx.fillStyle = '#94A3B8';
-    ctx.font = '13px system-ui';
-    ctx.fillText(`＋${extraCount} more participants`, 16, y + 30);
-    y += ROW_H;
-  }
-
-  // --- Tax + Tip row ---
-  ctx.fillStyle = '#F8FAFC';
-  ctx.fillRect(0, y, W, TAX_ROW_H);
-  drawDivider(ctx, y, W);
-  ctx.fillStyle = '#64748B';
-  ctx.font = '13px system-ui';
-  ctx.fillText('Tax + Tip', COL_NAME_W + 12, y + 28);
-  ctx.textAlign = 'right';
-  ctx.font = '13px "Courier New"';
-  ctx.fillText(formatAmount(config.taxAndTip, config.currency), W - 12, y + 28);
-  ctx.textAlign = 'left';
-  y += TAX_ROW_H;
-
-  // --- Total row ---
-  ctx.fillStyle = '#F1F5F9';
-  ctx.fillRect(0, y, W, TOTAL_ROW_H);
-  drawDivider(ctx, y, W);
-  ctx.fillStyle = '#0F172A';
-  ctx.font = 'bold 14px system-ui';
-  ctx.fillText('TOTAL', COL_NAME_W + 12, y + 30);
-  ctx.textAlign = 'right';
-  ctx.font = 'bold 16px "Courier New"';
-  ctx.fillText(formatAmount(config.total, config.currency), W - 12, y + 30);
-  ctx.textAlign = 'left';
-  y += TOTAL_ROW_H;
-
-  // --- Footer ---
-  ctx.fillStyle = '#F8FAFC';
-  ctx.fillRect(0, y, W, FOOTER_H);
-  ctx.fillStyle = '#94A3B8';
-  ctx.font = '11px system-ui';
-  ctx.fillText('LetsSplyt', 16, y + 23);
-
-  // Upload to Supabase Storage and return public URL
-  const buffer = canvas.toBuffer('image/png');
-  const path = `split-images/${recipientParticipantId}-${Date.now()}.png`;
-  return await uploadToStorage('split-images', path, buffer, 'image/png');
-}
-
-function drawRow(ctx: any, y: number, row: SplitRow, currency: string): void {
-  if (row.isRecipient) {
-    ctx.fillStyle = '#EEF2FF';
-    ctx.fillRect(0, y, W, ROW_H);
-    ctx.fillStyle = '#6366F1';
-    ctx.fillRect(0, y, 4, ROW_H);  // left accent bar
-    ctx.fillStyle = '#3730A3';
-  } else {
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, y, W, ROW_H);
-    ctx.fillStyle = '#1E293B';
-  }
-
-  drawDivider(ctx, y, W);
-
-  // Name
-  ctx.font = row.isRecipient ? 'bold 14px system-ui' : '500 14px system-ui';
-  ctx.fillText(truncate(row.displayName, 16), 16, y + 32);
-
-  // Items
-  ctx.font = '12px system-ui';
-  const itemText = formatItems(row.itemNames);
-  ctx.fillText(truncate(itemText, 30), COL_NAME_W + 12, y + 32);
-
-  // Amount
-  ctx.textAlign = 'right';
-  ctx.font = row.isRecipient ? `bold 14px "Courier New"` : `600 14px "Courier New"`;
-  ctx.fillText(formatAmount(row.amountOwed, currency), W - 12, y + 32);
-  ctx.textAlign = 'left';
-}
-
-function drawDivider(ctx: any, y: number, width: number): void {
-  ctx.strokeStyle = '#E2E8F0';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(0, y);
-  ctx.lineTo(width, y);
-  ctx.stroke();
-}
-
-function formatAmount(amount: number, currency: string): string {
-  const symbols: Record<string, string> = { USD: '$', GBP: '£', EUR: '€', CAD: 'C$', AUD: 'A$' };
-  const symbol = symbols[currency] ?? currency + ' ';
-  return `${symbol}${amount.toFixed(2)}`;
-}
-
-function formatItems(names: string[]): string {
-  if (names.length === 0) return 'Even split';
-  if (names.length <= 3) return names.join(', ');
-  return `${names.slice(0, 3).join(', ')} +${names.length - 3} more`;
-}
-
-function truncate(text: string, maxLen: number): string {
-  return text.length > maxLen ? text.slice(0, maxLen - 1) + '…' : text;
-}
-```
+| Route | Purpose |
+|-------|---------|
+| `GET /split/:token` | Public split breakdown HTML for SMS link recipients |
 
 ---
 
@@ -2527,6 +2334,7 @@ The web join pages are **not** React Native — they are server-rendered or Reac
 | `GET /join/:token/status` | Returns current join/lock status of the event |
 | `GET /join/:token/joined` | WebJoinedScreen |
 | `GET /join/:token/locked` | WebLockedScreen |
+| `GET /split/:token` | Public split breakdown HTML (SMS link — no CSRF, capability URL) |
 
 **CSRF protection:** The web join page fetches a CSRF token on page load from the `csrf_token` cookie set by `GET /join/:token`. Subsequent POST requests (`/otp/request`, `/otp/verify`) include an `X-CSRF-Token` header.
 
@@ -2548,4 +2356,4 @@ The web join pages must work on mobile browsers (the primary use case) and deskt
 
 ---
 
-*Navigation stack and state management decisions are hard to change later — implement exactly as specified. The split image dimensions (640px wide, fixed column percentages) must match exactly — participants will compare their received images and inconsistencies undermine trust in the calculations.*
+*Navigation stack and state management decisions are hard to change later — implement exactly as specified. The hosted breakdown page must list **every participant including the organiser** so row totals match the bill total; participants will compare their SMS link against others and inconsistencies undermine trust in the calculations.*

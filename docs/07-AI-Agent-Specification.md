@@ -2277,37 +2277,30 @@ function sleep(ms: number): Promise<void> {
 }
 ```
 
-### Split Image Visual Specification
+### Hosted Breakdown Page Specification (replaces MMS split image)
 
-File: `backend/src/modules/messages/split-image.generator.ts`
-Package: `@napi-rs/canvas`
+SMS delivery embeds a link — not an image attachment. A3/message-assembler adds:
+
+`See full split: https://{APP_DOMAIN}/split/{breakdown_token}`
+
+**Files:** `breakdown-page.service.ts`, `templates/breakdown.html.ts`, `breakdown-url.ts`
 
 ```
-Canvas dimensions: 800 × 400 px
-Background: #FFFFFF (white)
-Font: Roboto (or system-ui fallback)
+Route: GET /split/:token (public, no auth)
+Token: participants.breakdown_token (18-byte base64url, unique partial index)
 
-Header row: height 48px, background #1E293B (dark slate), text #FFFFFF
-  - Columns: "Item" (width 320px), "Qty" (width 80px), "Your share" (width 160px), "Total" (width 160px), padding 12px
-  - Font size: 14px, weight 600
+Page content:
+  - Event title + payer display name
+  - Table: Name | Items | Amount
+  - ALL participants including organiser (payer) — required for total to match member rows
+  - Token holder row: label "(you)", highlight #EEF2FF + #6366F1 left accent
+  - Payer row: label "(organiser)"
+  - Footer: bill total via formatCurrency(event.total_amount, currency, locale)
+  - Never show phone numbers
 
-Participant rows: height 48px each, alternating #FFFFFF / #F8FAFC
-  - Highlighted row (this participant): background #EEF2FF (light indigo), border-left 4px solid #6366F1
+404: friendly HTML for unknown token or deleted event
 
-Text colors:
-  - Item name: #1E293B
-  - Numbers: #1E293B, right-aligned within their column
-  - Subtotal/tax/tip rows: italic, #64748B
-  - Total row: bold, #1E293B
-
-Footer strip: height 56px, background #F1F5F9
-  - Left: "LetsSplyt" logo text, 18px, weight 700, #6366F1
-  - Right: "Your total: {formattedAmount}", 18px, weight 700, #1E293B
-
-Maximum rows before truncation: if more than 6 item rows, show first 5 + "...and X more items" in italics
-
-Output: PNG buffer, written to Supabase Storage bucket split-images/{eventId}/{participantId}.png
-  - Bucket is PRIVATE — accessed via signed URL valid for 24h (passed as mediaUrl in Twilio MMS)
+Legacy: split-image.generator.ts (@napi-rs/canvas) exists from early E08-S03 but is NOT used on send/preview.
 ```
 
 ### No-Payment-Handles Guard

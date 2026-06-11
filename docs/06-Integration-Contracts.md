@@ -319,14 +319,13 @@ client.messages.create({
   // OR use a Messaging Service SID for A2P compliance:
   // messagingServiceSid: process.env.TWILIO_MESSAGING_SERVICE_SID,
   to: '+15550001234',                       // participant's phone in E.164
-  body: 'Hey Marcus! Thanks for coming...\n\nYour share is $32.50.\n\nPay here:\nVenmo: venmo://...',
-  mediaUrl: [signedImageUrl],              // Supabase Storage signed URL for the split image (PNG)
-  // Only included when split image is available (after A1/split-image.generator.ts runs)
+  body: 'Hey Marcus! Thanks for coming...\n\nYour share is $32.50.\n\nSee full split: https://letssplyt.app/split/abc123token\n\nPay here:\nVenmo: venmo://...',
+  // Text-only delivery — breakdown is a link in the body, NOT MMS mediaUrl
   statusCallback: `${process.env.APP_URL}/api/v1/webhooks/twilio/delivery`,
 });
 ```
 
-**MMS fallback:** If MMS delivery fails (Twilio error `21617` or similar MMS-specific error), retry as SMS-only (same message text, no `mediaUrl`). Log the MMS failure to `ai_audit_log` with `error_code: 'MMS_FALLBACK'`. Do NOT retry the full A3 pipeline — just resend this participant's message as SMS.
+**No MMS:** LetsSplyt does not pass `mediaUrl` on payment-request messages. The full group split table is served at `GET /split/:token` (per-participant secret token in `participants.breakdown_token`). This avoids MMS carrier failures and per-segment MMS pricing. If a future feature needs MMS, it would be a separate explicit product decision — not a silent fallback.
 
 **Response shape (Twilio SDK object):**
 ```typescript
@@ -539,8 +538,7 @@ export interface SendMessageResult {
 export async function sendSplitMessage(
   participantId: string,
   phoneE164: string | null,
-  messageText: string,
-  splitImageUrl?: string,   // signed Supabase Storage URL (24h validity) for participant's split image PNG; undefined = SMS only
+  messageText: string,   // must already include See full split: {breakdown_url} from message-assembler
 ): Promise<SendMessageResult> {
   // Guard: no phone = cash participant, skip
   if (!phoneE164) {
@@ -562,7 +560,6 @@ export async function sendSplitMessage(
       from: process.env.TWILIO_PHONE_NUMBER!,
       to: phoneE164,
       body: messageText,
-      mediaUrl: splitImageUrl ? [splitImageUrl] : undefined,  // MMS with split image if available
       statusCallback: `${process.env.APP_URL}/api/v1/webhooks/twilio/delivery`,
     });
 

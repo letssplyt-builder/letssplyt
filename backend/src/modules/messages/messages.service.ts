@@ -6,7 +6,7 @@ import { getHandles } from '../profile/profile.service';
 import { assertEventOwner, fetchEventRow } from '../events/event.service';
 import { composeParticipantMessage } from './a3.agent';
 import { resolveParticipantPhoneContext } from './participant-phone';
-import { prepareSplitImageMediaUrl } from './split-image.service';
+import { ensureParticipantBreakdownUrl } from './breakdown-token.service';
 
 export interface MessagePreviewItem {
   participant_id: string;
@@ -19,7 +19,7 @@ export interface MessagePreviewItem {
     label: string;
     url: string;
   }>;
-  split_image_url: string | null;
+  breakdown_url: string | null;
 }
 
 export interface MessagePreviewResponse {
@@ -162,12 +162,6 @@ export async function buildMessagePreviewsForEvent(
   const locale = eventRow.locale ?? 'en-US';
   const eventName = eventRow.title;
   const payerDisplayName = payer.display_name as string;
-  const participantRowsForImage = rows.map((participant) => ({
-    id: participant.id as string,
-    display_name: participant.display_name as string,
-    amount_owed: participant.amount_owed as number | null,
-  }));
-
   const previews: MessagePreviewItem[] = [];
 
   for (const row of memberRows) {
@@ -184,12 +178,15 @@ export async function buildMessagePreviewsForEvent(
       ? getPaymentConfigForPhone(phoneContext.phoneE164, phoneContext.resolvedCountry)
       : getPaymentConfigForPhone('+1', phoneContext.resolvedCountry);
 
+    const participantId = row.id as string;
+    const breakdownUrl = await ensureParticipantBreakdownUrl(participantId);
+
     const composed = await composeParticipantMessage({
       eventId,
       eventName,
       displayName,
       payerDisplayName,
-      itemNames: itemNamesByParticipant.get(row.id as string) ?? [],
+      itemNames: itemNamesByParticipant.get(participantId) ?? [],
       amountOwed,
       currency,
       locale,
@@ -197,16 +194,8 @@ export async function buildMessagePreviewsForEvent(
       supportedMethods: paymentConfig.supportedMethods,
       channel: phoneContext.channel,
       isRegistered: Boolean(row.user_id),
+      breakdownUrl,
     });
-
-    const participantId = row.id as string;
-    const splitImageUrl = await prepareSplitImageMediaUrl(
-      eventRow,
-      payerDisplayName,
-      participantRowsForImage,
-      itemNamesByParticipant,
-      participantId,
-    );
 
     previews.push({
       participant_id: participantId,
@@ -219,7 +208,7 @@ export async function buildMessagePreviewsForEvent(
         label: link.label,
         url: link.url,
       })),
-      split_image_url: splitImageUrl ?? null,
+      breakdown_url: breakdownUrl,
     });
   }
 

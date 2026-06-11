@@ -23,6 +23,7 @@ export interface AssembleMessageParams {
   supportedMethods: PaymentProvider[];
   channel: 'whatsapp' | 'sms';
   isRegistered: boolean;
+  breakdownUrl?: string;
 }
 
 export function assembleParticipantMessage(params: AssembleMessageParams): AssembledParticipantMessage {
@@ -48,7 +49,17 @@ export function assembleParticipantMessage(params: AssembleMessageParams): Assem
     ? ''
     : '\n\nTrack your payments with LetsSplyt: https://letssplyt.app/download';
 
-  const messageText = [params.aiGreeting, `Your share is ${formattedAmount}.`, paymentBlock]
+  const breakdownLine = params.breakdownUrl
+    ? `See full split: ${params.breakdownUrl}`
+    : '';
+
+  const messageText = [
+    params.aiGreeting,
+    `Your share is ${formattedAmount}.`,
+    breakdownLine,
+    paymentBlock,
+  ]
+    .filter((line) => line.length > 0)
     .join('\n\n')
     .concat(nudge);
 

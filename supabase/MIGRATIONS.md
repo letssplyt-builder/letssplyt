@@ -13,7 +13,7 @@
 
 ---
 
-## Apply order (17 migrations)
+## Apply order (18 migrations)
 
 Run from **repository root** (`letssplyt/`), not `supabase/`:
 
@@ -54,6 +54,7 @@ If CLI reports *"Found local migration files to be inserted before the last migr
 | 15 | `20260613000000_events_last_parse_attempt_id.sql` | E07 | `events.last_parse_attempt_id` | `IF NOT EXISTS` |
 | 16 | `20260614000000_events_ai_stage_parsed_confirmed.sql` | E07-S03 | `ai_stage` includes `parsed_confirmed` | `DROP CONSTRAINT IF EXISTS` |
 | 17 | `20260615000000_reset_event_expenses_function.sql` | E07-S06 | `reset_event_expenses_data()` RPC | `CREATE OR REPLACE` |
+| 18 | `20260616000000_participants_breakdown_token.sql` | E08-S03 | `participants.breakdown_token` + unique partial index for SMS breakdown links | `ADD COLUMN IF NOT EXISTS` |
 
 ---
 
@@ -70,6 +71,8 @@ If CLI reports *"Found local migration files to be inserted before the last migr
 | Item review confirm | #16 |
 | `POST /events/:id/expenses/reset` (atomic) | #17 (fallback row updates work without #17) |
 | Split calculate + NLP | #1, #6, #16 |
+| SMS breakdown link (`GET /split/:token`) | #18 |
+| Message preview/send with `breakdown_url` | #18 |
 
 ---
 

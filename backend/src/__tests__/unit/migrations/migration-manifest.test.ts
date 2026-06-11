@@ -24,6 +24,7 @@ const EXPECTED_MIGRATIONS = [
   '20260613000000_events_last_parse_attempt_id.sql',
   '20260614000000_events_ai_stage_parsed_confirmed.sql',
   '20260615000000_reset_event_expenses_function.sql',
+  '20260616000000_participants_breakdown_token.sql',
 ] as const;
 
 const REPO_ROOT = path.resolve(__dirname, '../../../../..');

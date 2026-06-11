@@ -93,6 +93,7 @@ async function resetExpensesViaQueries(eventId: string): Promise<void> {
       self_reported_at: null,
       self_reported_method: null,
       confirmed_at: null,
+      breakdown_token: null,
     })
     .eq('event_id', eventId);
 

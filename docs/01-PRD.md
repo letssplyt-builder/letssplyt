@@ -146,7 +146,7 @@ When the payer is satisfied that everyone who needs to be in the group is in, th
 Payer photographs the receipt. AI (A1) reads every line item. Payer assigns items to people via drag-and-drop or natural language ("Rohan had the pasta and two beers"). AI (A2) calculates each person's exact share including proportional tax and tip.
 
 **Step 7 — Review and send.**
-Payer previews what each person's message will look like, then taps "Send to all" — one action delivers to every participant simultaneously. AI (A3) generates a personalised split image (recipient's row highlighted) and country-appropriate payment deep links for each person. Messages are sent server-side via Twilio, with in-app delivery tracking showing a green check per person as each message lands.
+Payer previews what each person's message will look like, then taps "Send to all" — one action delivers to every participant simultaneously. AI (A3) generates personalised greeting text and country-appropriate payment deep links for each person. Each SMS includes a secret link (`/split/:token`) to a server-rendered breakdown page where the recipient's row is highlighted and the full group table (including organiser) is shown. Messages are sent as SMS/WhatsApp **text only** (no MMS) via Twilio, with in-app delivery tracking showing a green check per person as each message lands.
 
 **Step 8 — Everyone gets their message.**
 Each person receives a WhatsApp or SMS with the full group split table, their exact amount, and direct payment links (Venmo/PayPal/etc — US MVP uses US payment apps). App members also see outstanding balances on the **Home** dashboard (Members toggle).
@@ -202,7 +202,7 @@ event.all_settled      → Notification Service ("you're all square!")
 | Backend | Node.js + Express + **TypeScript** | Fast REST + WebSocket. TypeScript on the backend means the same language and shared types across the full stack — a `Participant` type defined once is used by both mobile and backend. Compiled to JS at deploy time, no performance cost. |
 | Database | PostgreSQL (Supabase) | Relational integrity for financial data. pgvector available for v2 memory. RLS for data security. |
 | Cache / Queue | Upstash Redis | Serverless Redis — no idle cost. Job queue for nudge scheduler. |
-| File Storage | Supabase Storage | Included in $25/mo plan. S3-compatible. Receipt + split images. |
+| File Storage | Supabase Storage | Included in $25/mo plan. S3-compatible. Receipt images (private bucket). Split breakdown is server-rendered HTML — not stored in Storage on send. |
 | Auth | Supabase Auth (Phone OTP) | Phone-native. No email friction. Handles JWT + refresh tokens. |
 | AI (dev/staging) | Google Gemini 2.5 Flash | Free tier covers all development. ~$0.30/$1.50 per 1M tokens if paid. Fast, accurate for receipt parsing. |
 | AI (production) | Anthropic Claude Haiku 4.5 | $1/$5 per 1M tokens. Chosen for lowest hallucination rate on financial documents — won't invent prices not on the bill. |
@@ -263,9 +263,9 @@ Drag-and-drop is natural on a phone. But after a long dinner, speaking "Rohan ha
 ### Agent 3 — Message Composer (A3)
 **Trigger:** Payer taps "Send to all."
 **Input:** Per-person breakdown + payer's payment handles (fetched from profile).
-**Process:** For each participant — generate split table image (their row highlighted), construct country-filtered payment deep links with their exact amount, assemble message text, append conditional app nudge.
-**Output:** Queue of N delivery-ready packages (image + text + links), dispatched via Twilio.
-**Tools used:** Canvas renderer, deep link builder, AI text (personalised greeting — Gemini dev / Claude Haiku prod), Twilio Programmable Messaging.
+**Process:** For each participant — ensure a unique `breakdown_token` and build `https://{APP_DOMAIN}/split/{token}` URL, construct country-filtered payment deep links with their exact amount, assemble SMS body (greeting + amount + breakdown link + payment block), append conditional app nudge.
+**Output:** Queue of N delivery-ready text packages (SMS body includes breakdown URL), dispatched via Twilio — no MMS `mediaUrl`.
+**Tools used:** `breakdown-page.service.ts` (HTML breakdown at link), deep link builder, AI text (personalised greeting — Gemini dev / Claude Haiku prod), Twilio Programmable Messaging.
 
 **Country-aware payment filtering:**
 ```

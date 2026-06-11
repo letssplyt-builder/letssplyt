@@ -14,6 +14,7 @@ import joinWebRoutes from './modules/join/join-web.routes';
 import receiptsRoutes from './modules/receipts/receipts.routes';
 import settlementRoutes from './modules/settlement/settlement.routes';
 import twilioWebhookRouter from './modules/webhooks/twilio.routes';
+import breakdownRoutes from './modules/messages/breakdown.routes';
 import { errorHandler } from './modules/auth/auth.controller';
 
 const app = express();
@@ -64,6 +65,7 @@ app.get('/health', (_req, res) => {
 app.use('/api/v1/webhooks/twilio', twilioWebhookRouter);
 
 app.use('/join', joinWebRoutes);
+app.use('/split', breakdownRoutes);
 
 app.use('/api/v1/join', joinAppRoutes);
 

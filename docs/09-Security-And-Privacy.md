@@ -41,7 +41,7 @@ LetsSplyt handles phone numbers, payment handles (Venmo/PayPal usernames), and f
 | **Likelihood** | High — any public-facing API is probed continuously |
 | **Impact** | High — unauthenticated access could enumerate events, read participant lists, or trigger AI agent runs that incur cost |
 | **Primary mitigation** | Every endpoint requires a valid Supabase JWT in the `Authorization: Bearer` header. The backend calls `supabase.auth.getUser(token)` on every request — it never decodes and trusts the JWT payload without verification |
-| **Secondary mitigation** | Per-endpoint rate limiting via Upstash Redis (see Section 4). QR join tokens use 144-bit cryptographic randomness — not sequential IDs — making enumeration attacks computationally infeasible |
+| **Secondary mitigation** | Per-endpoint rate limiting via Upstash Redis (see Section 4). QR join tokens and SMS `breakdown_token` values use cryptographic randomness (`base64url` from 18 bytes) — not sequential IDs — making enumeration attacks computationally infeasible |
 
 ---
 
@@ -107,6 +107,7 @@ In this system, PII is any datum that can identify a natural person directly, in
 | IP addresses | Non-PII (operational) | SHA-256 hash stored in `analytics_events.ip_address`. Raw IP is never written to any table or log | Backend / DevOps only via analytics queries | 2 years (with analytics partition) |
 | Analytics events | Non-PII | Hashed user IDs and event metadata only; payment handles never included | Aggregated reporting via backend queries | 2 years, then dropped by monthly partition cleanup |
 | SMS opt-out records | PII — Operational | Phone hash only in `sms_opt_outs.phone_hash`. Plaintext phone is not stored in this table | Backend service role only | Permanent (legal requirement: must honour STOP indefinitely) |
+| Split breakdown token | Capability secret (non-PII) | `participants.breakdown_token` — 18-byte `base64url` random; maps to one participant row | Anyone with the URL (`GET /split/:token`) sees event split table for that event (names + amounts, no phones) | Cleared on expenses reset; invalidated when token column nulled |
 
 ### Handling Rules
 
@@ -114,6 +115,7 @@ In this system, PII is any datum that can identify a natural person directly, in
 2. **Decrypted payment handles are single-use in memory.** The A3 message composer decrypts a handle, builds the payment link, uses the link, and discards the decrypted value. The handle is never stored in a variable that persists beyond the message composition function.
 3. **`display_name` is the only name shown across users.** All cross-user name visibility in the app uses `display_name`. Full name (`name_encrypted`) is used only in outbound SMS composition and is not surfaced in the mobile UI for other users to see. For registered members, APIs resolve the live `users.display_name`; `participants.display_name` is a per-event snapshot kept in sync on profile edit.
 4. **Guest PII never crosses the API boundary to the mobile client.** The mobile app receives `display_name` in API responses (resolved from `users` for linked members, from `participants` for pure guests). It never receives the decrypted contents of `guest_pii`.
+5. **`breakdown_token` is a capability URL, not authentication.** Treat tokens like unguessable secrets (same entropy standard as join tokens). Do not log full `/split/{token}` URLs in analytics or application logs. The public breakdown page shows display names and amounts only — never phone numbers. Rate-limit abusive scanning at the edge if needed in production.
 
 ---
 

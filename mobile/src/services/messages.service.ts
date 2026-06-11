@@ -13,7 +13,7 @@ export interface MessagePreviewItem {
   message_text: string;
   channel: 'whatsapp' | 'sms';
   payment_links: MessagePaymentLink[];
-  split_image_url: string | null;
+  breakdown_url: string | null;
 }
 
 export interface MessagePreviewResponse {

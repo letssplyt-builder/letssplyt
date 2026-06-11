@@ -80,7 +80,7 @@ describe('Messages send API integration', () => {
         message_text: 'Hi Jordan — your share is $40.00.',
         channel: 'sms',
         payment_links: [],
-        split_image_url: null,
+        breakdown_url: 'https://letssplyt.app/split/testtoken',
       },
     ]);
     jest.mocked(loadParticipantItemNames).mockResolvedValue(
@@ -129,7 +129,7 @@ describe('Messages send API integration', () => {
     });
   });
 
-  it('POST /events/:id/messages/send uploads split image and returns sent_count', async () => {
+  it('POST /events/:id/messages/send returns sent_count without MMS upload', async () => {
     mockAuth(USER_A);
 
     const response = await request(app)
@@ -142,15 +142,7 @@ describe('Messages send API integration', () => {
     expect(response.body.event_status).toBe('sent');
 
     const receiptsBucket = mockSupabase.storage.from('receipts');
-    expect(receiptsBucket.upload).toHaveBeenCalledWith(
-      `${EVENT_ID}/split-${PARTICIPANT_MEMBER}.png`,
-      expect.any(Buffer),
-      expect.objectContaining({ contentType: 'image/png', upsert: true }),
-    );
-    expect(receiptsBucket.createSignedUrl).toHaveBeenCalledWith(
-      `${EVENT_ID}/split-${PARTICIPANT_MEMBER}.png`,
-      86400,
-    );
+    expect(receiptsBucket.upload).not.toHaveBeenCalled();
   });
 
   it('POST /events/:id/messages/send returns 401 without auth', async () => {

@@ -1,13 +1,11 @@
 /**
  * Live smoke test for split confirm, messages preview (E08-S01), send (E08-S02),
- * split image upload (E08-S03), and delivery tracking fields + retry (E08-S05).
+ * SMS breakdown links, and delivery tracking fields + retry (E08-S05).
  *
  * Usage (backend must be running on PORT, default 3000):
  *   doppler run -- npm run smoke:messages-preview
  */
-import sharp from 'sharp';
 import { supabaseAdmin } from '../src/infrastructure/supabase';
-import { splitImageStoragePath } from '../src/modules/messages/split-image.generator';
 
 const BASE_URL = (process.env.SMOKE_TEST_BASE_URL ?? `http://127.0.0.1:${process.env.PORT ?? 3000}`).replace(
   /\/$/,
@@ -260,24 +258,25 @@ async function main(): Promise<void> {
           amount_owed: number;
           message_text: string;
           channel: string;
-          split_image_url: string | null;
+          breakdown_url: string | null;
           payment_links: Array<{ provider: string; label: string; url: string }>;
         }>
       | undefined;
 
     const previewsWithLinks = previews?.filter((p) => p.payment_links.length > 0) ?? [];
-    const previewsWithImages =
-      previews?.filter((p) => typeof p.split_image_url === 'string' && p.split_image_url.length > 0) ??
+    const previewsWithBreakdown =
+      previews?.filter((p) => typeof p.breakdown_url === 'string' && p.breakdown_url.length > 0) ??
       [];
     if (
       preview.status === 200 &&
       previews?.length === memberCount &&
       previews.every((p) => p.message_text.length > 20) &&
-      previewsWithImages.length >= 1
+      previewsWithBreakdown.length >= 1 &&
+      previews.every((p) => p.message_text.includes('See full split:'))
     ) {
       pass(
         'GET messages/preview',
-        `${previews.length} previews, ${previewsWithLinks.length} with payment_links, ${previewsWithImages.length} with split_image_url`,
+        `${previews.length} previews, ${previewsWithLinks.length} with payment_links, ${previewsWithBreakdown.length} with breakdown_url`,
       );
     } else {
       fail('GET messages/preview', `status ${preview.status} ${JSON.stringify(preview.body)}`);
@@ -397,45 +396,29 @@ async function main(): Promise<void> {
       return;
     }
 
-    const sentParticipantId = guestParticipantId;
-    const storagePath = splitImageStoragePath(eventId, sentParticipantId);
-    const receiptsBucket = supabaseAdmin.storage.from('receipts');
+    const { data: guestBreakdown } = await supabaseAdmin
+      .from('participants')
+      .select('breakdown_token')
+      .eq('id', guestParticipantId)
+      .maybeSingle();
 
-    const { data: fileBlob, error: downloadError } = await receiptsBucket.download(storagePath);
-    if (downloadError || !fileBlob) {
-      fail('Storage split image download', downloadError?.message ?? `missing ${storagePath}`);
+    const breakdownToken = guestBreakdown?.breakdown_token as string | undefined;
+    if (!breakdownToken) {
+      fail('DB participant breakdown_token', 'missing token');
       return;
     }
 
-    const imageBuffer = Buffer.from(await fileBlob.arrayBuffer());
-    const imageMeta = await sharp(imageBuffer).metadata();
-    const underSizeLimit = imageBuffer.length < 200 * 1024;
+    const breakdownPage = await fetch(`${BASE_URL}/split/${breakdownToken}`);
+    const breakdownHtml = await breakdownPage.text();
     if (
-      imageMeta.width === 640 &&
-      underSizeLimit &&
-      imageBuffer[0] === 0x89 &&
-      imageBuffer[1] === 0x50
+      breakdownPage.status === 200 &&
+      breakdownHtml.includes('Who owes what') &&
+      breakdownHtml.includes('(you)')
     ) {
-      pass(
-        'Storage split image PNG',
-        `${storagePath} ${imageBuffer.length}b w=${imageMeta.width} h=${imageMeta.height ?? '?'}`,
-      );
+      pass('GET /split/:token', 'HTML breakdown page');
     } else {
-      fail(
-        'Storage split image PNG',
-        `path=${storagePath} w=${imageMeta.width} bytes=${imageBuffer.length}`,
-      );
+      fail('GET /split/:token', `status ${breakdownPage.status}`);
       return;
-    }
-
-    const { data: signedUrlData, error: signedUrlError } = await receiptsBucket.createSignedUrl(
-      storagePath,
-      3600,
-    );
-    if (!signedUrlError && signedUrlData?.signedUrl?.startsWith('http')) {
-      pass('Storage split image signed URL', 'created');
-    } else {
-      fail('Storage split image signed URL', signedUrlError?.message ?? 'missing signedUrl');
     }
 
     const { data: eventAfterSend } = await supabaseAdmin

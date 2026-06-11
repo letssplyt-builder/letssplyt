@@ -122,7 +122,7 @@ All 38 stories are in `docs/12-Build-Sequence.md`. Each story has:
 | E07-S05 | Split Entry + Review Screens | AI Pipeline |
 | E08-S01 | A3 Message Generation | Messages |
 | E08-S02 | Send Messages + Twilio | Messages |
-| E08-S03 | Split Image Generator | Messages |
+| E08-S03 | Hosted Split Breakdown Page (SMS link) | Messages |
 | E08-S04 | Message Preview + Sending | Messages |
 | E09-S01 | Settlement API | Settlement |
 | E09-S02 | Settlement Ledger API | Settlement |

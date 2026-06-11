@@ -479,6 +479,10 @@ CREATE TABLE participants (
   opted_out       BOOLEAN     NOT NULL DEFAULT FALSE,
   opted_out_at    TIMESTAMPTZ,
 
+  -- breakdown_token: per-participant secret for GET /split/:token (SMS breakdown link)
+  -- Generated before preview/send; cleared on expenses reset. Unique partial index when non-null.
+  breakdown_token TEXT,
+
   created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
@@ -489,7 +493,7 @@ CREATE TABLE participants (
 
 #### Display name resolution (registered members vs guests)
 
-LetsSplyt stores names in two places: `users.display_name` (profile, source of truth for registered members) and `participants.display_name` (per-event row used in member lists, split images, and outbound SMS).
+LetsSplyt stores names in two places: `users.display_name` (profile, source of truth for registered members) and `participants.display_name` (per-event row used in member lists, hosted breakdown pages, and outbound SMS).
 
 | Participant type | `user_id` | Name source at join | What others see after profile edit |
 |------------------|-----------|---------------------|-------------------------------------|
@@ -1124,6 +1128,10 @@ CREATE INDEX idx_participants_guest_pii ON participants(guest_pii_token);
 CREATE UNIQUE INDEX idx_participants_guest_unique
   ON participants (event_id, guest_pii_token)
   WHERE guest_pii_token IS NOT NULL;
+-- Lookup participant by SMS breakdown link token (GET /split/:token)
+CREATE UNIQUE INDEX idx_participants_breakdown_token
+  ON participants (breakdown_token)
+  WHERE breakdown_token IS NOT NULL;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- receipt_items

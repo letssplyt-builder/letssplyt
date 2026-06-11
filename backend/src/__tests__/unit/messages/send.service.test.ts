@@ -2,11 +2,6 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 
 jest.mock('../../../modules/messages/messages.service', () => ({
   buildMessagePreviewsForEvent: jest.fn(),
-  loadParticipantItemNames: jest.fn(),
-}));
-
-jest.mock('../../../modules/messages/split-image.service', () => ({
-  prepareSplitImageMediaUrl: jest.fn(),
 }));
 
 jest.mock('../../../infrastructure/notification/opt-out', () => ({
@@ -25,12 +20,8 @@ import { mockTwilio } from '../../mocks/twilio.mock';
 import { mockSupabase } from '../../mocks/supabase.mock';
 import { isPhoneOptedOut } from '../../../infrastructure/notification/opt-out';
 import { sendTwilioMessage } from '../../../infrastructure/notification/twilio-messaging';
-import {
-  buildMessagePreviewsForEvent,
-  loadParticipantItemNames,
-} from '../../../modules/messages/messages.service';
+import { buildMessagePreviewsForEvent } from '../../../modules/messages/messages.service';
 import { resolveParticipantPhoneContext } from '../../../modules/messages/participant-phone';
-import { prepareSplitImageMediaUrl } from '../../../modules/messages/split-image.service';
 import { sendEventMessages } from '../../../modules/messages/send.service';
 
 const EVENT_ID = 'event-eeee-eeee-eeee-eeee-eeee-eeee-eeee';
@@ -39,7 +30,7 @@ const MEMBER_USER_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const PARTICIPANT_ORGANISER = 'part-o-0000-0000-0000-000000000000';
 const PARTICIPANT_A = 'part-a-1111-1111-1111-111111111111';
 const PARTICIPANT_B = 'part-b-2222-2222-2222-222222222222';
-const MEDIA_URL = 'https://test.supabase.co/object/receipts/event/split-part-a.png';
+const BREAKDOWN_URL = 'https://letssplyt.app/split/testtoken123';
 
 describe('sendEventMessages', () => {
   beforeEach(() => {
@@ -47,17 +38,15 @@ describe('sendEventMessages', () => {
     mockSupabase.__resetMock();
     jest.mocked(isPhoneOptedOut).mockResolvedValue(false);
     jest.mocked(sendTwilioMessage).mockResolvedValue({ sid: 'SMtest123', channel: 'sms' });
-    jest.mocked(loadParticipantItemNames).mockResolvedValue(new Map());
-    jest.mocked(prepareSplitImageMediaUrl).mockResolvedValue(MEDIA_URL);
     jest.mocked(buildMessagePreviewsForEvent).mockResolvedValue([
       {
         participant_id: PARTICIPANT_A,
         display_name: 'Alex',
         amount_owed: 20,
-        message_text: 'Hi Alex — your share is $20.00.',
+        message_text: `Hi Alex — your share is $20.00.\n\nSee full split: ${BREAKDOWN_URL}`,
         channel: 'sms',
         payment_links: [],
-        split_image_url: null,
+        breakdown_url: BREAKDOWN_URL,
       },
       {
         participant_id: PARTICIPANT_B,
@@ -66,7 +55,7 @@ describe('sendEventMessages', () => {
         message_text: 'Hi Jordan — your share is $20.00.',
         channel: 'whatsapp',
         payment_links: [],
-        split_image_url: null,
+        breakdown_url: BREAKDOWN_URL,
       },
     ]);
     jest.mocked(resolveParticipantPhoneContext).mockImplementation(async (participant) => {
@@ -91,11 +80,6 @@ describe('sendEventMessages', () => {
         locale: 'en-US',
         total_amount: 40,
       },
-      error: null,
-    });
-
-    mockSupabase.__pushMockResultForTable('users', {
-      data: { display_name: 'Alex Payer' },
       error: null,
     });
 
@@ -171,57 +155,20 @@ describe('sendEventMessages', () => {
     expect(mockSupabase.from).toHaveBeenCalledWith('notification_log');
   });
 
-  it('uses SMS channel for US numbers', async () => {
+  it('sends SMS body without MMS mediaUrl', async () => {
     await sendEventMessages(PAYER_ID, EVENT_ID);
 
     expect(sendTwilioMessage).toHaveBeenCalledWith(
       '+15005550001',
       'sms',
       expect.stringContaining('Alex'),
-      MEDIA_URL,
     );
-  });
-
-  it('passes mediaUrl to Twilio when split image is available', async () => {
-    await sendEventMessages(PAYER_ID, EVENT_ID);
-
-    expect(prepareSplitImageMediaUrl).toHaveBeenCalled();
-    expect(sendTwilioMessage).toHaveBeenCalledWith(
-      expect.any(String),
-      expect.any(String),
-      expect.any(String),
-      MEDIA_URL,
-    );
-  });
-
-  it('uploads split image before Twilio send', async () => {
-    const callOrder: string[] = [];
-    jest.mocked(prepareSplitImageMediaUrl).mockImplementation(async () => {
-      callOrder.push('split-image');
-      return MEDIA_URL;
-    });
-    jest.mocked(sendTwilioMessage).mockImplementation(async () => {
-      callOrder.push('twilio');
-      return { sid: 'SMtest123', channel: 'sms' };
-    });
-
-    await sendEventMessages(PAYER_ID, EVENT_ID);
-
-    expect(callOrder).toEqual(['split-image', 'twilio']);
-  });
-
-  it('still sends message when split image preparation fails', async () => {
-    jest.mocked(prepareSplitImageMediaUrl).mockResolvedValue(undefined);
-
-    const result = await sendEventMessages(PAYER_ID, EVENT_ID);
-
-    expect(result.sent_count).toBe(1);
     expect(sendTwilioMessage).toHaveBeenCalledWith(
       '+15005550001',
       'sms',
-      expect.stringContaining('Alex'),
-      undefined,
+      expect.stringContaining('See full split'),
     );
+    expect(jest.mocked(sendTwilioMessage).mock.calls[0]?.length).toBe(3);
   });
 
   it('uses WhatsApp channel for international numbers', async () => {
@@ -234,7 +181,7 @@ describe('sendEventMessages', () => {
         message_text: 'Hi Alex — your share is £20.00.',
         channel: 'whatsapp',
         payment_links: [],
-        split_image_url: null,
+        breakdown_url: BREAKDOWN_URL,
       },
     ]);
     jest.mocked(resolveParticipantPhoneContext).mockResolvedValue({
@@ -253,10 +200,6 @@ describe('sendEventMessages', () => {
         locale: 'en-GB',
         total_amount: 20,
       },
-      error: null,
-    });
-    mockSupabase.__pushMockResultForTable('users', {
-      data: { display_name: 'Alex Payer' },
       error: null,
     });
     mockSupabase.__pushMockResultForTable('participants', {
@@ -295,7 +238,6 @@ describe('sendEventMessages', () => {
       '+447700900123',
       'whatsapp',
       expect.stringContaining('Alex'),
-      MEDIA_URL,
     );
   });
 

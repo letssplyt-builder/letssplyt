@@ -25,7 +25,7 @@ const PREVIEWS: messagesService.MessagePreviewItem[] = [
     message_text: 'Hi Alex — your share is $20.00.',
     channel: 'sms',
     payment_links: [{ provider: 'venmo', label: 'Venmo', url: 'https://venmo.com/test' }],
-    split_image_url: 'https://example.com/split-p1.png',
+    breakdown_url: 'https://letssplyt.app/split/token-p1',
   },
   {
     participant_id: 'p2',
@@ -34,7 +34,7 @@ const PREVIEWS: messagesService.MessagePreviewItem[] = [
     message_text: 'Hi Jordan — your share is $25.00.',
     channel: 'sms',
     payment_links: [],
-    split_image_url: null,
+    breakdown_url: null,
   },
 ];
 
