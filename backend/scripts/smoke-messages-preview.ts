@@ -226,8 +226,10 @@ async function main(): Promise<void> {
 
     const detailPostConfirm = await requestJson('GET', `/api/v1/events/${eventId}`, undefined, accessToken);
     const participantsPost = detailPostConfirm.body.participants as
-      | Array<{ amount_owed: number | null; display_name: string }>
+      | Array<{ amount_owed: number | null; display_name: string; is_organiser?: boolean }>
       | undefined;
+    const memberCount =
+      participantsPost?.filter((row) => !row.is_organiser).length ?? 0;
     const allSet =
       participantsPost?.every((row) => row.amount_owed !== null && row.amount_owed > 0) ?? false;
     const sumPost =
@@ -251,20 +253,25 @@ async function main(): Promise<void> {
           amount_owed: number;
           message_text: string;
           channel: string;
+          split_image_url: string | null;
           payment_links: Array<{ provider: string; label: string; url: string }>;
         }>
       | undefined;
 
     const previewsWithLinks = previews?.filter((p) => p.payment_links.length > 0) ?? [];
+    const previewsWithImages =
+      previews?.filter((p) => typeof p.split_image_url === 'string' && p.split_image_url.length > 0) ??
+      [];
     if (
       preview.status === 200 &&
-      previews?.length === calcSplits.length &&
+      previews?.length === memberCount &&
       previews.every((p) => p.message_text.length > 20) &&
-      previewsWithLinks.length >= 1
+      previewsWithLinks.length >= 1 &&
+      previewsWithImages.length >= 1
     ) {
       pass(
         'GET messages/preview',
-        `${previews.length} previews, ${previewsWithLinks.length} with payment_links`,
+        `${previews.length} previews, ${previewsWithLinks.length} with payment_links, ${previewsWithImages.length} with split_image_url`,
       );
     } else {
       fail('GET messages/preview', `status ${preview.status} ${JSON.stringify(preview.body)}`);
@@ -314,7 +321,7 @@ async function main(): Promise<void> {
     const eventStatus = send.body.event_status as string | undefined;
     if (
       send.status === 200 &&
-      sentCount === 1 &&
+      sentCount === 0 &&
       skippedCount === 1 &&
       eventStatus === 'sent'
     ) {
@@ -328,14 +335,15 @@ async function main(): Promise<void> {
       .from('notification_log')
       .select('id, participant_id, status, twilio_sid, channel')
       .eq('event_id', eventId);
-    if (logs?.length === 1 && logs[0]?.status === 'sent' && logs[0]?.twilio_sid) {
-      pass('DB notification_log', `1 row status=sent sid=${logs[0].twilio_sid}`);
+    if (!logs?.length) {
+      pass('DB notification_log', '0 rows (organiser excluded, guest has no phone)');
     } else {
       fail('DB notification_log', JSON.stringify(logs));
       return;
     }
 
-    const sentParticipantId = logs[0]?.participant_id as string;
+    const previewParticipantId = previews?.[0]?.participant_id as string;
+    const sentParticipantId = previewParticipantId;
     const storagePath = splitImageStoragePath(eventId, sentParticipantId);
     const receiptsBucket = supabaseAdmin.storage.from('receipts');
 

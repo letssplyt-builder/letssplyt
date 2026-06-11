@@ -29,9 +29,6 @@ interface CustomSplitPanelProps {
   allocationLabel: string;
   allocationBalanced: boolean;
   progressRatio: number;
-  manualTotalInput?: string;
-  onManualTotalChange?: (text: string) => void;
-  showManualTotal?: boolean;
 }
 
 export function CustomSplitPanel({
@@ -50,29 +47,11 @@ export function CustomSplitPanel({
   allocationLabel,
   allocationBalanced,
   progressRatio,
-  manualTotalInput,
-  onManualTotalChange,
-  showManualTotal,
 }: CustomSplitPanelProps) {
   const clampedProgress = Math.min(1, Math.max(0, progressRatio));
 
   return (
     <View style={styles.panel}>
-      {showManualTotal ? (
-        <View style={styles.manualBlock}>
-          <Text style={styles.manualLabel}>What was the total?</Text>
-          <TextInput
-            accessibilityLabel="Bill total amount"
-            keyboardType="decimal-pad"
-            value={manualTotalInput ?? ''}
-            onChangeText={onManualTotalChange}
-            style={styles.manualInput}
-            placeholder="0.00"
-            placeholderTextColor={colors.textFaint}
-          />
-        </View>
-      ) : null}
-
       <SplitModeTabs value={activeTab} onChange={onTabChange} />
 
       <View style={styles.progressBlock}>
@@ -163,35 +142,17 @@ export function CustomSplitPanel({
 
 const styles = StyleSheet.create({
   panel: {
-    gap: 4,
-  },
-  manualBlock: {
-    marginBottom: 14,
-    padding: 16,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
-  },
-  manualLabel: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.textMuted,
-    marginBottom: 8,
-  },
-  manualInput: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: colors.text,
-    letterSpacing: -0.5,
+    gap: 2,
   },
   progressBlock: {
-    marginBottom: 14,
+    marginBottom: 10,
   },
   progressTrack: {
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.22)',
     overflow: 'hidden',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   progressFill: {
     height: '100%',
@@ -204,7 +165,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FBBF24',
   },
   progressLabel: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
   },
   progressLabelOk: {
@@ -215,58 +176,61 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
     shadowColor: '#0B3D45',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.12,
-    shadowRadius: 24,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
+    paddingVertical: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: colors.borderLight,
-    gap: 12,
+    gap: 10,
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
     color: '#FFFFFF',
     fontWeight: '800',
-    fontSize: 16,
+    fontSize: 13,
   },
   name: {
     flex: 1,
-    fontSize: 16,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '600',
     color: colors.text,
   },
   amountPill: {
-    fontSize: 16,
-    fontWeight: '800',
+    fontSize: 14,
+    fontWeight: '700',
     color: colors.primary,
     backgroundColor: colors.primaryLight,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
   },
   input: {
-    minWidth: 88,
-    borderWidth: 1.5,
+    minWidth: 76,
+    minHeight: 36,
+    borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    fontSize: 16,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    fontSize: 15,
     fontWeight: '700',
     textAlign: 'right',
     color: colors.text,
@@ -275,26 +239,27 @@ const styles = StyleSheet.create({
   percentWrap: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   inputSmall: {
-    width: 56,
-    borderWidth: 1.5,
+    width: 48,
+    minHeight: 36,
+    borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    fontSize: 16,
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+    fontSize: 15,
     fontWeight: '700',
     textAlign: 'center',
     color: colors.text,
     backgroundColor: colors.surfaceMuted,
   },
   percentSuffix: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '600',
     color: colors.textMuted,
-    minWidth: 64,
+    minWidth: 56,
     textAlign: 'right',
   },
 });

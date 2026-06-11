@@ -6,6 +6,7 @@ export type HomeStackParamList = {
   Home: undefined;
   MemberDetail: { userId: string };
   GuestDetail: { phoneHash: string };
+  EventDetail: { eventId: string };
 };
 
 export type EventsStackParamList = {
@@ -20,6 +21,7 @@ export type EventsStackParamList = {
   };
   SplitEntry: { eventId: string; mode?: 'itemised' | 'manual' };
   SplitReview: { eventId: string };
+  MessagePreview: { eventId: string };
 };
 
 export type MainTabParamList = {

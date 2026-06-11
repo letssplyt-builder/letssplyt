@@ -35,6 +35,8 @@ import { sendEventMessages } from '../../../modules/messages/send.service';
 
 const EVENT_ID = 'event-eeee-eeee-eeee-eeee-eeee-eeee-eeee';
 const PAYER_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+const MEMBER_USER_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+const PARTICIPANT_ORGANISER = 'part-o-0000-0000-0000-000000000000';
 const PARTICIPANT_A = 'part-a-1111-1111-1111-111111111111';
 const PARTICIPANT_B = 'part-b-2222-2222-2222-222222222222';
 const MEDIA_URL = 'https://test.supabase.co/object/receipts/event/split-part-a.png';
@@ -55,6 +57,7 @@ describe('sendEventMessages', () => {
         message_text: 'Hi Alex — your share is $20.00.',
         channel: 'sms',
         payment_links: [],
+        split_image_url: null,
       },
       {
         participant_id: PARTICIPANT_B,
@@ -63,6 +66,7 @@ describe('sendEventMessages', () => {
         message_text: 'Hi Jordan — your share is $20.00.',
         channel: 'whatsapp',
         payment_links: [],
+        split_image_url: null,
       },
     ]);
     jest.mocked(resolveParticipantPhoneContext).mockImplementation(async (participant) => {
@@ -98,8 +102,17 @@ describe('sendEventMessages', () => {
     mockSupabase.__pushMockResultForTable('participants', {
       data: [
         {
-          id: PARTICIPANT_A,
+          id: PARTICIPANT_ORGANISER,
           user_id: PAYER_ID,
+          guest_pii_token: null,
+          country_code: 'US',
+          join_method: 'qr_app',
+          display_name: 'Payer',
+          amount_owed: 20,
+        },
+        {
+          id: PARTICIPANT_A,
+          user_id: MEMBER_USER_ID,
           guest_pii_token: null,
           country_code: 'US',
           join_method: 'qr_app',
@@ -221,6 +234,7 @@ describe('sendEventMessages', () => {
         message_text: 'Hi Alex — your share is £20.00.',
         channel: 'whatsapp',
         payment_links: [],
+        split_image_url: null,
       },
     ]);
     jest.mocked(resolveParticipantPhoneContext).mockResolvedValue({
@@ -248,8 +262,17 @@ describe('sendEventMessages', () => {
     mockSupabase.__pushMockResultForTable('participants', {
       data: [
         {
-          id: PARTICIPANT_A,
+          id: PARTICIPANT_ORGANISER,
           user_id: PAYER_ID,
+          guest_pii_token: null,
+          country_code: 'GB',
+          join_method: 'qr_app',
+          display_name: 'Payer',
+          amount_owed: 0,
+        },
+        {
+          id: PARTICIPANT_A,
+          user_id: MEMBER_USER_ID,
           guest_pii_token: null,
           country_code: 'GB',
           join_method: 'qr_app',

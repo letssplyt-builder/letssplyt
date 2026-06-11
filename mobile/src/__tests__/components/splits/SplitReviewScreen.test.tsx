@@ -60,8 +60,8 @@ describe('SplitReviewScreen', () => {
         route={{ key: 'SplitReview-1', name: 'SplitReview', params: { eventId: 'event-1' } }}
       />,
     );
-    const send = screen.getByLabelText('Send to all');
-    expect(send.props.accessibilityState?.disabled ?? send.props.disabled).toBeTruthy();
+    const preview = screen.getByLabelText('Preview messages');
+    expect(preview.props.accessibilityState?.disabled ?? preview.props.disabled).toBeTruthy();
   });
 
   it('opens edit sheet when tapping a row', () => {

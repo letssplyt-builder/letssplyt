@@ -29,11 +29,13 @@ export async function getUserBalance(userId: string): Promise<UserBalanceSummary
   let owedToYou = 0;
 
   if (createdEventIds.length > 0) {
+    // Include registered members (user_id != payer) and pure guests (user_id IS NULL).
+    // SQL `user_id != payer` alone excludes NULL rows, which drops all guest obligations.
     const { data: owedRows, error: owedError } = await supabaseAdmin
       .from('participants')
       .select('amount_owed')
       .in('event_id', createdEventIds)
-      .neq('user_id', userId)
+      .or(`user_id.is.null,user_id.neq.${userId}`)
       .in('payment_status', [...OUTSTANDING_STATUSES])
       .not('amount_owed', 'is', null);
 

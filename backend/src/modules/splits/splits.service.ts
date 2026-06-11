@@ -602,3 +602,42 @@ export async function confirmEventSplit(
     })),
   };
 }
+
+export interface SplitAssignmentsResponse {
+  assignments: Array<{ item_id: string; participant_ids: string[] }>;
+}
+
+export async function getSplitAssignments(
+  userId: string,
+  eventId: string,
+): Promise<SplitAssignmentsResponse> {
+  const eventRow = await fetchEventRow(eventId);
+  await assertEventOwner(eventRow, userId);
+
+  const { data, error } = await supabaseAdmin
+    .from('item_assignments')
+    .select('item_id, participant_id, receipt_items!inner(event_id)')
+    .eq('receipt_items.event_id', eventId);
+
+  if (error) {
+    throw new AppError('ITEM_ASSIGNMENTS_FETCH_FAILED', 'Could not load item assignments', 500);
+  }
+
+  const byItem = new Map<string, string[]>();
+  for (const row of data ?? []) {
+    const itemId = row.item_id as string;
+    const participantId = row.participant_id as string;
+    const existing = byItem.get(itemId) ?? [];
+    if (!existing.includes(participantId)) {
+      existing.push(participantId);
+    }
+    byItem.set(itemId, existing);
+  }
+
+  return {
+    assignments: [...byItem.entries()].map(([item_id, participant_ids]) => ({
+      item_id,
+      participant_ids,
+    })),
+  };
+}

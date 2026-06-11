@@ -13,17 +13,6 @@ type ParticipantRow = {
   amount_owed: number | null;
 };
 
-function formatEventDateLabel(eventDate: string | null | undefined): string | null {
-  if (!eventDate) return null;
-  const parsed = new Date(eventDate);
-  if (Number.isNaN(parsed.getTime())) return null;
-  return parsed.toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
 export function buildSplitImageParams(
   eventRow: EventRowWithReceiptFields,
   payerDisplayName: string,
@@ -33,10 +22,9 @@ export function buildSplitImageParams(
 ): SplitImageParams {
   const currency = eventRow.currency ?? 'USD';
   const locale = eventRow.locale ?? 'en-US';
-  const taxAndTip =
-    Number(eventRow.tax_amount ?? 0) +
-    Number(eventRow.tip_amount ?? 0) +
-    Number(eventRow.fees_amount ?? 0);
+  const showItemsColumn =
+    eventRow.split_mode === 'itemised' ||
+    [...itemNamesByParticipant.values()].some((names) => names.length > 0);
 
   const participants: ParticipantSplitRow[] = participantRows.map((row) => ({
     participantId: row.id,
@@ -45,21 +33,14 @@ export function buildSplitImageParams(
     amountOwed: Number(row.amount_owed ?? 0),
   }));
 
-  const total =
-    eventRow.total_amount != null
-      ? Number(eventRow.total_amount)
-      : participants.reduce((sum, row) => sum + row.amountOwed, 0);
-
   return {
     eventName: eventRow.title,
-    eventDate: formatEventDateLabel(eventRow.event_date),
     payerDisplayName,
     participants,
     highlightedParticipantId,
     currency,
     locale,
-    taxAndTip,
-    total,
+    showItemsColumn,
   };
 }
 
@@ -84,7 +65,7 @@ export async function prepareSplitImageMediaUrl(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.warn({
-      msg: 'split image generation failed — sending message without media',
+      msg: 'split image generation failed — continuing without image',
       eventId: eventRow.id,
       participantId: highlightedParticipantId,
       error: message,

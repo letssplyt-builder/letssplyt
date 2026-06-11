@@ -1,4 +1,4 @@
-import { apiPostAuth } from './api';
+import { apiGet, apiPostAuth } from './api';
 
 export type SplitModeApi = 'equal' | 'itemised' | 'portion';
 
@@ -32,4 +32,12 @@ export async function calculateSplit(
     `/events/${eventId}/split/calculate`,
     body as Record<string, unknown>,
   );
+}
+
+export interface SplitAssignmentsResponse {
+  assignments: Array<{ item_id: string; participant_ids: string[] }>;
+}
+
+export async function fetchSplitAssignments(eventId: string): Promise<SplitAssignmentsResponse> {
+  return apiGet<SplitAssignmentsResponse>(`/events/${eventId}/split/assignments`);
 }

@@ -30,8 +30,10 @@ import {
 import { resolveParticipantPhoneContext } from '../../../modules/messages/participant-phone';
 
 const USER_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+const MEMBER_USER = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const EVENT_ID = 'event-eeee-eeee-eeee-eeee-eeee-eeee-eeee';
-const PARTICIPANT_A = 'part-a-1111-1111-1111-111111111111';
+const PARTICIPANT_MEMBER = 'part-m-1111-1111-1111-111111111111';
+const PARTICIPANT_ORGANISER = 'part-o-0000-0000-0000-000000000000';
 const AUTH_A = { Authorization: 'Bearer mock-token-a' };
 
 const EVENT_ROW = {
@@ -72,16 +74,17 @@ describe('Messages send API integration', () => {
 
     jest.mocked(buildMessagePreviewsForEvent).mockResolvedValue([
       {
-        participant_id: PARTICIPANT_A,
-        display_name: 'Alex',
+        participant_id: PARTICIPANT_MEMBER,
+        display_name: 'Jordan',
         amount_owed: 40,
-        message_text: 'Hi Alex — your share is $40.00.',
+        message_text: 'Hi Jordan — your share is $40.00.',
         channel: 'sms',
         payment_links: [],
+        split_image_url: null,
       },
     ]);
     jest.mocked(loadParticipantItemNames).mockResolvedValue(
-      new Map([[PARTICIPANT_A, ['Pasta', 'Wine']]]),
+      new Map([[PARTICIPANT_MEMBER, ['Pasta', 'Wine']]]),
     );
     jest.mocked(isPhoneOptedOut).mockResolvedValue(false);
     jest.mocked(resolveParticipantPhoneContext).mockResolvedValue({
@@ -98,12 +101,21 @@ describe('Messages send API integration', () => {
     mockSupabase.__pushMockResultForTable('participants', {
       data: [
         {
-          id: PARTICIPANT_A,
+          id: PARTICIPANT_ORGANISER,
           user_id: USER_A,
           guest_pii_token: null,
           country_code: 'US',
           join_method: 'qr_app',
-          display_name: 'Alex',
+          display_name: 'Payer',
+          amount_owed: 0,
+        },
+        {
+          id: PARTICIPANT_MEMBER,
+          user_id: MEMBER_USER,
+          guest_pii_token: null,
+          country_code: 'US',
+          join_method: 'qr_app',
+          display_name: 'Jordan',
           amount_owed: 40,
         },
       ],
@@ -131,12 +143,12 @@ describe('Messages send API integration', () => {
 
     const receiptsBucket = mockSupabase.storage.from('receipts');
     expect(receiptsBucket.upload).toHaveBeenCalledWith(
-      `${EVENT_ID}/split-${PARTICIPANT_A}.png`,
+      `${EVENT_ID}/split-${PARTICIPANT_MEMBER}.png`,
       expect.any(Buffer),
       expect.objectContaining({ contentType: 'image/png', upsert: true }),
     );
     expect(receiptsBucket.createSignedUrl).toHaveBeenCalledWith(
-      `${EVENT_ID}/split-${PARTICIPANT_A}.png`,
+      `${EVENT_ID}/split-${PARTICIPANT_MEMBER}.png`,
       86400,
     );
   });

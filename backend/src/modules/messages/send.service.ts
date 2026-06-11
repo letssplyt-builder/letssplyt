@@ -108,6 +108,10 @@ export async function sendEventMessages(
 
   for (const row of rows) {
     const participantId = row.id as string;
+    if ((row.user_id as string | null) === eventRow.payer_id) {
+      continue;
+    }
+
     if (filterIds && !filterIds.has(participantId)) {
       continue;
     }

@@ -6,6 +6,7 @@ import { getHandles } from '../profile/profile.service';
 import { assertEventOwner, fetchEventRow } from '../events/event.service';
 import { composeParticipantMessage } from './a3.agent';
 import { resolveParticipantPhoneContext } from './participant-phone';
+import { prepareSplitImageMediaUrl } from './split-image.service';
 
 export interface MessagePreviewItem {
   participant_id: string;
@@ -18,6 +19,7 @@ export interface MessagePreviewItem {
     label: string;
     url: string;
   }>;
+  split_image_url: string | null;
 }
 
 export interface MessagePreviewResponse {
@@ -138,15 +140,19 @@ export async function buildMessagePreviewsForEvent(
   }
 
   const rows = participantRows ?? [];
-  if (rows.length === 0) {
-    throw new AppError('VALIDATION_ERROR', 'Event has no participants', 400);
+  const memberRows = rows.filter(
+    (row) => (row.user_id as string | null) !== eventRow.payer_id,
+  );
+
+  if (memberRows.length === 0) {
+    throw new AppError('VALIDATION_ERROR', 'Event has no members to message', 400);
   }
 
-  const missingAmounts = rows.filter((row) => row.amount_owed === null);
+  const missingAmounts = memberRows.filter((row) => row.amount_owed === null);
   if (missingAmounts.length > 0) {
     throw new AppError(
       'SPLIT_NOT_CONFIRMED',
-      'All participants must have amount_owed set before preview',
+      'All members must have amount_owed set before preview',
       409,
     );
   }
@@ -155,10 +161,16 @@ export async function buildMessagePreviewsForEvent(
   const currency = eventRow.currency ?? 'USD';
   const locale = eventRow.locale ?? 'en-US';
   const eventName = eventRow.title;
+  const payerDisplayName = payer.display_name as string;
+  const participantRowsForImage = rows.map((participant) => ({
+    id: participant.id as string,
+    display_name: participant.display_name as string,
+    amount_owed: participant.amount_owed as number | null,
+  }));
 
   const previews: MessagePreviewItem[] = [];
 
-  for (const row of rows) {
+  for (const row of memberRows) {
     const amountOwed = Number(row.amount_owed);
     const displayName = row.display_name as string;
     const phoneContext = await resolveParticipantPhoneContext({
@@ -176,7 +188,7 @@ export async function buildMessagePreviewsForEvent(
       eventId,
       eventName,
       displayName,
-      payerDisplayName: payer.display_name as string,
+      payerDisplayName,
       itemNames: itemNamesByParticipant.get(row.id as string) ?? [],
       amountOwed,
       currency,
@@ -187,8 +199,17 @@ export async function buildMessagePreviewsForEvent(
       isRegistered: Boolean(row.user_id),
     });
 
+    const participantId = row.id as string;
+    const splitImageUrl = await prepareSplitImageMediaUrl(
+      eventRow,
+      payerDisplayName,
+      participantRowsForImage,
+      itemNamesByParticipant,
+      participantId,
+    );
+
     previews.push({
-      participant_id: row.id as string,
+      participant_id: participantId,
       display_name: displayName,
       amount_owed: amountOwed,
       message_text: composed.messageText,
@@ -198,6 +219,7 @@ export async function buildMessagePreviewsForEvent(
         label: link.label,
         url: link.url,
       })),
+      split_image_url: splitImageUrl ?? null,
     });
   }
 

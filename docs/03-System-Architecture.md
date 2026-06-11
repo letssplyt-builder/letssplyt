@@ -155,7 +155,7 @@ The backend is organised into 7 logical services (modules), each with a defined 
 ---
 
 ### Settlement Service
-**Owns:** The participant payment state machine (all valid state transitions), settlement log writes, dispute handling, the two-party confirmation model (participant self-reports, payer confirms or disputes), nudge job scheduling via QStash, and **cross-event counterparty aggregation** for the Home dashboard (`GET /users/me/balance`, `GET /users/me/counterparties`, `GET /settlement/member/:userId`, `GET /settlement/guest/:phoneHash`).
+**Owns:** The participant payment state machine (all valid state transitions), settlement log writes, dispute handling, the two-party confirmation model (participant self-reports, payer confirms or disputes), nudge job scheduling via QStash, and **cross-event counterparty aggregation** for the Home dashboard (`GET /users/me/balance` — members + guest obligations in `owed_to_you`; `GET /users/me/counterparties` — split by kind for toggle lists; `GET /settlement/member/:userId`, `GET /settlement/guest/:phoneHash`).
 
 **Does NOT own:** Delivery of notifications (Notification Service), event-level status aggregation (Event Service computes `events.status = 'settled'` when all participants reach `settled`). Settlement **actions** (confirm, nudge, self-report) are invoked from Event Detail — Home is a read-only router to counterparties and events.
 
@@ -253,7 +253,7 @@ This section traces a single complete event from the creator opening the app to 
 **Step 7b — Reset expenses (optional, pre-send)**
 
 - **Service:** Event Service (`expenses.reset.ts`)
-- **What happens:** Before messages are sent, the payer may tap **Reset expenses** on Event Detail. `POST /events/:id/expenses/reset` clears receipt items, split amounts, AI audit logs, and resets `events.ai_stage` to `'none'` while keeping participants and join tokens. The mobile footer returns to **Scan receipt** + **Enter total**. Blocked once `messages_sent_at` is set.
+- **What happens:** Before messages are sent, the payer may tap **Reset expenses** on Event Detail. `POST /events/:id/expenses/reset` clears receipt items, split amounts, AI audit logs, and resets `events.ai_stage` to `'none'` while keeping participants and join tokens. The mobile footer returns to **Scan receipt** + **Enter total** (paired row layout in `EventSplitActionBar` — regression-tested so CTAs stay visible in the sticky footer). Blocked once `messages_sent_at` is set.
 - **Tables written:** `receipt_items` (DELETE), `participants` (amount_owed and message fields cleared), `events` (receipt/total/ai_stage reset), `ai_audit_log` (DELETE for event)
 - **DB function:** `reset_event_expenses_data(p_event_id)` when migration `20260615000000` is applied
 

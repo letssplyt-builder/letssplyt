@@ -1,6 +1,7 @@
 import { describe, expect, it } from '@jest/globals';
 import {
   canResetEventExpenses,
+  canSendEventMessages,
   getEventSplitActionMode,
   hasEventExpensesEntered,
   resolveEventSplitActionMode,
@@ -84,5 +85,16 @@ describe('canResetEventExpenses', () => {
 
   it('blocks reset after messages sent', () => {
     expect(canResetEventExpenses('calculated', '2026-01-01T00:00:00.000Z')).toBe(false);
+  });
+});
+
+describe('canSendEventMessages', () => {
+  it('allows send when expenses entered and messages not sent', () => {
+    expect(canSendEventMessages('calculated', null)).toBe(true);
+    expect(canSendEventMessages('messaging', null)).toBe(true);
+  });
+
+  it('blocks send after messages sent', () => {
+    expect(canSendEventMessages('calculated', '2026-01-01T00:00:00.000Z')).toBe(false);
   });
 });

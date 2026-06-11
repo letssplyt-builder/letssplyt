@@ -10,12 +10,10 @@ import {
 
 const BASE_PARAMS: SplitImageParams = {
   eventName: 'Team Dinner',
-  eventDate: 'Jun 7, 2026',
   payerDisplayName: 'Alex',
   currency: 'USD',
   locale: 'en-US',
-  taxAndTip: 10.2,
-  total: 85.2,
+  showItemsColumn: true,
   highlightedParticipantId: 'part-bob',
   participants: [
     {
@@ -61,6 +59,7 @@ describe('split-image.generator', () => {
       ...BASE_PARAMS,
       currency: 'GBP',
       locale: 'en-GB',
+      showItemsColumn: false,
       participants: [
         {
           participantId: 'part-bob',
@@ -100,9 +99,21 @@ describe('split-image.generator', () => {
     expect(hasHighlightBackground).toBe(true);
   });
 
+  it('omits item column when showItemsColumn is false', async () => {
+    const buffer = await generateSplitImage({
+      ...BASE_PARAMS,
+      showItemsColumn: false,
+      participants: BASE_PARAMS.participants.slice(0, 1),
+      highlightedParticipantId: 'part-alice',
+    });
+    const meta = await sharp(buffer).metadata();
+    expect(meta.height).toBeLessThan(200);
+  });
+
   it('handles missing font gracefully (falls back to system default)', async () => {
     const buffer = await generateSplitImage({
       ...BASE_PARAMS,
+      showItemsColumn: false,
       participants: [
         {
           participantId: 'part-bob',

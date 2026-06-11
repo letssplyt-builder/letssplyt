@@ -84,3 +84,11 @@ export function canResetEventExpenses(
 ): boolean {
   return hasEventExpensesEntered(aiStage) && !messagesSentAt;
 }
+
+/** Send messages CTA when split is ready but payment requests have not been sent. */
+export function canSendEventMessages(
+  aiStage: AiStage,
+  messagesSentAt: string | null,
+): boolean {
+  return hasEventExpensesEntered(aiStage) && !messagesSentAt;
+}

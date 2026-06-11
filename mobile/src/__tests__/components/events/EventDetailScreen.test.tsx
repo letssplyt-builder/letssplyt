@@ -354,6 +354,36 @@ describe('EventDetailScreen', () => {
     expect(screen.queryByLabelText('Remove Sam')).toBeNull();
   });
 
+  it('shows settlement summary labels in full (three-column card)', async () => {
+    jest.mocked(eventService.fetchEventById).mockResolvedValue({
+      ...mockDetailLocked,
+      summary: {
+        total: 120,
+        collected: 45,
+        outstanding: 75,
+        confirmed_count: 1,
+        pending_count: 2,
+      },
+    });
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Settlement phase')).toBeTruthy();
+      expect(screen.getByText('Total bill')).toBeTruthy();
+      expect(screen.getByText('Collected')).toBeTruthy();
+      expect(screen.getByText('Outstanding')).toBeTruthy();
+      expect(screen.getByText('$120.00')).toBeTruthy();
+      expect(screen.getByText('$45.00')).toBeTruthy();
+      expect(screen.getByText('$75.00')).toBeTruthy();
+    });
+  });
+
   it('shows scan and enter total when locked and receipt not scanned', async () => {
     jest.mocked(eventService.fetchEventById).mockResolvedValue(mockDetailLocked);
 
@@ -367,6 +397,29 @@ describe('EventDetailScreen', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('Scan receipt for itemised split')).toBeTruthy();
       expect(screen.getByLabelText('Enter total for custom split')).toBeTruthy();
+    });
+  });
+
+  it('shows split footer CTAs when event status is calculating', async () => {
+    jest.mocked(eventService.fetchEventById).mockResolvedValue({
+      ...mockDetailLocked,
+      event: {
+        ...mockDetailLocked.event,
+        status: 'calculating',
+        ai_stage: 'calculated',
+        total_amount: 90,
+      },
+    });
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Edit split')).toBeTruthy();
     });
   });
 
@@ -500,9 +553,10 @@ describe('EventDetailScreen', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByLabelText('Reset expenses')).toBeTruthy();
+      expect(screen.getByLabelText('More options')).toBeTruthy();
     });
 
+    fireEvent.press(screen.getByLabelText('More options'));
     fireEvent.press(screen.getByLabelText('Reset expenses'));
 
     const resetButton = Alert.alert.mock.calls[0]?.[2]?.find((b) => b.text === 'Reset');
@@ -618,9 +672,12 @@ describe('EventDetailScreen', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Reopen join window')).toBeTruthy();
-      expect(screen.getByText(/Reopens QR and link for 24 hours/)).toBeTruthy();
+      expect(screen.getByLabelText('More options')).toBeTruthy();
     });
+
+    fireEvent.press(screen.getByLabelText('More options'));
+
+    expect(screen.getByLabelText('Reopen join window')).toBeTruthy();
   });
 
   it('reopen calls reopenEvent and transitions to joining phase', async () => {
@@ -645,10 +702,15 @@ describe('EventDetailScreen', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Reopen join window')).toBeTruthy();
+      expect(screen.getByLabelText('More options')).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText('Reopen join window'));
+    fireEvent.press(screen.getByLabelText('More options'));
+    fireEvent.press(screen.getByLabelText('Reopen join window'));
+
+    const reopenAlert = Alert.alert.mock.calls.find((call) => call[0] === 'Reopen join window?');
+    const reopenButton = reopenAlert?.[2]?.find((b) => b.text === 'Reopen');
+    reopenButton?.onPress?.();
 
     await waitFor(() => {
       expect(eventService.reopenEvent).toHaveBeenCalledWith('event-1');

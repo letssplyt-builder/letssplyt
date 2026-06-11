@@ -5,6 +5,7 @@ import { ItemReviewScreen } from '../screens/receipts/ItemReviewScreen';
 import { ReceiptPreviewScreen } from '../screens/receipts/ReceiptPreviewScreen';
 import { ReceiptScanScreen } from '../screens/receipts/ReceiptScanScreen';
 import { SplitEntryScreen } from '../screens/splits/SplitEntryScreen';
+import { MessagePreviewScreen } from '../screens/messages/MessagePreviewScreen';
 import { SplitReviewScreen } from '../screens/splits/SplitReviewScreen';
 import type { EventsStackParamList } from './types';
 
@@ -20,6 +21,7 @@ export function EventsStackNavigator() {
       <EventsStack.Screen name="ItemReview" component={ItemReviewScreen} />
       <EventsStack.Screen name="SplitEntry" component={SplitEntryScreen} />
       <EventsStack.Screen name="SplitReview" component={SplitReviewScreen} />
+      <EventsStack.Screen name="MessagePreview" component={MessagePreviewScreen} />
     </EventsStack.Navigator>
   );
 }

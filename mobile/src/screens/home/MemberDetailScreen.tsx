@@ -45,10 +45,7 @@ export function MemberDetailScreen({ navigation, route }: Props) {
   }, [refresh, clearDetail]);
 
   const openEvent = (eventId: string) => {
-    navigation.navigate('EventsTab', {
-      screen: 'EventDetail',
-      params: { eventId },
-    });
+    navigation.navigate('EventDetail', { eventId });
   };
 
   return (

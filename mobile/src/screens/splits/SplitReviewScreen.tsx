@@ -15,6 +15,8 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { splitActionBarFooterStyle } from '../../constants/layout';
 import { useAppInsets } from '../../hooks/useAppInsets';
 import type { EventsStackParamList } from '../../navigation/types';
+import { confirmEventSplit } from '../../services/messages.service';
+import { isApiRequestError } from '../../services/api';
 import { useSplitStore } from '../../store/splitStore';
 import { authColors, colors } from '../../theme/colors';
 import { glassStyles } from '../../theme/glassStyles';
@@ -37,6 +39,8 @@ export function SplitReviewScreen({ navigation, route }: Props) {
 
   const [editParticipantId, setEditParticipantId] = useState<string | null>(null);
   const [editInput, setEditInput] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
 
   const sumBalanced = useMemo(
     () => isWithinMoneyTolerance(totalCheck, billTotal, currency),
@@ -64,12 +68,34 @@ export function SplitReviewScreen({ navigation, route }: Props) {
       footerStyle={splitActionBarFooterStyle(rawBottom)}
       footer={
         <PrimaryButton
-          label="Send to all →"
-          disabled={!canSend}
+          label="Preview messages →"
+          loading={confirming}
+          disabled={!canSend || confirming}
           onPress={() => {
-            // Message send ships in E08 — keep user on review with data intact.
+            void (async () => {
+              setConfirmError(null);
+              setConfirming(true);
+              try {
+                await confirmEventSplit(
+                  eventId,
+                  splits.map((row) => ({
+                    participant_id: row.participant_id,
+                    amount_owed: row.amount_owed,
+                  })),
+                );
+                navigation.navigate('MessagePreview', { eventId });
+              } catch (err) {
+                setConfirmError(
+                  isApiRequestError(err)
+                    ? err.message
+                    : "Couldn't confirm split. Try again.",
+                );
+              } finally {
+                setConfirming(false);
+              }
+            })();
           }}
-          accessibilityLabel="Send to all"
+          accessibilityLabel="Preview messages"
           variant="inverse"
         />
       }
@@ -117,9 +143,8 @@ export function SplitReviewScreen({ navigation, route }: Props) {
           <Text style={styles.hint}>
             Adjust amounts so everyone has a share and the total matches the bill.
           </Text>
-        ) : (
-          <Text style={styles.hintMuted}>Messaging ships in the next epic — amounts are ready.</Text>
-        )}
+        ) : null}
+        {confirmError ? <Text style={styles.hint}>{confirmError}</Text> : null}
       </ScrollView>
 
       <Modal visible={editParticipantId !== null} transparent animationType="fade">

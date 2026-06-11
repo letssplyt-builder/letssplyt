@@ -97,6 +97,18 @@ describe('SplitEntryScreen', () => {
     expect(screen.getAllByText('$15.00').length).toBeGreaterThan(0);
   });
 
+  it('shows a single Bill Total input in manual mode without receipt items', async () => {
+    jest.mocked(eventService.fetchEventById).mockResolvedValue({
+      ...eventDetail,
+      receipt_review: null,
+      event: { ...eventDetail.event, total_amount: null },
+    });
+    renderScreen('manual');
+    await waitFor(() => expect(screen.getByLabelText('Bill total')).toBeTruthy());
+    expect(screen.queryByText('What was the total?')).toBeNull();
+    expect(screen.getAllByLabelText('Bill total').length).toBe(1);
+  });
+
   it('disables Review button when amount tab totals do not match', async () => {
     renderScreen();
     await switchToCustomSplit();

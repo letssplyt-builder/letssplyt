@@ -41,28 +41,28 @@ export function SplitModeTabs({ value, onChange }: SplitModeTabsProps) {
 const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 16,
+    gap: 6,
+    marginBottom: 10,
   },
   tab: {
     flex: 1,
-    paddingVertical: 11,
-    borderRadius: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
     alignItems: 'center',
     backgroundColor: colors.surfaceMuted,
-    borderWidth: 1.5,
-    borderColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
   tabActive: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#6366F1',
+    backgroundColor: colors.primaryLight,
+    borderColor: colors.primaryBorder,
   },
   label: {
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '700',
     color: colors.textMuted,
   },
   labelActive: {
-    color: '#4338CA',
+    color: colors.primaryDark,
   },
 });

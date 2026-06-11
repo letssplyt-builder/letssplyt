@@ -129,10 +129,7 @@ export function HomeScreen({ navigation }: Props) {
   };
 
   const openEventDetail = (eventId: string) => {
-    navigation.navigate('EventsTab', {
-      screen: 'EventDetail',
-      params: { eventId },
-    });
+    navigation.navigate('EventDetail', { eventId });
   };
 
   const renderMembersLists = () => {

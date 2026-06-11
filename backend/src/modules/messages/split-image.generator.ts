@@ -12,25 +12,18 @@ export interface ParticipantSplitRow {
 
 export interface SplitImageParams {
   eventName: string;
-  eventDate: string | null;
   payerDisplayName: string;
   participants: ParticipantSplitRow[];
   highlightedParticipantId: string;
   currency: string;
   locale: string;
-  taxAndTip: number;
-  total: number;
+  showItemsColumn: boolean;
 }
 
 const W = 640;
-const HEADER_H = 68;
-const COL_HEADER_H = 40;
-const ROW_H = 52;
-const TAX_ROW_H = 44;
-const TOTAL_ROW_H = 48;
-const FOOTER_H = 36;
-const COL_NAME_W = Math.floor(W * 0.3);
-const COL_ITEMS_W = Math.floor(W * 0.45);
+const TITLE_H = 36;
+const COL_HEADER_H = 36;
+const ROW_H = 44;
 
 const FONT_PATHS = [
   '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',
@@ -69,16 +62,12 @@ function truncate(text: string, maxLen: number): string {
 }
 
 function formatItems(names: string[]): string {
-  if (names.length === 0) return 'Even split';
-  if (names.length <= 3) return names.join(', ');
-  return `${names.slice(0, 3).join(', ')} +${names.length - 3} more`;
+  if (names.length === 0) return '—';
+  if (names.length <= 4) return names.join(', ');
+  return `${names.slice(0, 4).join(', ')} +${names.length - 4}`;
 }
 
-function formatAmount(
-  amountMajor: number,
-  currency: string,
-  locale: string,
-): string {
+function formatAmount(amountMajor: number, currency: string, locale: string): string {
   const rounded = roundAmountForCurrency(amountMajor, currency);
   return formatCurrency(rounded, currency, locale);
 }
@@ -91,16 +80,45 @@ interface DrawRow {
   isRecipient: boolean;
 }
 
+interface ColumnLayout {
+  nameX: number;
+  itemsX: number;
+  shareX: number;
+  nameMaxChars: number;
+  itemsMaxChars: number;
+}
+
+function columnLayout(showItemsColumn: boolean): ColumnLayout {
+  if (showItemsColumn) {
+    const nameW = Math.floor(W * 0.28);
+    const itemsW = Math.floor(W * 0.42);
+    return {
+      nameX: 14,
+      itemsX: nameW + 8,
+      shareX: nameW + itemsW,
+      nameMaxChars: 14,
+      itemsMaxChars: 28,
+    };
+  }
+  const nameW = Math.floor(W * 0.55);
+  return {
+    nameX: 14,
+    itemsX: 0,
+    shareX: nameW,
+    nameMaxChars: 22,
+    itemsMaxChars: 0,
+  };
+}
+
 function drawDivider(
   ctx: ReturnType<ReturnType<typeof createCanvas>['getContext']>,
   y: number,
-  width: number,
 ): void {
   ctx.strokeStyle = '#E2E8F0';
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(0, y);
-  ctx.lineTo(width, y);
+  ctx.lineTo(W, y);
   ctx.stroke();
 }
 
@@ -110,12 +128,14 @@ function drawRow(
   row: DrawRow,
   currency: string,
   locale: string,
+  layout: ColumnLayout,
+  showItemsColumn: boolean,
 ): void {
   if (row.isRecipient) {
     ctx.fillStyle = '#EEF2FF';
     ctx.fillRect(0, y, W, ROW_H);
     ctx.fillStyle = '#6366F1';
-    ctx.fillRect(0, y, 4, ROW_H);
+    ctx.fillRect(0, y, 3, ROW_H);
     ctx.fillStyle = '#3730A3';
   } else {
     ctx.fillStyle = '#FFFFFF';
@@ -123,27 +143,34 @@ function drawRow(
     ctx.fillStyle = '#1E293B';
   }
 
-  drawDivider(ctx, y, W);
+  drawDivider(ctx, y);
 
   const family = fontFamily();
+  ctx.textAlign = 'left';
   ctx.font = row.isRecipient ? `bold 14px ${family}` : `500 14px ${family}`;
-  ctx.fillText(truncate(row.displayName, 16), 16, y + 32);
+  ctx.fillText(truncate(row.displayName, layout.nameMaxChars), layout.nameX, y + 28);
 
-  ctx.font = `12px ${family}`;
-  const itemText = formatItems(row.itemNames);
-  ctx.fillText(truncate(itemText, 30), COL_NAME_W + 12, y + 32);
+  if (showItemsColumn) {
+    ctx.font = `13px ${family}`;
+    ctx.fillStyle = row.isRecipient ? '#3730A3' : '#475569';
+    ctx.fillText(
+      truncate(formatItems(row.itemNames), layout.itemsMaxChars),
+      layout.itemsX,
+      y + 28,
+    );
+  }
 
   ctx.textAlign = 'right';
-  ctx.font = row.isRecipient
-    ? `bold 14px ${family}`
-    : `600 14px ${family}`;
-  ctx.fillText(formatAmount(row.amountOwed, currency, locale), W - 12, y + 32);
+  ctx.font = row.isRecipient ? `bold 14px ${family}` : `600 14px ${family}`;
+  ctx.fillStyle = row.isRecipient ? '#3730A3' : '#1E293B';
+  ctx.fillText(formatAmount(row.amountOwed, currency, locale), W - 14, y + 28);
   ctx.textAlign = 'left';
 }
 
 export async function generateSplitImage(params: SplitImageParams): Promise<Buffer> {
   registerFonts();
   const family = fontFamily();
+  const layout = columnLayout(params.showItemsColumn);
 
   const sortedParticipants = [...params.participants].sort(
     (a, b) => b.amountOwed - a.amountOwed,
@@ -156,89 +183,54 @@ export async function generateSplitImage(params: SplitImageParams): Promise<Buff
     isRecipient: row.participantId === params.highlightedParticipantId,
   }));
 
-  const visibleRows = rows.slice(0, 12);
-  const extraCount = rows.length > 12 ? rows.length - 12 : 0;
+  const visibleRows = rows.slice(0, 14);
+  const extraCount = rows.length > 14 ? rows.length - 14 : 0;
 
   const H =
-    HEADER_H +
+    TITLE_H +
     COL_HEADER_H +
     visibleRows.length * ROW_H +
-    (extraCount > 0 ? ROW_H : 0) +
-    TAX_ROW_H +
-    TOTAL_ROW_H +
-    FOOTER_H;
+    (extraCount > 0 ? ROW_H : 0);
 
   const canvas = createCanvas(W, H);
   const ctx = canvas.getContext('2d');
 
-  ctx.fillStyle = '#6366F1';
-  ctx.fillRect(0, 0, W, HEADER_H);
   ctx.fillStyle = '#FFFFFF';
-  ctx.font = `bold 18px ${family}`;
-  ctx.fillText(truncate(params.eventName, 35), 16, 26);
-  ctx.font = `13px ${family}`;
-  const dateStr = params.eventDate ? ` • ${params.eventDate}` : '';
-  ctx.fillText(`Paid by ${params.payerDisplayName}${dateStr}`, 16, 50);
+  ctx.fillRect(0, 0, W, H);
 
-  let y = HEADER_H;
+  ctx.fillStyle = '#0F172A';
+  ctx.font = `bold 15px ${family}`;
+  ctx.fillText(truncate(params.eventName, 40), 14, 24);
+
+  let y = TITLE_H;
   ctx.fillStyle = '#F1F5F9';
   ctx.fillRect(0, y, W, COL_HEADER_H);
+  drawDivider(ctx, y);
   ctx.fillStyle = '#64748B';
-  ctx.font = `bold 12px ${family}`;
-  ctx.fillText('NAME', 16, y + 26);
-  ctx.fillText('ITEMS', COL_NAME_W + 12, y + 26);
+  ctx.font = `bold 11px ${family}`;
+  ctx.fillText('NAME', layout.nameX, y + 24);
+  if (params.showItemsColumn) {
+    ctx.fillText('ITEM', layout.itemsX, y + 24);
+  }
   ctx.textAlign = 'right';
-  ctx.fillText('AMOUNT', W - 12, y + 26);
+  ctx.fillText('YOUR SHARE', W - 14, y + 24);
   ctx.textAlign = 'left';
 
   y += COL_HEADER_H;
   for (const row of visibleRows) {
-    drawRow(ctx, y, row, params.currency, params.locale);
+    drawRow(ctx, y, row, params.currency, params.locale, layout, params.showItemsColumn);
     y += ROW_H;
   }
 
   if (extraCount > 0) {
     ctx.fillStyle = '#FFFFFF';
     ctx.fillRect(0, y, W, ROW_H);
-    drawDivider(ctx, y, W);
+    drawDivider(ctx, y);
     ctx.fillStyle = '#94A3B8';
     ctx.font = `13px ${family}`;
-    ctx.fillText(`＋${extraCount} more participants`, 16, y + 30);
+    ctx.fillText(`+${extraCount} more`, layout.nameX, y + 28);
     y += ROW_H;
   }
-
-  ctx.fillStyle = '#F8FAFC';
-  ctx.fillRect(0, y, W, TAX_ROW_H);
-  drawDivider(ctx, y, W);
-  ctx.fillStyle = '#64748B';
-  ctx.font = `13px ${family}`;
-  ctx.fillText('Tax + Tip', COL_NAME_W + 12, y + 28);
-  ctx.textAlign = 'right';
-  ctx.fillText(
-    formatAmount(params.taxAndTip, params.currency, params.locale),
-    W - 12,
-    y + 28,
-  );
-  ctx.textAlign = 'left';
-  y += TAX_ROW_H;
-
-  ctx.fillStyle = '#F1F5F9';
-  ctx.fillRect(0, y, W, TOTAL_ROW_H);
-  drawDivider(ctx, y, W);
-  ctx.fillStyle = '#0F172A';
-  ctx.font = `bold 14px ${family}`;
-  ctx.fillText('TOTAL', COL_NAME_W + 12, y + 30);
-  ctx.textAlign = 'right';
-  ctx.font = `bold 16px ${family}`;
-  ctx.fillText(formatAmount(params.total, params.currency, params.locale), W - 12, y + 30);
-  ctx.textAlign = 'left';
-  y += TOTAL_ROW_H;
-
-  ctx.fillStyle = '#F8FAFC';
-  ctx.fillRect(0, y, W, FOOTER_H);
-  ctx.fillStyle = '#94A3B8';
-  ctx.font = `11px ${family}`;
-  ctx.fillText('LetsSplyt • letssplyt.app', 16, y + 23);
 
   return canvas.toBuffer('image/png');
 }

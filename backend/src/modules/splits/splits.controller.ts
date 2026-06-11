@@ -5,6 +5,7 @@ import {
   assignSplitsWithNlp,
   calculateEventSplits,
   confirmEventSplit,
+  getSplitAssignments,
 } from './splits.service';
 
 const calculateBodySchema = z.object({
@@ -86,6 +87,29 @@ export async function postSplitConfirmHandler(
 
     const body = confirmBodySchema.parse(req.body);
     const result = await confirmEventSplit(userId, eventId, body);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getSplitAssignmentsHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new AppError('AUTH_REQUIRED', 'Unauthorized', 401);
+    }
+
+    const eventId = req.params.id;
+    if (!eventId) {
+      throw new AppError('VALIDATION_ERROR', 'Event id is required', 400);
+    }
+
+    const result = await getSplitAssignments(userId, eventId);
     res.status(200).json(result);
   } catch (err) {
     next(err);

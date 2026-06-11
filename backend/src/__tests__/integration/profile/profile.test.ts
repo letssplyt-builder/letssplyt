@@ -30,6 +30,30 @@ describe('Profile API integration', () => {
     jest.restoreAllMocks();
   });
 
+  it('GET /users/me/balance includes guest outstanding in owed_to_you', async () => {
+    mockAuth();
+    mockSupabase.__pushMockResultForTable('events', {
+      data: [{ id: 'event-balance-1', currency: 'USD' }],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: [
+        { amount_owed: 20, user_id: 'member-other' },
+        { amount_owed: 12, user_id: null },
+      ],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', { data: [], error: null });
+
+    const response = await request(app).get('/api/v1/users/me/balance').set(AUTH_HEADER);
+
+    expect(response.status).toBe(200);
+    expect(response.body.owed_to_you).toBe(32);
+    expect(response.body.you_owe).toBe(0);
+    expect(response.body.net_balance).toBe(32);
+    expect(response.body.currency).toBe('USD');
+  });
+
   it('GET /users/me returns user without phone fields', async () => {
     mockAuth();
     mockSupabase.__setMockResultForTable('users', { data: PUBLIC_USER, error: null });

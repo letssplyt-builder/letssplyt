@@ -901,7 +901,8 @@ Refer to `prototype/home.html` (dashboard states). **MVP: USD only.**
 **Layout (top → bottom):**
 
 1. **Net balance hero** (unchanged from E05-S03 placeholder)
-   - `GET /api/v1/users/me/balance` → `{ net_balance_minor_units, currency: "USD", owed_to_you, you_owe }`
+   - `GET /api/v1/users/me/balance` → `{ net_balance, currency: "USD", owed_to_you, you_owe }`
+   - **Owed to you** = all outstanding on events the user created (registered members + pure guests). **You owe** = registered counterparties only. Not scoped to the Members toggle — guest obligations still count in the hero even when Guests toggle is hidden.
    - Green / red / grey by sign; skeleton while loading; graceful "Balance unavailable" if 404/501
 2. **Members | Guests** segmented toggle (below hero)
 3. **List area** (content depends on toggle)
@@ -1034,11 +1035,16 @@ Each section lists only events matching the selected toggle. Event card: title, 
 
 | Condition | Footer CTA |
 |-----------|------------|
-| `ai_stage = none` | **Scan receipt** + **Enter total** |
+| `ai_stage = none` | **Scan receipt** + **Enter total** (side by side) |
 | `ai_stage = parsing` | **Reading receipt…** (disabled) |
-| `ai_stage = failed` | **Scan receipt** + **Enter total** (retry) |
+| `ai_stage = failed` | **Scan receipt** + **Enter total** (retry, stacked) |
 | `ai_stage = parsed` | **Review items** only |
-| `ai_stage = parsed_confirmed` or later AI stages (before messages sent) | **Edit share** + **Reset expenses** |
+| `ai_stage = parsed_confirmed` or later AI stages (before messages sent) | **Edit share** (+ **Send messages** when expenses entered and `messages_sent_at` null) + optional **Reset expenses** |
+
+**Footer layout rules (non-negotiable — regression-tested):**
+- **Paired actions** (**Scan receipt** + **Enter total**, **Edit share** + **Send messages**) use a **row** (`flexDirection: 'row'`) with `flex: 1` on each `PrimaryButton`. The sticky footer has no fixed height; placing `flex: 1` buttons in a **column** collapses them to zero height on device (invisible CTAs).
+- **Stacked full-width actions** (**Review items**, **Reading receipt…**, **Reset expenses**, failed-mode retry buttons) use `alignSelf: 'stretch'` only — **never** `flex: 1` in a column.
+- Component: `mobile/src/components/events/EventSplitActionBar.tsx`. Tests: `mobile/src/__tests__/components/events/EventSplitActionBar.test.tsx` (all modes + layout regression). Integration: `EventDetailScreen.test.tsx` (`shows scan and enter total when locked and receipt not scanned`).
 
 **Review items** navigates to `ItemReviewScreen` with `receipt_review` from `GET /events/:id` (no re-scan). If `receipt_review` is missing, show toast and pull to refresh.
 
@@ -1046,11 +1052,13 @@ Each section lists only events matching the selected toggle. Event card: title, 
 - `itemised` when `receipt_review` exists or `split_mode = 'itemised'`
 - `manual` for **Enter total** flows (`split_mode = equal|portion` or `ai_stage = calculated|messaging|complete` without receipt data)
 
+**Send messages** (when `canSendEventMessages()` — expenses entered, messages not sent) navigates to `MessagePreviewScreen` via `navigateInEventFlow()`.
+
 **Reset expenses** shows a destructive confirmation alert, then calls `POST /events/:id/expenses/reset`. On success: optimistic store patch (`applyExpensesResetLocal`), clear split store, refetch event detail, toast success. Footer returns to **Scan receipt** + **Enter total**. Hidden when `messages_sent_at` is set (`canResetEventExpenses()`).
 
 Event Detail **refetches on focus** (`useFocusEffect`) except immediately after reset (skip one focus refresh to avoid alert-dismiss race overwriting optimistic state).
 
-- Summary bar: total | collected | outstanding + progress ring
+- Summary card: three equal columns (amount on top, label below — **Total bill**, **Collected**, **Outstanding**). Column layout avoids label truncation from cramped label|value rows on narrow screens.
 - Segmented progress bar: green (confirmed) | amber (self-reported) | grey (pending)
 - Per-member roster:
   - Pending: name | amount | "💵 Cash" button | "⏰ Nudge" button (grayed if cooldown active, shows "Xh ago")

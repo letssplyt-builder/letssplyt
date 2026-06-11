@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
+import type { CompositeScreenProps } from '@react-navigation/native';
+import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -15,7 +17,9 @@ import {
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
+import type { EventStatus } from '@letssplyt/shared/event.types';
 import { AddParticipantModal } from '../../components/events/AddParticipantModal';
+import { EventDetailOverflowMenu } from '../../components/events/EventDetailOverflowMenu';
 import { EventMemberRow } from '../../components/events/EventMemberRow';
 import { EventSplitActionBar } from '../../components/events/EventSplitActionBar';
 import { ParticipantEventDetail } from '../../components/events/ParticipantEventDetail';
@@ -26,7 +30,8 @@ import { PrimaryButton } from '../../components/PrimaryButton';
 import { splitActionBarFooterStyle } from '../../constants/layout';
 import { useAppInsets } from '../../hooks/useAppInsets';
 import { getSupabase } from '../../lib/supabase';
-import type { EventsStackParamList } from '../../navigation/types';
+import { navigateInEventFlow } from '../../navigation/eventFlowNavigation';
+import type { EventsStackParamList, HomeStackParamList, MainTabParamList } from '../../navigation/types';
 import { getApiErrorCode, isApiRequestError } from '../../services/api';
 import * as eventService from '../../services/event.service';
 import { useAuthStore } from '../../store/authStore';
@@ -38,11 +43,18 @@ import { receiptReviewToParseResult } from '../receipts/itemReview.utils';
 import { formatMoney, isPayerParticipant } from '../../utils/events';
 import {
   canResetEventExpenses,
+  canSendEventMessages,
   resolveEventSplitActionMode,
   resolveSplitEntryMode,
 } from '../../utils/eventSplitFooter';
 
-type Props = NativeStackScreenProps<EventsStackParamList, 'EventDetail'>;
+type Props = CompositeScreenProps<
+  NativeStackScreenProps<EventsStackParamList, 'EventDetail'>,
+  BottomTabScreenProps<MainTabParamList>
+> | CompositeScreenProps<
+  NativeStackScreenProps<HomeStackParamList, 'EventDetail'>,
+  BottomTabScreenProps<MainTabParamList>
+>;
 
 function isTokenExpired(expiresAt: string | undefined): boolean {
   if (!expiresAt) return true;
@@ -52,6 +64,12 @@ function isTokenExpired(expiresAt: string | undefined): boolean {
 
 function isJoiningPhase(status: string): boolean {
   return status === 'open';
+}
+
+const SETTLEMENT_EVENT_STATUSES: EventStatus[] = ['locked', 'calculating', 'sent', 'settled'];
+
+function isSettlementEventStatus(status: EventStatus): boolean {
+  return SETTLEMENT_EVENT_STATUSES.includes(status);
 }
 
 function lockGroupErrorMessage(code: string | undefined): string {
@@ -166,13 +184,22 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const memberCount = participants.length;
   const lockEnabled = memberCount >= 2;
   const isPayer = Boolean(authUser && event && authUser.id === event.payer_id);
-  const showSplitActions = isPayer && event?.status === 'locked';
   const splitActionMode = event
     ? resolveEventSplitActionMode(event.ai_stage, Boolean(currentEvent?.receipt_review))
     : 'initial';
   const showResetExpenses = event
     ? canResetEventExpenses(event.ai_stage, event.messages_sent_at)
     : false;
+  const showSendMessages = event
+    ? canSendEventMessages(event.ai_stage, event.messages_sent_at)
+    : false;
+  const showSplitActions = Boolean(isPayer && event && isSettlementEventStatus(event.status));
+  const showOverflowMenu = Boolean(
+    isPayer &&
+      event &&
+      !joining &&
+      (event.status === 'locked' || showResetExpenses),
+  );
 
   const openItemReview = () => {
     const review = currentEvent?.receipt_review;
@@ -180,7 +207,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
       setToast('Receipt data is not ready yet. Pull to refresh.');
       return;
     }
-    navigation.navigate('ItemReview', {
+    navigateInEventFlow(navigation, 'ItemReview', {
       eventId,
       storagePath: '',
       parseResult: receiptReviewToParseResult(review),
@@ -210,7 +237,27 @@ export function EventDetailScreen({ navigation, route }: Props) {
       event.ai_stage,
       Boolean(detail?.receipt_review),
     );
-    navigation.navigate('SplitEntry', { eventId, mode });
+    navigateInEventFlow(navigation, 'SplitEntry', { eventId, mode });
+  };
+
+  const openMessagePreview = () => {
+    navigateInEventFlow(navigation, 'MessagePreview', { eventId });
+  };
+
+  const confirmReopenJoinWindow = () => {
+    Alert.alert(
+      'Reopen join window?',
+      'The group will be open again for 24 hours so a latecomer can scan the QR or use the link. Lock the group again after they join.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reopen',
+          onPress: () => {
+            void handleReopen();
+          },
+        },
+      ],
+    );
   };
 
   const confirmResetExpenses = () => {
@@ -372,14 +419,14 @@ export function EventDetailScreen({ navigation, route }: Props) {
         showSplitActions ? (
           <EventSplitActionBar
             mode={splitActionMode}
-            canResetExpenses={showResetExpenses && !isResettingExpenses}
-            onScanReceipt={() => navigation.navigate('ReceiptScan', { eventId })}
+            canSendMessages={showSendMessages}
+            onScanReceipt={() => navigateInEventFlow(navigation, 'ReceiptScan', { eventId })}
             onEnterTotal={() =>
-              navigation.navigate('SplitEntry', { eventId, mode: 'manual' })
+              navigateInEventFlow(navigation, 'SplitEntry', { eventId, mode: 'manual' })
             }
             onReviewItems={openItemReview}
             onEditShare={() => void openEditShare()}
-            onResetExpenses={confirmResetExpenses}
+            onSendMessages={openMessagePreview}
           />
         ) : undefined
       }
@@ -399,7 +446,18 @@ export function EventDetailScreen({ navigation, route }: Props) {
         <Text style={styles.screenTitle} numberOfLines={1}>
           {event?.title ?? 'Event'}
         </Text>
-        <View style={styles.backPlaceholder} />
+        {showOverflowMenu ? (
+          <EventDetailOverflowMenu
+            showReopen={event?.status === 'locked'}
+            reopenLoading={isReopening}
+            onReopen={confirmReopenJoinWindow}
+            showReset={showResetExpenses}
+            resetLoading={isResettingExpenses}
+            onReset={confirmResetExpenses}
+          />
+        ) : (
+          <View style={styles.topBarPlaceholder} />
+        )}
       </View>
 
       <ScrollView
@@ -512,41 +570,27 @@ export function EventDetailScreen({ navigation, route }: Props) {
           </>
         ) : isPayer ? (
           <View style={styles.settlementPhase}>
-            {event?.status === 'locked' && isPayer ? (
-              <View style={styles.reopenSection}>
-                <PrimaryButton
-                  label="Reopen join window"
-                  variant="inverse"
-                  loading={isReopening}
-                  disabled={isReopening}
-                  onPress={() => void handleReopen()}
-                  style={styles.reopenButton}
-                />
-                <Text style={styles.reopenHelper}>
-                  Reopens QR and link for 24 hours for latecomers.
-                </Text>
-              </View>
-            ) : null}
-
             <Text style={glassStyles.heading}>Settlement phase</Text>
             <View style={styles.summaryCard}>
-              <View style={styles.summaryRow}>
-                <Text style={glassStyles.meta}>Total</Text>
-                <Text style={styles.summaryValue}>
-                  {formatMoney(settlementSummary.total, event?.currency ?? 'USD')}
-                </Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={glassStyles.meta}>Collected</Text>
-                <Text style={[styles.summaryValue, styles.collected]}>
-                  {formatMoney(settlementSummary.collected, event?.currency ?? 'USD')}
-                </Text>
-              </View>
-              <View style={styles.summaryRow}>
-                <Text style={glassStyles.meta}>Outstanding</Text>
-                <Text style={[styles.summaryValue, styles.outstanding]}>
-                  {formatMoney(settlementSummary.outstanding, event?.currency ?? 'USD')}
-                </Text>
+              <View style={styles.summaryColumns}>
+                <View style={[styles.summaryColumn, styles.summaryColumnTotal]}>
+                  <Text style={[styles.summaryAmount, styles.summaryAmountTotal]}>
+                    {formatMoney(settlementSummary.total, event?.currency ?? 'USD')}
+                  </Text>
+                  <Text style={styles.summaryLabel}>Total bill</Text>
+                </View>
+                <View style={[styles.summaryColumn, styles.summaryColumnCollected]}>
+                  <Text style={[styles.summaryAmount, styles.summaryAmountCollected]}>
+                    {formatMoney(settlementSummary.collected, event?.currency ?? 'USD')}
+                  </Text>
+                  <Text style={styles.summaryLabel}>Collected</Text>
+                </View>
+                <View style={[styles.summaryColumn, styles.summaryColumnOutstanding]}>
+                  <Text style={[styles.summaryAmount, styles.summaryAmountOutstanding]}>
+                    {formatMoney(settlementSummary.outstanding, event?.currency ?? 'USD')}
+                  </Text>
+                  <Text style={styles.summaryLabel}>Outstanding</Text>
+                </View>
               </View>
             </View>
 
@@ -621,8 +665,9 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: authColors.textOnDarkMuted,
   },
-  backPlaceholder: {
-    minWidth: 72,
+  topBarPlaceholder: {
+    minWidth: 36,
+    minHeight: 36,
   },
   screenTitle: {
     flex: 1,
@@ -692,40 +737,54 @@ const styles = StyleSheet.create({
     marginTop: 8,
     lineHeight: 17,
   },
-  reopenSection: {
-    marginBottom: 20,
-    gap: 8,
-  },
-  reopenButton: {
-    alignSelf: 'stretch',
-  },
-  reopenHelper: {
-    fontSize: 13,
-    color: authColors.textOnDarkMuted,
-    lineHeight: 18,
-  },
   settlementPhase: {
     marginTop: 8,
   },
   summaryCard: {
     ...glassStyles.cardStrong,
     marginBottom: 20,
-    gap: 10,
   },
-  summaryRow: {
+  summaryColumns: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    gap: 8,
   },
-  summaryValue: {
+  summaryColumn: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 6,
+    borderRadius: 12,
+    minWidth: 0,
+  },
+  summaryColumnTotal: {
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+  },
+  summaryColumnCollected: {
+    backgroundColor: 'rgba(110, 231, 183, 0.14)',
+  },
+  summaryColumnOutstanding: {
+    backgroundColor: 'rgba(252, 165, 165, 0.14)',
+  },
+  summaryAmount: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  summaryAmountTotal: {
     color: authColors.textOnDark,
   },
-  collected: {
+  summaryAmountCollected: {
     color: '#6EE7B7',
   },
-  outstanding: {
+  summaryAmountOutstanding: {
     color: authColors.errorOnDark,
+  },
+  summaryLabel: {
+    marginTop: 4,
+    fontSize: 11,
+    fontWeight: '600',
+    color: authColors.textOnDarkMuted,
+    textAlign: 'center',
+    flexShrink: 0,
   },
 });

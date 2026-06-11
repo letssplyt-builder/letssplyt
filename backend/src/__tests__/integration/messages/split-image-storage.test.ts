@@ -20,7 +20,6 @@ describe('split image storage integration', () => {
   it('uploadSplitImage writes PNG to receipts bucket at split-[participantId].png path', async () => {
     const buffer = await generateSplitImage({
       eventName: 'Smoke Dinner',
-      eventDate: null,
       payerDisplayName: 'Alex',
       participants: [
         {
@@ -33,8 +32,7 @@ describe('split image storage integration', () => {
       highlightedParticipantId: PARTICIPANT_ID,
       currency: 'USD',
       locale: 'en-US',
-      taxAndTip: 8,
-      total: 50,
+      showItemsColumn: true,
     });
 
     const path = await uploadSplitImage(EVENT_ID, PARTICIPANT_ID, buffer);

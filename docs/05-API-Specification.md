@@ -280,7 +280,7 @@ X-RateLimit-Reset: [unix timestamp]
 ### GET `/users/me/balance`
 **Auth:** `[AUTH]`
 
-Returns the authenticated user's net balance across all events — amounts others owe them minus amounts they owe others.
+Returns the authenticated user's net balance across all events — amounts others owe them minus amounts they owe others. **`owed_to_you` includes every outstanding obligation on events the user created:** registered members (`user_id` set) and pure guests (`user_id` null, e.g. manual add / SMS guests). Guests never contribute to `you_owe` (guests cannot be logged-in viewers). Aligns with the combined total shown in the Home balance hero above the Members | Guests toggle.
 
 **Response `200`:**
 ```json

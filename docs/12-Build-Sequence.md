@@ -1957,8 +1957,9 @@ backend/src/__tests__/unit/ai/receipt-parser.dedupe.test.ts
 4. Swipe left on compact food row → delete → total updates
 5. **+ Add line** adds a new editable row
 6. **Looks good → assign shares** → `POST /api/v1/receipts/confirm` → `SplitEntryScreen` (`itemised`)
-7. Event Detail (locked payer): after scan without confirm, footer shows **Review items** (not Scan/Enter total); after confirm or manual split entry, **Edit share** + **Reset expenses**; refetch on screen focus (skip one refresh after reset alert)
+7. Event Detail (locked payer): after scan without confirm, footer shows **Review items** (not Scan/Enter total); after confirm or manual split entry, **Edit share** + **Reset expenses** (+ **Send messages** when expenses entered); refetch on screen focus (skip one refresh after reset alert)
 8. **Reset expenses** → `POST /events/:id/expenses/reset` → footer returns to **Scan receipt** + **Enter total** (blocked after `messages_sent_at`)
+9. **EventSplitActionBar layout:** paired CTAs (**Scan receipt** + **Enter total**, **Edit share** + **Send messages**) must use a **row** with `flex: 1` per button; stacked CTAs use `alignSelf: 'stretch'` only (never `flex: 1` in a column) — prevents invisible zero-height footer buttons in `AuthGradientLayout`
 
 **Tests required:**
 ```
@@ -1966,6 +1967,7 @@ mobile/src/__tests__/components/receipts/ItemReviewScreen.test.tsx
 mobile/src/__tests__/components/receipts/ReceiptReviewSlip.test.tsx
 mobile/src/__tests__/unit/utils/eventSplitFooter.test.ts
 mobile/src/__tests__/unit/screens/itemReview.utils.test.ts
+mobile/src/__tests__/components/events/EventSplitActionBar.test.tsx (all footer modes + row/stack layout regression)
 mobile/src/__tests__/components/events/EventDetailScreen.test.tsx (reset + footer modes)
 
 backend/src/__tests__/unit/receipts/confirm.test.ts

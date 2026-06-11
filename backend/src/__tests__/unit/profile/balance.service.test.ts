@@ -38,6 +38,27 @@ describe('balance.service', () => {
     expect(balance.currency).toBe('USD');
   });
 
+  it('includes pure guest obligations in owed_to_you (user_id IS NULL)', async () => {
+    mockSupabase.__pushMockResultForTable('events', {
+      data: [{ id: EVENT_CREATED, currency: 'USD' }],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: [
+        { amount_owed: 25, user_id: OTHER_USER_ID },
+        { amount_owed: 15, user_id: null },
+      ],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', { data: [], error: null });
+
+    const balance = await getUserBalance(USER_ID);
+
+    expect(balance.owed_to_you).toBe(40);
+    expect(balance.you_owe).toBe(0);
+    expect(balance.net_balance).toBe(40);
+  });
+
   it('returns zeros when user has no outstanding amounts', async () => {
     mockSupabase.__pushMockResultForTable('events', { data: [], error: null });
     mockSupabase.__pushMockResultForTable('participants', { data: [], error: null });

@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
@@ -21,6 +22,10 @@ import type { EventsStackParamList } from '../../navigation/types';
 import * as eventService from '../../services/event.service';
 import * as splitsService from '../../services/splits.service';
 import { useSplitStore } from '../../store/splitStore';
+import {
+  assignmentsFromApiRows,
+  hydrateSplitEntryState,
+} from './splitEntry.hydrate';
 import { colors } from '../../theme/colors';
 import {
   amountsFromPercents,
@@ -78,6 +83,7 @@ export function SplitEntryScreen({ navigation, route }: Props) {
       setCurrency(eventCurrency);
 
       const review = detail.receipt_review;
+      let hasItems = false;
       if (review) {
         const items = review.items
           .filter((item) => item.id)
@@ -87,6 +93,7 @@ export function SplitEntryScreen({ navigation, route }: Props) {
             unit_price: item.unit_price,
             quantity: item.quantity,
           }));
+        hasItems = items.length > 0;
         setFoodItems(items);
         const subtotal = review.items.reduce(
           (sum, item) => sum + item.unit_price * item.quantity,
@@ -104,10 +111,39 @@ export function SplitEntryScreen({ navigation, route }: Props) {
         setManualTotalInput(total > 0 ? String(total) : '');
       }
 
-      const emptyInputs = Object.fromEntries(rows.map((p) => [p.id, '']));
-      setAmountInputs(emptyInputs);
-      setPercentInputs(emptyInputs);
-      setPortionInputs(Object.fromEntries(rows.map((p) => [p.id, '1'])));
+      const storedSplit = useSplitStore.getState();
+      const storedSplits =
+        storedSplit.eventId === eventId && storedSplit.splits.length > 0
+          ? storedSplit.splits
+          : undefined;
+
+      const hydrated = hydrateSplitEntryState({
+        participants: detail.participants,
+        splitMode: detail.event.split_mode,
+        aiStage: detail.event.ai_stage,
+        currency: eventCurrency,
+        hasReceiptItems: hasItems,
+        storedSplits,
+      });
+
+      setAmountInputs(hydrated.amountInputs);
+      setPercentInputs(hydrated.percentInputs);
+      setPortionInputs(hydrated.portionInputs);
+      setActiveTab(hydrated.activeTab);
+      setSplitPath(hydrated.splitPath);
+
+      if (hydrated.splitPath === 'itemised' && hasItems) {
+        try {
+          const { assignments: assignmentRows } = await splitsService.fetchSplitAssignments(
+            eventId,
+          );
+          if (assignmentRows.length > 0) {
+            setAssignments(assignmentsFromApiRows(assignmentRows));
+          }
+        } catch {
+          // Assignments optional — user can re-assign if fetch fails.
+        }
+      }
     } catch {
       Alert.alert('Could not load event', 'Check your connection and try again.');
       navigation.goBack();
@@ -341,10 +377,27 @@ export function SplitEntryScreen({ navigation, route }: Props) {
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>Fair play</Text>
           <Text style={styles.title}>Lets Splyt</Text>
-          <View style={styles.totalPill}>
-            <Text style={styles.totalLabel}>Bill total</Text>
-            <Text style={styles.totalValue}>{formatSplitMoney(effectiveTotal, currency)}</Text>
-          </View>
+          {hasReceiptItems ? (
+            <View style={styles.totalPill}>
+              <Text style={styles.totalLabel}>Bill total</Text>
+              <Text style={styles.totalValue}>
+                {formatSplitMoney(effectiveTotal, currency)}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.totalInputBlock}>
+              <Text style={styles.totalLabel}>Bill Total</Text>
+              <TextInput
+                accessibilityLabel="Bill total"
+                keyboardType="decimal-pad"
+                value={manualTotalInput}
+                onChangeText={setManualTotalInput}
+                style={styles.totalInput}
+                placeholder="0.00"
+                placeholderTextColor="rgba(255,255,255,0.45)"
+              />
+            </View>
+          )}
         </View>
 
         <SplitPathToggle
@@ -391,9 +444,6 @@ export function SplitEntryScreen({ navigation, route }: Props) {
             allocationLabel={allocationLabel.text}
             allocationBalanced={allocationLabel.balanced}
             progressRatio={allocationLabel.ratio}
-            manualTotalInput={manualTotalInput}
-            onManualTotalChange={setManualTotalInput}
-            showManualTotal={!hasReceiptItems}
           />
         )}
 
@@ -413,56 +463,72 @@ const styles = StyleSheet.create({
   },
   scroll: {
     paddingHorizontal: 20,
-    paddingTop: 4,
+    paddingTop: 2,
   },
   backBtn: {
-    marginBottom: 8,
+    marginBottom: 6,
   },
   back: {
     color: 'rgba(255,255,255,0.85)',
     fontWeight: '600',
-    fontSize: 15,
+    fontSize: 14,
   },
   hero: {
-    marginBottom: 20,
+    marginBottom: 14,
   },
   eyebrow: {
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 1.2,
+    fontSize: 11,
+    fontWeight: '700',
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
     color: 'rgba(255,255,255,0.55)',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   title: {
-    fontSize: 32,
-    fontWeight: '900',
+    fontSize: 22,
+    fontWeight: '800',
     color: '#FFFFFF',
-    letterSpacing: -0.5,
-    lineHeight: 38,
-    marginBottom: 16,
+    letterSpacing: -0.3,
+    lineHeight: 28,
+    marginBottom: 10,
   },
   totalPill: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(255,255,255,0.12)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.22)',
-    borderRadius: 20,
-    paddingVertical: 14,
-    paddingHorizontal: 18,
+    borderColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
   },
   totalLabel: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.75)',
+    color: 'rgba(255,255,255,0.72)',
   },
   totalValue: {
-    fontSize: 24,
-    fontWeight: '900',
+    fontSize: 18,
+    fontWeight: '800',
     color: '#FFFFFF',
     letterSpacing: -0.5,
+  },
+  totalInputBlock: {
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 14,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+  },
+  totalInput: {
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    letterSpacing: -0.3,
+    paddingVertical: 2,
+    marginTop: 2,
   },
   error: {
     marginTop: 16,

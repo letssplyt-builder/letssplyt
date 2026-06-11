@@ -4,23 +4,23 @@ import { PrimaryButton } from '../PrimaryButton';
 
 interface EventSplitActionBarProps {
   mode: EventSplitActionMode;
-  canResetExpenses: boolean;
+  canSendMessages: boolean;
   onScanReceipt: () => void;
   onEnterTotal: () => void;
   onReviewItems: () => void;
   onEditShare: () => void;
-  onResetExpenses: () => void;
+  onSendMessages: () => void;
 }
 
 /** Split CTAs shown after the group is locked (creator only). Render in AuthGradientLayout footer. */
 export function EventSplitActionBar({
   mode,
-  canResetExpenses,
+  canSendMessages,
   onScanReceipt,
   onEnterTotal,
   onReviewItems,
   onEditShare,
-  onResetExpenses,
+  onSendMessages,
 }: EventSplitActionBarProps) {
   if (mode === 'parsing') {
     return (
@@ -29,7 +29,7 @@ export function EventSplitActionBar({
           label="Reading receipt…"
           disabled
           accessibilityLabel="Reading receipt"
-          style={styles.fullWidth}
+          style={styles.stacked}
         />
       </View>
     );
@@ -42,30 +42,40 @@ export function EventSplitActionBar({
           label="Review items"
           onPress={onReviewItems}
           accessibilityLabel="Review receipt items"
-          style={styles.fullWidth}
+          style={styles.stacked}
         />
       </View>
     );
   }
 
   if (mode === 'edit') {
+    if (canSendMessages) {
+      return (
+        <View style={[styles.container, styles.row]} pointerEvents="box-none">
+          <PrimaryButton
+            label="Edit share"
+            onPress={onEditShare}
+            accessibilityLabel="Edit split"
+            style={styles.button}
+          />
+          <PrimaryButton
+            label="Send messages"
+            onPress={onSendMessages}
+            accessibilityLabel="Preview and send messages"
+            style={styles.button}
+          />
+        </View>
+      );
+    }
+
     return (
       <View style={styles.container} pointerEvents="box-none">
         <PrimaryButton
           label="Edit share"
           onPress={onEditShare}
           accessibilityLabel="Edit split"
-          style={styles.button}
+          style={styles.stacked}
         />
-        {canResetExpenses ? (
-          <PrimaryButton
-            label="Reset expenses"
-            variant="inverse"
-            onPress={onResetExpenses}
-            accessibilityLabel="Reset expenses"
-            style={styles.button}
-          />
-        ) : null}
       </View>
     );
   }
@@ -77,21 +87,21 @@ export function EventSplitActionBar({
           label="Scan receipt"
           onPress={onScanReceipt}
           accessibilityLabel="Scan receipt again"
-          style={styles.fullWidth}
+          style={styles.stacked}
         />
         <PrimaryButton
           label="Enter total"
           variant="inverse"
           onPress={onEnterTotal}
           accessibilityLabel="Enter total for custom split"
-          style={styles.fullWidth}
+          style={styles.stacked}
         />
       </View>
     );
   }
 
   return (
-    <View style={styles.container} pointerEvents="box-none">
+    <View style={[styles.container, styles.row]} pointerEvents="box-none">
       <PrimaryButton
         label="Scan receipt"
         onPress={onScanReceipt}
@@ -111,6 +121,9 @@ export function EventSplitActionBar({
 
 const styles = StyleSheet.create({
   container: {
+    gap: 10,
+  },
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
@@ -118,8 +131,7 @@ const styles = StyleSheet.create({
   button: {
     flex: 1,
   },
-  fullWidth: {
-    flex: 1,
+  stacked: {
     alignSelf: 'stretch',
   },
 });

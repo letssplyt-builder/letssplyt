@@ -1,4 +1,5 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { StackActions } from '@react-navigation/native';
 import { StyleSheet, Text } from 'react-native';
 import { TAB_BAR_CONTENT_HEIGHT, TAB_BAR_PADDING_TOP } from '../constants/layout';
 import { useAppInsets } from '../hooks/useAppInsets';
@@ -67,10 +68,18 @@ export function MainTabNavigator() {
         options={{
           tabBarLabel: 'Events',
           tabBarIcon: ({ focused }) => <TabIcon label="☰" focused={focused} />,
+          unmountOnBlur: true,
         }}
-        listeners={({ navigation }) => ({
-          tabPress: () => {
-            navigation.navigate('EventsTab', { screen: 'Events' });
+        listeners={({ navigation, route }) => ({
+          tabPress: (e) => {
+            const eventsState = route.state;
+            if (eventsState && eventsState.index > 0 && eventsState.key) {
+              e.preventDefault();
+              navigation.dispatch({
+                ...StackActions.popToTop(),
+                target: eventsState.key,
+              });
+            }
           },
         })}
       />
