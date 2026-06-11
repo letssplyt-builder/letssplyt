@@ -105,7 +105,7 @@
 | Tier 1 — Foundation | 4 | 16 | 16 | 0 |
 | Tier 2 — Core Flow | 5 | 23 | 19 | 4 |
 | Tier 3 — Operations | 4 | 13 | 0 | 13 |
-| **Total** | **13** | **52** | **28** | **24** |
+| **Total** | **13** | **52** | **29** | **23** |
 
 ---
 
@@ -134,4 +134,5 @@
 - [2026-06-10] — E07-S03 — Item Review Screen + `POST /receipts/confirm`, receipt-review snapshot on GET event, Event Detail footer modes (review/edit), ReceiptReviewSlip UX. **Partial E09 (ahead of E09-S02/S03):** Home Members|Guests dashboard, counterparties + member/guest detail APIs, HomeStack (Member/Guest detail), Events Active|Settled toggle with Created/Joined sections, tab stack reset on Dashboard/Events tap. Docs: 01, 02, 03, 08, 12 updated for Events layout. Tests: counterparties.service, EventsScreen, settlementStore, HomeScreen, filterEventsBySegment, eventSections, receipt confirm/review, ItemReview, eventSplitFooter.
 - [2026-06-11] — E08-S04 — Message Preview Screen: carousel per member (organiser excluded), split image from signed URL, Send to all gated until all viewed (send wired in E08-S05). Edit → SplitEntry with hydrate from split store + assignments API. Event Detail polish: overflow ⋮ (Reopen/Reset + confirm alerts), settlement footer for all post-lock statuses, split entry UI slimming, Home→EventDetail navigation, balance hero guests. Backend: preview/send exclude organiser, simplified split image columns, GET split assignments. MessagePreviewScreen tests 3/3; mobile suite green at sign-off.
 - [2026-06-07] — E08-S05 — Send + Realtime Delivery Tracking: DeliveryTrackingScreen (Realtime on participants, Done when sent/delivered/failed/skipped), MessagePreview Send to all (preview optional), retry per participant. Backend: POST messages/retry/:participantId, GET event includes message_sent_at/delivered_at/failed, dev bypass sets delivered_at, Twilio webhook updates delivered_at. Smoke 24/24; 260 backend + 9 mobile message tests passing at sign-off.
+- [2026-06-07] — E08-S06 — Twilio STOP webhook: `processSmsStopOptOut` (sms_opt_outs, users, participants, settlement_log), `/webhooks/twilio/stop` + `/opt-out`, TwiML confirmation; 264 backend tests. No mobile UI.
 - [2026-06-07] — **SMS delivery strategy change** — Retired MMS `mediaUrl` on send/preview. Each participant gets `participants.breakdown_token` + `See full split: https://{APP_DOMAIN}/split/{token}` in SMS body; `GET /split/:token` serves HTML (all rows including organiser; viewer highlighted). Preview API field `breakdown_url`; mobile MessagePreview opens link in browser. `POST /split/confirm` allowed when `events.status` is `locked` or `sent`. Migration #18. Legacy `split-image.generator.ts` not on delivery path. Docs: CLAUDE, 01–08, 12, MIGRATIONS. Tests: breakdown-page integration, message-assembler, confirm-split, send.service (no MMS), messages-send integration, MessagePreviewScreen 4/4, smoke script breakdown checks; 262 backend tests.
