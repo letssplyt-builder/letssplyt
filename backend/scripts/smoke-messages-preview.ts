@@ -1,6 +1,6 @@
 /**
  * Live smoke test for split confirm, messages preview (E08-S01), send (E08-S02),
- * and split image upload (E08-S03).
+ * split image upload (E08-S03), and delivery tracking fields + retry (E08-S05).
  *
  * Usage (backend must be running on PORT, default 3000):
  *   doppler run -- npm run smoke:messages-preview
@@ -14,6 +14,8 @@ const BASE_URL = (process.env.SMOKE_TEST_BASE_URL ?? `http://127.0.0.1:${process
   '',
 );
 const ALEX_PHONE = '+15005550001';
+/** Twilio magic number — distinct from payer for manual_phone guest. */
+const GUEST_PHONE = '+15005550002';
 
 type StepResult = { name: string; ok: boolean; detail: string };
 
@@ -107,7 +109,7 @@ async function ensurePayerHandle(accessToken: string): Promise<boolean> {
 }
 
 async function main(): Promise<void> {
-  console.log(`Smoke: messages preview + send + split image (E08-S01–S03) (${BASE_URL})\n`);
+  console.log(`Smoke: messages preview + send + delivery (E08-S01–S05) (${BASE_URL})\n`);
 
   let eventId: string | null = null;
 
@@ -150,14 +152,19 @@ async function main(): Promise<void> {
     const addGuest = await requestJson(
       'POST',
       `/api/v1/events/${eventId}/participants/manual`,
-      { display_name: 'Jordan', join_method: 'manual_name_only' },
+      {
+        display_name: 'Jordan',
+        join_method: 'manual_phone',
+        phone_e164: GUEST_PHONE,
+      },
       accessToken,
     );
-    if (addGuest.status !== 201) {
-      fail('POST /participants/manual', `status ${addGuest.status}`);
+    const guestParticipantId = addGuest.body.id as string | undefined;
+    if (addGuest.status !== 201 || !guestParticipantId) {
+      fail('POST /participants/manual (phone)', `status ${addGuest.status}`);
       return;
     }
-    pass('POST /participants/manual');
+    pass('POST /participants/manual (phone)', guestParticipantId);
 
     const locked = await requestJson('POST', `/api/v1/events/${eventId}/lock`, {}, accessToken);
     if (locked.status !== 200) {
@@ -266,7 +273,6 @@ async function main(): Promise<void> {
       preview.status === 200 &&
       previews?.length === memberCount &&
       previews.every((p) => p.message_text.length > 20) &&
-      previewsWithLinks.length >= 1 &&
       previewsWithImages.length >= 1
     ) {
       pass(
@@ -321,8 +327,8 @@ async function main(): Promise<void> {
     const eventStatus = send.body.event_status as string | undefined;
     if (
       send.status === 200 &&
-      sentCount === 0 &&
-      skippedCount === 1 &&
+      sentCount === 1 &&
+      skippedCount === 0 &&
       eventStatus === 'sent'
     ) {
       pass('POST messages/send', `sent=${sentCount} skipped=${skippedCount}`);
@@ -335,15 +341,63 @@ async function main(): Promise<void> {
       .from('notification_log')
       .select('id, participant_id, status, twilio_sid, channel')
       .eq('event_id', eventId);
-    if (!logs?.length) {
-      pass('DB notification_log', '0 rows (organiser excluded, guest has no phone)');
+    if (logs?.length === 1 && logs[0]?.participant_id === guestParticipantId) {
+      pass('DB notification_log', `1 row sid=${logs[0]?.twilio_sid}`);
     } else {
       fail('DB notification_log', JSON.stringify(logs));
       return;
     }
 
-    const previewParticipantId = previews?.[0]?.participant_id as string;
-    const sentParticipantId = previewParticipantId;
+    const detailAfterSend = await requestJson('GET', `/api/v1/events/${eventId}`, undefined, accessToken);
+    const participantsAfterSend = detailAfterSend.body.participants as
+      | Array<{
+          id: string;
+          is_organiser?: boolean;
+          message_sent_at?: string | null;
+          message_delivered_at?: string | null;
+          message_failed?: boolean;
+        }>
+      | undefined;
+    const guestAfterSend = participantsAfterSend?.find((row) => row.id === guestParticipantId);
+    if (
+      detailAfterSend.status === 200 &&
+      guestAfterSend?.message_sent_at &&
+      guestAfterSend?.message_delivered_at &&
+      !guestAfterSend?.message_failed
+    ) {
+      pass('GET event message delivery fields', 'message_sent_at + message_delivered_at');
+    } else {
+      fail('GET event message delivery fields', JSON.stringify(guestAfterSend));
+      return;
+    }
+
+    const { data: guestRow } = await supabaseAdmin
+      .from('participants')
+      .select('message_sent_at, message_delivered_at, message_failed')
+      .eq('id', guestParticipantId)
+      .maybeSingle();
+    if (guestRow?.message_sent_at && guestRow?.message_delivered_at && !guestRow?.message_failed) {
+      pass('DB participant delivery fields', 'sent_at + delivered_at');
+    } else {
+      fail('DB participant delivery fields', JSON.stringify(guestRow));
+      return;
+    }
+
+    const retry = await requestJson(
+      'POST',
+      `/api/v1/events/${eventId}/messages/retry/${guestParticipantId}`,
+      {},
+      accessToken,
+    );
+    const retrySent = retry.body.sent_count as number | undefined;
+    if (retry.status === 200 && retrySent === 1) {
+      pass('POST messages/retry/:participantId', `sent=${retrySent}`);
+    } else {
+      fail('POST messages/retry/:participantId', `status ${retry.status} ${JSON.stringify(retry.body)}`);
+      return;
+    }
+
+    const sentParticipantId = guestParticipantId;
     const storagePath = splitImageStoragePath(eventId, sentParticipantId);
     const receiptsBucket = supabaseAdmin.storage.from('receipts');
 

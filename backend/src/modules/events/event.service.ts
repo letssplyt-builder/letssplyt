@@ -489,7 +489,9 @@ export async function getEventById(userId: string, eventId: string): Promise<Eve
 
   const { data: participantRows, error: participantsError } = await supabaseAdmin
     .from('participants')
-    .select('id, user_id, display_name, join_method, payment_status, amount_owed')
+    .select(
+      'id, user_id, display_name, join_method, payment_status, amount_owed, message_sent_at, message_delivered_at, message_failed',
+    )
     .eq('event_id', eventId)
     .order('created_at', { ascending: true });
 
@@ -517,6 +519,9 @@ export async function getEventById(userId: string, eventId: string): Promise<Eve
     amount_owed: row.amount_owed as number | null,
     is_organiser: (row.user_id as string | null) === eventRow.payer_id,
     is_self: (row.user_id as string | null) === userId,
+    message_sent_at: row.message_sent_at as string | null,
+    message_delivered_at: row.message_delivered_at as string | null,
+    message_failed: Boolean(row.message_failed),
   }));
 
   const selfParticipant = participants.find((participant) => participant.is_self);

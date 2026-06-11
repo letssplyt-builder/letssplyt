@@ -41,6 +41,45 @@ export async function confirmEventSplit(
   });
 }
 
+export type SendResultStatus =
+  | 'sent'
+  | 'skipped_opt_out'
+  | 'skipped_no_phone'
+  | 'failed';
+
+export interface SendMessageResultRow {
+  participant_id: string;
+  status: SendResultStatus;
+  twilio_sid?: string;
+}
+
+export interface SendMessagesResponse {
+  sent_count: number;
+  skipped_count: number;
+  failed_count: number;
+  results: SendMessageResultRow[];
+  event_status: 'sent';
+}
+
 export async function fetchMessagePreviews(eventId: string): Promise<MessagePreviewResponse> {
   return apiGet<MessagePreviewResponse>(`/events/${eventId}/messages/preview`);
+}
+
+export async function sendEventMessages(
+  eventId: string,
+  participantIds?: string[],
+): Promise<SendMessagesResponse> {
+  return apiPostAuth<SendMessagesResponse>(`/events/${eventId}/messages/send`, {
+    participant_ids: participantIds ?? [],
+  });
+}
+
+export async function retryParticipantMessage(
+  eventId: string,
+  participantId: string,
+): Promise<SendMessagesResponse> {
+  return apiPostAuth<SendMessagesResponse>(
+    `/events/${eventId}/messages/retry/${participantId}`,
+    {},
+  );
 }

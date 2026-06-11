@@ -1,6 +1,7 @@
 import type { AiStage } from '@letssplyt/shared/event.types';
 import { AppError } from '../../infrastructure/errors';
 import { isPhoneOptedOut } from '../../infrastructure/notification/opt-out';
+import { isMessagingDevBypassEnabled } from '../../infrastructure/notification/messaging-dev-bypass';
 import { sendTwilioMessage } from '../../infrastructure/notification/twilio-messaging';
 import { supabaseAdmin } from '../../infrastructure/supabase';
 import {
@@ -160,10 +161,13 @@ export async function sendEventMessages(
         mediaUrl,
       );
 
+      const sentAt = new Date().toISOString();
+      const devBypass = isMessagingDevBypassEnabled();
       const { error: participantError } = await supabaseAdmin
         .from('participants')
         .update({
-          message_sent_at: new Date().toISOString(),
+          message_sent_at: sentAt,
+          ...(devBypass ? { message_delivered_at: sentAt } : {}),
           message_channel: twilioResult.channel,
           message_failed: false,
         })

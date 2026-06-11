@@ -59,7 +59,12 @@ describe('Twilio webhooks', () => {
     expect(mockSupabase.from).toHaveBeenCalledWith('sms_opt_outs');
   });
 
-  it('updates notification_log on delivery callback', async () => {
+  it('updates notification_log and participant delivery on delivered callback', async () => {
+    mockSupabase.__pushMockResultForTable('notification_log', {
+      data: { participant_id: 'part-1' },
+      error: null,
+    });
+
     const app = createApp();
 
     const res = await request(app)
@@ -70,5 +75,6 @@ describe('Twilio webhooks', () => {
 
     expect(res.status).toBe(200);
     expect(mockSupabase.from).toHaveBeenCalledWith('notification_log');
+    expect(mockSupabase.from).toHaveBeenCalledWith('participants');
   });
 });

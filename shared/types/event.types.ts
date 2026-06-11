@@ -86,6 +86,12 @@ export interface EventParticipantSummary {
   is_organiser?: boolean;
   /** True when this row belongs to the authenticated viewer. */
   is_self?: boolean;
+  /** Twilio send timestamp (payer settlement view). */
+  message_sent_at?: string | null;
+  /** Carrier delivery confirmation from Twilio callback. */
+  message_delivered_at?: string | null;
+  /** Send or delivery failure. */
+  message_failed?: boolean;
 }
 
 export interface ParticipantAssignedItem {

@@ -87,6 +87,18 @@ export async function handleTwilioDelivery(
     }
 
     const mappedStatus = mapDeliveryStatus(messageStatus);
+
+    const { data: logRow, error: logFetchError } = await supabaseAdmin
+      .from('notification_log')
+      .select('participant_id')
+      .eq('twilio_sid', messageSid)
+      .maybeSingle();
+
+    if (logFetchError) {
+      res.status(500).send('DB error');
+      return;
+    }
+
     const updatePayload: Record<string, unknown> = { status: mappedStatus };
     if (mappedStatus === 'delivered') {
       updatePayload.delivered_at = new Date().toISOString();
@@ -102,19 +114,19 @@ export async function handleTwilioDelivery(
       return;
     }
 
-    if (mappedStatus === 'failed' || mappedStatus === 'bounced') {
-      const { data: logRow } = await supabaseAdmin
-        .from('notification_log')
-        .select('participant_id')
-        .eq('twilio_sid', messageSid)
-        .maybeSingle();
+    const participantId = logRow?.participant_id as string | undefined;
+    if (participantId && mappedStatus === 'delivered') {
+      await supabaseAdmin
+        .from('participants')
+        .update({ message_delivered_at: new Date().toISOString() })
+        .eq('id', participantId);
+    }
 
-      if (logRow?.participant_id) {
-        await supabaseAdmin
-          .from('participants')
-          .update({ message_failed: true })
-          .eq('id', logRow.participant_id as string);
-      }
+    if (participantId && (mappedStatus === 'failed' || mappedStatus === 'bounced')) {
+      await supabaseAdmin
+        .from('participants')
+        .update({ message_failed: true })
+        .eq('id', participantId);
     }
 
     res.status(200).send('');

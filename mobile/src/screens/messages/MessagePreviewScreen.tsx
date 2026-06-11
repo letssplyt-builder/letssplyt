@@ -17,6 +17,7 @@ import { useAppInsets } from '../../hooks/useAppInsets';
 import type { EventsStackParamList } from '../../navigation/types';
 import {
   fetchMessagePreviews,
+  sendEventMessages,
   type MessagePreviewItem,
 } from '../../services/messages.service';
 import { isApiRequestError } from '../../services/api';
@@ -43,6 +44,8 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [viewedIds, setViewedIds] = useState<Set<string>>(new Set());
   const [imageLoading, setImageLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   const loadPreviews = useCallback(async () => {
     setLoading(true);
@@ -69,7 +72,6 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
   }, [loadPreviews]);
 
   const selected = previews[selectedIndex];
-  const allViewed = previews.length > 0 && viewedIds.size >= previews.length;
 
   const amountLabel = useMemo(() => {
     if (!selected) return '';
@@ -85,16 +87,34 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
     setImageLoading(Boolean(previews[index]?.split_image_url));
   };
 
+  const handleSendAll = async () => {
+    setSending(true);
+    setSendError(null);
+    try {
+      const result = await sendEventMessages(eventId);
+      navigation.replace('DeliveryTracking', {
+        eventId,
+        sendResults: result.results,
+      });
+    } catch (err) {
+      const message = isApiRequestError(err)
+        ? err.message
+        : 'Messages failed to send. Tap to retry.';
+      setSendError(message);
+    } finally {
+      setSending(false);
+    }
+  };
+
   return (
     <AuthGradientLayout
       footerStyle={splitActionBarFooterStyle(rawBottom)}
       footer={
         <PrimaryButton
           label="Send to all →"
-          disabled={!allViewed || loading || Boolean(error)}
-          onPress={() => {
-            // Delivery + Twilio send wired in E08-S05.
-          }}
+          loading={sending}
+          disabled={loading || Boolean(error) || sending || previews.length === 0}
+          onPress={() => void handleSendAll()}
           accessibilityLabel="Send to all"
           variant="inverse"
         />
@@ -140,7 +160,13 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
-          <Text style={styles.hint}>Tap each member to preview their message</Text>
+          {sendError ? (
+            <Pressable onPress={() => void handleSendAll()} style={styles.sendErrorBanner}>
+              <Text style={styles.sendErrorText}>{sendError}</Text>
+              <Text style={styles.sendErrorAction}>Tap to retry</Text>
+            </Pressable>
+          ) : null}
+          <Text style={styles.hint}>Optional — tap a member to preview their message</Text>
 
           <ScrollView
             horizontal
@@ -254,11 +280,6 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
             </View>
           ) : null}
 
-          {!allViewed && previews.length > 1 ? (
-            <Text style={styles.viewHint}>
-              Preview all {previews.length} messages to enable Send to all
-            </Text>
-          ) : null}
         </ScrollView>
       )}
     </AuthGradientLayout>
@@ -455,12 +476,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textMuted,
   },
-  viewHint: {
-    marginTop: 14,
-    fontSize: 13,
-    color: authColors.textOnDarkMuted,
-    textAlign: 'center',
-  },
   centered: {
     flex: 1,
     alignItems: 'center',
@@ -487,5 +502,22 @@ const styles = StyleSheet.create({
   retryText: {
     color: colors.primary,
     fontWeight: '700',
+  },
+  sendErrorBanner: {
+    backgroundColor: authColors.errorBgOnDark,
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 12,
+  },
+  sendErrorText: {
+    color: authColors.errorOnDark,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  sendErrorAction: {
+    marginTop: 4,
+    color: authColors.textOnDarkMuted,
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

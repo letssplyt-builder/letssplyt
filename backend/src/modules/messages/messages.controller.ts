@@ -27,6 +27,30 @@ export async function handleSendMessages(
   }
 }
 
+export async function handleRetryMessage(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new AppError('AUTH_REQUIRED', 'Unauthorized', 401);
+    }
+
+    const eventId = req.params.eventId ?? req.params.id;
+    const participantId = req.params.participantId;
+    if (!eventId || !participantId) {
+      throw new AppError('VALIDATION_ERROR', 'Event id and participant id are required', 400);
+    }
+
+    const result = await sendEventMessages(userId, eventId, [participantId]);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
 export async function handlePreviewMessages(
   req: Request,
   res: Response,

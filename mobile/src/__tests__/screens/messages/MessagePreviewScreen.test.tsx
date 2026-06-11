@@ -5,9 +5,16 @@ import * as messagesService from '../../../services/messages.service';
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
+const mockReplace = jest.fn();
+
+jest.mock('../../../services/messages.service');
 
 jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({ goBack: mockGoBack, navigate: mockNavigate }),
+  useNavigation: () => ({
+    goBack: mockGoBack,
+    navigate: mockNavigate,
+    replace: mockReplace,
+  }),
 }));
 
 const PREVIEWS: messagesService.MessagePreviewItem[] = [
@@ -52,7 +59,7 @@ describe('MessagePreviewScreen', () => {
     expect(screen.getByText(/Hi Alex/)).toBeTruthy();
   });
 
-  it('keeps Send to all disabled until every participant is previewed', async () => {
+  it('enables Send to all without previewing every participant', async () => {
     render(
       <MessagePreviewScreen
         navigation={{ goBack: mockGoBack, navigate: mockNavigate } as never}
@@ -65,13 +72,43 @@ describe('MessagePreviewScreen', () => {
     );
 
     const send = screen.getByLabelText('Send to all');
-    expect(send.props.accessibilityState?.disabled ?? send.props.disabled).toBeTruthy();
+    expect(send.props.accessibilityState?.disabled ?? send.props.disabled).toBeFalsy();
+  });
 
+  it('sends messages and navigates to delivery tracking', async () => {
+    jest.mocked(messagesService.sendEventMessages).mockResolvedValue({
+      sent_count: 2,
+      skipped_count: 0,
+      failed_count: 0,
+      event_status: 'sent',
+      results: [
+        { participant_id: 'p1', status: 'sent' },
+        { participant_id: 'p2', status: 'sent' },
+      ],
+    });
+
+    render(
+      <MessagePreviewScreen
+        navigation={{ goBack: mockGoBack, navigate: mockNavigate, replace: mockReplace } as never}
+        route={{ key: 'MessagePreview-1', name: 'MessagePreview', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Preview message for Alex')).toBeTruthy(),
+    );
     fireEvent.press(screen.getByLabelText('Preview message for Jordan'));
+    fireEvent.press(screen.getByLabelText('Send to all'));
 
     await waitFor(() => {
-      const enabledSend = screen.getByLabelText('Send to all');
-      expect(enabledSend.props.accessibilityState?.disabled ?? enabledSend.props.disabled).toBeFalsy();
+      expect(messagesService.sendEventMessages).toHaveBeenCalledWith('event-1');
+      expect(mockReplace).toHaveBeenCalledWith('DeliveryTracking', {
+        eventId: 'event-1',
+        sendResults: [
+          { participant_id: 'p1', status: 'sent' },
+          { participant_id: 'p2', status: 'sent' },
+        ],
+      });
     });
   });
 

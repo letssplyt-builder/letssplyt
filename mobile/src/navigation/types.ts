@@ -22,6 +22,14 @@ export type EventsStackParamList = {
   SplitEntry: { eventId: string; mode?: 'itemised' | 'manual' };
   SplitReview: { eventId: string };
   MessagePreview: { eventId: string };
+  DeliveryTracking: {
+    eventId: string;
+    sendResults?: Array<{
+      participant_id: string;
+      status: 'sent' | 'skipped_opt_out' | 'skipped_no_phone' | 'failed';
+      twilio_sid?: string;
+    }>;
+  };
 };
 
 export type MainTabParamList = {
