@@ -1,6 +1,5 @@
 import type { ApiError } from '@letssplyt/shared/api.types';
-import * as SecureStore from 'expo-secure-store';
-import { AUTH_TOKEN_KEY } from '../store/authStore';
+import { resolveAccessToken } from './authToken';
 import { getApiBaseUrl } from './getApiBaseUrl';
 
 export class ApiRequestError extends Error {
@@ -56,6 +55,8 @@ function resolveErrorMessage(
       return 'No account found. Check number and try again.';
     case 'SESSION_CREATE_FAILED':
       return 'Could not sign you in. Please try again.';
+    case 'DEVICE_SESSION_UPDATE_FAILED':
+      return 'Could not sign you in. Please try again.';
     case 'AUTH_PROFILE_CREATION_FAILED':
       return 'Could not finish setting up your account. Please try again.';
     case 'NETWORK_ERROR':
@@ -80,7 +81,7 @@ function resolveErrorMessage(
 }
 
 async function getAuthHeaders(): Promise<Record<string, string>> {
-  const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+  const token = await resolveAccessToken();
   if (!token) {
     throw new ApiRequestError('AUTH_REQUIRED', 'Unauthorized', 401);
   }

@@ -116,15 +116,20 @@ describe('OTPVerifyScreen', () => {
     }
 
     await waitFor(() => {
-      expect(mockApiPost).toHaveBeenCalledWith('/auth/otp/verify', {
-        phone_e164: '+15551234567',
-        code: '123456',
-        context: 'register',
-      });
+      expect(mockApiPost).toHaveBeenCalledWith(
+        '/auth/otp/verify',
+        expect.objectContaining({
+          phone_e164: '+15551234567',
+          code: '123456',
+          context: 'register',
+          device_id: expect.any(String),
+          platform: expect.any(String),
+        }),
+      );
     });
 
     await waitFor(() => {
-      expect(useAuthStore.getState().session?.access_token).toBe('refreshed-access-token');
+      expect(useAuthStore.getState().session?.access_token).toBe('access-1');
       expect(useAuthStore.getState().user?.display_name).toBe('Alex');
     });
   });
@@ -187,11 +192,16 @@ describe('OTPVerifyScreen', () => {
     }
 
     await waitFor(() => {
-      expect(mockApiPost).toHaveBeenCalledWith('/auth/otp/verify', {
-        phone_e164: '+15005550006',
-        code: '111111',
-        context: 'register',
-      });
+      expect(mockApiPost).toHaveBeenCalledWith(
+        '/auth/otp/verify',
+        expect.objectContaining({
+          phone_e164: '+15005550006',
+          code: '111111',
+          context: 'register',
+          device_id: expect.any(String),
+          platform: expect.any(String),
+        }),
+      );
     });
   });
 

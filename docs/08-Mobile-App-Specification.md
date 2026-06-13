@@ -55,9 +55,12 @@ RootNavigator (NativeStack)
 │   ├── WelcomeScreen
 │   ├── PhoneEntryScreen
 │   ├── OTPVerifyScreen
+│   ├── BiometricOptInScreen   ← after first OTP when device has biometrics enrolled (skippable)
 │   └── PushPermissionScreen  ← shown once after first OTP verify (is_new_user === true)
 │
-├── MainTabs           ← shown when session is valid (BottomTabNavigator) — **3 tabs** (Home, Events, Profile)
+├── BiometricLockScreen    ← shown when stored credentials exist but app is locked (cold start or idle)
+│
+├── MainTabs           ← shown when session is valid and unlocked (BottomTabNavigator) — **3 tabs** (Home, Events, Profile)
 │   ├── HomeTab         (icon: home)
 │   │   └── HomeStack (NativeStack)
 │   │       ├── HomeScreen               ← net balance + Members|Guests toggle + counterparty lists
@@ -254,151 +257,18 @@ Do not use Redux or Context API for application state. Zustand provides the righ
 
 ### Store Definitions
 
-```typescript
-// mobile/src/stores/authStore.ts
-import { create } from 'zustand';
-import { Session, User } from '@supabase/supabase-js';
-// NOTE: auth session/token data is stored via SecureStore through the Supabase client
-// (see ExpoSecureStoreAdapter in src/lib/supabase.ts). Do NOT use AsyncStorage for
-// session or token data — it is unencrypted on-disk storage. AsyncStorage is only
-// acceptable for non-sensitive user preferences (theme, language, last viewed tab).
+**Auth store (`mobile/src/store/authStore.ts`)** — authoritative implementation. Key behaviours:
 
-interface AuthUser {
-  id: string;
-  display_name: string;
-  avatar_colour: string;
-}
-
-interface AuthState {
-  user: AuthUser | null;
-  session: { access_token: string; refresh_token: string } | null;
-  isLoading: boolean;
-  login: (phone: string, otp: string) => Promise<{ is_new_user: boolean }>;
-  logout: () => Promise<void>;
-  setSession: (session: { access_token: string; refresh_token: string } | null) => void; // REQUIRED — updated by initAuthListener on token refresh
-}
-
-// NOTE: LetsSplyt has NO separate registration step. The first OTP verify auto-creates
-// the user; subsequent OTP verifies log in the existing user. The mobile app can check
-// if the user is 'new' from `response.data.is_new_user: boolean` in the response.
-//
-// Navigation flow:
-//   OTP Verify → [if is_new_user] → PushPermissionScreen → HomeScreen
-//   OTP Verify → [if !is_new_user] → HomeScreen
-//
-// IMPORTANT: The mobile app MUST NEVER call supabase.auth.verifyOtp() directly.
-// The backend's /auth/otp/verify endpoint handles:
-//   (1) Supabase OTP verification
-//   (2) user creation if first login
-//   (3) phone PII storage (hashed + encrypted)
-//   (4) JWT token return
-
-export const useAuthStore = create<AuthState>()((set) => ({
-  user: null,
-  session: null,
-  isLoading: false,
-
-  login: async (phone: string, otp: string) => {
-    set({ isLoading: true });
-    try {
-      // CORRECT — calls backend which handles user creation + PII storage:
-      const response = await api.post('/auth/otp/verify', { phone, code: otp });
-      // response.data: { access_token, refresh_token, user: { id, display_name, avatar_colour }, is_new_user }
-      const { access_token, refresh_token, user, is_new_user } = response.data;
-      // Store tokens via expo-secure-store
-      await SecureStore.setItemAsync('letssplyt_access_token', access_token);
-      await SecureStore.setItemAsync('letssplyt_refresh_token', refresh_token);
-      set({ user, session: { access_token, refresh_token }, isLoading: false });
-      return { is_new_user };
-    } catch (err) {
-      set({ isLoading: false });
-      throw err;
-    }
-  },
-
-  logout: async () => {
-    await supabase.auth.signOut();
-    // SecureStore entries are cleared by the Supabase client on sign-out
-    set({ user: null, session: null });
-  },
-
-  // setSession is called by initAuthListener on TOKEN_REFRESHED and SIGNED_IN events.
-  // It must be an explicit action in the store so the listener can update the session
-  // without triggering a full login flow.
-  setSession: (session: Session | null) => {
-    set({ session, user: session?.user ?? null });
-  },
-}));
-
-// REQUIRED: Wire Supabase token refresh into Zustand auth store.
-// Without this, the session in the store becomes stale after the 15-minute access token expires.
-// Add this to authStore initialization (call once on app startup):
-
-export function initAuthListener() {
-  const { data: { subscription } } = supabase.auth.onAuthStateChange(
-    (event, session) => {
-      if (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') {
-        useAuthStore.getState().setSession(session);
-        // Also update SecureStore so session survives app restart
-        if (session) {
-          SecureStore.setItemAsync('letssplyt_access_token', session.access_token);
-          SecureStore.setItemAsync('letssplyt_refresh_token', session.refresh_token ?? '');
-        }
-      }
-      if (event === 'SIGNED_OUT') {
-        useAuthStore.getState().logout();
-      }
-    }
-  );
-  return subscription; // call subscription.unsubscribe() in app cleanup
-}
-
-// Wiring requirement:
-// Call initAuthListener() in App.tsx root component useEffect on mount.
-// Store the returned subscription and call subscription.unsubscribe() on app unmount.
-// The Supabase client automatically refreshes the access token 60 seconds before expiry when autoRefreshToken: true.
-// The listener ensures the Zustand store and SecureStore stay in sync with the current token.
-```
-
-**Supabase client — SecureStore adapter (REQUIRED — never use AsyncStorage for auth storage):**
-
-```typescript
-// mobile/src/lib/supabase.ts
-import * as SecureStore from 'expo-secure-store';
-import { createClient } from '@supabase/supabase-js';
-
-// CORRECT — security-sensitive data in SecureStore
-// await SecureStore.setItemAsync('supabase_session', JSON.stringify(session));
-// const raw = await SecureStore.getItemAsync('supabase_session');
-
-// WRONG — never store tokens in AsyncStorage
-// import AsyncStorage from '@react-native-async-storage/async-storage';
-// await AsyncStorage.setItem('session', ...) // ← DO NOT DO THIS
-
-// AsyncStorage is only acceptable for:
-// - User preferences (theme, language)
-// - Zustand state persistence for NON-sensitive data (e.g. last viewed tab)
-// - Never for auth tokens, never for encrypted keys
-
-const ExpoSecureStoreAdapter = {
-  getItem: (key: string) => SecureStore.getItemAsync(key),
-  setItem: (key: string, value: string) => SecureStore.setItemAsync(key, value),
-  removeItem: (key: string) => SecureStore.deleteItemAsync(key),
-};
-
-export const supabase = createClient(
-  process.env.EXPO_PUBLIC_SUPABASE_URL!,
-  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
-  {
-    auth: {
-      storage: ExpoSecureStoreAdapter,
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: false,
-    },
-  }
-);
-```
+| Concern | Implementation |
+|---|---|
+| OTP login | `applyAuthResponse()` sets in-memory session **immediately** (navigation can proceed); persists refresh to SecureStore; offers biometric opt-in asynchronously when `isEnrolledAsync()` is true |
+| Token storage | `mobile/src/services/secureTokenStorage.ts` — **plain** mode: access + refresh in SecureStore; **biometric** mode: refresh in biometric-gated SecureStore (`requireAuthentication: true`); access token kept in memory while unlocked |
+| Skip biometric (Option B) | `skipBiometricStorage()` keeps **plain** persisted refresh — user still gets idle app lock, but cold start restores session without biometric gate |
+| API JWT | `resolveAccessToken()` in `mobile/src/services/authToken.ts` reads Zustand session first, then SecureStore — required so Profile/API calls work after biometric enroll when memory holds the active JWT |
+| Supabase client | In-memory session adapter (`mobile/src/lib/supabaseAuthStorage.ts`) — not SecureStore-backed; `initAuthListener` wires `TOKEN_REFRESHED` only; **does not** clear credentials on `SIGNED_OUT` (logout calls `clearSession` explicitly) |
+| Cold start | `bootstrapFromStorage()` — plain mode: silent restore; biometric mode: show `BiometricLockScreen` until `unlockApp()` succeeds |
+| Idle lock | `useAppLock` hook — 5 min background → `lockApp()` clears memory session; unlock via biometrics or device PIN |
+| Logout | `logout()` — best-effort `supabase.auth.signOut()`; **always** `clearSession()` locally even if network fails |
 
 ```typescript
 // mobile/src/stores/eventStore.ts
@@ -851,16 +721,43 @@ The backend still supports `context: 'login'` for other entry points (e.g. web j
 - 6 `TextInput` boxes side by side (one digit each), auto-focus, auto-advance
 - "Resend code" link (disabled for 30 seconds after initial send, shows countdown); resend uses `context: 'register'`
 - On complete entry (6 digits filled): auto-submit `POST /api/v1/auth/otp/verify` with `context: 'register'` (backend endpoint — NOT supabase.auth.verifyOtp())
-  - Request body: `{ phone_e164, code, context: 'register', display_name? }`
+  - Request body: `{ phone_e164, code, context: 'register', display_name?, device_id, platform }` — `device_id` is a stable UUID from SecureStore (`mobile/src/services/deviceId.ts`); `platform` is `ios` or `android`
   - Response: `{ access_token, refresh_token, user: { id, display_name, avatar_colour, is_new_user }, ... }`
-  - Store tokens in expo-secure-store; set authStore.user
-- On success (`is_new_user === true`): navigate to PushPermissionScreen
-- On success (`is_new_user === false`): navigate to Home (biometric prompt deferred)
+  - Call `authStore.applyAuthResponse()` — sets session in memory immediately; `RootNavigator` resets stack off OTP (do not rely on navigator `key` remount)
+- On success navigation (via `RootNavigator` + `resolveAuthenticatedRoute`):
+  1. If device biometrics enrolled → `BiometricOptInScreen` (user can Enable or Skip)
+  2. Else if pending join deep link → `AppJoinScreen`
+  3. Else if `is_new_user` → `PushPermissionScreen`
+  4. Else → `MainTabs`
 - Back button → PhoneEntryScreen
 
 **Error state:** If OTP is incorrect, show red text below the input boxes: "Incorrect code. Try again." and clear all boxes. If expired: "That code has expired. Tap Resend to get a new one."
 
 **Accessibility:** Each digit input: `accessibilityLabel="Digit 1"` through `"Digit 6"`. Resend link: `accessibilityRole="button"`, `accessibilityHint="Sends a new verification code to your phone"`.
+
+---
+
+#### BiometricOptInScreen (after first OTP — skippable)
+
+Shown when `authStore.pendingBiometricOptIn === true` (device has Face ID / fingerprint enrolled). Prototype: `prototype/dusk-auth.html` (biometric panel).
+
+- Heading: faster sign-in with Face ID or fingerprint
+- **Enable** → `enrollBiometricStorage()` — user confirms with biometrics; refresh token moves to biometric-gated SecureStore; plain refresh deleted
+- **Skip** → `skipBiometricStorage()` (**Option B**) — refresh stays in plain SecureStore; user still gets **idle app lock** (5 min background) but cold start restores without biometric gate
+- Navigation: `RootNavigator` resets to this screen; completing either path proceeds to join flow / push permission / main tabs per `resolveAuthenticatedRoute`
+
+---
+
+#### BiometricLockScreen (cold start + idle lock)
+
+Shown when `hasStoredCredentials && !isUnlocked` (biometric mode cold start, or after `lockApp()` from idle background).
+
+- Prompt: unlock with Face ID, fingerprint, or device PIN (`authenticateAsync` with device fallback allowed)
+- **Success** → `unlockApp()` restores session from stored refresh token
+- **Failure** (cancel or 3 failed attempts) → `clearSession()` → Welcome / phone OTP
+- **Use phone number** link → `clearSession()` → Welcome
+
+If user removes biometrics from device settings while in biometric mode: `isEnrolledAsync()` false on unlock → silent credential wipe and return to phone OTP (no crash, no biometric error toast).
 
 ---
 

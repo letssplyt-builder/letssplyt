@@ -9,6 +9,7 @@ import {
   type NativeSyntheticEvent,
   type TextInputKeyPressEventData,
 } from 'react-native';
+import { Platform } from 'react-native';
 import type { AuthSession } from '@letssplyt/shared/auth.types';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { FadeSlideIn } from '../../components/auth/FadeSlideIn';
@@ -16,6 +17,7 @@ import { OtpDigitBox } from '../../components/auth/OtpDigitBox';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import type { RootStackParamList } from '../../navigation/types';
 import { apiPost, getApiErrorCode, isApiRequestError } from '../../services/api';
+import { getDeviceId } from '../../services/deviceId';
 import { useAuthStore } from '../../store/authStore';
 import { useJoinStore } from '../../store/joinStore';
 import { authColors } from '../../theme/colors';
@@ -38,6 +40,7 @@ export function OTPVerifyScreen({ navigation, route }: Props) {
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [resendSeconds, setResendSeconds] = useState(RESEND_COOLDOWN_SECONDS);
+  const verifyingRef = useRef(false);
   const inputRefs = useRef<Array<TextInput | null>>([]);
   const isLoading = useAuthStore((state) => state.isLoading);
   const setLoading = useAuthStore((state) => state.setLoading);
@@ -60,14 +63,18 @@ export function OTPVerifyScreen({ navigation, route }: Props) {
     async (codeOverride?: string) => {
       const code = codeOverride ?? digits.join('');
       if (code.length !== OTP_LENGTH) return;
+      if (verifyingRef.current) return;
 
       setError(null);
+      verifyingRef.current = true;
       setLoading(true);
       try {
         const body: Record<string, string> = {
           phone_e164: phoneE164,
           code,
           context: 'register',
+          device_id: await getDeviceId(),
+          platform: Platform.OS === 'ios' ? 'ios' : 'android',
         };
         if (!isExistingAccount && displayName.trim()) {
           body.display_name = displayName.trim();
@@ -95,6 +102,7 @@ export function OTPVerifyScreen({ navigation, route }: Props) {
           setError('Incorrect code. Try again.');
         }
       } finally {
+        verifyingRef.current = false;
         setLoading(false);
       }
     },

@@ -474,5 +474,31 @@ describe('auth.service OTP verify regressions', () => {
       expect(session.user.id).toBe('auth-login-1');
       expect(session.user.is_new_user).toBe(false);
     });
+
+    it('still returns a session when device_sessions registration fails', async () => {
+      mockSupabase.__setMockResultForTable('users', {
+        data: { id: 'user-public-1', display_name: 'Alex', avatar_colour: '#4F46E5' },
+        error: null,
+      });
+      mockSupabase.auth.admin.getUserById.mockResolvedValueOnce({
+        data: { user: { id: 'user-public-1', email: 'user-public-1@letssplyt.internal' } },
+        error: null,
+      });
+      mockSupabase.__setMockResultForTable('device_sessions', {
+        data: null,
+        error: { code: '42P01', message: 'relation device_sessions does not exist' },
+      });
+
+      const session = await verifyOtpAndCreateSession(
+        PHONE,
+        '123456',
+        undefined,
+        'login',
+        { deviceId: 'device-android-1', platform: 'android' },
+      );
+
+      expect(session.access_token).toBe('access-token');
+      expect(session.user.id).toBe('user-public-1');
+    });
   });
 });

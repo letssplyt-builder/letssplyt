@@ -1,10 +1,14 @@
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import {
+  AUTH_REFRESH_TOKEN_BIO_KEY,
   AUTH_REFRESH_TOKEN_KEY,
   AUTH_TOKEN_KEY,
-  useAuthStore,
-} from './authStore';
+  BIOMETRIC_MODE_KEY,
+} from '../services/secureTokenStorage';
+import { useAuthStore } from './authStore';
 import {
   mockAuthStateCallback,
   mockOnAuthStateChange,
@@ -14,97 +18,28 @@ import {
 
 describe('authStore', () => {
   beforeEach(() => {
-    useAuthStore.setState({ session: null, user: null, isLoading: false, needsPushPermission: false });
+    useAuthStore.setState({
+      session: null,
+      user: null,
+      isLoading: false,
+      needsPushPermission: false,
+      isBootstrapping: false,
+      isUnlocked: false,
+      hasStoredCredentials: false,
+      storageMode: null,
+      pendingBiometricOptIn: false,
+    });
     jest.clearAllMocks();
   });
 
-  it('initialises with null session and user', () => {
+  it('initialises with null session and locked state', () => {
     const state = useAuthStore.getState();
     expect(state.session).toBeNull();
-    expect(state.user).toBeNull();
-    expect(state.isLoading).toBe(false);
+    expect(state.isUnlocked).toBe(false);
   });
 
-  it('setSession persists access and refresh tokens to expo-secure-store', async () => {
-    const session = {
-      access_token: 'test-access-token',
-      refresh_token: 'test-refresh-token',
-      expires_in: 3600,
-      token_type: 'bearer',
-      user: {
-        id: 'user-1',
-        app_metadata: {},
-        user_metadata: {},
-        aud: 'authenticated',
-        created_at: '2026-01-01T00:00:00Z',
-      },
-    };
-
-    useAuthStore.setState({
-      user: { id: 'user-1', display_name: 'Alex', avatar_colour: '#4F46E5' },
-    });
-
-    await useAuthStore.getState().setSession(session as never);
-
-    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY, 'test-access-token');
-    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
-      AUTH_REFRESH_TOKEN_KEY,
-      'test-refresh-token',
-    );
-    expect(useAuthStore.getState().session).toEqual(session);
-    expect(useAuthStore.getState().user?.display_name).toBe('Alex');
-  });
-
-  it('logout signs out of Supabase and clears stored tokens', async () => {
-    await useAuthStore.getState().setSession({
-      access_token: 'token',
-      refresh_token: 'refresh',
-      expires_in: 3600,
-      token_type: 'bearer',
-      user: null,
-    } as never);
-    useAuthStore.setState({
-      user: { id: 'user-1', display_name: 'Alex', avatar_colour: '#4F46E5' },
-    });
-
-    await useAuthStore.getState().logout();
-
-    expect(mockSignOut).toHaveBeenCalled();
-    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY);
-    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(AUTH_REFRESH_TOKEN_KEY);
-    expect(useAuthStore.getState().session).toBeNull();
-    expect(useAuthStore.getState().user).toBeNull();
-  });
-
-  it('clearSession removes tokens from secure store', async () => {
-    await useAuthStore.getState().setSession({
-      access_token: 'token',
-      refresh_token: 'refresh',
-      expires_in: 3600,
-      token_type: 'bearer',
-      user: null,
-    } as never);
-
-    await useAuthStore.getState().clearSession();
-
-    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY);
-    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(AUTH_REFRESH_TOKEN_KEY);
-    expect(useAuthStore.getState().session).toBeNull();
-    expect(useAuthStore.getState().user).toBeNull();
-  });
-
-  it('applyAuthResponse sets local session immediately even if Supabase setSession fails', async () => {
-    const { getSupabase } = jest.requireMock('../lib/supabase') as {
-      getSupabase: () => {
-        auth: {
-          setSession: () => Promise<{ data: { session: null }; error: { message: '404' } }>;
-        };
-      };
-    };
-    const supabase = getSupabase();
-    supabase.auth.setSession = jest.fn(() =>
-      Promise.resolve({ data: { session: null }, error: { message: '404 Not Found' } }),
-    );
+  it('applyAuthResponse stores plain tokens and offers biometric opt-in', async () => {
+    jest.mocked(LocalAuthentication.isEnrolledAsync).mockResolvedValue(true);
 
     await useAuthStore.getState().applyAuthResponse({
       access_token: 'access-1',
@@ -119,10 +54,41 @@ describe('authStore', () => {
     });
 
     expect(useAuthStore.getState().session?.access_token).toBe('access-1');
-    expect(useAuthStore.getState().user?.display_name).toBe('Sam');
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    expect(useAuthStore.getState().pendingBiometricOptIn).toBe(true);
+    expect(useAuthStore.getState().storageMode).toBe('plain');
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY, 'access-1');
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(AUTH_REFRESH_TOKEN_KEY, 'refresh-1');
   });
 
-  it('applyAuthResponse stores user profile from backend response', async () => {
+  it('bootstrapFromStorage restores plain mode silently', async () => {
+    await AsyncStorage.setItem(BIOMETRIC_MODE_KEY, 'plain');
+    await SecureStore.setItemAsync(AUTH_TOKEN_KEY, 'stored-access');
+    await SecureStore.setItemAsync(AUTH_REFRESH_TOKEN_KEY, 'stored-refresh');
+
+    await useAuthStore.getState().bootstrapFromStorage();
+
+    expect(useAuthStore.getState().isUnlocked).toBe(true);
+    expect(useAuthStore.getState().session?.access_token).toBe('refreshed-access-token');
+    expect(useAuthStore.getState().hasStoredCredentials).toBe(true);
+  });
+
+  it('bootstrapFromStorage waits for unlock in biometric mode', async () => {
+    jest.mocked(AsyncStorage.getItem).mockImplementation((key) =>
+      Promise.resolve(key === BIOMETRIC_MODE_KEY ? 'biometric' : null),
+    );
+
+    await useAuthStore.getState().bootstrapFromStorage();
+
+    expect(useAuthStore.getState().isUnlocked).toBe(false);
+    expect(useAuthStore.getState().session).toBeNull();
+    expect(useAuthStore.getState().hasStoredCredentials).toBe(true);
+    expect(useAuthStore.getState().storageMode).toBe('biometric');
+  });
+
+  it('skipBiometricStorage keeps plain persisted refresh (Option B)', async () => {
     await useAuthStore.getState().applyAuthResponse({
       access_token: 'access-1',
       refresh_token: 'refresh-1',
@@ -131,40 +97,137 @@ describe('authStore', () => {
         id: 'user-1',
         display_name: 'Sam',
         avatar_colour: '#7C3AED',
-        is_new_user: true,
+        is_new_user: false,
       },
     });
 
-    expect(useAuthStore.getState().user).toEqual({
-      id: 'user-1',
-      display_name: 'Sam',
-      avatar_colour: '#7C3AED',
-    });
-    expect(useAuthStore.getState().needsPushPermission).toBe(true);
-    expect(useAuthStore.getState().session?.access_token).toBe('access-1');
-    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY, 'access-1');
+    await useAuthStore.getState().skipBiometricStorage();
+
+    expect(useAuthStore.getState().pendingBiometricOptIn).toBe(false);
+    expect(useAuthStore.getState().storageMode).toBe('plain');
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(AUTH_REFRESH_TOKEN_KEY, 'refresh-1');
   });
 
-  it('applyAuthResponse clears push permission prompt for returning users', async () => {
-    await useAuthStore.getState().applyAuthResponse({
-      access_token: 'access-2',
-      refresh_token: 'refresh-2',
+  it('applyAuthResponse sets session before biometric enrollment check completes', async () => {
+    let finishEnrollmentCheck: (value: boolean) => void = () => undefined;
+    jest.mocked(LocalAuthentication.isEnrolledAsync).mockImplementation(
+      () =>
+        new Promise<boolean>((resolve) => {
+          finishEnrollmentCheck = resolve;
+        }),
+    );
+
+    const applyPromise = useAuthStore.getState().applyAuthResponse({
+      access_token: 'access-immediate',
+      refresh_token: 'refresh-1',
       expires_in: 3600,
       user: {
-        id: 'user-2',
-        display_name: 'Pat',
+        id: 'user-1',
+        display_name: 'Sam',
+        avatar_colour: '#7C3AED',
+        is_new_user: false,
+      },
+    });
+
+    expect(useAuthStore.getState().session?.access_token).toBe('access-immediate');
+    expect(useAuthStore.getState().isUnlocked).toBe(true);
+    expect(useAuthStore.getState().pendingBiometricOptIn).toBe(false);
+
+    finishEnrollmentCheck(true);
+    await applyPromise;
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
+
+    expect(useAuthStore.getState().pendingBiometricOptIn).toBe(true);
+  });
+
+  it('logout clears local session when Supabase signOut fails', async () => {
+    mockSignOut.mockRejectedValueOnce(new Error('network error'));
+
+    await useAuthStore.getState().applyAuthResponse({
+      access_token: 'token',
+      refresh_token: 'refresh',
+      expires_in: 3600,
+      user: {
+        id: 'user-1',
+        display_name: 'Alex',
         avatar_colour: '#4F46E5',
         is_new_user: false,
       },
     });
 
-    expect(useAuthStore.getState().needsPushPermission).toBe(false);
+    await useAuthStore.getState().logout();
+
+    expect(useAuthStore.getState().session).toBeNull();
+    expect(useAuthStore.getState().hasStoredCredentials).toBe(false);
+    expect(useAuthStore.getState().isUnlocked).toBe(false);
   });
 
-  it('initAuthListener wires TOKEN_REFRESHED to setSession', async () => {
-    const { unsubscribe } = useAuthStore.getState().initAuthListener();
+  it('enrollBiometricStorage keeps in-memory access token for API calls', async () => {
+    jest.mocked(LocalAuthentication.authenticateAsync).mockResolvedValue({ success: true });
+    jest.mocked(LocalAuthentication.isEnrolledAsync).mockResolvedValue(true);
 
-    expect(mockOnAuthStateChange).toHaveBeenCalled();
+    await useAuthStore.getState().applyAuthResponse({
+      access_token: 'bio-access',
+      refresh_token: 'refresh-1',
+      expires_in: 3600,
+      user: {
+        id: 'user-1',
+        display_name: 'Sam',
+        avatar_colour: '#7C3AED',
+        is_new_user: false,
+      },
+    });
+
+    const enrolled = await useAuthStore.getState().enrollBiometricStorage();
+    expect(enrolled).toBe(true);
+    expect(useAuthStore.getState().session?.access_token).toBe('bio-access');
+    expect(useAuthStore.getState().storageMode).toBe('biometric');
+  });
+
+  it('logout signs out of Supabase and clears stored tokens', async () => {
+    await useAuthStore.getState().applyAuthResponse({
+      access_token: 'token',
+      refresh_token: 'refresh',
+      expires_in: 3600,
+      user: {
+        id: 'user-1',
+        display_name: 'Alex',
+        avatar_colour: '#4F46E5',
+        is_new_user: false,
+      },
+    });
+
+    await useAuthStore.getState().logout();
+
+    expect(mockSignOut).toHaveBeenCalled();
+    expect(useAuthStore.getState().session).toBeNull();
+    expect(useAuthStore.getState().hasStoredCredentials).toBe(false);
+  });
+
+  it('lockApp clears session memory but keeps stored credentials', async () => {
+    await useAuthStore.getState().applyAuthResponse({
+      access_token: 'token',
+      refresh_token: 'refresh',
+      expires_in: 3600,
+      user: {
+        id: 'user-1',
+        display_name: 'Alex',
+        avatar_colour: '#4F46E5',
+        is_new_user: false,
+      },
+    });
+
+    await useAuthStore.getState().lockApp();
+
+    expect(useAuthStore.getState().session).toBeNull();
+    expect(useAuthStore.getState().isUnlocked).toBe(false);
+    expect(useAuthStore.getState().hasStoredCredentials).toBe(true);
+  });
+
+  it('initAuthListener wires TOKEN_REFRESHED to setSession when unlocked', async () => {
+    const { unsubscribe } = useAuthStore.getState().initAuthListener();
 
     const refreshedSession = {
       access_token: 'new-token',
@@ -181,42 +244,67 @@ describe('authStore', () => {
     };
 
     useAuthStore.setState({
+      isUnlocked: true,
       user: { id: 'user-1', display_name: 'Alex', avatar_colour: '#4F46E5' },
     });
 
     await mockAuthStateCallback('TOKEN_REFRESHED', refreshedSession);
-
-    await Promise.resolve();
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
 
     expect(useAuthStore.getState().session?.access_token).toBe('new-token');
-    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY, 'new-token');
 
     unsubscribe();
     expect(mockUnsubscribe).toHaveBeenCalled();
   });
 
-  it('initAuthListener clears session on SIGNED_OUT', async () => {
+  it('initAuthListener does not clear session on SIGNED_OUT (logout clears explicitly)', async () => {
     useAuthStore.getState().initAuthListener();
 
-    await useAuthStore.getState().setSession({
+    await useAuthStore.getState().applyAuthResponse({
       access_token: 'token',
       refresh_token: 'refresh',
       expires_in: 3600,
-      token_type: 'bearer',
-      user: null,
-    } as never);
+      user: {
+        id: 'user-1',
+        display_name: 'Alex',
+        avatar_colour: '#4F46E5',
+        is_new_user: false,
+      },
+    });
 
     await mockAuthStateCallback('SIGNED_OUT', null);
-    await Promise.resolve();
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
 
-    expect(useAuthStore.getState().session).toBeNull();
-    expect(SecureStore.deleteItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY);
+    expect(useAuthStore.getState().session?.access_token).toBe('token');
   });
 
-  it('setLoading updates isLoading flag', () => {
-    useAuthStore.getState().setLoading(true);
-    expect(useAuthStore.getState().isLoading).toBe(true);
-    useAuthStore.getState().setLoading(false);
-    expect(useAuthStore.getState().isLoading).toBe(false);
+  it('enrollBiometricStorage moves refresh to biometric-protected storage', async () => {
+    jest.mocked(LocalAuthentication.authenticateAsync).mockResolvedValue({ success: true });
+    jest.mocked(LocalAuthentication.isEnrolledAsync).mockResolvedValue(true);
+
+    await useAuthStore.getState().applyAuthResponse({
+      access_token: 'access-1',
+      refresh_token: 'refresh-1',
+      expires_in: 3600,
+      user: {
+        id: 'user-1',
+        display_name: 'Sam',
+        avatar_colour: '#7C3AED',
+        is_new_user: false,
+      },
+    });
+
+    const ok = await useAuthStore.getState().enrollBiometricStorage();
+    expect(ok).toBe(true);
+    expect(useAuthStore.getState().storageMode).toBe('biometric');
+    expect(SecureStore.setItemAsync).toHaveBeenCalledWith(
+      AUTH_REFRESH_TOKEN_BIO_KEY,
+      'refresh-1',
+      expect.objectContaining({ requireAuthentication: true }),
+    );
   });
 });

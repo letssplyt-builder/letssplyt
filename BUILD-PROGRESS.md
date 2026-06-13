@@ -81,7 +81,7 @@
 - [ ] E10-S02 — Push Notifications (token registration, send from backend, foreground/background/killed)
 
 ### Epic 11: Account Management
-- [ ] E11-S01 — Biometric Authentication (opt-in, isEnrolledAsync edge case)
+- [x] E11-S01 — Biometric Authentication (Option B skip, idle lock, OTP/logout fixes) (2026-06-07)
 - [ ] E11-S02 — Settings Screen + Delete Account (3-screen flow, full PII wipe)
 
 ### Epic 12: Launch Readiness
@@ -105,8 +105,8 @@
 |---|---|---|---|---|
 | Tier 1 — Foundation | 4 | 16 | 16 | 0 |
 | Tier 2 — Core Flow | 5 | 24 | 20 | 4 |
-| Tier 3 — Operations | 4 | 13 | 0 | 13 |
-| **Total** | **13** | **53** | **30** | **23** |
+| Tier 3 — Operations | 4 | 13 | 1 | 12 |
+| **Total** | **13** | **53** | **31** | **22** |
 
 ---
 
@@ -140,4 +140,5 @@
 - [2026-06-07] — E08-S07 (revised, pending sign-off) — Post-send split edit via existing **Edit share** → Review split → **Save and notify** (no EditSplitModal). `POST /split/confirm` post-send revisions + `POST /splits/resend` selective SMS. Edit locked on `self_reported` / `confirmed` / `settled`; dispute→`pending` re-opens. Docs: 01, 02, 05, 08, 10, 12. Smoke `smoke:split-revision` 20/20; 265 backend + 192 mobile tests.
 - [2026-06-07] — E09-S01 — Per-event settlement API complete: mark-paid/cash, migrations #19–#20 (`settlement_log` audit columns + `disputed` action), `smoke:settlement` 22/22, backend 277 tests.
 - [2026-06-07] — E09-S01 — Per-event settlement API: mark-paid/cash endpoint, migrations #19–#20 (`settlement_log` audit + `disputed` action), `npm run smoke:settlement` 22/22, backend 277 tests.
+- [2026-06-07] — E11-S01 — Biometric auth (Option B: skip keeps plain refresh; enroll gates refresh behind OS biometrics). Idle app lock (5 min). `secureTokenStorage`, `authToken.resolveAccessToken`, BiometricOptIn/Lock screens, in-memory Supabase session, OTP verify `device_id`/`platform`, non-fatal `registerDeviceAfterOtp`, navigation reset fixes, logout best-effort. Migration #22 `device_sessions` trust columns. Docs 02/05/08/09/12. Tests: mobile 233, backend 304 passing.
 - [2026-06-07] — Product/docs — Epic 9 realigned to 4 stories: E09-S01 per-event API, **E09-S02 bulk settle-all**, E09-S03 ledger (partial E07-S03), E09-S04 mobile actions (partial E07-S03). Total stories 53.

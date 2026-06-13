@@ -114,8 +114,12 @@ Verify OTP. On success, creates or retrieves user, issues JWT pair.
   display_name?: string;     // required only if new user (first registration)
   context?: "login" | "join_event";  // default: "login"
   join_token?: string;       // required if context = "join_event"
+  device_id?: string;        // stable mobile device UUID (SecureStore) — upserts device_sessions on success
+  platform?: "ios" | "android";
 }
 ```
+
+**Device registration note:** When `device_id` and `platform` are present, the backend upserts `device_sessions` with `last_otp_verified_at`. Failures are logged and **do not** fail OTP verify — login must succeed even if the migration/table is missing in dev.
 
 **Response `200`:**
 ```json

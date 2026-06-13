@@ -13,7 +13,7 @@
 
 ---
 
-## Apply order (21 migrations)
+## Apply order (22 migrations)
 
 Run from **repository root** (`letssplyt/`), not `supabase/`:
 
@@ -58,6 +58,7 @@ If CLI reports *"Found local migration files to be inserted before the last migr
 | 19 | `20260617000000_settlement_log_audit_columns.sql` | E09-S01 | `settlement_log.from_status`, `to_status` (+ amount/note/metadata if missing) | `ADD COLUMN IF NOT EXISTS` |
 | 20 | `20260617000001_settlement_log_action_disputed.sql` | E09-S01 | `settlement_log.action` CHECK includes `disputed` | `DROP CONSTRAINT IF EXISTS` |
 | 21 | `20260618000000_event_delete_fk_cascade.sql` | E07+ | `notification_log` / `settlement_log` `ON DELETE CASCADE` on `event_id`; `sms_opt_outs.event_id` `ON DELETE SET NULL` | `DROP CONSTRAINT IF EXISTS` |
+| 22 | `20260619000000_device_sessions_trust_columns.sql` | E11 | `device_sessions` OTP/biometric trust timestamps | `ADD COLUMN IF NOT EXISTS` |
 
 ---
 
@@ -92,7 +93,7 @@ After `supabase db push` on staging or production:
    ```bash
    supabase migration list --db-url "$SUPABASE_DB_URL"
    ```
-   All 21 versions should show as applied on remote.
+   All 22 versions should show as applied on remote.
 
 3. **Smoke tests** (backend running against that environment):
    ```bash

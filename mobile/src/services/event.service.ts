@@ -8,8 +8,7 @@ import type {
 } from '@letssplyt/shared/event.types';
 import type { ManualParticipantResponse } from '@letssplyt/shared/participant.types';
 import { ApiRequestError, apiGet, apiPostAuth, apiDelete } from './api';
-import * as SecureStore from 'expo-secure-store';
-import { AUTH_TOKEN_KEY } from '../store/authStore';
+import { resolveAccessToken } from './authToken';
 import { getApiBaseUrl } from './getApiBaseUrl';
 
 export interface BalanceSummary {
@@ -74,7 +73,7 @@ export async function deleteParticipant(eventId: string, participantId: string):
 }
 
 export async function fetchBalance(): Promise<BalanceSummary> {
-  const token = await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+  const token = await resolveAccessToken();
   if (!token) {
     return {
       net_balance: 0,

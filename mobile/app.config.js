@@ -49,6 +49,8 @@ module.exports = {
     infoPlist: {
       NSContactsUsageDescription:
         'LetsSplyt uses your contacts to add members to your group.',
+      NSFaceIDUsageDescription:
+        'LetsSplyt uses Face ID to unlock your account and sign you in faster.',
     },
   },
   android: {

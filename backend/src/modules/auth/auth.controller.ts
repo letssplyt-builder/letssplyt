@@ -15,6 +15,8 @@ const otpVerifySchema = z.object({
   display_name: z.string().max(50).optional(),
   context: z.enum(['login', 'register', 'join_event']).optional(),
   join_token: z.string().optional(),
+  device_id: z.string().min(8).max(128).optional(),
+  platform: z.enum(['ios', 'android']).optional(),
 });
 
 export async function handleOtpRequest(
@@ -69,6 +71,10 @@ export async function handleOtpVerify(
       parsed.data.code,
       parsed.data.display_name,
       parsed.data.context ?? 'register',
+      {
+        deviceId: parsed.data.device_id,
+        platform: parsed.data.platform,
+      },
     );
 
     res.status(200).json(session);

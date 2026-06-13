@@ -15,6 +15,11 @@ export { isOtpDevBypassEnabled } from './otp-dev-bypass';
 
 export type OtpVerifyContext = 'login' | 'register' | 'join_event';
 
+export interface OtpVerifyDeviceContext {
+  deviceId?: string;
+  platform?: 'ios' | 'android';
+}
+
 const AVATAR_COLOURS = [
   '#4F46E5',
   '#7C3AED',
@@ -217,6 +222,40 @@ export function isPhoneAlreadyRegisteredError(message: string): boolean {
     lower.includes('already exists') ||
     lower.includes('phone number is already')
   );
+}
+
+export async function registerDeviceAfterOtp(
+  userId: string,
+  deviceId: string,
+  platform: 'ios' | 'android',
+): Promise<void> {
+  const now = new Date().toISOString();
+  const { data: existing, error: lookupError } = await supabaseAdmin
+    .from('device_sessions')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('device_id', deviceId)
+    .maybeSingle();
+
+  if (lookupError) {
+    throw new AppError('DEVICE_SESSION_UPDATE_FAILED', lookupError.message, 500);
+  }
+
+  const payload = {
+    user_id: userId,
+    device_id: deviceId,
+    platform,
+    last_otp_verified_at: now,
+    last_active_at: now,
+  };
+
+  const { error } = existing
+    ? await supabaseAdmin.from('device_sessions').update(payload).eq('id', existing.id)
+    : await supabaseAdmin.from('device_sessions').insert(payload);
+
+  if (error) {
+    throw new AppError('DEVICE_SESSION_UPDATE_FAILED', error.message, 500);
+  }
 }
 
 export async function findAuthUserIdByPhone(phoneE164: string): Promise<string | null> {
@@ -562,6 +601,7 @@ export async function verifyOtpAndCreateSession(
   code: string,
   displayName?: string,
   context: OtpVerifyContext = 'register',
+  device?: OtpVerifyDeviceContext,
 ): Promise<AuthSession> {
   const phoneE164 = normalisePhone(phoneInput);
   const phoneHash = hashPhone(phoneE164);
@@ -591,6 +631,19 @@ export async function verifyOtpAndCreateSession(
   );
 
   const session = await createAdminSession(resolved.userId);
+
+  if (device?.deviceId && device.platform) {
+    try {
+      await registerDeviceAfterOtp(resolved.userId, device.deviceId, device.platform);
+    } catch (err) {
+      logger.warn({
+        msg: 'Device session registration failed after OTP — login still succeeds',
+        userId: resolved.userId,
+        deviceId: device.deviceId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
 
   return {
     access_token: session.access_token,

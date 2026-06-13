@@ -1,12 +1,6 @@
 import Constants from 'expo-constants';
-import * as SecureStore from 'expo-secure-store';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-
-const ExpoSecureStoreAdapter = {
-  getItem: (key: string) => SecureStore.getItemAsync(key),
-  setItem: (key: string, value: string) => SecureStore.setItemAsync(key, value),
-  removeItem: (key: string) => SecureStore.deleteItemAsync(key),
-};
+import { supabaseMemoryStorage } from './supabaseAuthStorage';
 
 type ExpoExtra = {
   supabaseUrl?: string;
@@ -36,7 +30,7 @@ export function getSupabase(): SupabaseClient | null {
     const { url, key } = resolveSupabaseConfig();
     supabaseClient = createClient(url, key, {
       auth: {
-        storage: ExpoSecureStoreAdapter,
+        storage: supabaseMemoryStorage,
         autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: false,

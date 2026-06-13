@@ -74,7 +74,7 @@ LetsSplyt handles phone numbers, payment handles (Venmo/PayPal usernames), and f
 | **Likelihood** | Low-Medium — OTP interception (SIM swap) and JWT theft are the primary vectors |
 | **Impact** | Critical — a compromised account exposes payment handles and allows the attacker to create events, view financial data, and send messages to the victim's contacts |
 | **Primary mitigation** | OTP rate limiting (3 attempts per phone per 10 minutes, 5 requests per phone per hour, 20 requests per IP per hour). Access tokens expire after 15 minutes. Refresh tokens rotate on every use; reuse of an old refresh token invalidates all sessions for that user |
-| **Secondary mitigation** | Refresh tokens stored in Expo SecureStore (mobile) or HTTP-only cookie (web) — never in AsyncStorage or localStorage. Biometric unlock gates access to the SecureStore vault without transmitting biometric data off-device |
+| **Secondary mitigation** | Refresh tokens in Expo SecureStore (mobile). **Biometric mode:** refresh token in SecureStore with `requireAuthentication: true` — OS biometric/PIN gate before read. **Plain mode (Option B skip):** refresh in standard SecureStore. Access JWT held in memory while app is unlocked; `resolveAccessToken()` reads memory first for API calls. Biometric data never leaves the device |
 
 ---
 

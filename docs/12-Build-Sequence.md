@@ -2743,39 +2743,57 @@ mobile/src/__tests__/hooks/usePushNotifications.test.ts
 
 ### E11-S01 — Biometric Authentication
 
-**Description:** After first OTP login, offer biometric auth enrollment. On subsequent launches, authenticate with Face ID/fingerprint before restoring the session. Handle the edge case where biometrics are removed from device settings.
+**Description:** After first OTP login, offer biometric enrollment (refresh token behind OS biometric gate). On subsequent launches: optional biometric unlock on cold start; idle app lock after 5 minutes background. **Option B (approved):** Skip on opt-in keeps plain persisted refresh — user still gets idle lock but cold start restores without biometric prompt.
 
-**Prompt:**
-*"Implement biometric authentication in mobile/src/hooks/useBiometricAuth.ts. (1) After successful OTP login (in OTPVerifyScreen, after tokens saved to SecureStore): call expo-local-authentication isEnrolledAsync(). If true: show BiometricOptInScreen modal (prototype/dusk-auth.html ID 'biometric') — 'Use Face ID / fingerprint next time?' with Enable and Skip buttons. On Enable: store 'biometric_enabled=true' in SecureStore. (2) BiometricOptInScreen.tsx: simple modal with fingerprint/face icon, description 'Sign in faster next time without typing a code', Enable button (calls isEnrolledAsync() again to confirm still enrolled — shows settings instruction if not), Skip button. (3) In authStore.restoreSession(): if 'biometric_enabled=true' in SecureStore AND tokens exist: call authenticateAsync({ promptMessage: 'Sign in to LetsSplyt' }). If success: restore session normally. If failure (user cancels or 3 failed attempts): clear biometric_enabled flag, clear tokens, navigate to PhoneEntryScreen (force OTP). CRITICAL EDGE CASE: if isEnrolledAsync() returns false after 'biometric_enabled=true' was set (user removed biometrics from device settings): silently clear the flag, clear tokens, navigate to PhoneEntryScreen — do NOT show any error about biometrics, do NOT crash. Log this case for debugging only."*
+**Implementation (as built — not the original `useBiometricAuth` hook prompt):**
 
-**Files created:**
-- `mobile/src/hooks/useBiometricAuth.ts`
-- `mobile/src/screens/auth/BiometricOptInScreen.tsx`
-- Updates to `mobile/src/store/authStore.ts` (restoreSession with biometric check)
-- Updates to `mobile/src/screens/auth/OTPVerifyScreen.tsx` (show biometric opt-in after login)
+| File | Role |
+|---|---|
+| `mobile/src/services/secureTokenStorage.ts` | Plain vs biometric refresh storage; `wipeAllStoredCredentials` best-effort |
+| `mobile/src/services/authToken.ts` | `resolveAccessToken()` — memory session first |
+| `mobile/src/services/deviceId.ts` | Stable device UUID for OTP verify + push |
+| `mobile/src/store/authStore.ts` | `applyAuthResponse`, `bootstrapFromStorage`, `unlockApp`, `lockApp`, enroll/skip |
+| `mobile/src/lib/supabaseAuthStorage.ts` | In-memory Supabase session (not SecureStore) |
+| `mobile/src/hooks/useAppLock.ts` | 5 min idle → `lockApp()` |
+| `mobile/src/screens/auth/BiometricOptInScreen.tsx` | Enable / Skip after OTP |
+| `mobile/src/screens/auth/BiometricLockScreen.tsx` | Cold start + idle unlock |
+| `mobile/src/navigation/RootNavigator.tsx` | `navigationRef.reset()` on auth transitions; `authFlowNavigation.ts` |
+| `backend/src/modules/auth/auth.service.ts` | `registerDeviceAfterOtp` on verify (non-fatal on failure) |
+| `supabase/migrations/20260619000000_device_sessions_trust_columns.sql` | `last_otp_verified_at`, `biometric_enrolled_at` |
 
 **Acceptance Criteria:**
-1. After first OTP login → BiometricOptInScreen appears with enable/skip options
-2. Tap Enable → next app launch → Face ID/fingerprint prompt appears instead of phone entry
-3. Failed biometric (3 attempts or cancel) → app navigates to PhoneEntryScreen
-4. Remove fingerprints from device Settings, reopen app → goes to PhoneEntryScreen silently (no crash, no biometric error message)
-5. Tap Skip on BiometricOptInScreen → future launches go directly to phone OTP
+1. After first OTP login → BiometricOptInScreen when device biometrics enrolled (Enable / Skip)
+2. Tap Enable → next cold start → BiometricLockScreen → biometrics unlock → MainTabs
+3. Tap Skip (Option B) → next cold start → silent session restore (no biometric prompt); idle lock still applies after 5 min background
+4. Failed unlock (3 attempts or cancel) → credentials cleared → Welcome / phone OTP
+5. Remove biometrics from device Settings → unlock fails gracefully → phone OTP (no crash)
+6. Logout from Profile always clears local credentials even if `signOut` network fails
+7. OTP verify sends `device_id` + `platform`; login succeeds even if `device_sessions` upsert fails
 
 **Tests required:**
 ```
-mobile/src/__tests__/hooks/useBiometricAuth.test.ts
-  - shows opt-in screen after successful OTP login
-  - stores biometric_enabled flag on enable
-  - restoreSession: calls authenticateAsync when biometric_enabled is true
-  - restoreSession: clears tokens on biometric failure
-  - restoreSession: silently falls back to OTP when isEnrolledAsync returns false
-  - restoreSession: does not call authenticateAsync when biometric_enabled is false
+mobile/src/store/authStore.test.ts
+  - applyAuthResponse sets session before isEnrolledAsync completes
+  - logout clears local session when Supabase signOut fails
+  - enrollBiometricStorage keeps in-memory access token
+  - skipBiometricStorage keeps plain persisted refresh (Option B)
+  - initAuthListener does not clear session on SIGNED_OUT
 
-mobile/src/__tests__/components/auth/BiometricOptInScreen.test.tsx
-  - renders enable and skip buttons
-  - enable button calls isEnrolledAsync before enabling
-  - skip button does not store flag
+mobile/src/services/authToken.test.ts
+  - resolveAccessToken prefers memory over SecureStore
+
+mobile/src/services/secureTokenStorage.test.ts
+  - wipeAllStoredCredentials completes when biometric key delete throws
+
+mobile/src/__tests__/unit/navigation/authFlowNavigation.test.ts
+  - resolveAuthenticatedRoute prioritises BiometricOptIn after OTP
+
+backend/src/__tests__/unit/auth/auth.service.test.ts
+  - verifyOtpAndCreateSession still returns session when device_sessions registration fails
 ```
+
+**Prompt (historical — superseded by implementation above):**
+*"Implement biometric authentication in mobile/src/hooks/useBiometricAuth.ts..."* — **do not build the hook**; use `authStore` + `secureTokenStorage` + screens as listed above.
 
 ---
 

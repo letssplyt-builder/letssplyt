@@ -44,11 +44,14 @@ jest.mock('expo-secure-store', () => ({
     mockSecureStoreMap.delete(k);
     return Promise.resolve();
   }),
+  WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'WHEN_UNLOCKED_THIS_DEVICE_ONLY',
+  canUseBiometricAuthentication: jest.fn().mockResolvedValue(true),
 }));
 
 jest.mock('expo-local-authentication', () => ({
   isEnrolledAsync: jest.fn().mockResolvedValue(true),
   authenticateAsync: jest.fn().mockResolvedValue({ success: true }),
+  hasHardwareAsync: jest.fn().mockResolvedValue(true),
 }));
 
 jest.mock('expo-notifications', () => ({

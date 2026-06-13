@@ -45,6 +45,8 @@ export type RootStackParamList = {
     joinToken?: string;
   };
   PushPermission: undefined;
+  BiometricOptIn: undefined;
+  BiometricLock: undefined;
   MainTabs: undefined;
   AppJoin: { token: string };
   AppJoined: { eventId: string; eventName: string };

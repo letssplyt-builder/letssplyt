@@ -107,6 +107,8 @@ export function ProfileScreen({ navigation, route }: Props) {
     setIsLoggingOut(true);
     try {
       await logout();
+    } catch {
+      Alert.alert('Could not log out', 'Please try again.');
     } finally {
       setIsLoggingOut(false);
     }
