@@ -16,6 +16,9 @@ interface EventDetailOverflowMenuProps {
   showReset?: boolean;
   resetLoading?: boolean;
   onReset?: () => void;
+  showDelete?: boolean;
+  deleteLoading?: boolean;
+  onDelete?: () => void;
 }
 
 /** Compact ⋮ menu for infrequent payer actions on Event Detail. */
@@ -26,10 +29,13 @@ export function EventDetailOverflowMenu({
   showReset,
   resetLoading,
   onReset,
+  showDelete,
+  deleteLoading,
+  onDelete,
 }: EventDetailOverflowMenuProps) {
   const [open, setOpen] = useState(false);
 
-  if (!showReopen && !showReset) {
+  if (!showReopen && !showReset && !showDelete) {
     return <View style={styles.placeholder} />;
   }
 
@@ -43,6 +49,11 @@ export function EventDetailOverflowMenu({
   const handleReset = () => {
     close();
     onReset?.();
+  };
+
+  const handleDelete = () => {
+    close();
+    onDelete?.();
   };
 
   return (
@@ -99,6 +110,26 @@ export function EventDetailOverflowMenu({
               >
                 <Text style={styles.menuLabelDestructive}>Reset expenses</Text>
                 {resetLoading ? (
+                  <ActivityIndicator color={authColors.errorOnDark} size="small" />
+                ) : null}
+              </Pressable>
+            ) : null}
+
+            {(showReset || showReopen) && showDelete ? <View style={styles.divider} /> : null}
+
+            {showDelete ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Delete event"
+                disabled={deleteLoading}
+                onPress={handleDelete}
+                style={({ pressed }) => [
+                  styles.menuItem,
+                  pressed && !deleteLoading && styles.menuItemPressed,
+                ]}
+              >
+                <Text style={styles.menuLabelDestructive}>Delete event</Text>
+                {deleteLoading ? (
                   <ActivityIndicator color={authColors.errorOnDark} size="small" />
                 ) : null}
               </Pressable>

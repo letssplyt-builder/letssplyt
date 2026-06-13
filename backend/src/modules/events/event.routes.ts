@@ -7,6 +7,7 @@ import {
   handleLockEvent,
   handleRegenerateJoinToken,
   handleResetExpenses,
+  handleDeleteEvent,
   handleReopenEvent,
 } from './event.controller';
 import {
@@ -35,6 +36,7 @@ router.use(authenticate);
 router.get('/', handleListEvents);
 router.post('/', handleCreateEvent);
 router.get('/:id', handleGetEvent);
+router.delete('/:id', handleDeleteEvent);
 router.post('/:id/participants/manual', handleAddManualParticipant);
 router.delete('/:id/participants/:participantId', handleDeleteParticipant);
 router.post('/:id/lock', handleLockEvent);

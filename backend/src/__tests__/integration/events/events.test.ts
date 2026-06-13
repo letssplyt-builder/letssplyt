@@ -194,4 +194,35 @@ describe('Events API integration', () => {
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe('FORBIDDEN');
   });
+
+  it('DELETE /events/:id returns 204 when messages not sent', async () => {
+    mockAuth(USER_A);
+    mockSupabase.__pushMockResultForTable('events', { data: EVENT_ROW, error: null });
+    mockSupabase.__pushMockResultForTable('participants', { data: [], error: null });
+    mockSupabase.__pushMockResultForTable('settlement_log', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('notification_log', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('sms_opt_outs', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('events', { data: { id: EVENT_ID }, error: null });
+
+    const response = await request(app).delete(`/api/v1/events/${EVENT_ID}`).set(AUTH_A);
+
+    expect(response.status).toBe(204);
+  });
+
+  it('DELETE /events/:id returns 409 after messages sent', async () => {
+    mockAuth(USER_A);
+    mockSupabase.__pushMockResultForTable('events', {
+      data: {
+        ...EVENT_ROW,
+        status: 'sent',
+        messages_sent_at: '2026-01-02T00:00:00.000Z',
+      },
+      error: null,
+    });
+
+    const response = await request(app).delete(`/api/v1/events/${EVENT_ID}`).set(AUTH_A);
+
+    expect(response.status).toBe(409);
+    expect(response.body.error?.code).toBe('EVENT_MESSAGES_ALREADY_SENT');
+  });
 });

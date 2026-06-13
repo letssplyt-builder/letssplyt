@@ -28,7 +28,7 @@
 - **Encrypted payment handles (AES-256-GCM).** Payment identifiers (Venmo usernames, PayPal handles) are PII. They are encrypted at the Node.js application layer before any INSERT and decrypted only at A3 message composition time. Never stored in plaintext, never logged.
 - **Immutable audit trail (`settlement_log`, `ai_audit_log`).** Every state transition and every AI call is logged with actor, timestamp, before/after state. These rows are never updated or deleted.
 - **Row Level Security on every table.** The database itself enforces data isolation. API-layer WHERE clauses are not a substitute for RLS — both are required.
-- **Soft deletes where user data is referenced by other entities.** `users` and `events` have `deleted_at TIMESTAMPTZ NULL`. Never hard-delete these rows — it breaks audit trails and foreign keys in `settlement_log`.
+- **Soft deletes where user data is referenced by other entities.** `users` and `events` have `deleted_at TIMESTAMPTZ NULL`. Never hard-delete these rows in normal operation — it breaks audit trails and foreign keys in `settlement_log`. **Exception:** payer may hard-delete an event via `DELETE /events/:id` only when `messages_sent_at IS NULL` (draft / pre-send). Service layer deletes `guest_pii`, notification/settlement logs for the event, Storage objects under `receipts/{eventId}/`, then `DELETE FROM events` (cascade removes participants, tokens, receipt items, assignments, audit log). After messages are sent, use soft archive (`deleted_at`) — no hard delete.
 
 ---
 
@@ -257,6 +257,7 @@ The core domain entity. One row per bill-splitting session created by a payer.
 -- Core bill-splitting session. Created by a payer, progresses through a
 -- lifecycle from 'open' (join window) through to 'settled'.
 -- Soft deletes only — payer "archiving" sets deleted_at, row is never removed.
+-- Hard DELETE is allowed only pre-send (messages_sent_at IS NULL) via DELETE /events/:id.
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE events (
   id              UUID        PRIMARY KEY DEFAULT gen_random_uuid(),

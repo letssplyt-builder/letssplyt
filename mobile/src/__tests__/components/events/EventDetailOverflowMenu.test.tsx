@@ -9,16 +9,19 @@ describe('EventDetailOverflowMenu', () => {
     expect(screen.queryByLabelText('More options')).toBeNull();
   });
 
-  it('opens dropdown with reopen and reset actions', () => {
+  it('opens dropdown with reopen, reset, and delete actions', () => {
     const onReopen = jest.fn();
     const onReset = jest.fn();
+    const onDelete = jest.fn();
 
     render(
       <EventDetailOverflowMenu
         showReopen
         showReset
+        showDelete
         onReopen={onReopen}
         onReset={onReset}
+        onDelete={onDelete}
       />,
     );
 
@@ -26,8 +29,11 @@ describe('EventDetailOverflowMenu', () => {
     fireEvent.press(screen.getByLabelText('Reopen join window'));
     fireEvent.press(screen.getByLabelText('More options'));
     fireEvent.press(screen.getByLabelText('Reset expenses'));
+    fireEvent.press(screen.getByLabelText('More options'));
+    fireEvent.press(screen.getByLabelText('Delete event'));
 
     expect(onReopen).toHaveBeenCalledTimes(1);
     expect(onReset).toHaveBeenCalledTimes(1);
+    expect(onDelete).toHaveBeenCalledTimes(1);
   });
 });

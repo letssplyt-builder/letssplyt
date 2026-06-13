@@ -704,6 +704,20 @@ Implemented via Postgres function `reset_event_expenses_data(p_event_id)` when t
 
 ---
 
+### DELETE `/events/:eventId`
+**Auth:** `[AUTH]` | `[PAYER]` | Allowed only when `messages_sent_at` IS NULL
+
+Hard-deletes the event and cascaded child rows (participants, join tokens, receipt items, assignments, audit log). Also deletes `guest_pii` rows for event participants, `notification_log` / `settlement_log` rows for the event, and all objects under Storage `receipts/{eventId}/`.
+
+**Response `204`:** no body
+
+**Error codes:**
+- `EVENT_MESSAGES_ALREADY_SENT` 409 — payment request messages were already sent
+- `FORBIDDEN` 403 — caller is not the payer
+- `NOT_FOUND` 404 — event does not exist or already deleted
+
+---
+
 ## Participant Endpoints
 
 ### Canonical Participant Response Shape
@@ -1857,6 +1871,7 @@ Android Digital Asset Links JSON. Required for App Links (Android). The backend 
 | PATCH | /events/:id | AUTH | — |
 | POST | /events/:id/lock | AUTH PAYER | — |
 | POST | /events/:id/reopen | AUTH PAYER | — |
+| DELETE | /events/:id | AUTH PAYER | — |
 | GET | /events/:id/participants | AUTH | — |
 | POST | /events/:id/participants | AUTH PAYER | — |
 | DELETE | /events/:id/participants/:pid | AUTH PAYER | — |

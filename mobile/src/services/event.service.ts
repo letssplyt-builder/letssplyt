@@ -54,6 +54,10 @@ export async function resetEventExpenses(eventId: string): Promise<ResetExpenses
   return apiPostAuth<ResetExpensesResponse>(`/events/${eventId}/expenses/reset`, {});
 }
 
+export async function deleteEvent(eventId: string): Promise<void> {
+  await apiDelete(`/events/${eventId}`);
+}
+
 export async function addManualParticipant(
   eventId: string,
   input: {

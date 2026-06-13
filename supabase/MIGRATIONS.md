@@ -13,7 +13,7 @@
 
 ---
 
-## Apply order (20 migrations)
+## Apply order (21 migrations)
 
 Run from **repository root** (`letssplyt/`), not `supabase/`:
 
@@ -57,6 +57,7 @@ If CLI reports *"Found local migration files to be inserted before the last migr
 | 18 | `20260616000000_participants_breakdown_token.sql` | E08-S03 | `participants.breakdown_token` + unique partial index for SMS breakdown links | `ADD COLUMN IF NOT EXISTS` |
 | 19 | `20260617000000_settlement_log_audit_columns.sql` | E09-S01 | `settlement_log.from_status`, `to_status` (+ amount/note/metadata if missing) | `ADD COLUMN IF NOT EXISTS` |
 | 20 | `20260617000001_settlement_log_action_disputed.sql` | E09-S01 | `settlement_log.action` CHECK includes `disputed` | `DROP CONSTRAINT IF EXISTS` |
+| 21 | `20260618000000_event_delete_fk_cascade.sql` | E07+ | `notification_log` / `settlement_log` `ON DELETE CASCADE` on `event_id`; `sms_opt_outs.event_id` `ON DELETE SET NULL` | `DROP CONSTRAINT IF EXISTS` |
 
 ---
 
@@ -76,6 +77,7 @@ If CLI reports *"Found local migration files to be inserted before the last migr
 | SMS breakdown link (`GET /split/:token`) | #18 |
 | Message preview/send with `breakdown_url` | #18 |
 | Settlement API (`settlement_log` writes) | #19, #20 |
+| `DELETE /events/:id` (pre-send hard delete) | #21 (service also deletes logs + guest_pii explicitly) |
 
 ---
 
@@ -90,7 +92,7 @@ After `supabase db push` on staging or production:
    ```bash
    supabase migration list --db-url "$SUPABASE_DB_URL"
    ```
-   All 17 versions should show as applied on remote.
+   All 21 versions should show as applied on remote.
 
 3. **Smoke tests** (backend running against that environment):
    ```bash

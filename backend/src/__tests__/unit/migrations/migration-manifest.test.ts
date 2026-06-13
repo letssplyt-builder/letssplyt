@@ -27,6 +27,7 @@ const EXPECTED_MIGRATIONS = [
   '20260616000000_participants_breakdown_token.sql',
   '20260617000000_settlement_log_audit_columns.sql',
   '20260617000001_settlement_log_action_disputed.sql',
+  '20260618000000_event_delete_fk_cascade.sql',
 ] as const;
 
 const REPO_ROOT = path.resolve(__dirname, '../../../../..');

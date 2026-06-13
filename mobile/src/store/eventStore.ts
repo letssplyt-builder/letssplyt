@@ -35,6 +35,8 @@ interface EventState {
   resetCurrentEvent: () => void;
   /** Optimistic UI after POST /expenses/reset succeeds. */
   applyExpensesResetLocal: (eventId: string) => void;
+  removeEvent: (eventId: string) => void;
+  deleteEvent: (eventId: string) => Promise<void>;
 }
 
 export const useEventStore = create<EventState>((set, get) => ({
@@ -214,5 +216,18 @@ export const useEventStore = create<EventState>((set, get) => ({
         },
       };
     });
+  },
+
+  removeEvent: (eventId) => {
+    set((state) => ({
+      events: state.events.filter((event) => event.id !== eventId),
+      currentEvent:
+        state.currentEvent?.event.id === eventId ? null : state.currentEvent,
+    }));
+  },
+
+  deleteEvent: async (eventId) => {
+    await eventService.deleteEvent(eventId);
+    get().removeEvent(eventId);
   },
 }));

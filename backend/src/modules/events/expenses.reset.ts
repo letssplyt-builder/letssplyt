@@ -5,8 +5,7 @@ import {
   fetchEventRow,
   type EventRowWithReceiptFields,
 } from './event.service';
-
-const RECEIPTS_BUCKET = 'receipts';
+import { deleteReceiptImagesForEvent } from './event-storage.cleanup';
 
 export interface ResetExpensesResponse {
   reset: true;
@@ -24,35 +23,6 @@ function hasExpensesToReset(row: EventRowWithReceiptFields): boolean {
     row.fees_amount !== null ||
     row.split_mode !== null
   );
-}
-
-async function deleteReceiptImagesForEvent(eventId: string): Promise<void> {
-  try {
-    const bucket = supabaseAdmin.storage.from(RECEIPTS_BUCKET);
-    if (typeof bucket.list !== 'function') {
-      return;
-    }
-
-    const { data: files, error } = await bucket.list(eventId);
-    if (error || !files?.length) {
-      return;
-    }
-
-    const paths = files.map((file) => `${eventId}/${file.name}`);
-    if (typeof bucket.remove !== 'function') {
-      return;
-    }
-
-    const { error: removeError } = await bucket.remove(paths);
-    if (removeError) {
-      console.warn(
-        `[resetExpenses] Could not delete receipt images for event ${eventId}: ${removeError.message}`,
-      );
-    }
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.warn(`[resetExpenses] Storage cleanup skipped for event ${eventId}: ${message}`);
-  }
 }
 
 /** Optional DB function — never fails the request; falls back to row updates. */

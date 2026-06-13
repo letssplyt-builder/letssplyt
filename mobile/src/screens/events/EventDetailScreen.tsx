@@ -53,6 +53,7 @@ import {
   canOrganiserNudgeOrMarkCash,
   canParticipantPayShare,
   canResetEventExpenses,
+  canDeleteEvent,
   canSendEventMessages,
   resolveEventSplitActionMode,
   resolveSplitEntryMode,
@@ -114,6 +115,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
     lockEvent,
     removeParticipant,
     reopenEvent,
+    deleteEvent: deleteEventFromStore,
   } = useEventStore();
 
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -127,6 +129,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const [isReopening, setIsReopening] = useState(false);
   const [removingParticipantId, setRemovingParticipantId] = useState<string | null>(null);
   const [isResettingExpenses, setIsResettingExpenses] = useState(false);
+  const [isDeletingEvent, setIsDeletingEvent] = useState(false);
   const [fetchError, setFetchError] = useState(false);
   const [settlementActionLoading, setSettlementActionLoading] = useState<Record<string, string>>(
     {},
@@ -254,6 +257,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const showResetExpenses = event
     ? canResetEventExpenses(event.ai_stage, event.messages_sent_at)
     : false;
+  const showDeleteEvent = event ? canDeleteEvent(event.messages_sent_at) : false;
   const showSendMessages = event
     ? canSendEventMessages(event.ai_stage, event.messages_sent_at)
     : false;
@@ -262,7 +266,9 @@ export function EventDetailScreen({ navigation, route }: Props) {
     event && canEditEventShare(event.messages_sent_at, participants),
   );
   const showOverflowMenu = Boolean(
-    isPayer && event && !joining && (event.status === 'locked' || showResetExpenses),
+    isPayer &&
+      event &&
+      (showDeleteEvent || (!joining && (event.status === 'locked' || showResetExpenses))),
   );
   const selfParticipant = participants.find((row) => row.is_self);
   const showOrganiserCollectionActions = canOrganiserNudgeOrMarkCash(event?.messages_sent_at);
@@ -391,6 +397,47 @@ export function EventDetailScreen({ navigation, route }: Props) {
         },
       ],
     );
+  };
+
+  const confirmDeleteEvent = () => {
+    Alert.alert(
+      'Delete event?',
+      'This permanently removes the event, members, and any receipt data. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            void handleDeleteEvent();
+          },
+        },
+      ],
+    );
+  };
+
+  const handleDeleteEvent = async () => {
+    setIsDeletingEvent(true);
+    try {
+      await deleteEventFromStore(eventId);
+      if (useSplitStore.getState().eventId === eventId) {
+        useSplitStore.getState().clear();
+      }
+      navigation.navigate('Events');
+    } catch (err) {
+      const code = isApiRequestError(err) ? getApiErrorCode(err) : undefined;
+      if (code === 'EVENT_MESSAGES_ALREADY_SENT') {
+        Alert.alert(
+          'Cannot delete',
+          'Payment messages were already sent for this event.',
+        );
+        await refreshDetail();
+      } else {
+        Alert.alert('Could not delete event', 'Try again in a moment.');
+      }
+    } finally {
+      setIsDeletingEvent(false);
+    }
   };
 
   const handleResetExpenses = async () => {
@@ -571,6 +618,9 @@ export function EventDetailScreen({ navigation, route }: Props) {
             showReset={showResetExpenses}
             resetLoading={isResettingExpenses}
             onReset={confirmResetExpenses}
+            showDelete={showDeleteEvent}
+            deleteLoading={isDeletingEvent}
+            onDelete={confirmDeleteEvent}
           />
         ) : (
           <View style={styles.topBarPlaceholder} />

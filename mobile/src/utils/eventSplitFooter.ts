@@ -85,6 +85,11 @@ export function canResetEventExpenses(
   return hasEventExpensesEntered(aiStage) && !messagesSentAt;
 }
 
+/** Payer may hard-delete the event only before payment request messages are sent. */
+export function canDeleteEvent(messagesSentAt: string | null | undefined): boolean {
+  return !messagesSentAt;
+}
+
 /** Send messages CTA when split is ready but payment requests have not been sent. */
 export function canSendEventMessages(
   aiStage: AiStage,

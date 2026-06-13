@@ -4,6 +4,7 @@ import {
   canOrganiserNudgeOrMarkCash,
   canParticipantPayShare,
   canResetEventExpenses,
+  canDeleteEvent,
   canSendEventMessages,
   getEventSplitActionMode,
   hasPaymentRequestBeenSent,
@@ -90,6 +91,17 @@ describe('canResetEventExpenses', () => {
 
   it('blocks reset after messages sent', () => {
     expect(canResetEventExpenses('calculated', '2026-01-01T00:00:00.000Z')).toBe(false);
+  });
+});
+
+describe('canDeleteEvent', () => {
+  it('allows delete before messages sent', () => {
+    expect(canDeleteEvent(null)).toBe(true);
+    expect(canDeleteEvent(undefined)).toBe(true);
+  });
+
+  it('blocks delete after messages sent', () => {
+    expect(canDeleteEvent('2026-01-01T00:00:00.000Z')).toBe(false);
   });
 });
 

@@ -1029,6 +1029,7 @@ Each section lists only events matching the selected toggle. Event card: title, 
 - **Group roster:** all members with amounts when split is finalised; viewer's row labelled "You" and highlighted
 
 **Joining phase — payer only** (event status = `"open"`):
+- Header **⋮ overflow menu** (`EventDetailOverflowMenu`): **Reopen join window** (when locked), **Reset expenses** (when locked + expenses entered + pre-send), **Delete event** (pre-send only — `canDeleteEvent(messages_sent_at)`). Destructive items use red label + confirmation alert.
 - QR code at top (tap → QRDisplayModal fullscreen)
 - "Copy link" and "Share link" buttons
 - "Expired" amber state with "Regenerate" button if token lapsed
@@ -1067,7 +1068,9 @@ Each section lists only events matching the selected toggle. Event card: title, 
 
 **Post-send edit (P20a):** Same **Edit share** CTA — no separate modal or overflow item. Gated by `canEditEventShare(messages_sent_at, participants)` in `eventSplitFooter.ts`. Blocked when any participant has `self_reported`, `confirmed`, or `settled`; re-opens after dispute returns that participant to `pending` and no other blockers exist. Toast: *"Split is locked — resolve self-reported or confirmed payments first."*
 
-**Reset expenses** shows a destructive confirmation alert, then calls `POST /events/:id/expenses/reset`. On success: optimistic store patch (`applyExpensesResetLocal`), clear split store, refetch event detail, toast success. Footer returns to **Scan receipt** + **Enter total**. Hidden when `messages_sent_at` is set (`canResetEventExpenses()`).
+**Reset expenses** shows a destructive confirmation alert, then calls `POST /events/:id/expenses/reset`. On success: optimistic store patch (`applyExpensesResetLocal`), clear split store, refetch event detail, toast success. Footer returns to **Scan receipt** + **Enter total**. Hidden when `messages_sent_at` is set (`canResetEventExpenses()`). Available from overflow menu (not footer).
+
+**Delete event** (overflow menu, payer only): destructive confirmation → `DELETE /events/:id` via `eventStore.deleteEvent()`. On success: `removeEvent()` from list, clear split store if needed, `navigation.navigate('Events')`. Hidden when `messages_sent_at` is set (`canDeleteEvent()`). 409 → alert *"Payment messages were already sent for this event."*
 
 Event Detail **refetches on focus** (`useFocusEffect`) except immediately after reset (skip one focus refresh to avoid alert-dismiss race overwriting optimistic state).
 
