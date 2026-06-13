@@ -12,8 +12,11 @@ describe('settlementStore', () => {
       guests: [],
       memberDetail: null,
       guestDetail: null,
+      owedToMeRows: [],
+      iOweRows: [],
       isLoadingCounterparties: false,
       isLoadingDetail: false,
+      isLoadingLedger: false,
       counterpartyError: false,
     });
     jest.clearAllMocks();
@@ -103,5 +106,59 @@ describe('settlementStore', () => {
     const state = useSettlementStore.getState();
     expect(state.memberDetail?.outstanding).toHaveLength(1);
     expect(state.memberDetail?.counterparty.display_name).toBe('Jordan');
+  });
+
+  it('loadEventLedger populates i-owe rows', async () => {
+    jest.mocked(settlementService.fetchOwedToMe).mockResolvedValue({
+      data: [],
+      total_owed_minor_units: 0,
+      currency: 'USD',
+    });
+    jest.mocked(settlementService.fetchIOwe).mockResolvedValue({
+      data: [
+        {
+          event_id: 'e1',
+          event_title: 'Dinner',
+          payer_display_name: 'Alex',
+          amount_minor_units: 20,
+          currency: 'USD',
+          payment_status: 'pending',
+          creator_payment_handles: [],
+        },
+      ],
+      total_owe_minor_units: 20,
+      currency: 'USD',
+    });
+
+    await useSettlementStore.getState().loadEventLedger();
+
+    const state = useSettlementStore.getState();
+    expect(state.iOweRows).toHaveLength(1);
+    expect(state.getIOweForEvent('e1')?.event_title).toBe('Dinner');
+  });
+
+  it('clears stale member rows while loading counterparties', async () => {
+    useSettlementStore.setState({
+      membersOweYou: [
+        {
+          user_id: 'member-1',
+          display_name: 'Jordan',
+          avatar_colour: '#4F46E5',
+          net_amount: 25,
+        },
+      ],
+      membersYouOwe: [],
+    });
+
+    jest.mocked(settlementService.fetchMemberCounterparties).mockResolvedValue({
+      owe_you: [],
+      you_owe: [],
+    });
+
+    await useSettlementStore.getState().loadCounterparties('members');
+
+    const state = useSettlementStore.getState();
+    expect(state.membersOweYou).toEqual([]);
+    expect(state.membersYouOwe).toEqual([]);
   });
 });

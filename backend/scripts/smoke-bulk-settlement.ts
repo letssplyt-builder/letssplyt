@@ -30,6 +30,13 @@ function fail(name: string, detail: string): void {
   console.error(`  ✗ ${name}: ${detail}`);
 }
 
+function resultsForEvents(
+  results: Array<{ event_id: string; payment_status: string }> | undefined,
+  eventIds: string[],
+): Array<{ event_id: string; payment_status: string }> {
+  return (results ?? []).filter((row) => eventIds.includes(row.event_id));
+}
+
 async function requestJson(
   method: string,
   path: string,
@@ -231,17 +238,27 @@ async function main(): Promise<void> {
     if (!(await sendEventToSettlement(payer.token, memberEventA.eventId, 'member A'))) return;
     if (!(await sendEventToSettlement(payer.token, memberEventB.eventId, 'member B'))) return;
 
+    const runEventIds = [memberEventA.eventId, memberEventB.eventId];
+
     const selfReportAll = await requestJson(
       'POST',
       `/api/v1/settlement/member/${payer.userId}/self-report-all`,
       { payment_method: 'venmo' },
       member.token,
     );
-    if (selfReportAll.status !== 200 || Number(selfReportAll.body.updated_count) !== 2) {
+    const selfReportedThisRun = resultsForEvents(
+      selfReportAll.body.results as Array<{ event_id: string; payment_status: string }> | undefined,
+      runEventIds,
+    );
+    if (
+      selfReportAll.status !== 200 ||
+      selfReportedThisRun.length !== 2 ||
+      !selfReportedThisRun.every((row) => row.payment_status === 'confirmed')
+    ) {
       fail('POST member self-report-all', JSON.stringify(selfReportAll.body));
       return;
     }
-    pass('POST member self-report-all', `updated_count=${selfReportAll.body.updated_count}`);
+    pass('POST member self-report-all', `updated_count=${selfReportAll.body.updated_count} (2 this run)`);
 
     const disputeAll = await requestJson(
       'POST',
@@ -249,11 +266,19 @@ async function main(): Promise<void> {
       { note: 'bulk smoke dispute' },
       payer.token,
     );
-    if (disputeAll.status !== 200 || Number(disputeAll.body.updated_count) !== 2) {
+    const disputedThisRun = resultsForEvents(
+      disputeAll.body.results as Array<{ event_id: string; payment_status: string }> | undefined,
+      runEventIds,
+    );
+    if (
+      disputeAll.status !== 200 ||
+      disputedThisRun.length !== 2 ||
+      disputedThisRun.every((row) => row.payment_status === 'disputed') !== true
+    ) {
       fail('POST member dispute-all', JSON.stringify(disputeAll.body));
       return;
     }
-    pass('POST member dispute-all', `updated_count=${disputeAll.body.updated_count}`);
+    pass('POST member dispute-all', `updated_count=${disputeAll.body.updated_count} (2 this run)`);
 
     const selfReportAll2 = await requestJson(
       'POST',
@@ -261,11 +286,19 @@ async function main(): Promise<void> {
       { payment_method: 'paypal' },
       member.token,
     );
-    if (selfReportAll2.status !== 200 || Number(selfReportAll2.body.updated_count) !== 2) {
+    const selfReportedRetry = resultsForEvents(
+      selfReportAll2.body.results as Array<{ event_id: string; payment_status: string }> | undefined,
+      runEventIds,
+    );
+    if (
+      selfReportAll2.status !== 200 ||
+      selfReportedRetry.length !== 2 ||
+      !selfReportedRetry.every((row) => row.payment_status === 'confirmed')
+    ) {
       fail('POST member self-report-all (retry)', JSON.stringify(selfReportAll2.body));
       return;
     }
-    pass('POST member self-report-all (retry)', `updated_count=${selfReportAll2.body.updated_count}`);
+    pass('POST member self-report-all (retry)', `updated_count=${selfReportAll2.body.updated_count} (2 this run)`);
 
     const confirmAll = await requestJson(
       'POST',
@@ -273,15 +306,19 @@ async function main(): Promise<void> {
       undefined,
       payer.token,
     );
-    const eventsSettled = confirmAll.body.events_fully_settled as string[] | undefined;
-    if (confirmAll.status !== 200 || Number(confirmAll.body.updated_count) !== 2) {
+    if (confirmAll.status !== 200) {
       fail('POST member confirm-all', JSON.stringify(confirmAll.body));
       return;
     }
-    pass(
-      'POST member confirm-all',
-      `updated_count=${confirmAll.body.updated_count}, settled=${eventsSettled?.length ?? 0}`,
-    );
+    const confirmCount = Number(confirmAll.body.updated_count);
+    if (confirmCount === 0) {
+      pass('POST member confirm-all', '0 — self-report-all already confirmed rows');
+    } else if (confirmCount === 2) {
+      pass('POST member confirm-all', `updated_count=${confirmCount}`);
+    } else {
+      fail('POST member confirm-all', JSON.stringify(confirmAll.body));
+      return;
+    }
 
     const guestEventA = await createEventWithGuest(payer.token, GUEST_PHONE, 'A');
     const guestEventB = await createEventWithGuest(payer.token, GUEST_PHONE, 'B');

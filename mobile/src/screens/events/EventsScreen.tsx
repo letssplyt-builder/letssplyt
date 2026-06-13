@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -94,6 +95,12 @@ export function EventsScreen({ navigation }: Props) {
   useEffect(() => {
     void refreshList();
   }, [refreshList]);
+
+  useFocusEffect(
+    useCallback(() => {
+      useEventStore.getState().resetCurrentEvent();
+    }, []),
+  );
 
   const handleCreate = async () => {
     const trimmed = titleDraft.trim();

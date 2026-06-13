@@ -1,7 +1,7 @@
 import { AppError } from '../../infrastructure/errors';
 import { supabaseAdmin } from '../../infrastructure/supabase';
 
-const OUTSTANDING_STATUSES = ['pending', 'self_reported', 'disputed'] as const;
+const OUTSTANDING_STATUSES = ['pending', 'disputed'] as const;
 
 export interface UserBalanceSummary {
   net_balance: number;

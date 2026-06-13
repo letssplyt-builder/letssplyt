@@ -26,8 +26,6 @@ import {
   formatSplitMoney,
 } from '../splits/splitEntry.utils';
 import { useSplitStore } from '../../store/splitStore';
-import { useEventStore } from '../../store/eventStore';
-import { resolveSplitEntryMode } from '../../utils/eventSplitFooter';
 import { authColors, colors } from '../../theme/colors';
 
 type Props = NativeStackScreenProps<EventsStackParamList, 'MessagePreview'>;
@@ -123,24 +121,7 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
           <Text style={styles.back}>‹ Back</Text>
         </Pressable>
         <Text style={styles.title}>Preview</Text>
-        <Pressable
-          onPress={() => {
-            const detail = useEventStore.getState().currentEvent;
-            const mode =
-              detail?.event.id === eventId
-                ? resolveSplitEntryMode(
-                    detail.event.split_mode,
-                    detail.event.ai_stage,
-                    Boolean(detail.receipt_review),
-                  )
-                : 'manual';
-            navigation.navigate('SplitEntry', { eventId, mode });
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Edit split"
-        >
-          <Text style={styles.editLink}>Edit</Text>
-        </Pressable>
+        <View style={styles.headerSpacer} />
       </View>
 
       {loading ? (
@@ -300,6 +281,9 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '700',
     color: authColors.ctaSurface,
+  },
+  headerSpacer: {
+    minWidth: 48,
   },
   editLink: {
     fontSize: 14,

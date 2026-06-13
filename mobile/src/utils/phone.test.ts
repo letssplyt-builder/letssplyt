@@ -2,6 +2,8 @@ import { describe, expect, it } from '@jest/globals';
 import {
   countryFromE164,
   DEFAULT_AUTH_REGION,
+  formatUsNationalDisplay,
+  handleUsNationalPhoneInput,
   nationalFromE164,
   SUPPORTED_AUTH_REGIONS,
   toE164FromNational,
@@ -37,5 +39,10 @@ describe('phone utils', () => {
 
   it('falls back to E.164 regex when libphonenumber rejects but shape is valid', () => {
     expect(toE164FromPhoneInput('+15559999999')).toBe('+15559999999');
+  });
+
+  it('formats US national digits as (xxx) - xxx - xxxx', () => {
+    expect(formatUsNationalDisplay('5005550006')).toBe('(500) - 555 - 0006');
+    expect(handleUsNationalPhoneInput('5005550006123')).toBe('(500) - 555 - 0006');
   });
 });

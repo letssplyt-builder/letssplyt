@@ -3,6 +3,10 @@ import { supabaseAdmin } from '../../infrastructure/supabase';
 import type { MemberDetailResponse } from '@letssplyt/shared/counterparty.types';
 import { isOutstandingPaymentStatus } from './outstanding';
 
+function participantCanReceiveNudge(joinMethod: string): boolean {
+  return joinMethod !== 'manual_name_only';
+}
+
 export async function getMemberDetail(
   viewerId: string,
   counterpartyUserId: string,
@@ -65,7 +69,7 @@ export async function getMemberDetail(
   if (viewerPayerEventIds.length > 0) {
     const { data: theyOweRows, error } = await supabaseAdmin
       .from('participants')
-      .select('id, event_id, amount_owed, payment_status')
+      .select('id, event_id, amount_owed, payment_status, join_method')
       .in('event_id', viewerPayerEventIds)
       .eq('user_id', counterpartyUserId);
 
@@ -78,6 +82,7 @@ export async function getMemberDetail(
       if (!meta) continue;
       const amount = row.amount_owed as number | null;
       const status = row.payment_status as string;
+      const joinMethod = row.join_method as string;
       const eventRow = {
         event_id: row.event_id as string,
         event_title: meta.title,
@@ -86,6 +91,7 @@ export async function getMemberDetail(
         direction: 'owed_to_me' as const,
         payment_status: status,
         participant_id: row.id as string,
+        can_nudge: participantCanReceiveNudge(joinMethod),
       };
       if (isOutstandingPaymentStatus(status) && amount !== null && amount > 0) {
         rows.push(eventRow);

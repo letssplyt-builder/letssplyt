@@ -12,7 +12,10 @@ interface EventCardProps {
 export function EventCard({ event, onPress, variant = 'default' }: EventCardProps) {
   const compact = variant === 'compact';
   const dateLabel = formatEventDate(event.created_at);
-  const statusLabel = statusChipLabel(event.status);
+  const statusLabel = statusChipLabel(event.status, {
+    role: event.role,
+    viewerPaymentStatus: event.viewer_payment_status,
+  });
   const amountLabel = formatMoney(event.total_amount);
   const memberLabel = `${event.participant_count} ${
     event.participant_count === 1 ? 'member' : 'members'

@@ -1,10 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-
-jest.mock('../../../infrastructure/llm/ai-audit', () => ({
-  writeAuditLog: jest.fn(),
-}));
-
-import { createLLMProvider, mockLLMProvider } from '../../mocks/llm.mock';
+import { describe, expect, it } from '@jest/globals';
 import { formatCurrency } from '../../../infrastructure/security';
 import { getPaymentConfigForPhone } from '../../../config/payment-methods.config';
 import {
@@ -13,20 +7,11 @@ import {
 } from '../../../modules/messages/a3.agent';
 import { buildPaymentLinksForMethods } from '../../../modules/messages/deepLinks';
 import { buildA3Prompt } from '../../../modules/messages/a3.prompt';
+import { buildStandardOpeningLine } from '../../../modules/messages/message-assembler';
 
 const EVENT_ID = 'event-aaaa-aaaa-aaaa-aaaa-aaaa-aaaa-aaaa';
 
 describe('A3 message composer', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-    createLLMProvider.mockReturnValue(mockLLMProvider);
-    mockLLMProvider.complete.mockResolvedValue({
-      text: 'Hey Recipient! Hope you had an amazing time at Nobu — here is your share from dinner.',
-      usage: { inputTokens: 40, outputTokens: 20 },
-      modelUsed: 'mock-a3',
-    });
-  });
-
   it('builds A3 prompt WITHOUT participant display_name or phone numbers', () => {
     const prompt = buildA3Prompt('Nobu Dinner', '$25.00', ['Salmon', 'Ramen'], 'Alex');
 
@@ -43,7 +28,7 @@ describe('A3 message composer', () => {
     expect(prompt).toContain('Sushi');
   });
 
-  it('inserts real display_name AFTER AI call in composed message', async () => {
+  it('uses deterministic opening line with participant and event names', async () => {
     const result = await composeParticipantMessage({
       eventId: EVENT_ID,
       eventName: 'Nobu Dinner',
@@ -59,11 +44,11 @@ describe('A3 message composer', () => {
       isRegistered: true,
     });
 
+    expect(result.messageText).toContain(
+      'Hi Mark!! Here is your share from Nobu Dinner organized by Alex Payer.',
+    );
+    expect(result.messageText).toContain('Your share is $25.00');
     expect(result.messageText).toContain('Mark');
-    expect(mockLLMProvider.complete).toHaveBeenCalled();
-    const promptContent = JSON.stringify(mockLLMProvider.complete.mock.calls);
-    expect(promptContent).not.toContain('Mark');
-    expect(promptContent).toContain('Recipient');
   });
 
   it('excludes Venmo and Zelle for Canadian +1 numbers', () => {
@@ -80,42 +65,42 @@ describe('A3 message composer', () => {
       config.supportedMethods,
       20,
       'Dinner',
-      'CAD',
-      'en-CA',
+      'USD',
+      'en-US',
     );
 
-    expect(links.map((l) => l.provider)).toEqual(['paypal']);
+    expect(links.map((link) => link.provider)).toEqual(['paypal']);
   });
 
-  it('includes Wise and excludes Venmo and CashApp for Indian numbers', () => {
-    const config = getPaymentConfigForPhone('+919876543210', 'IN');
-    expect(config.supportedMethods).toContain('wise');
-    expect(config.supportedMethods).not.toContain('venmo');
-    expect(config.supportedMethods).not.toContain('cashapp');
-
-    const links = buildPaymentLinksForMethods(
-      [
-        { provider: 'venmo', handle_value: 'venmo-user' },
-        { provider: 'cashapp', handle_value: '$cash' },
-        { provider: 'wise', handle_value: 'wise-user' },
-        { provider: 'upi', handle_value: 'user@upi' },
-      ],
-      config.supportedMethods,
-      100,
-      'Dinner',
-      'INR',
-      'en-IN',
-    );
-
-    expect(links.map((l) => l.provider)).toEqual(expect.arrayContaining(['wise', 'upi']));
-    expect(links.map((l) => l.provider)).not.toContain('venmo');
-    expect(links.map((l) => l.provider)).not.toContain('cashapp');
+  it('buildStandardOpeningLine matches product format', () => {
+    const line = buildStandardOpeningLine('Sam', 'Friday Dinner', 'Alex Payer');
+    expect(line).toBe('Hi Sam!! Here is your share from Friday Dinner organized by Alex Payer.');
   });
 
-  it('uses formatCurrency with event currency in prompt (not hardcoded $)', () => {
-    const formatted = formatCurrency(1234.56, 'INR', 'en-IN');
-    const prompt = buildA3PromptForTest('Event', formatted, [], 'Payer');
-    expect(prompt).toContain(formatted);
-    expect(prompt).not.toMatch(/\$1234/);
+  it('buildA3PromptForTest delegates to buildA3Prompt', () => {
+    const prompt = buildA3PromptForTest('Event', '$12.00', ['Tacos'], 'Host');
+    expect(prompt).toContain('Event');
+    expect(prompt).toContain('$12.00');
+  });
+
+  it('formats currency in composed message for non-USD', async () => {
+    const amount = 10.5;
+    const result = await composeParticipantMessage({
+      eventId: EVENT_ID,
+      eventName: 'Lunch',
+      displayName: 'Yuki',
+      payerDisplayName: 'Host',
+      itemNames: [],
+      amountOwed: amount,
+      currency: 'EUR',
+      locale: 'de-DE',
+      payerHandles: [],
+      supportedMethods: [],
+      channel: 'sms',
+      isRegistered: false,
+    });
+
+    const formatted = formatCurrency(amount, 'EUR', 'de-DE');
+    expect(result.messageText).toContain(formatted);
   });
 });

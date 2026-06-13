@@ -1,4 +1,4 @@
-export const OUTSTANDING_PAYMENT_STATUSES = ['pending', 'self_reported', 'disputed'] as const;
+export const OUTSTANDING_PAYMENT_STATUSES = ['pending', 'disputed'] as const;
 
 export function isOutstandingPaymentStatus(status: string): boolean {
   return (OUTSTANDING_PAYMENT_STATUSES as readonly string[]).includes(status);

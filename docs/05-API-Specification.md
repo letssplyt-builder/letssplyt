@@ -306,7 +306,7 @@ Returns the authenticated user's net balance across all events — amounts other
 ### GET `/users/me/counterparties`
 **Auth:** `[AUTH]` | **Built in:** E09-S02
 
-Powers the Home dashboard **Members** and **Guests** toggles. All amounts in USD minor units (cents). Only **outstanding** obligations included in list totals (`payment_status` IN `pending`, `self_reported`, `disputed`; `amount_owed` NOT NULL).
+Powers the Home dashboard **Members** and **Guests** toggles. All amounts in USD minor units (cents). Only **outstanding** obligations included in list totals (`payment_status` IN `pending`, `disputed`; `amount_owed` NOT NULL). `confirmed`, `self_reported`, and `settled` rows are excluded from net totals.
 
 **Query params:**
 - `kind`: `"members"` | `"guests"` (required)
@@ -484,6 +484,8 @@ Returns all events the user is payer of or participant in, sorted by created_at 
     participant_count: number;
     settled_count: number;
     role: "creator" | "participant";
+    /** Participant list only — viewer's payment_status on this event (for Active/Settled toggle). */
+    viewer_payment_status?: string | null;
     created_at: string;
   }>;
   count: number;
@@ -555,6 +557,7 @@ Full event detail with participants and settlement status.
   // for pure guests (user_id null), from participants.display_name (join/add snapshot).
   participants: Array<{
     id: string;
+    user_id: string | null;   // null for pure guests; used client-side to gate Dispute swipe
     display_name: string;
     join_method: JoinMethod;   // 'qr_app' | 'qr_web' | 'manual_phone' | 'manual_name_only'
     amount_owed: number | null;  // null until A2 (split calculation) completes; clients should show a skeleton/loading state when null
@@ -563,6 +566,7 @@ Full event detail with participants and settlement status.
     is_self?: boolean;        // true for the authenticated viewer's row (participant Event Detail UI)
     message_delivered_at: string | null;
     self_reported_at: string | null;
+    self_reported_method: string | null;  // payment method when participant self-reported or payer marked paid
     last_nudged_at: string | null;
     nudge_count: number;
     opted_out_at: string | null;
@@ -716,10 +720,10 @@ interface ParticipantResponse {
   payment_status: 'pending' | 'self_reported' | 'payer_marked' | 'confirmed' | 'disputed' | 'opted_out' | 'settled';
   // All 7 payment_status values:
   //   pending         — awaiting payment
-  //   self_reported   — participant says they paid (payer has not yet confirmed)
+  //   self_reported   — legacy intermediate (app self-report now sets confirmed directly)
   //   payer_marked    — payer marked participant as paid; if participant had previously self_reported, backend auto-advances to confirmed (synchronous return is payer_marked; Realtime subscription delivers the confirmed transition)
-  //   confirmed       — both parties agree payment received
-  //   disputed        — payer rejected the self_reported claim; reset to pending
+  //   confirmed       — payment accepted (self-report, mark-paid, or legacy confirm)
+  //   disputed        — payer disputed a confirmed/self_reported payment; participant may self-report again
   //   opted_out       — participant sent STOP via SMS; no further Twilio messages will be sent to them
   //   settled         — final settled state; event-level settlement complete
   amount_owed: number | null;  // null until A2 (split calculation) completes; clients should show a skeleton/loading state when null
@@ -1519,7 +1523,7 @@ Guest detail screen for **phone guests** aggregated by `guest_pii.phone_hash`. V
 ### POST `/events/:eventId/settlement/:participantId/self-report`
 **Auth:** `[AUTH]` | `[PARTICIPANT]`
 
-Participant marks themselves as paid. Sends push notification to payer.
+Participant marks themselves as paid. Sets `payment_status` to **`confirmed`** immediately (also sets `self_reported_at`, `self_reported_method`, `confirmed_at`). Valid from `pending` or `disputed`.
 
 **Request body:**
 ```typescript
@@ -1533,8 +1537,10 @@ Participant marks themselves as paid. Sends push notification to payer.
 ```typescript
 {
   participant_id: string;
-  payment_status: "self_reported";
+  payment_status: "confirmed";
   self_reported_at: string;
+  confirmed_at: string;
+  event_fully_settled: boolean;
 }
 ```
 
@@ -1543,7 +1549,7 @@ Participant marks themselves as paid. Sends push notification to payer.
 ### POST `/events/:eventId/settlement/:participantId/confirm`
 **Auth:** `[AUTH]` | `[PAYER]`
 
-Payer confirms a self-reported payment. Sends push notification to participant.
+**Legacy:** Payer confirms a row still in `self_reported`. App self-report no longer uses this path (self-report → `confirmed` directly). Retained for backward compatibility and manual DB states.
 
 **Request body:** none
 
@@ -1557,12 +1563,14 @@ Payer confirms a self-reported payment. Sends push notification to participant.
 }
 ```
 
+**Response `409`:** `INVALID_PAYMENT_STATUS` when row is not `self_reported`.
+
 ---
 
 ### POST `/events/:eventId/settlement/:participantId/dispute`
 **Auth:** `[AUTH]` | `[PAYER]`
 
-Payer disputes a self-reported payment. Resets status to pending. Notifies participant.
+Payer disputes a **confirmed** or **self_reported** payment. Sets `payment_status` to **`disputed`** (clears `confirmed_at`). Notifies participant.
 
 **Request body:**
 ```typescript
@@ -1575,7 +1583,7 @@ Payer disputes a self-reported payment. Resets status to pending. Notifies parti
 ```typescript
 {
   participant_id: string;
-  payment_status: "pending";
+  payment_status: "disputed";
   disputed_count: number;
 }
 ```
@@ -1613,7 +1621,7 @@ One-tap actions across **all direct outstanding participant rows** for a registe
 #### POST `/settlement/member/:userId/self-report-all`
 **Auth:** `[AUTH]` | **Participant** owes counterparty `:userId`
 
-Bulk `pending` → `self_reported` for every `outstanding[]` row where `direction=i_owe`.
+**Net settlement alias** (`memberNetSettle`): offsets mutual `owed_to_me` rows via `payerConfirmOffset`, then self-reports all `i_owe` rows (`pending`/`disputed` → `confirmed`). Requires `payment_method` when net amount owed to counterparty is negative.
 
 **Request body:** same as per-event self-report (`payment_method`, optional `note`).
 
@@ -1624,7 +1632,7 @@ Bulk `pending` → `self_reported` for every `outstanding[]` row where `directio
   results: Array<{
     event_id: string;
     participant_id: string;
-    payment_status: "self_reported";
+    payment_status: "confirmed";
   }>;
 }
 ```
@@ -1632,7 +1640,7 @@ Bulk `pending` → `self_reported` for every `outstanding[]` row where `directio
 #### POST `/settlement/member/:userId/confirm-all`
 **Auth:** `[AUTH]` | `[PAYER]` — counterparty owes viewer
 
-Bulk `self_reported` → `confirmed` for all `owed_to_me` rows; runs event settle check per affected event.
+**Legacy:** Bulk `self_reported` → `confirmed` for `owed_to_me` rows still in `outstanding[]`. Returns `updated_count: 0` when app self-report already confirmed rows (typical).
 
 **Response `200`:**
 ```typescript
@@ -1646,13 +1654,13 @@ Bulk `self_reported` → `confirmed` for all `owed_to_me` rows; runs event settl
 #### POST `/settlement/member/:userId/dispute-all`
 **Auth:** `[AUTH]` | `[PAYER]`
 
-Bulk `self_reported` → `pending` for all rows from that member.
+Bulk `confirmed` or `self_reported` → `disputed` for all `owed_to_me` rows (includes `history[]` — confirmed rows are not in `outstanding[]`).
 
 **Request body:** `{ note?: string }`
 
 **Response `200`:**
 ```typescript
-{ updated_count: number; results: Array<{ event_id: string; participant_id: string; payment_status: "pending" }> }
+{ updated_count: number; results: Array<{ event_id: string; participant_id: string; payment_status: "disputed" }> }
 ```
 
 #### POST `/settlement/member/:userId/mark-paid-all`

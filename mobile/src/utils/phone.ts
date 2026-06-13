@@ -113,3 +113,25 @@ export function isValidNationalNumber(
 ): boolean {
   return toE164FromNational(nationalDigits, country) !== null;
 }
+
+/** US/Canada NANP — 10 digits after +1. */
+export const US_NATIONAL_MAX_DIGITS = 10;
+
+export function extractUsNationalDigits(input: string): string {
+  return input.replace(/\D/g, '').slice(0, US_NATIONAL_MAX_DIGITS);
+}
+
+/** Display format: (xxx) - xxx - xxxx */
+export function formatUsNationalDisplay(digits: string): string {
+  const d = extractUsNationalDigits(digits);
+  if (d.length === 0) return '';
+  if (d.length <= 3) return `(${d}`;
+  if (d.length <= 6) return `(${d.slice(0, 3)}) - ${d.slice(3)}`;
+  return `(${d.slice(0, 3)}) - ${d.slice(3, 6)} - ${d.slice(6)}`;
+}
+
+export function handleUsNationalPhoneInput(text: string): string {
+  return formatUsNationalDisplay(extractUsNationalDigits(text));
+}
+
+export const US_NATIONAL_DISPLAY_MAX_LENGTH = 18;

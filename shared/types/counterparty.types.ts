@@ -33,6 +33,8 @@ export interface CounterpartyEventRow {
   direction: 'owed_to_me' | 'i_owe';
   payment_status: string;
   participant_id: string;
+  /** False for name-only guests / participants without a reachable phone. */
+  can_nudge?: boolean;
 }
 
 export interface MemberDetailResponse {

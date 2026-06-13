@@ -115,7 +115,13 @@ export function ProfileScreen({ navigation, route }: Props) {
   const listHeader = (
     <View style={styles.headerBlock}>
       <FadeSlideIn delay={0}>
-        <Pressable accessibilityRole="button" onPress={() => navigation.goBack()} style={styles.back}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() =>
+            navigation.navigate('MainTabs', { screen: 'HomeTab', params: { screen: 'Home' } })
+          }
+          style={styles.back}
+        >
           <Text style={styles.backText}>← Back</Text>
         </Pressable>
       </FadeSlideIn>

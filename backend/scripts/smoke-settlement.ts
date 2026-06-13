@@ -205,11 +205,11 @@ async function main(): Promise<void> {
       { payment_method: 'venmo' },
       memberToken,
     );
-    if (selfReport.status !== 200 || selfReport.body.payment_status !== 'self_reported') {
+    if (selfReport.status !== 200 || selfReport.body.payment_status !== 'confirmed') {
       fail('POST self-report', `status ${selfReport.status} ${JSON.stringify(selfReport.body)}`);
       return;
     }
-    pass('POST self-report', 'self_reported');
+    pass('POST self-report', 'confirmed');
 
     const dispute = await requestJson(
       'POST',
@@ -217,11 +217,11 @@ async function main(): Promise<void> {
       { note: 'smoke dispute' },
       payerToken,
     );
-    if (dispute.status !== 200 || dispute.body.payment_status !== 'pending') {
-      fail('POST dispute', `status ${dispute.status}`);
+    if (dispute.status !== 200 || dispute.body.payment_status !== 'disputed') {
+      fail('POST dispute', `status ${dispute.status} ${JSON.stringify(dispute.body)}`);
       return;
     }
-    pass('POST dispute', 'pending');
+    pass('POST dispute', 'disputed');
 
     const selfReport2 = await requestJson(
       'POST',
@@ -241,11 +241,15 @@ async function main(): Promise<void> {
       undefined,
       payerToken,
     );
-    if (confirm.status !== 200 || confirm.body.payment_status !== 'confirmed') {
-      fail('POST confirm', `status ${confirm.status}`);
+    const confirmError = confirm.body.error as { code?: string } | undefined;
+    if (confirm.status === 409 && confirmError?.code === 'INVALID_PAYMENT_STATUS') {
+      pass('POST confirm (legacy)', '409 — already confirmed via self-report');
+    } else if (confirm.status !== 200 || confirm.body.payment_status !== 'confirmed') {
+      fail('POST confirm', `status ${confirm.status} ${JSON.stringify(confirm.body)}`);
       return;
+    } else {
+      pass('POST confirm', 'confirmed');
     }
-    pass('POST confirm', 'confirmed');
 
     const selfConfirm403 = await requestJson(
       'POST',

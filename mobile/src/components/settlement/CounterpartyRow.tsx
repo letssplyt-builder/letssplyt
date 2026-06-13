@@ -7,6 +7,7 @@ interface CounterpartyRowProps {
   amount: number;
   avatarColour?: string;
   directionLabel?: string;
+  amountTone?: 'positive' | 'negative';
   onPress: () => void;
 }
 
@@ -15,6 +16,7 @@ export function CounterpartyRow({
   amount,
   avatarColour = '#4F46E5',
   directionLabel,
+  amountTone,
   onPress,
 }: CounterpartyRowProps) {
   const spokenAmount = formatMoney(amount);
@@ -36,7 +38,15 @@ export function CounterpartyRow({
         <Text style={styles.name} numberOfLines={1}>{displayName}</Text>
         {directionLabel ? <Text style={styles.hint}>{directionLabel}</Text> : null}
       </View>
-      <Text style={styles.amount}>{spokenAmount}</Text>
+      <Text
+        style={[
+          styles.amount,
+          amountTone === 'positive' && styles.amountPositive,
+          amountTone === 'negative' && styles.amountNegative,
+        ]}
+      >
+        {spokenAmount}
+      </Text>
     </Pressable>
   );
 }
@@ -88,5 +98,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     marginLeft: 8,
+  },
+  amountPositive: {
+    color: '#6EE7B7',
+  },
+  amountNegative: {
+    color: authColors.errorOnDark,
   },
 });

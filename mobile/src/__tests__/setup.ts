@@ -72,13 +72,16 @@ jest.mock('react-native-gesture-handler', () => {
     Swipeable: ({
       children,
       renderRightActions,
+      renderLeftActions,
     }: {
       children: React.ReactNode;
       renderRightActions?: () => React.ReactNode;
+      renderLeftActions?: () => React.ReactNode;
     }) =>
       React.createElement(
         View,
         null,
+        renderLeftActions ? renderLeftActions() : null,
         children,
         renderRightActions ? renderRightActions() : null,
       ),

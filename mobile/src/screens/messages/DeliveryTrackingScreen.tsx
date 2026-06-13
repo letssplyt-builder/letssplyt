@@ -16,6 +16,8 @@ import { useAppInsets } from '../../hooks/useAppInsets';
 import { getSupabase } from '../../lib/supabase';
 import type { EventsStackParamList } from '../../navigation/types';
 import * as eventService from '../../services/event.service';
+import { finishEventFlowToEventDetail } from '../../navigation/eventNavigation';
+import { useEventStore } from '../../store/eventStore';
 import { retryParticipantMessage, type SendResultStatus } from '../../services/messages.service';
 import { isApiRequestError } from '../../services/api';
 import { authColors } from '../../theme/colors';
@@ -190,7 +192,13 @@ export function DeliveryTrackingScreen({ navigation, route }: Props) {
   };
 
   const handleDone = () => {
-    navigation.navigate('EventDetail', { eventId });
+    void useEventStore
+      .getState()
+      .loadEventDetail(eventId)
+      .catch(() => undefined)
+      .finally(() => {
+        finishEventFlowToEventDetail(navigation, eventId);
+      });
   };
 
   return (

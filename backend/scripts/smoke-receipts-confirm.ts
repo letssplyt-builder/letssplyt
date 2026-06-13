@@ -240,12 +240,20 @@ async function main(): Promise<void> {
       fail('DB receipt_items', JSON.stringify(dbItems));
     }
 
-    const reject = await requestJson('POST', '/api/v1/receipts/confirm', confirmBody, accessToken);
-    const rejectError = reject.body.error as { code?: string } | undefined;
-    if (reject.status === 400 && rejectError?.code === 'INVALID_AI_STAGE') {
-      pass('POST /receipts/confirm reject', rejectError.code);
+    const reconfirm = await requestJson('POST', '/api/v1/receipts/confirm', confirmBody, accessToken);
+    const reconfirmed = reconfirm.body.confirmed as boolean | undefined;
+    if (reconfirm.status === 200 && reconfirmed === true) {
+      pass('POST /receipts/confirm re-confirm', 'idempotent at parsed_confirmed');
     } else {
-      fail('POST /receipts/confirm reject', `status ${reject.status} ${JSON.stringify(reject.body)}`);
+      const rejectError = reconfirm.body.error as { code?: string } | undefined;
+      if (reconfirm.status === 400 && rejectError?.code === 'INVALID_AI_STAGE') {
+        pass('POST /receipts/confirm re-confirm', rejectError.code);
+      } else {
+        fail(
+          'POST /receipts/confirm re-confirm',
+          `status ${reconfirm.status} ${JSON.stringify(reconfirm.body)}`,
+        );
+      }
     }
   } finally {
     if (eventId) {

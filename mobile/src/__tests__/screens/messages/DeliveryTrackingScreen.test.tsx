@@ -11,11 +11,17 @@ import {
   mockRemoveChannel,
 } from '../../mocks/supabase';
 
-const mockNavigate = jest.fn();
+const mockDispatch = jest.fn();
 
-jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({ navigate: mockNavigate }),
-}));
+jest.mock('@react-navigation/native', () => {
+  const actual = jest.requireActual('@react-navigation/native') as typeof import('@react-navigation/native');
+  return {
+    ...actual,
+    useNavigation: () => ({
+      dispatch: mockDispatch,
+    }),
+  };
+});
 
 jest.mock('../../../services/event.service');
 jest.mock('../../../services/messages.service');
@@ -78,7 +84,7 @@ describe('DeliveryTrackingScreen', () => {
   it('subscribes to participant realtime updates and unsubscribes on unmount', async () => {
     const { unmount } = render(
       <DeliveryTrackingScreen
-        navigation={{ navigate: mockNavigate } as never}
+        navigation={{ dispatch: mockDispatch } as never}
         route={{
           key: 'DeliveryTracking-1',
           name: 'DeliveryTracking',
@@ -101,7 +107,7 @@ describe('DeliveryTrackingScreen', () => {
   it('enables Done when all rows are terminal', async () => {
     render(
       <DeliveryTrackingScreen
-        navigation={{ navigate: mockNavigate } as never}
+        navigation={{ dispatch: mockDispatch } as never}
         route={{
           key: 'DeliveryTracking-1',
           name: 'DeliveryTracking',
@@ -119,7 +125,9 @@ describe('DeliveryTrackingScreen', () => {
     });
 
     fireEvent.press(screen.getByLabelText('Done'));
-    expect(mockNavigate).toHaveBeenCalledWith('EventDetail', { eventId: 'event-1' });
+    await waitFor(() => {
+      expect(mockDispatch).toHaveBeenCalled();
+    });
   });
 
   it('shows Retry for failed participants and calls retry API', async () => {
@@ -133,7 +141,7 @@ describe('DeliveryTrackingScreen', () => {
 
     render(
       <DeliveryTrackingScreen
-        navigation={{ navigate: mockNavigate } as never}
+        navigation={{ dispatch: mockDispatch } as never}
         route={{
           key: 'DeliveryTracking-1',
           name: 'DeliveryTracking',

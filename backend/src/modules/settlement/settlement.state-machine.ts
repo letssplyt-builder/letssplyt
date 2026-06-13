@@ -11,8 +11,8 @@ const VALID_TRANSITIONS: Record<PaymentStatus, PaymentStatus[]> = {
   pending: ['self_reported', 'confirmed', 'payer_marked', 'opted_out'],
   self_reported: ['confirmed', 'disputed'],
   payer_marked: ['confirmed'],
-  confirmed: ['settled'],
-  disputed: ['pending'],
+  confirmed: ['disputed', 'settled'],
+  disputed: ['confirmed'],
   opted_out: [],
   settled: [],
 };

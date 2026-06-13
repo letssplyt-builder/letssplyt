@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
 **Last updated:** 2026-06-07
-**Current story:** E09-S04 — Settlement mobile UI (Event Detail actions, Member/Guest Settle all, PayNow)
+**Current story:** E10-S01 — QStash Job Handlers (nudge-check, purge-guest-pii, create-analytics-partition)
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -69,8 +69,8 @@
 ### Epic 9: Settlement Tracking
 - [x] E09-S01 — Per-event settlement API (self-report, confirm, dispute, nudge, mark-paid/cash + `smoke:settlement`) (2026-06-07)
 - [x] E09-S02 — Counterparty bulk settlement API (settle-all per member/guest: self-report-all, confirm-all, dispute-all, mark-paid-all + `smoke:bulk-settlement`) (2026-06-07)
-- [ ] E09-S03 — Settlement ledger API (balance, counterparties, member/guest detail — **shipped E07-S03**; owed-to-me, i-owe, ledger tests **remaining**)
-- [ ] E09-S04 — Settlement mobile UI (Home/Events lists — **shipped E07-S03**; Event Detail actions, Member/Guest Settle all, PayNow **remaining**)
+- [x] E09-S03 — Settlement ledger API (owed-to-me, i-owe, person alias, ledger tests + `smoke:ledger`) (2026-06-07)
+- [x] E09-S04 — Settlement mobile UI (Event Detail swipe roster, participant paid state, Events Active/Settled rules, Member detail Pay all / I've paid all, eventNavigation, Android refresh fix, Dashboard stack reset) (2026-06-07)
 
 ---
 

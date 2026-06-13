@@ -53,6 +53,8 @@ export interface EventListItem {
   role: EventListRole;
   /** Set when role is participant — who created the event. */
   creator_name?: string | null;
+  /** Participant's payment_status on this event (participant role only). */
+  viewer_payment_status?: string | null;
 }
 
 export interface EventListResponse {
@@ -78,6 +80,8 @@ export interface JoinTokenInfo {
 
 export interface EventParticipantSummary {
   id: string;
+  /** Linked LetsSplyt account — null for guests without an app account. */
+  user_id?: string | null;
   display_name: string;
   join_method: string;
   payment_status: string;
@@ -92,6 +96,8 @@ export interface EventParticipantSummary {
   message_delivered_at?: string | null;
   /** Send or delivery failure. */
   message_failed?: boolean;
+  /** Method reported when participant self-paid (organiser roster). */
+  self_reported_method?: string | null;
 }
 
 export interface ParticipantAssignedItem {

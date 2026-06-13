@@ -78,29 +78,44 @@ describe('settlement.service', () => {
     });
   });
 
-  it('self-report rejects when status is not pending', async () => {
-    pushParticipantRow({ payment_status: 'self_reported' });
+  it('self-report rejects when status is already confirmed', async () => {
+    pushParticipantRow({ payment_status: 'confirmed' });
 
     await expect(
       selfReportPayment(PARTICIPANT_USER, EVENT_ID, PARTICIPANT_ID, {
         payment_method: 'venmo',
       }),
-    ).rejects.toThrow('Invalid settlement transition: self_reported → self_reported');
+    ).rejects.toMatchObject({ code: 'INVALID_PAYMENT_STATUS' });
   });
 
-  it('self-report writes settlement_log with self_reported action', async () => {
+  it('self-report confirms payment immediately', async () => {
     pushParticipantRow();
     mockSupabase.__pushMockResultForTable('participants', {
       data: { id: PARTICIPANT_ID, amount_owed: 25 },
       error: null,
     });
     mockSupabase.__pushMockResultForTable('settlement_log', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('events', {
+      data: { payer_id: PAYER_ID },
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: [
+        {
+          id: PARTICIPANT_ID,
+          user_id: PARTICIPANT_USER,
+          payment_status: 'confirmed',
+          amount_owed: 25,
+        },
+      ],
+      error: null,
+    });
 
     const result = await selfReportPayment(PARTICIPANT_USER, EVENT_ID, PARTICIPANT_ID, {
       payment_method: 'venmo',
     });
 
-    expect(result.payment_status).toBe('self_reported');
+    expect(result.payment_status).toBe('confirmed');
     expect(mockSupabase.from).toHaveBeenCalledWith('settlement_log');
   });
 
@@ -112,8 +127,19 @@ describe('settlement.service', () => {
       error: null,
     });
     mockSupabase.__pushMockResultForTable('settlement_log', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('events', {
+      data: { payer_id: PAYER_ID },
+      error: null,
+    });
     mockSupabase.__pushMockResultForTable('participants', {
-      data: [{ id: PARTICIPANT_ID, payment_status: 'confirmed', amount_owed: 25 }],
+      data: [
+        {
+          id: PARTICIPANT_ID,
+          user_id: PARTICIPANT_USER,
+          payment_status: 'confirmed',
+          amount_owed: 25,
+        },
+      ],
       error: null,
     });
     mockSupabase.__pushMockResultForTable('events', { data: null, error: null });
@@ -125,9 +151,19 @@ describe('settlement.service', () => {
     expect(result.event_fully_settled).toBe(true);
   });
 
-  it('dispute resets payment_status to pending', async () => {
+  it('confirm rejects when status is already confirmed', async () => {
     pushEvent();
-    pushParticipantRow({ payment_status: 'self_reported', disputed_count: 0 });
+    pushParticipantRow({ payment_status: 'confirmed' });
+
+    await expect(confirmPayment(PAYER_ID, EVENT_ID, PARTICIPANT_ID)).rejects.toMatchObject({
+      code: 'INVALID_PAYMENT_STATUS',
+      statusCode: 409,
+    });
+  });
+
+  it('dispute moves confirmed payment to disputed', async () => {
+    pushEvent();
+    pushParticipantRow({ payment_status: 'confirmed', disputed_count: 0 });
     mockSupabase.__pushMockResultForTable('participants', {
       data: { id: PARTICIPANT_ID },
       error: null,
@@ -136,7 +172,7 @@ describe('settlement.service', () => {
 
     const result = await disputePayment(PAYER_ID, EVENT_ID, PARTICIPANT_ID, {});
 
-    expect(result.payment_status).toBe('pending');
+    expect(result.payment_status).toBe('disputed');
     expect(result.disputed_count).toBe(1);
   });
 
@@ -167,8 +203,19 @@ describe('settlement.service', () => {
       error: null,
     });
     mockSupabase.__pushMockResultForTable('settlement_log', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('events', {
+      data: { payer_id: PAYER_ID },
+      error: null,
+    });
     mockSupabase.__pushMockResultForTable('participants', {
-      data: [{ id: PARTICIPANT_ID, payment_status: 'confirmed', amount_owed: 25 }],
+      data: [
+        {
+          id: PARTICIPANT_ID,
+          user_id: PARTICIPANT_USER,
+          payment_status: 'confirmed',
+          amount_owed: 25,
+        },
+      ],
       error: null,
     });
     mockSupabase.__pushMockResultForTable('events', { data: null, error: null });

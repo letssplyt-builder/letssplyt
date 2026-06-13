@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -6,7 +7,6 @@ import { StatusBar } from 'expo-status-bar';
 import {
   ActivityIndicator,
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -20,6 +20,7 @@ import { QRDisplayModal } from '../../components/events/QRDisplayModal';
 import { SegmentedControl } from '../../components/events/SegmentedControl';
 import { CounterpartyRow } from '../../components/settlement/CounterpartyRow';
 import { useAppInsets } from '../../hooks/useAppInsets';
+import { openEventDetail } from '../../navigation/eventNavigation';
 import type {
   HomeStackParamList,
   MainTabParamList,
@@ -29,9 +30,9 @@ import { fetchBalance, regenerateJoinToken, type BalanceSummary } from '../../se
 import { useAuthStore } from '../../store/authStore';
 import { useEventStore } from '../../store/eventStore';
 import { useSettlementStore } from '../../store/settlementStore';
-import { DevJoinTestPanel } from '../../components/dev/DevJoinTestPanel';
 import { glassStyles } from '../../theme/glassStyles';
 import { authColors } from '../../theme/colors';
+import { appRefreshControl } from '../../utils/refreshControl';
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<HomeStackParamList, 'Home'>,
@@ -97,13 +98,11 @@ export function HomeScreen({ navigation }: Props) {
     await Promise.all([loadBalance(), loadCounterparties(segment)]);
   }, [loadBalance, loadCounterparties, segment]);
 
-  useEffect(() => {
-    void refreshData();
-  }, [refreshData]);
-
-  useEffect(() => {
-    void loadCounterparties(segment);
-  }, [loadCounterparties, segment]);
+  useFocusEffect(
+    useCallback(() => {
+      void refreshData();
+    }, [refreshData]),
+  );
 
   const handleCreate = async () => {
     const trimmed = titleDraft.trim();
@@ -128,8 +127,8 @@ export function HomeScreen({ navigation }: Props) {
     }
   };
 
-  const openEventDetail = (eventId: string) => {
-    navigation.navigate('EventDetail', { eventId });
+  const handleOpenEvent = (eventId: string) => {
+    openEventDetail(navigation, eventId);
   };
 
   const renderMembersLists = () => {
@@ -139,7 +138,7 @@ export function HomeScreen({ navigation }: Props) {
       );
     }
 
-    if (isLoadingCounterparties && membersOweYou.length === 0 && membersYouOwe.length === 0) {
+    if (isLoadingCounterparties) {
       return <ActivityIndicator color={authColors.textOnDark} style={styles.loader} />;
     }
 
@@ -162,6 +161,7 @@ export function HomeScreen({ navigation }: Props) {
                 amount={row.net_amount}
                 avatarColour={row.avatar_colour}
                 directionLabel="owe you"
+                amountTone="positive"
                 onPress={() =>
                   navigation.navigate('MemberDetail', { userId: row.user_id })
                 }
@@ -180,6 +180,7 @@ export function HomeScreen({ navigation }: Props) {
                 amount={row.net_amount}
                 avatarColour={row.avatar_colour}
                 directionLabel="you owe"
+                amountTone="negative"
                 onPress={() =>
                   navigation.navigate('MemberDetail', { userId: row.user_id })
                 }
@@ -198,7 +199,7 @@ export function HomeScreen({ navigation }: Props) {
       );
     }
 
-    if (isLoadingCounterparties && guests.length === 0) {
+    if (isLoadingCounterparties) {
       return <ActivityIndicator color={authColors.textOnDark} style={styles.loader} />;
     }
 
@@ -213,7 +214,7 @@ export function HomeScreen({ navigation }: Props) {
         amount={guest.amount}
         onPress={() => {
           if (guest.kind === 'name_only' && guest.event_id) {
-            openEventDetail(guest.event_id);
+            handleOpenEvent(guest.event_id);
             return;
           }
           navigation.navigate('GuestDetail', { phoneHash: guest.guest_key });
@@ -230,16 +231,15 @@ export function HomeScreen({ navigation }: Props) {
           styles.content,
           { paddingBottom: screenScrollBottomPadding },
         ]}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            tintColor={authColors.textOnDark}
-            onRefresh={() => {
-              setRefreshing(true);
-              void refreshData().finally(() => setRefreshing(false));
-            }}
-          />
-        }
+        removeClippedSubviews={false}
+        refreshControl={appRefreshControl({
+          refreshing: refreshing,
+          tintColor: authColors.textOnDark,
+          onRefresh: () => {
+            setRefreshing(true);
+            void refreshData().finally(() => setRefreshing(false));
+          },
+        })}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
@@ -275,7 +275,6 @@ export function HomeScreen({ navigation }: Props) {
           {segment === 'members' ? renderMembersLists() : renderGuestsList()}
         </View>
 
-        <DevJoinTestPanel navigation={navigation} />
       </ScrollView>
 
       <EventFab onPress={openCreateModal} />

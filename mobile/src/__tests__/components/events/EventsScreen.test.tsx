@@ -6,6 +6,17 @@ import { useEventStore } from '../../../store/eventStore';
 
 jest.mock('../../../services/event.service');
 
+jest.mock('@react-navigation/native', () => {
+  const React = require('react');
+  return {
+    useFocusEffect: (callback: () => void) => {
+      React.useEffect(() => {
+        callback();
+      }, [callback]);
+    },
+  };
+});
+
 const navigation = { navigate: jest.fn() } as never;
 
 const activeCreated = {

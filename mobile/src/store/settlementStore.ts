@@ -4,6 +4,7 @@ import type {
   MemberCounterpartyRow,
   MemberDetailResponse,
 } from '@letssplyt/shared/counterparty.types';
+import type { IOweEntry, OwedToMeEntry } from '@letssplyt/shared/settlement.types';
 import { create } from 'zustand';
 import * as settlementService from '../services/settlement.service';
 
@@ -13,27 +14,41 @@ interface SettlementState {
   guests: GuestCounterpartyRow[];
   memberDetail: MemberDetailResponse | null;
   guestDetail: GuestDetailResponse | null;
+  owedToMeRows: OwedToMeEntry[];
+  iOweRows: IOweEntry[];
   isLoadingCounterparties: boolean;
   isLoadingDetail: boolean;
+  isLoadingLedger: boolean;
   counterpartyError: boolean;
   loadCounterparties: (kind: 'members' | 'guests') => Promise<void>;
   loadMemberDetail: (userId: string) => Promise<void>;
   loadGuestDetail: (phoneHash: string) => Promise<void>;
+  loadEventLedger: () => Promise<void>;
+  getIOweForEvent: (eventId: string) => IOweEntry | undefined;
   clearDetail: () => void;
 }
 
-export const useSettlementStore = create<SettlementState>((set) => ({
+export const useSettlementStore = create<SettlementState>((set, get) => ({
   membersOweYou: [],
   membersYouOwe: [],
   guests: [],
   memberDetail: null,
   guestDetail: null,
+  owedToMeRows: [],
+  iOweRows: [],
   isLoadingCounterparties: false,
   isLoadingDetail: false,
+  isLoadingLedger: false,
   counterpartyError: false,
 
   loadCounterparties: async (kind) => {
-    set({ isLoadingCounterparties: true, counterpartyError: false });
+    set({
+      isLoadingCounterparties: true,
+      counterpartyError: false,
+      ...(kind === 'members'
+        ? { membersOweYou: [], membersYouOwe: [] }
+        : { guests: [] }),
+    });
     try {
       if (kind === 'members') {
         const data = await settlementService.fetchMemberCounterparties();
@@ -71,6 +86,27 @@ export const useSettlementStore = create<SettlementState>((set) => ({
       set({ isLoadingDetail: false });
       throw new Error('GUEST_DETAIL_FAILED');
     }
+  },
+
+  loadEventLedger: async () => {
+    set({ isLoadingLedger: true });
+    try {
+      const [owed, owe] = await Promise.all([
+        settlementService.fetchOwedToMe(),
+        settlementService.fetchIOwe(),
+      ]);
+      set({
+        owedToMeRows: owed.data,
+        iOweRows: owe.data,
+        isLoadingLedger: false,
+      });
+    } catch {
+      set({ isLoadingLedger: false });
+    }
+  },
+
+  getIOweForEvent: (eventId) => {
+    return get().iOweRows.find((row) => row.event_id === eventId);
   },
 
   clearDetail: () => set({ memberDetail: null, guestDetail: null }),

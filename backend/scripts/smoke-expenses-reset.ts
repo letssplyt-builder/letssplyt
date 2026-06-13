@@ -100,11 +100,12 @@ async function main(): Promise<void> {
       { title: `Smoke Reset ${Date.now()}` },
       accessToken,
     );
-    eventId = created.body.id as string | undefined;
-    if (created.status !== 201 || !eventId) {
+    const createdId = created.body.id as string | undefined;
+    if (created.status !== 201 || !createdId) {
       fail('POST /events', `status ${created.status}`);
       return;
     }
+    eventId = createdId;
     pass('POST /events', eventId);
 
     const addGuest = await requestJson(

@@ -13,6 +13,7 @@ import { useJoinStore } from '../../store/joinStore';
 import { authColors } from '../../theme/colors';
 import {
   DEFAULT_AUTH_REGION,
+  formatUsNationalDisplay,
   isValidNationalNumber,
   nationalFromE164,
   toE164FromNational,
@@ -23,14 +24,16 @@ type Props = NativeStackScreenProps<RootStackParamList, 'PhoneEntry'>;
 export function PhoneEntryScreen({ navigation, route }: Props) {
   const initialPhone = route.params?.initialPhone ?? '';
   const joinToken = route.params?.joinToken;
-  const [phoneValue, setPhoneValue] = useState(() => nationalFromE164(initialPhone));
+  const [phoneValue, setPhoneValue] = useState(() =>
+    formatUsNationalDisplay(nationalFromE164(initialPhone)),
+  );
   const [error, setError] = useState<string | null>(null);
   const isLoading = useAuthStore((state) => state.isLoading);
   const setLoading = useAuthStore((state) => state.setLoading);
 
   useEffect(() => {
     if (route.params?.initialPhone) {
-      setPhoneValue(nationalFromE164(route.params.initialPhone));
+      setPhoneValue(formatUsNationalDisplay(nationalFromE164(route.params.initialPhone)));
     }
   }, [route.params?.initialPhone]);
 

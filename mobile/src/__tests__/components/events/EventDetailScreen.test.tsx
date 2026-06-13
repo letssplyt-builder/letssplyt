@@ -12,6 +12,7 @@ import { EventDetailScreen } from '../../../screens/events/EventDetailScreen';
 import { ApiRequestError } from '../../../services/api';
 import * as eventService from '../../../services/event.service';
 import { useEventStore } from '../../../store/eventStore';
+import { useSettlementStore } from '../../../store/settlementStore';
 
 jest.mock('@react-navigation/native', () => {
   const React = require('react');
@@ -21,10 +22,20 @@ jest.mock('@react-navigation/native', () => {
         callback();
       }, [callback]);
     },
+    useIsFocused: () => true,
   };
 });
 
 jest.mock('../../../services/event.service');
+jest.mock('../../../services/settlement.service', () => ({
+  confirmPayment: jest.fn(),
+  disputePayment: jest.fn(),
+  nudgeParticipant: jest.fn(),
+  markParticipantPaid: jest.fn(),
+  selfReportPayment: jest.fn(),
+}));
+
+import * as settlementService from '../../../services/settlement.service';
 
 let mockAuthUser: { id: string; display_name: string; avatar_colour: string } | null = {
   id: 'user-1',
@@ -85,13 +96,13 @@ const mockDetailLocked = {
       display_name: 'Sam',
       join_method: 'qr_web',
       payment_status: 'pending',
-      amount_owed: 0,
+      amount_owed: 30,
     },
   ],
   summary: {
-    total: 0,
+    total: 60,
     collected: 0,
-    outstanding: 0,
+    outstanding: 60,
     confirmed_count: 0,
     pending_count: 1,
   },
@@ -894,6 +905,460 @@ describe('EventDetailScreen', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Only pending members can be removed.')).toBeTruthy();
+    });
+  });
+
+  it('settlement phase shows Dispute swipe on paid registered member', async () => {
+    jest.mocked(settlementService.disputePayment).mockResolvedValue({
+      payment_status: 'disputed',
+    });
+    jest.mocked(eventService.fetchEventById).mockResolvedValue({
+      ...mockDetailLocked,
+      event: {
+        ...mockDetailLocked.event,
+        status: 'sent',
+        messages_sent_at: '2026-06-08T12:00:00.000Z',
+      },
+      participants: [
+        {
+          id: 'p-1',
+          user_id: 'user-member-1',
+          display_name: 'Sam',
+          join_method: 'qr_app',
+          payment_status: 'confirmed',
+          amount_owed: 30,
+          self_reported_method: 'venmo',
+        },
+      ],
+      summary: {
+        total: 60,
+        collected: 30,
+        outstanding: 0,
+        confirmed_count: 1,
+        pending_count: 0,
+      },
+    });
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Paid by Venmo')).toBeTruthy();
+      expect(screen.getByLabelText('Dispute')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByLabelText('Dispute'));
+
+    await waitFor(() => {
+      expect(settlementService.disputePayment).toHaveBeenCalledWith('event-1', 'p-1');
+    });
+  });
+
+  it('shows Dispute for registered user who joined via browser (qr_web)', async () => {
+    jest.mocked(eventService.fetchEventById).mockResolvedValue({
+      ...mockDetailLocked,
+      event: {
+        ...mockDetailLocked.event,
+        status: 'sent',
+        messages_sent_at: '2026-06-08T12:00:00.000Z',
+      },
+      participants: [
+        {
+          id: 'p-1',
+          user_id: 'user-member-2',
+          display_name: 'Sam',
+          join_method: 'qr_web',
+          payment_status: 'confirmed',
+          amount_owed: 30,
+          self_reported_method: 'venmo',
+        },
+      ],
+      summary: {
+        total: 60,
+        collected: 30,
+        outstanding: 0,
+        confirmed_count: 1,
+        pending_count: 0,
+      },
+    });
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Dispute')).toBeTruthy();
+    });
+  });
+
+  it('does not show Dispute swipe for guest without user_id', async () => {
+    jest.mocked(eventService.fetchEventById).mockResolvedValue({
+      ...mockDetailLocked,
+      event: {
+        ...mockDetailLocked.event,
+        status: 'sent',
+        messages_sent_at: '2026-06-08T12:00:00.000Z',
+      },
+      participants: [
+        {
+          id: 'p-1',
+          display_name: 'Sam',
+          join_method: 'qr_web',
+          payment_status: 'confirmed',
+          amount_owed: 30,
+          self_reported_method: 'venmo',
+        },
+      ],
+      summary: {
+        total: 60,
+        collected: 30,
+        outstanding: 0,
+        confirmed_count: 1,
+        pending_count: 0,
+      },
+    });
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Paid by Venmo')).toBeTruthy();
+      expect(screen.queryByLabelText('Dispute')).toBeNull();
+    });
+  });
+
+  it('hides swipe actions until payment messages are sent', async () => {
+    jest.mocked(eventService.fetchEventById).mockResolvedValue({
+      ...mockDetailLocked,
+      event: {
+        ...mockDetailLocked.event,
+        status: 'locked',
+        ai_stage: 'calculated',
+        messages_sent_at: null,
+      },
+      participants: [
+        {
+          id: 'p-1',
+          display_name: 'Sam',
+          join_method: 'qr_web',
+          payment_status: 'pending',
+          amount_owed: 30,
+        },
+      ],
+      summary: {
+        total: 60,
+        collected: 0,
+        outstanding: 30,
+        confirmed_count: 0,
+        pending_count: 1,
+      },
+    });
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Sam')).toBeTruthy();
+      expect(screen.queryByLabelText('Paid')).toBeNull();
+      expect(screen.queryByLabelText('Dispute')).toBeNull();
+    });
+  });
+
+  it('settlement roster lists organiser and all members including zero-share rows', async () => {
+    jest.mocked(eventService.fetchEventById).mockResolvedValue({
+      ...mockDetailLocked,
+      event: {
+        ...mockDetailLocked.event,
+        status: 'sent',
+        messages_sent_at: '2026-06-08T12:00:00.000Z',
+      },
+      participants: [
+        {
+          id: 'p-organiser',
+          display_name: 'Alex',
+          join_method: 'qr_app',
+          payment_status: 'pending',
+          amount_owed: 40,
+          is_organiser: true,
+          is_self: true,
+        },
+        {
+          id: 'p-1',
+          display_name: 'Sam',
+          join_method: 'qr_web',
+          payment_status: 'pending',
+          amount_owed: 30,
+          is_organiser: false,
+        },
+        {
+          id: 'p-2',
+          display_name: 'Mia',
+          join_method: 'manual_name_only',
+          payment_status: 'opted_out',
+          amount_owed: 0,
+          is_organiser: false,
+        },
+      ],
+      summary: {
+        total: 100,
+        collected: 0,
+        outstanding: 30,
+        confirmed_count: 0,
+        pending_count: 1,
+      },
+    });
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Members · 3')).toBeTruthy();
+      expect(screen.getByText('You')).toBeTruthy();
+      expect(screen.getByText('Sam')).toBeTruthy();
+      expect(screen.getByText('Mia')).toBeTruthy();
+      expect(screen.getByText('Pending')).toBeTruthy();
+      expect(screen.getByLabelText('Paid')).toBeTruthy();
+      expect(screen.queryByLabelText('Nudge')).toBeNull();
+      expect(screen.queryByLabelText('Mark cash')).toBeNull();
+    });
+  });
+
+  it('organiser sees Expenses Share status after messages sent', async () => {
+    jest.mocked(eventService.fetchEventById).mockResolvedValue({
+      ...mockDetailLocked,
+      event: {
+        ...mockDetailLocked.event,
+        status: 'sent',
+        messages_sent_at: '2026-06-08T12:00:00.000Z',
+      },
+      participants: [
+        {
+          id: 'p-1',
+          display_name: 'Sam',
+          join_method: 'qr_web',
+          payment_status: 'pending',
+          amount_owed: 30,
+        },
+      ],
+      summary: {
+        total: 60,
+        collected: 0,
+        outstanding: 30,
+        confirmed_count: 0,
+        pending_count: 1,
+      },
+    });
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Expenses Share')).toBeTruthy();
+    });
+  });
+
+  it('participant does not see pay actions before payment messages are sent', async () => {
+    mockAuthUser = {
+      id: 'user-2',
+      display_name: 'Guest',
+      avatar_colour: '#6366F1',
+    };
+
+    jest.mocked(eventService.fetchEventById).mockResolvedValue({
+      ...mockDetailLocked,
+      join_token: null,
+      event: {
+        ...mockDetailLocked.event,
+        status: 'locked',
+        ai_stage: 'calculated',
+        messages_sent_at: null,
+      },
+      participants: [
+        {
+          id: 'p-self',
+          display_name: 'Guest',
+          join_method: 'qr_app',
+          payment_status: 'pending',
+          amount_owed: 30,
+          is_self: true,
+        },
+      ],
+      summary: null,
+    });
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Your share')).toBeTruthy();
+      expect(screen.queryByText('Pay now')).toBeNull();
+      expect(screen.queryByText('All paid')).toBeNull();
+    });
+  });
+
+  it('participant with pending share sees Pay now and All paid actions', async () => {
+    mockAuthUser = {
+      id: 'user-2',
+      display_name: 'Guest',
+      avatar_colour: '#6366F1',
+    };
+
+    jest.mocked(settlementService.selfReportPayment).mockResolvedValue({
+      payment_status: 'self_reported',
+    });
+
+    useSettlementStore.setState({
+      iOweRows: [
+        {
+          event_id: 'event-1',
+          event_title: 'Friday Dinner',
+          payer_display_name: 'Alex',
+          amount_minor_units: 30,
+          currency: 'USD',
+          payment_status: 'pending',
+          creator_payment_handles: [{ provider: 'venmo', handle_display: '@alex' }],
+        },
+      ],
+      loadEventLedger: jest.fn(async () => {}),
+    } as never);
+
+    jest.mocked(eventService.fetchEventById).mockResolvedValue({
+      ...mockDetailLocked,
+      join_token: null,
+      event: {
+        ...mockDetailLocked.event,
+        status: 'sent',
+        messages_sent_at: '2026-06-08T12:00:00.000Z',
+      },
+      participants: [
+        {
+          id: 'p-self',
+          display_name: 'Guest',
+          join_method: 'qr_app',
+          payment_status: 'pending',
+          amount_owed: 30,
+          is_self: true,
+        },
+        {
+          id: 'p-organiser',
+          display_name: 'Alex',
+          join_method: 'qr_app',
+          payment_status: 'pending',
+          amount_owed: 0,
+          is_organiser: true,
+        },
+      ],
+      summary: {
+        total: 60,
+        collected: 0,
+        outstanding: 30,
+        confirmed_count: 0,
+        pending_count: 1,
+      },
+    });
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Pay now')).toBeTruthy();
+      expect(screen.getByText('All paid')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByText('All paid'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Which payment method did you use?')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByText('OK'));
+
+    await waitFor(() => {
+      expect(settlementService.selfReportPayment).toHaveBeenCalledWith(
+        'event-1',
+        'p-self',
+        'venmo',
+      );
+    });
+  });
+
+  it('participant who has paid sees Settled status and Paid share label', async () => {
+    mockAuthUser = {
+      id: 'user-2',
+      display_name: 'Guest',
+      avatar_colour: '#6366F1',
+    };
+
+    jest.mocked(eventService.fetchEventById).mockResolvedValue({
+      ...mockDetailLocked,
+      join_token: null,
+      event: {
+        ...mockDetailLocked.event,
+        status: 'sent',
+        messages_sent_at: '2026-06-08T12:00:00.000Z',
+      },
+      participants: [
+        {
+          id: 'p-self',
+          display_name: 'Guest',
+          join_method: 'qr_app',
+          payment_status: 'confirmed',
+          amount_owed: 30,
+          is_self: true,
+        },
+      ],
+      summary: {
+        total: 60,
+        collected: 30,
+        outstanding: 0,
+        confirmed_count: 1,
+        pending_count: 0,
+      },
+    });
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Settled')).toBeTruthy();
+      expect(screen.getByText('Paid')).toBeTruthy();
+      expect(screen.queryByText('Payment request')).toBeNull();
+      expect(screen.queryByText('Pay now')).toBeNull();
     });
   });
 });

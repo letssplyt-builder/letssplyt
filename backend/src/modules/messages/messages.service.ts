@@ -5,7 +5,7 @@ import { getPaymentConfigForPhone } from '../../config/payment-methods.config';
 import { getHandles } from '../profile/profile.service';
 import { assertEventOwner, fetchEventRow } from '../events/event.service';
 import { composeParticipantMessage } from './a3.agent';
-import { assembleParticipantMessage } from './message-assembler';
+import { assembleParticipantMessage, buildStandardOpeningLine } from './message-assembler';
 import type { PayerHandleInput } from './deepLinks';
 import { resolveParticipantPhoneContext } from './participant-phone';
 import { ensureParticipantBreakdownUrl } from './breakdown-token.service';
@@ -176,9 +176,14 @@ export async function buildMessagePreviewsForEvent(
       join_method: row.join_method as string,
     });
 
-    const paymentConfig = phoneContext.phoneE164
-      ? getPaymentConfigForPhone(phoneContext.phoneE164, phoneContext.resolvedCountry)
-      : getPaymentConfigForPhone('+1', phoneContext.resolvedCountry);
+    if (!phoneContext.phoneE164) {
+      continue;
+    }
+
+    const paymentConfig = getPaymentConfigForPhone(
+      phoneContext.phoneE164,
+      phoneContext.resolvedCountry,
+    );
 
     const participantId = row.id as string;
     const breakdownUrl = await ensureParticipantBreakdownUrl(participantId);
@@ -293,15 +298,21 @@ export async function buildRevisionMessagesForParticipants(
       join_method: row.join_method as string,
     });
 
-    const paymentConfig = phoneContext.phoneE164
-      ? getPaymentConfigForPhone(phoneContext.phoneE164, phoneContext.resolvedCountry)
-      : getPaymentConfigForPhone('+1', phoneContext.resolvedCountry);
+    if (!phoneContext.phoneE164) {
+      continue;
+    }
+
+    const paymentConfig = getPaymentConfigForPhone(
+      phoneContext.phoneE164,
+      phoneContext.resolvedCountry,
+    );
 
     const breakdownUrl = await ensureParticipantBreakdownUrl(participantId);
+    const payerDisplayName = payer.display_name as string;
 
     const composed = assembleParticipantMessage({
       revisionLeadIn: 'Your share has been updated.',
-      aiGreeting: `Hi ${displayName}!`,
+      aiGreeting: buildStandardOpeningLine(displayName, eventName, payerDisplayName),
       displayName,
       amountOwed,
       currency,

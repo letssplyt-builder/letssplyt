@@ -8,6 +8,17 @@ import { useSettlementStore } from '../../store/settlementStore';
 
 jest.mock('../../services/event.service');
 
+jest.mock('@react-navigation/native', () => {
+  const React = require('react');
+  return {
+    useFocusEffect: (callback: () => void) => {
+      React.useEffect(() => {
+        callback();
+      }, [callback]);
+    },
+  };
+});
+
 describe('HomeScreen', () => {
   beforeEach(() => {
     useAuthStore.setState({

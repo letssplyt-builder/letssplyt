@@ -48,8 +48,8 @@ describe('Settlement ledger API integration', () => {
           event_id: EVENT_B,
           display_name: 'Jordan',
           amount_owed: 20,
-          payment_status: 'self_reported',
-          confirmed_at: null,
+          payment_status: 'confirmed',
+          confirmed_at: '2026-01-01T00:00:00.000Z',
         },
       ],
       error: null,
@@ -60,8 +60,8 @@ describe('Settlement ledger API integration', () => {
       .set(AUTH_PAYER);
 
     expect(response.status).toBe(200);
-    expect(response.body.total_owed_minor_units).toBe(50);
-    expect(response.body.data).toHaveLength(2);
+    expect(response.body.total_owed_minor_units).toBe(30);
+    expect(response.body.data).toHaveLength(1);
     expect(response.body.data[0]).not.toHaveProperty('phone_hash');
   });
 

@@ -22,14 +22,24 @@ describe('navigateInEventFlow', () => {
 
   it('delegates to EventsTab when opened from the Home stack', () => {
     const tabNavigate = jest.fn();
+    const tabNavigation = {
+      getState: () => ({
+        routeNames: ['HomeTab', 'EventsTab'],
+        index: 0,
+        routes: [],
+        key: 'main-tabs',
+      }),
+      getParent: jest.fn(),
+      navigate: tabNavigate,
+    };
     const navigation = {
       getState: () => ({
-        routeNames: ['Home', 'MemberDetail', 'EventDetail'],
-        index: 2,
+        routeNames: ['Home', 'MemberDetail'],
+        index: 1,
         routes: [],
         key: 'home-stack',
       }),
-      getParent: jest.fn(() => ({ navigate: tabNavigate })),
+      getParent: jest.fn(() => tabNavigation),
       navigate: jest.fn(),
     };
 

@@ -123,4 +123,6 @@ After `supabase db push` on staging or production:
 | `supabase/scripts/verify-deployment-schema.sql` | Post-push schema + function verification |
 | `supabase/scripts/verify-receipt-items-schema.sql` | Receipt items column audit |
 | `supabase/scripts/reset-receipt-scans.sql` | Dev-only manual reset (use API in prod) |
+| `supabase/scripts/wipe-all-dev-data.sql` | **Dev/staging only** — delete all rows + auth users + receipt storage; keeps schema |
+| `supabase/scripts/repair-ai-audit-log.sql` | Recreate `ai_audit_log` if table missing but migration #1 is marked applied |
 | `supabase/seed.sql` | Dev seed data (`supabase db reset` only — **never** on staging/prod) |

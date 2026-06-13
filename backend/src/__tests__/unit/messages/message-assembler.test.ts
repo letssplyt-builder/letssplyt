@@ -1,5 +1,16 @@
 import { describe, expect, it } from '@jest/globals';
-import { assembleParticipantMessage } from '../../../modules/messages/message-assembler';
+import {
+  assembleParticipantMessage,
+  buildStandardOpeningLine,
+} from '../../../modules/messages/message-assembler';
+
+describe('buildStandardOpeningLine', () => {
+  it('follows the fixed greeting format', () => {
+    expect(buildStandardOpeningLine('Bob', 'Dinner', 'Alex Host')).toBe(
+      'Hi Bob!! Here is your share from Dinner organized by Alex Host.',
+    );
+  });
+});
 
 describe('assembleParticipantMessage', () => {
   it('includes breakdown link in SMS body when provided', () => {

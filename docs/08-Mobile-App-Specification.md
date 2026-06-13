@@ -906,9 +906,15 @@ Refer to `prototype/home.html` (dashboard states). **MVP: USD only.**
 2. **Members | Guests** segmented toggle (below hero)
 3. **List area** (content depends on toggle)
 4. **FAB** bottom right: "＋ New event" → `CreateEventModal`
-5. Pull to refresh refreshes balance + active toggle list
+5. Pull to refresh refreshes balance + active toggle list (iOS `RefreshControl`; Android uses `useFocusEffect` on focus instead)
 
-**Tab navigation:** Tapping the **Dashboard** bottom tab resets the Home stack to this screen (does not leave the user on Member/Guest detail).
+**`settlementStore.loadCounterparties`** clears in-memory lists before fetch to avoid stale rows after settlement (prevents Android `IndexOutOfBoundsException` during stack transitions).
+
+**Tab navigation:** Tapping the **Dashboard** bottom tab resets the Home stack to `HomeScreen` (pops Member/Guest detail). Tapping **Events** resets the Events stack to the list.
+
+**Pull-to-refresh:** iOS only on Dashboard and Member detail (`appRefreshControl` — Android disables native `RefreshControl` to avoid `getChildDrawingOrder` crashes during stack transitions; Android relies on `useFocusEffect` refresh).
+
+**Removed:** `DevJoinTestPanel` on Home (dev-only join shortcut).
 
 **Members toggle** — `GET /api/v1/users/me/counterparties?kind=members`
 
@@ -944,13 +950,13 @@ Refer to `prototype/home.html` (dashboard states). **MVP: USD only.**
 - **Route params:** `userId: string`
 - **Data:** `GET /api/v1/settlement/member/:userId`
 - Header: counterparty avatar, name, signed net amount
-- **Outstanding** events (from `outstanding[]`): event title, per-event amount, direction chip (`They owe you` / `You owe`), payment status chip
-- **"See more events"** button at bottom → expands `history[]` (settled / $0 direct relationships only)
-- Tap event row → `EventDetailScreen` (`eventId`) — payer or participant view per role
-- **Primary bulk CTA** (when outstanding rows exist):
-  - Viewer owes counterparty: **Settle all** → payment method sheet → `POST /settlement/member/:userId/self-report-all`
-  - Viewer is payer, counterparty owes: **Confirm all** (self-reported rows), **Mark all paid** (pending rows), **Dispute all** (self-reported rows) — E09-S02 bulk endpoints
-- Per-event **Pay now** on `i_owe` rows → `PayNowScreen` with decrypted handles
+- **Nudge** when counterparty has pending `owed_to_me` rows (`can_nudge` true)
+- When viewer owes (`net_amount <= 0` and pending/disputed `i_owe` rows): **Pay all** (`PayHandlesSheet`) + **I've paid all** (`AllPaidSheet` → `POST /settlement/member/:userId/self-report-all`)
+- On successful **I've paid all**: refresh detail, `loadCounterparties('members')`, `loadEventLedger()`
+- **Outstanding** events (from `outstanding[]`): event title, per-event amount, direction implied by list
+- **"See more events"** → `history[]` (settled / non-outstanding rows)
+- Tap event row → `openEventDetail()` (Events stack `EventDetailScreen`)
+- No bulk Confirm/Dispute CTAs — payer uses Event Detail swipe actions per row
 
 **Back:** pops to `HomeScreen`.
 
@@ -991,11 +997,13 @@ Refer to `prototype/home.html` (dashboard states). **MVP: USD only.**
 2. **Events you created** — `GET /api/v1/events?role=creator` (paginated)
 3. **Events you joined** — `GET /api/v1/events?role=participant` (paginated)
 
-The toggle filters **both** sections:
-- **Active** — events where `status` is not `settled` or `archived`
-- **Settled** — events where `status` is `settled` or `archived`
+The toggle filters **both** sections via `isEventSettledForList()`:
+- **Active** — not settled per role rules below
+- **Settled** — creator: event `status` is `settled` or `archived`; participant: same **or** `viewer_payment_status` complete (`confirmed`, `payer_marked`, `settled`, `opted_out`)
 
-Each section lists only events matching the selected toggle. Event card: title, date, participant count, status chip, optional outstanding amount. FAB: "＋ New event" → `CreateEventModal`. Tap card → `EventDetailScreen`.
+**Status chips** (`statusChipLabel`): `sent` → **Expenses Share**; creator `settled`/`archived` → **All settled**; participant paid → **Settled**.
+
+Each section lists only events matching the selected toggle. Event card: title, date, participant count, status chip. FAB: "＋ New event" → `CreateEventModal`. Tap card → `EventDetailScreen` (Events stack).
 
 **Tab navigation:** Tapping the **Events** bottom tab always resets the Events stack to this list (does not leave the user on a previously opened `EventDetailScreen`).
 
@@ -1064,14 +1072,18 @@ Each section lists only events matching the selected toggle. Event card: title, 
 Event Detail **refetches on focus** (`useFocusEffect`) except immediately after reset (skip one focus refresh to avoid alert-dismiss race overwriting optimistic state).
 
 - Summary card: three equal columns (amount on top, label below — **Total bill**, **Collected**, **Outstanding**). Column layout avoids label truncation from cramped label|value rows on narrow screens.
-- Segmented progress bar: green (confirmed) | amber (self-reported) | grey (pending)
-- Per-member roster:
-  - Pending: name | amount | "💵 Cash" button | "⏰ Nudge" button (grayed if cooldown active, shows "Xh ago")
-  - Self-reported: name | amount | "✓ Confirm" button | "✕ Dispute" button
-  - Confirmed: name | amount | green check
-  - Opted out: name | "opted out" chip | no action buttons
+- Segmented progress bar: green (confirmed/paid) | amber (disputed) | grey (pending)
+- Per-member roster (`SettlementRosterRow`):
+  - Status labels: **Paid by [method]** (green), **Pending** (amber), **Disputed. Pending** (amber), **Organiser** (muted)
+  - **Swipe right** → **Paid** (`POST .../settlement/cash/:participantId`) when `pending` or `disputed` (not organiser)
+  - **Swipe left** → **Dispute** when row is paid (`confirmed`, `payer_marked`, `settled`, `self_reported`) **and** `user_id` is set (registered member — not pure guests)
+  - No inline Nudge/Cash chips on roster cards; swipe auto-closes on action and on `paymentStatus` change
+  - Each swipe row wrapped in `GestureHandlerRootView`; `Swipeable` not mounted when no actions (organiser / settled rows)
+- Participant view after paying: hero status **Paid** (green), header chip **Settled**; **I've paid** via `ParticipantPayActions` when outstanding
 
-Note: Settlement **actions** execute in **Event Detail** (per participant) and **Member/Guest detail** (**Settle all** bulk). Cross-event summary lives on **Home** (Members/Guests toggle + detail screens).
+**Navigation:** `openEventDetail()` / `finishEventFlowToEventDetail()` in `mobile/src/navigation/eventNavigation.ts` — all event drill-down uses Events stack.
+
+Note: Settlement **actions** execute in **Event Detail** (per participant swipe) and **Member detail** (**Pay all** / **I've paid all**). Cross-event summary lives on **Home** (Members/Guests toggle + detail screens).
 
 Back button: pops to previous screen (`EventsScreen`, `HomeScreen`, or `MemberDetailScreen` / `GuestDetailScreen`).
 

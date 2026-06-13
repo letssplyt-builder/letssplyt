@@ -113,6 +113,19 @@ async function ensurePayerHandle(payerToken: string): Promise<boolean> {
     pass('POST /users/me/handles', 'venmo smoke-ledger-payer');
     return true;
   }
+  if (created.status === 429) {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    const retry = await requestJson(
+      'POST',
+      '/api/v1/users/me/handles',
+      { provider: 'venmo', handle_value: 'smoke-ledger-payer' },
+      payerToken,
+    );
+    if (retry.status === 201 || retry.status === 200) {
+      pass('POST /users/me/handles', 'retry after rate limit');
+      return true;
+    }
+  }
   fail('POST /users/me/handles', `status ${created.status}`);
   return false;
 }
@@ -254,12 +267,14 @@ async function main(): Promise<void> {
 
     const owedToMe = await requestJson('GET', '/api/v1/settlement/owed-to-me', undefined, payer.token);
     const owedData = owedToMe.body.data as Array<{ event_id: string; amount_minor_units: number }> | undefined;
-    if (owedToMe.status !== 200 || !owedData || owedData.length < 2) {
+    const runEventIds = [eventAId, eventBId];
+    const owedThisRun = (owedData ?? []).filter((row) => runEventIds.includes(row.event_id));
+    if (owedToMe.status !== 200 || owedThisRun.length !== 2) {
       fail('GET owed-to-me', JSON.stringify(owedToMe.body));
       return;
     }
-    const owedTotal = Number(owedToMe.body.total_owed_minor_units);
-    if (owedTotal <= 0 || owedToMe.body.currency !== 'USD') {
+    const owedThisRunTotal = owedThisRun.reduce((sum, row) => sum + row.amount_minor_units, 0);
+    if (owedThisRunTotal <= 0 || owedToMe.body.currency !== 'USD') {
       fail('GET owed-to-me totals', JSON.stringify(owedToMe.body));
       return;
     }
@@ -267,7 +282,7 @@ async function main(): Promise<void> {
       fail('GET owed-to-me PII', 'phone fields leaked');
       return;
     }
-    pass('GET owed-to-me', `${owedData.length} rows, total=${owedTotal}`);
+    pass('GET owed-to-me', `${owedThisRun.length} rows this run, total=${owedThisRunTotal}`);
 
     const iOwe = await requestJson('GET', '/api/v1/settlement/i-owe', undefined, member.token);
     const oweData = iOwe.body.data as
@@ -278,16 +293,20 @@ async function main(): Promise<void> {
           creator_payment_handles: Array<{ provider: string; handle_display: string }>;
         }>
       | undefined;
-    if (iOwe.status !== 200 || !oweData || oweData.length < 2) {
+    if (iOwe.status !== 200 || !oweData) {
       fail('GET i-owe', JSON.stringify(iOwe.body));
       return;
     }
-    const oweTotal = Number(iOwe.body.total_owe_minor_units);
-    if (oweTotal !== owedTotal) {
-      fail('GET i-owe total matches owed-to-me', `owe=${oweTotal} owed=${owedTotal}`);
+    const oweThisRun = oweData.filter((row) => runEventIds.includes(row.event_id));
+    const oweThisRunTotal = oweThisRun.reduce((sum, row) => sum + row.amount_minor_units, 0);
+    if (oweThisRun.length !== 2 || oweThisRunTotal !== owedThisRunTotal) {
+      fail(
+        'GET i-owe total matches owed-to-me (this run)',
+        `owe=${oweThisRunTotal} owed=${owedThisRunTotal}`,
+      );
       return;
     }
-    const handles = oweData[0].creator_payment_handles ?? [];
+    const handles = oweThisRun[0]?.creator_payment_handles ?? [];
     if (handles.length === 0 || !handles[0].handle_display) {
       fail('GET i-owe handles', 'missing decrypted handles');
       return;
@@ -298,7 +317,7 @@ async function main(): Promise<void> {
     }
     pass(
       'GET i-owe',
-      `${oweData.length} rows, total=${oweTotal}, handle=${handles[0].provider}:${handles[0].handle_display}`,
+      `${oweThisRun.length} rows this run, total=${oweThisRunTotal}, handle=${handles[0].provider}:${handles[0].handle_display}`,
     );
 
     const memberDetail = await requestJson(
@@ -338,21 +357,28 @@ async function main(): Promise<void> {
     pass('POST mark-paid (one row)', 'confirmed');
 
     const owedAfter = await requestJson('GET', '/api/v1/settlement/owed-to-me', undefined, payer.token);
-    const afterData = owedAfter.body.data as Array<{ event_id: string }> | undefined;
+    const afterData = owedAfter.body.data as
+      | Array<{ event_id: string; amount_minor_units?: number }>
+      | undefined;
     const afterTotal = Number(owedAfter.body.total_owed_minor_units);
-    if (owedAfter.status !== 200 || !afterData || afterData.length !== 1) {
+    if (owedAfter.status !== 200 || !afterData) {
       fail('GET owed-to-me after confirm', JSON.stringify(owedAfter.body));
       return;
     }
-    if (afterData[0].event_id !== eventBId) {
-      fail('GET owed-to-me after confirm', 'wrong event remaining');
+    const afterThisRun = (afterData ?? []).filter((row) => runEventIds.includes(row.event_id));
+    if (afterThisRun.length !== 1 || afterThisRun[0].event_id !== eventBId) {
+      fail('GET owed-to-me after confirm', `expected only event B: ${JSON.stringify(afterThisRun)}`);
       return;
     }
-    if (afterTotal >= owedTotal) {
-      fail('GET owed-to-me after confirm', `total did not decrease: ${afterTotal}`);
+    const afterThisRunTotal = afterThisRun.reduce((sum, row) => {
+      const amount = (row as { amount_minor_units?: number }).amount_minor_units ?? 0;
+      return sum + amount;
+    }, 0);
+    if (afterThisRunTotal >= owedThisRunTotal) {
+      fail('GET owed-to-me after confirm', `total did not decrease: ${afterThisRunTotal}`);
       return;
     }
-    pass('GET owed-to-me excludes confirmed', `1 row, total=${afterTotal}`);
+    pass('GET owed-to-me excludes confirmed', `1 row this run, total=${afterThisRunTotal}`);
   } finally {
     for (const eventId of eventIds) {
       await cleanup(eventId);

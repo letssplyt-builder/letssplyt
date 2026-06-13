@@ -5,6 +5,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -14,7 +15,10 @@ import {
 } from 'react-native';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { useAppInsets } from '../../hooks/useAppInsets';
+import { openEventDetail } from '../../navigation/eventNavigation';
 import type { HomeStackParamList, MainTabParamList } from '../../navigation/types';
+import { isApiRequestError } from '../../services/api';
+import * as settlementService from '../../services/settlement.service';
 import { useSettlementStore } from '../../store/settlementStore';
 import { glassStyles } from '../../theme/glassStyles';
 import { authColors } from '../../theme/colors';
@@ -34,7 +38,7 @@ export function GuestDetailScreen({ navigation, route }: Props) {
   const clearDetail = useSettlementStore((state) => state.clearDetail);
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-
+  const [nudgeLoading, setNudgeLoading] = useState(false);
   const refresh = useCallback(async () => {
     await loadGuestDetail(phoneHash);
   }, [loadGuestDetail, phoneHash]);
@@ -45,7 +49,40 @@ export function GuestDetailScreen({ navigation, route }: Props) {
   }, [refresh, clearDetail]);
 
   const openEvent = (eventId: string) => {
-    navigation.navigate('EventDetail', { eventId });
+    openEventDetail(navigation, eventId);
+  };
+
+  const nudgeableOutstanding =
+    guestDetail?.outstanding.filter((row) => row.payment_status === 'pending') ?? [];
+
+  const handleNudge = async () => {
+    if (nudgeableOutstanding.length === 0) return;
+    setNudgeLoading(true);
+    let sentCount = 0;
+    try {
+      for (const row of nudgeableOutstanding) {
+        try {
+          await settlementService.nudgeParticipant(row.event_id, row.participant_id);
+          sentCount += 1;
+        } catch (err) {
+          if (isApiRequestError(err) && err.code === 'NUDGE_COOLDOWN') {
+            Alert.alert('Nudge cooldown', 'Try again later for this guest.');
+            break;
+          }
+        }
+      }
+      if (sentCount > 0) {
+        Alert.alert(
+          'Nudge sent',
+          sentCount === 1 ? 'Reminder sent.' : `${sentCount} reminder(s) sent.`,
+        );
+        await refresh();
+      } else if (nudgeableOutstanding.length > 0) {
+        Alert.alert('Could not nudge', 'Try again in a moment.');
+      }
+    } finally {
+      setNudgeLoading(false);
+    }
   };
 
   return (
@@ -86,6 +123,20 @@ export function GuestDetailScreen({ navigation, route }: Props) {
               <Text style={styles.name}>{guestDetail.display_name}</Text>
               <Text style={styles.net}>{formatMoney(guestDetail.amount)}</Text>
             </View>
+
+            {nudgeableOutstanding.length > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Nudge"
+                disabled={nudgeLoading}
+                onPress={() => void handleNudge()}
+                style={[styles.nudgeButton, nudgeLoading && styles.nudgeButtonDisabled]}
+              >
+                <Text style={styles.nudgeButtonText}>
+                  {nudgeLoading ? 'Sending…' : 'Nudge'}
+                </Text>
+              </Pressable>
+            ) : null}
 
             <Text style={glassStyles.sectionTitle}>Outstanding</Text>
             {guestDetail.outstanding.length === 0 ? (
@@ -175,6 +226,24 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginTop: 4,
+  },
+  nudgeButton: {
+    alignSelf: 'center',
+    marginBottom: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 100,
+    backgroundColor: 'rgba(99, 102, 241, 0.35)',
+    borderWidth: 1,
+    borderColor: 'rgba(129, 140, 248, 0.5)',
+  },
+  nudgeButtonDisabled: {
+    opacity: 0.6,
+  },
+  nudgeButtonText: {
+    color: authColors.textOnDark,
+    fontSize: 14,
+    fontWeight: '700',
   },
   empty: {
     color: authColors.textOnDarkMuted,

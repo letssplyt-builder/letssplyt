@@ -116,3 +116,32 @@ export function canEditEventShare(
   }
   return !hasSettlementBlockingEdit(participants);
 }
+
+/** Payment collection UX unlocks after the organiser sends payment request messages. */
+export function hasPaymentRequestBeenSent(
+  messagesSentAt: string | null | undefined,
+): boolean {
+  return Boolean(messagesSentAt);
+}
+
+/** Organizer nudge / mark-cash actions — only after payment requests were sent. */
+export function canOrganiserNudgeOrMarkCash(
+  messagesSentAt: string | null | undefined,
+): boolean {
+  return hasPaymentRequestBeenSent(messagesSentAt);
+}
+
+/** Participant Pay now / All paid — share must be finalised and requests sent. */
+export function canParticipantPayShare(
+  messagesSentAt: string | null | undefined,
+  amountOwed: number | null | undefined,
+  paymentStatus: string,
+): boolean {
+  if (!hasPaymentRequestBeenSent(messagesSentAt)) {
+    return false;
+  }
+  if (amountOwed === null || amountOwed <= 0) {
+    return false;
+  }
+  return paymentStatus === 'pending' || paymentStatus === 'disputed';
+}

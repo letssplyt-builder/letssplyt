@@ -1,5 +1,5 @@
+import { CommonActions } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { StackActions } from '@react-navigation/native';
 import { StyleSheet, Text } from 'react-native';
 import { TAB_BAR_CONTENT_HEIGHT, TAB_BAR_PADDING_TOP } from '../constants/layout';
 import { useAppInsets } from '../hooks/useAppInsets';
@@ -57,7 +57,21 @@ export function MainTabNavigator() {
           tabBarIcon: ({ focused }) => <TabIcon label="⬡" focused={focused} />,
         }}
         listeners={({ navigation }) => ({
-          tabPress: () => {
+          tabPress: (e) => {
+            e.preventDefault();
+            const state = navigation.getState();
+            const homeTabRoute = state.routes.find((route) => route.name === 'HomeTab');
+            const homeStackKey = homeTabRoute?.state?.key;
+            const homeStackIndex = homeTabRoute?.state?.index ?? 0;
+            if (homeStackKey && homeStackIndex > 0) {
+              navigation.dispatch({
+                ...CommonActions.reset({
+                  index: 0,
+                  routes: [{ name: 'Home' }],
+                }),
+                target: homeStackKey,
+              });
+            }
             navigation.navigate('HomeTab', { screen: 'Home' });
           },
         })}
@@ -68,18 +82,11 @@ export function MainTabNavigator() {
         options={{
           tabBarLabel: 'Events',
           tabBarIcon: ({ focused }) => <TabIcon label="☰" focused={focused} />,
-          unmountOnBlur: true,
         }}
-        listeners={({ navigation, route }) => ({
+        listeners={({ navigation }) => ({
           tabPress: (e) => {
-            const eventsState = route.state;
-            if (eventsState && eventsState.index > 0 && eventsState.key) {
-              e.preventDefault();
-              navigation.dispatch({
-                ...StackActions.popToTop(),
-                target: eventsState.key,
-              });
-            }
+            e.preventDefault();
+            navigation.navigate('EventsTab', { screen: 'Events' });
           },
         })}
       />

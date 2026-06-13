@@ -112,19 +112,4 @@ describe('MessagePreviewScreen', () => {
     });
   });
 
-  it('navigates to split entry when Edit is pressed', async () => {
-    render(
-      <MessagePreviewScreen
-        navigation={{ goBack: mockGoBack, navigate: mockNavigate } as never}
-        route={{ key: 'MessagePreview-1', name: 'MessagePreview', params: { eventId: 'event-1' } }}
-      />,
-    );
-
-    await waitFor(() => expect(screen.getByText('Edit')).toBeTruthy());
-    fireEvent.press(screen.getByLabelText('Edit split'));
-    expect(mockNavigate).toHaveBeenCalledWith('SplitEntry', {
-      eventId: 'event-1',
-      mode: 'manual',
-    });
-  });
 });

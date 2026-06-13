@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useIsFocused } from '@react-navigation/native';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -21,6 +21,11 @@ import type { EventStatus } from '@letssplyt/shared/event.types';
 import { AddParticipantModal } from '../../components/events/AddParticipantModal';
 import { EventDetailOverflowMenu } from '../../components/events/EventDetailOverflowMenu';
 import { EventMemberRow } from '../../components/events/EventMemberRow';
+import { AllPaidSheet } from '../../components/settlement/AllPaidSheet';
+import { PayHandlesSheet } from '../../components/settlement/PayHandlesSheet';
+import { ParticipantPayActions } from '../../components/settlement/ParticipantPayActions';
+import { SettlementProgressBar } from '../../components/settlement/SettlementProgressBar';
+import { SettlementRosterRow } from '../../components/settlement/SettlementRosterRow';
 import { EventSplitActionBar } from '../../components/events/EventSplitActionBar';
 import { ParticipantEventDetail } from '../../components/events/ParticipantEventDetail';
 import { QRDisplayModal } from '../../components/events/QRDisplayModal';
@@ -31,18 +36,22 @@ import { splitActionBarFooterStyle } from '../../constants/layout';
 import { useAppInsets } from '../../hooks/useAppInsets';
 import { getSupabase } from '../../lib/supabase';
 import { navigateInEventFlow } from '../../navigation/eventFlowNavigation';
-import type { EventsStackParamList, HomeStackParamList, MainTabParamList } from '../../navigation/types';
+import type { EventsStackParamList, MainTabParamList } from '../../navigation/types';
 import { getApiErrorCode, isApiRequestError } from '../../services/api';
 import * as eventService from '../../services/event.service';
+import * as settlementService from '../../services/settlement.service';
 import { useAuthStore } from '../../store/authStore';
 import { useEventStore } from '../../store/eventStore';
+import { useSettlementStore } from '../../store/settlementStore';
 import { useSplitStore } from '../../store/splitStore';
 import { glassStyles } from '../../theme/glassStyles';
 import { authColors } from '../../theme/colors';
 import { receiptReviewToParseResult } from '../receipts/itemReview.utils';
-import { formatMoney, isPayerParticipant } from '../../utils/events';
+import { formatMoney, isPayerParticipant, statusChipLabel } from '../../utils/events';
 import {
   canEditEventShare,
+  canOrganiserNudgeOrMarkCash,
+  canParticipantPayShare,
   canResetEventExpenses,
   canSendEventMessages,
   resolveEventSplitActionMode,
@@ -51,9 +60,6 @@ import {
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<EventsStackParamList, 'EventDetail'>,
-  BottomTabScreenProps<MainTabParamList>
-> | CompositeScreenProps<
-  NativeStackScreenProps<HomeStackParamList, 'EventDetail'>,
   BottomTabScreenProps<MainTabParamList>
 >;
 
@@ -122,7 +128,16 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const [removingParticipantId, setRemovingParticipantId] = useState<string | null>(null);
   const [isResettingExpenses, setIsResettingExpenses] = useState(false);
   const [fetchError, setFetchError] = useState(false);
+  const [settlementActionLoading, setSettlementActionLoading] = useState<Record<string, string>>(
+    {},
+  );
+  const [selfReportLoading, setSelfReportLoading] = useState(false);
+  const [paySheetOpen, setPaySheetOpen] = useState(false);
+  const [allPaidSheetOpen, setAllPaidSheetOpen] = useState(false);
+  const loadEventLedger = useSettlementStore((state) => state.loadEventLedger);
+  const getIOweForEvent = useSettlementStore((state) => state.getIOweForEvent);
   const skipFocusRefreshRef = useRef(false);
+  const isFocused = useIsFocused();
 
   const refreshDetail = useCallback(async () => {
     setFetchError(false);
@@ -144,12 +159,13 @@ export function EventDetailScreen({ navigation, route }: Props) {
   );
 
   useEffect(() => {
-    return () => useEventStore.getState().resetCurrentEvent();
-  }, []);
+    if (!isFocused) return undefined;
 
-  useEffect(() => {
     const event = currentEvent?.event;
-    if (!event || !isJoiningPhase(event.status)) return undefined;
+    if (!event) return undefined;
+
+    const subscribeSettlement = isSettlementEventStatus(event.status);
+    if (!isJoiningPhase(event.status) && !subscribeSettlement) return undefined;
 
     const supabase = getSupabase();
     if (!supabase) return undefined;
@@ -165,7 +181,9 @@ export function EventDetailScreen({ navigation, route }: Props) {
           filter: `event_id=eq.${eventId}`,
         },
         () => {
-          void loadEventDetail(eventId);
+          void loadEventDetail(eventId).catch(() => {
+            // Realtime refresh failures must not surface as unhandled rejections (red screen).
+          });
         },
       )
       .subscribe();
@@ -174,10 +192,55 @@ export function EventDetailScreen({ navigation, route }: Props) {
       channel.unsubscribe();
       supabase.removeChannel(channel);
     };
-  }, [currentEvent?.event.status, eventId, loadEventDetail]);
+  }, [isFocused, currentEvent?.event?.status, eventId, loadEventDetail]);
 
   const participants = currentEvent?.participants ?? [];
   const event = currentEvent?.event;
+
+  const runSettlementAction = async (
+    participantId: string,
+    actionKey: string,
+    action: () => Promise<unknown>,
+    successMessage?: string,
+  ): Promise<void> => {
+    setSettlementActionLoading((prev) => ({ ...prev, [participantId]: actionKey }));
+    try {
+      await action();
+      if (successMessage) setToast(successMessage);
+      await loadEventDetail(eventId);
+    } catch (err: unknown) {
+      const code = isApiRequestError(err) ? err.code : getApiErrorCode(err);
+      if (code === 'NUDGE_COOLDOWN') {
+        setToast('Nudge cooldown — try again later');
+      } else {
+        setToast('Could not update payment. Try again.');
+      }
+    } finally {
+      setSettlementActionLoading((prev) => {
+        const next = { ...prev };
+        delete next[participantId];
+        return next;
+      });
+    }
+  };
+
+  const submitSelfReport = async (
+    participantId: string,
+    method: settlementService.SelfReportPaymentMethod,
+  ): Promise<void> => {
+    setSelfReportLoading(true);
+    try {
+      await settlementService.selfReportPayment(eventId, participantId, method);
+      setAllPaidSheetOpen(false);
+      setToast('Payment recorded');
+      await loadEventDetail(eventId);
+    } catch {
+      setToast('Could not report payment. Try again.');
+    } finally {
+      setSelfReportLoading(false);
+    }
+  };
+
   const joinUrl = currentEvent?.join_token?.join_url ?? '';
   const tokenExpiresAt = currentEvent?.join_token?.expires_at ?? '';
   const expired = isTokenExpired(tokenExpiresAt);
@@ -201,6 +264,53 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const showOverflowMenu = Boolean(
     isPayer && event && !joining && (event.status === 'locked' || showResetExpenses),
   );
+  const selfParticipant = participants.find((row) => row.is_self);
+  const showOrganiserCollectionActions = canOrganiserNudgeOrMarkCash(event?.messages_sent_at);
+  const showParticipantPayActions = Boolean(
+    !isPayer &&
+      event &&
+      isSettlementEventStatus(event.status) &&
+      selfParticipant &&
+      canParticipantPayShare(
+        event.messages_sent_at,
+        selfParticipant.amount_owed,
+        selfParticipant.payment_status,
+      ),
+  );
+
+  const iOweEntry = getIOweForEvent(eventId);
+
+  const participantPayContext = useMemo(() => {
+    if (!showParticipantPayActions || !selfParticipant || !event) return null;
+    const amount =
+      iOweEntry?.amount_minor_units ?? selfParticipant.amount_owed ?? 0;
+    const handles = iOweEntry?.creator_payment_handles ?? [];
+    const payerName =
+      iOweEntry?.payer_display_name ?? event.payer?.display_name ?? 'Organiser';
+    return {
+      amount,
+      currency: iOweEntry?.currency ?? event.currency,
+      payerDisplayName: payerName,
+      eventTitleForLink: event.title,
+      handles,
+      participantId: selfParticipant.id,
+    };
+  }, [showParticipantPayActions, selfParticipant, event, iOweEntry, eventId]);
+
+  useEffect(() => {
+    if (showParticipantPayActions) {
+      void loadEventLedger();
+    }
+  }, [showParticipantPayActions, loadEventLedger]);
+  const settlementRosterParticipants = useMemo(() => {
+    return [...participants].sort((a, b) => {
+      if (a.is_organiser) return -1;
+      if (b.is_organiser) return 1;
+      if (a.is_self) return -1;
+      if (b.is_self) return 1;
+      return 0;
+    });
+  }, [participants]);
 
   const openItemReview = () => {
     const review = currentEvent?.receipt_review;
@@ -477,6 +587,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
               : screenScrollBottomPadding,
           },
         ]}
+        removeClippedSubviews={false}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -494,7 +605,16 @@ export function EventDetailScreen({ navigation, route }: Props) {
         ) : null}
 
         {!isPayer && currentEvent ? (
-          <ParticipantEventDetail detail={currentEvent} />
+          <>
+            <ParticipantEventDetail detail={currentEvent} />
+            {participantPayContext ? (
+              <ParticipantPayActions
+                onPayNow={() => setPaySheetOpen(true)}
+                onAllPaid={() => setAllPaidSheetOpen(true)}
+                allPaidLoading={selfReportLoading}
+              />
+            ) : null}
+          </>
         ) : null}
 
         {isPayer && joining ? (
@@ -577,7 +697,16 @@ export function EventDetailScreen({ navigation, route }: Props) {
           </>
         ) : isPayer ? (
           <View style={styles.settlementPhase}>
-            <Text style={glassStyles.heading}>Settlement phase</Text>
+            <View style={styles.settlementHeader}>
+              <Text style={glassStyles.heading}>Settlement phase</Text>
+              {event ? (
+                <View style={styles.organiserStatusChip}>
+                  <Text style={styles.organiserStatusChipText}>
+                    {statusChipLabel(event.status, { role: 'creator' })}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
             <View style={styles.summaryCard}>
               <View style={styles.summaryColumns}>
                 <View style={[styles.summaryColumn, styles.summaryColumnTotal]}>
@@ -601,18 +730,65 @@ export function EventDetailScreen({ navigation, route }: Props) {
               </View>
             </View>
 
-            <Text style={glassStyles.sectionTitle}>Roster</Text>
+            <SettlementProgressBar
+              collected={settlementSummary.collected}
+              total={
+                settlementSummary.collected + settlementSummary.outstanding > 0
+                  ? settlementSummary.collected + settlementSummary.outstanding
+                  : settlementSummary.total
+              }
+            />
+
+            <Text style={glassStyles.sectionTitle}>
+              Members · {settlementRosterParticipants.length}
+            </Text>
             <View style={styles.memberList}>
-              {participants.map((participant) => (
-                <EventMemberRow
-                  key={participant.id}
-                  variant="settlement"
-                  displayName={participant.display_name}
-                  paymentStatus={participant.payment_status}
-                  amountOwed={participant.amount_owed}
-                  currency={event?.currency ?? 'USD'}
-                />
-              ))}
+              {settlementRosterParticipants.map((participant) => {
+                const isOrganiserRow = Boolean(participant.is_organiser);
+                return (
+                  <SettlementRosterRow
+                    key={participant.id}
+                    displayName={
+                      participant.is_self ? 'You' : participant.display_name
+                    }
+                    paymentStatus={participant.payment_status}
+                    amountOwed={participant.amount_owed}
+                    currency={event?.currency ?? 'USD'}
+                    userId={participant.user_id}
+                    selfReportedMethod={participant.self_reported_method}
+                    isOrganiser={isOrganiserRow}
+                    isSelf={participant.is_self}
+                    loadingAction={settlementActionLoading[participant.id]}
+                    onDispute={
+                      isOrganiserRow || !showOrganiserCollectionActions
+                        ? undefined
+                        : () =>
+                            void runSettlementAction(
+                              participant.id,
+                              'dispute',
+                              () => settlementService.disputePayment(eventId, participant.id),
+                              'Payment disputed',
+                            )
+                    }
+                    onMarkCash={
+                      isOrganiserRow || !showOrganiserCollectionActions
+                        ? undefined
+                        : () =>
+                            void runSettlementAction(
+                              participant.id,
+                              'mark-cash',
+                              () =>
+                                settlementService.markParticipantPaid(
+                                  eventId,
+                                  participant.id,
+                                  'cash',
+                                ),
+                              'Marked as paid',
+                            )
+                    }
+                  />
+                );
+              })}
             </View>
           </View>
         ) : null}
@@ -638,6 +814,34 @@ export function EventDetailScreen({ navigation, route }: Props) {
           isRegenerating={isRegenerating}
           onClose={() => setQrFullscreen(false)}
           onRegenerate={() => void handleRegenerate()}
+        />
+      ) : null}
+
+      {participantPayContext ? (
+        <PayHandlesSheet
+          visible={paySheetOpen}
+          onClose={() => setPaySheetOpen(false)}
+          title="Pay now"
+          subtitle={participantPayContext.eventTitleForLink}
+          amount={participantPayContext.amount}
+          currency={participantPayContext.currency}
+          payerDisplayName={participantPayContext.payerDisplayName}
+          eventTitleForLink={participantPayContext.eventTitleForLink}
+          handles={participantPayContext.handles}
+        />
+      ) : null}
+
+      {participantPayContext ? (
+        <AllPaidSheet
+          visible={allPaidSheetOpen}
+          onClose={() => setAllPaidSheetOpen(false)}
+          title="All paid"
+          description="Which payment method did you use?"
+          handles={participantPayContext.handles}
+          loading={selfReportLoading}
+          onConfirm={(method) =>
+            void submitSelfReport(participantPayContext.participantId, method)
+          }
         />
       ) : null}
 
@@ -746,6 +950,24 @@ const styles = StyleSheet.create({
   },
   settlementPhase: {
     marginTop: 8,
+  },
+  settlementHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginBottom: 16,
+  },
+  organiserStatusChip: {
+    backgroundColor: authColors.pillOnDark,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 100,
+  },
+  organiserStatusChipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: authColors.textOnDarkMuted,
   },
   summaryCard: {
     ...glassStyles.cardStrong,

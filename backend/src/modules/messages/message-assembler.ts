@@ -1,4 +1,8 @@
-import { defaultLocaleForCurrency, formatCurrency } from '../../infrastructure/security';
+import {
+  defaultLocaleForCurrency,
+  formatCurrency,
+  sanitizePromptInput,
+} from '../../infrastructure/security';
 import type { PaymentProvider } from '@letssplyt/shared/profile.types';
 import {
   buildPaymentLinksForMethods,
@@ -10,6 +14,18 @@ export interface AssembledParticipantMessage {
   messageText: string;
   paymentLinks: PaymentLinkResult[];
   channel: 'whatsapp' | 'sms';
+}
+
+/** Deterministic SMS/WhatsApp opening — no AI variability. */
+export function buildStandardOpeningLine(
+  displayName: string,
+  eventName: string,
+  payerDisplayName: string,
+): string {
+  const safeName = sanitizePromptInput(displayName, 80);
+  const safeEvent = sanitizePromptInput(eventName, 80);
+  const safePayer = sanitizePromptInput(payerDisplayName, 80);
+  return `Hi ${safeName}!! Here is your share from ${safeEvent} organized by ${safePayer}.`;
 }
 
 export interface AssembleMessageParams {

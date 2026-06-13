@@ -3,7 +3,9 @@ import { AppError } from '../../../infrastructure/errors';
 import {
   guestMarkPaidAll,
   memberConfirmAll,
+  memberDisputeAll,
   memberMarkPaidAll,
+  memberNetSettle,
   memberSelfReportAll,
 } from '../../../modules/settlement/bulk-settlement.service';
 
@@ -20,13 +22,16 @@ jest.mock('../../../modules/settlement/settlement.service', () => ({
   confirmPayment: jest.fn(),
   disputePayment: jest.fn(),
   markParticipantPaid: jest.fn(),
+  payerConfirmOffset: jest.fn(),
 }));
 
 import { getGuestDetail } from '../../../modules/settlement/guest-detail.service';
 import { getMemberDetail } from '../../../modules/settlement/member-detail.service';
 import {
   confirmPayment,
+  disputePayment,
   markParticipantPaid,
+  payerConfirmOffset,
   selfReportPayment,
 } from '../../../modules/settlement/settlement.service';
 
@@ -42,7 +47,63 @@ describe('bulk-settlement.service', () => {
     jest.clearAllMocks();
   });
 
-  it('self-report-all across two events with same payer', async () => {
+  it('net-settle offsets owed_to_me and confirms i_owe rows', async () => {
+    jest.mocked(getMemberDetail).mockResolvedValue({
+      counterparty: {
+        user_id: COUNTERPARTY_ID,
+        display_name: 'Alex',
+        avatar_colour: '#000',
+      },
+      net_amount: -20,
+      currency: 'USD',
+      outstanding: [
+        {
+          event_id: EVENT_A,
+          event_title: 'Dinner A',
+          event_date: '2026-01-01',
+          amount: 50,
+          direction: 'i_owe',
+          payment_status: 'pending',
+          participant_id: PART_A,
+        },
+        {
+          event_id: EVENT_B,
+          event_title: 'Dinner B',
+          event_date: '2026-01-02',
+          amount: 30,
+          direction: 'owed_to_me',
+          payment_status: 'pending',
+          participant_id: PART_B,
+        },
+      ],
+      history: [],
+    });
+
+    jest.mocked(payerConfirmOffset).mockResolvedValue({
+      participant_id: PART_B,
+      payment_status: 'confirmed',
+      confirmed_at: '2026-01-01T00:00:00.000Z',
+      event_fully_settled: false,
+    });
+    jest.mocked(selfReportPayment).mockResolvedValue({
+      participant_id: PART_A,
+      payment_status: 'confirmed',
+      self_reported_at: '2026-01-01T00:00:00.000Z',
+      confirmed_at: '2026-01-01T00:00:00.000Z',
+      event_fully_settled: false,
+    });
+
+    const result = await memberNetSettle(VIEWER_ID, COUNTERPARTY_ID, {
+      payment_method: 'venmo',
+    });
+
+    expect(result.updated_count).toBe(2);
+    expect(payerConfirmOffset).toHaveBeenCalledTimes(1);
+    expect(selfReportPayment).toHaveBeenCalledTimes(1);
+    expect(result.results.every((row) => row.payment_status === 'confirmed')).toBe(true);
+  });
+
+  it('self-report-all delegates to net settle', async () => {
     jest.mocked(getMemberDetail).mockResolvedValue({
       counterparty: {
         user_id: COUNTERPARTY_ID,
@@ -76,8 +137,10 @@ describe('bulk-settlement.service', () => {
 
     jest.mocked(selfReportPayment).mockResolvedValue({
       participant_id: PART_A,
-      payment_status: 'self_reported',
+      payment_status: 'confirmed',
       self_reported_at: '2026-01-01T00:00:00.000Z',
+      confirmed_at: '2026-01-01T00:00:00.000Z',
+      event_fully_settled: false,
     });
 
     const result = await memberSelfReportAll(VIEWER_ID, COUNTERPARTY_ID, {
@@ -86,7 +149,7 @@ describe('bulk-settlement.service', () => {
 
     expect(result.updated_count).toBe(2);
     expect(selfReportPayment).toHaveBeenCalledTimes(2);
-    expect(result.results[0].payment_status).toBe('self_reported');
+    expect(result.results[0].payment_status).toBe('confirmed');
   });
 
   it('confirm-all settles both events when last participant confirms', async () => {
@@ -191,6 +254,57 @@ describe('bulk-settlement.service', () => {
       PART_A,
       { payment_method: 'cash' },
     );
+  });
+
+  it('dispute-all targets confirmed rows in history (not only outstanding)', async () => {
+    jest.mocked(getMemberDetail).mockResolvedValue({
+      counterparty: {
+        user_id: COUNTERPARTY_ID,
+        display_name: 'Alex',
+        avatar_colour: '#000',
+      },
+      net_amount: 0,
+      currency: 'USD',
+      outstanding: [],
+      history: [
+        {
+          event_id: EVENT_A,
+          event_title: 'Dinner A',
+          event_date: '2026-01-01',
+          amount: 30,
+          direction: 'owed_to_me',
+          payment_status: 'confirmed',
+          participant_id: PART_A,
+        },
+        {
+          event_id: EVENT_B,
+          event_title: 'Dinner B',
+          event_date: '2026-01-02',
+          amount: 20,
+          direction: 'owed_to_me',
+          payment_status: 'confirmed',
+          participant_id: PART_B,
+        },
+      ],
+    });
+
+    jest.mocked(disputePayment)
+      .mockResolvedValueOnce({
+        participant_id: PART_A,
+        payment_status: 'disputed',
+        disputed_count: 1,
+      })
+      .mockResolvedValueOnce({
+        participant_id: PART_B,
+        payment_status: 'disputed',
+        disputed_count: 1,
+      });
+
+    const result = await memberDisputeAll(VIEWER_ID, COUNTERPARTY_ID, { note: 'bulk' });
+
+    expect(result.updated_count).toBe(2);
+    expect(disputePayment).toHaveBeenCalledTimes(2);
+    expect(result.results.every((row) => row.payment_status === 'disputed')).toBe(true);
   });
 
   it('guest mark-paid-all uses guest detail outstanding rows only', async () => {

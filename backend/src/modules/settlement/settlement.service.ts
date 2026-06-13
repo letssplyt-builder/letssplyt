@@ -108,9 +108,21 @@ async function writeSettlementLog(params: {
 }
 
 async function checkAndMarkEventSettled(eventId: string): Promise<boolean> {
+  const { data: payerRow, error: payerError } = await supabaseAdmin
+    .from('events')
+    .select('payer_id')
+    .eq('id', eventId)
+    .maybeSingle();
+
+  if (payerError) {
+    throw new AppError('EVENT_FETCH_FAILED', 'Could not load event', 500);
+  }
+
+  const payerId = payerRow?.payer_id as string | undefined;
+
   const { data: rows, error } = await supabaseAdmin
     .from('participants')
-    .select('id, payment_status, amount_owed')
+    .select('id, user_id, payment_status, amount_owed')
     .eq('event_id', eventId);
 
   if (error) {
@@ -122,7 +134,12 @@ async function checkAndMarkEventSettled(eventId: string): Promise<boolean> {
     return false;
   }
 
-  const owing = participants.filter((row) => Number(row.amount_owed ?? 0) > 0);
+  const owing = participants.filter((row) => {
+    const amount = Number(row.amount_owed ?? 0);
+    if (amount <= 0) return false;
+    if (payerId && (row.user_id as string | null) === payerId) return false;
+    return true;
+  });
 
   const allSettled =
     owing.length === 0 ||
@@ -164,8 +181,10 @@ export interface SelfReportInput {
 
 export interface SelfReportResult {
   participant_id: string;
-  payment_status: 'self_reported';
+  payment_status: 'confirmed';
   self_reported_at: string;
+  confirmed_at: string;
+  event_fully_settled: boolean;
 }
 
 export async function selfReportPayment(
@@ -184,19 +203,29 @@ export async function selfReportPayment(
     throw new AppError('FORBIDDEN', 'Only the participant can self-report payment', 403);
   }
 
-  assertTransitionAllowed(participant.payment_status as PaymentStatus, 'self_reported');
+  const fromStatus = participant.payment_status as PaymentStatus;
+  if (fromStatus !== 'pending' && fromStatus !== 'disputed') {
+    throw new AppError(
+      'INVALID_PAYMENT_STATUS',
+      'Payment can only be reported when status is pending or disputed',
+      409,
+    );
+  }
+
+  assertTransitionAllowed(fromStatus, 'confirmed');
 
   const now = new Date().toISOString();
   const { data: updated, error } = await supabaseAdmin
     .from('participants')
     .update({
-      payment_status: 'self_reported',
+      payment_status: 'confirmed',
       self_reported_at: now,
       self_reported_method: input.payment_method,
+      confirmed_at: now,
     })
     .eq('id', participantId)
     .eq('event_id', eventId)
-    .eq('payment_status', 'pending')
+    .in('payment_status', ['pending', 'disputed'])
     .select('id, amount_owed')
     .maybeSingle();
 
@@ -207,7 +236,7 @@ export async function selfReportPayment(
   if (!updated) {
     throw new AppError(
       'INVALID_PAYMENT_STATUS',
-      'Payment can only be self-reported when status is pending',
+      'Payment could not be confirmed — status may have changed',
       409,
     );
   }
@@ -215,18 +244,23 @@ export async function selfReportPayment(
   await writeSettlementLog({
     eventId,
     participantId,
-    action: 'self_reported',
+    action: 'confirmed',
     actorId: userId,
-    fromStatus: 'pending',
-    toStatus: 'self_reported',
+    fromStatus,
+    toStatus: 'confirmed',
     amount: participant.amount_owed,
     note: input.note ?? null,
+    metadata: { via: 'self_report', payment_method: input.payment_method },
   });
+
+  const eventFullySettled = await checkAndMarkEventSettled(eventId);
 
   return {
     participant_id: participantId,
-    payment_status: 'self_reported',
+    payment_status: 'confirmed',
     self_reported_at: now,
+    confirmed_at: now,
+    event_fully_settled: eventFullySettled,
   };
 }
 
@@ -251,7 +285,14 @@ export async function confirmPayment(
     throw new AppError('FORBIDDEN', 'Participants cannot confirm their own payment', 403);
   }
 
-  assertTransitionAllowed(participant.payment_status as PaymentStatus, 'confirmed');
+  const fromStatus = participant.payment_status as PaymentStatus;
+  if (fromStatus !== 'self_reported') {
+    throw new AppError(
+      'INVALID_PAYMENT_STATUS',
+      'Payment can only be confirmed when status is self_reported',
+      409,
+    );
+  }
 
   const now = new Date().toISOString();
   const { data: updated, error } = await supabaseAdmin
@@ -304,7 +345,7 @@ export interface DisputePaymentInput {
 
 export interface DisputePaymentResult {
   participant_id: string;
-  payment_status: 'pending';
+  payment_status: 'disputed';
   disputed_count: number;
 }
 
@@ -319,24 +360,28 @@ export async function disputePayment(
 
   const participant = await loadParticipantRow(eventId, participantId);
 
-  if (participant.payment_status !== 'self_reported') {
+  const fromStatus = participant.payment_status as PaymentStatus;
+  if (fromStatus !== 'confirmed' && fromStatus !== 'self_reported') {
     throw new AppError(
       'INVALID_PAYMENT_STATUS',
-      'Payment can only be disputed when status is self_reported',
+      'Payment can only be disputed when status is confirmed',
       409,
     );
   }
+
+  assertTransitionAllowed(fromStatus, 'disputed');
 
   const newDisputedCount = participant.disputed_count + 1;
   const { data: updated, error } = await supabaseAdmin
     .from('participants')
     .update({
-      payment_status: 'pending',
+      payment_status: 'disputed',
       disputed_count: newDisputedCount,
+      confirmed_at: null,
     })
     .eq('id', participantId)
     .eq('event_id', eventId)
-    .eq('payment_status', 'self_reported')
+    .in('payment_status', ['confirmed', 'self_reported'])
     .select('id')
     .maybeSingle();
 
@@ -347,7 +392,7 @@ export async function disputePayment(
   if (!updated) {
     throw new AppError(
       'INVALID_PAYMENT_STATUS',
-      'Payment can only be disputed when status is self_reported',
+      'Payment can only be disputed when status is confirmed',
       409,
     );
   }
@@ -357,15 +402,15 @@ export async function disputePayment(
     participantId,
     action: 'disputed',
     actorId: userId,
-    fromStatus: 'self_reported',
-    toStatus: 'pending',
+    fromStatus,
+    toStatus: 'disputed',
     amount: participant.amount_owed,
     note: input.note ?? null,
   });
 
   return {
     participant_id: participantId,
-    payment_status: 'pending',
+    payment_status: 'disputed',
     disputed_count: newDisputedCount,
   };
 }
@@ -474,6 +519,76 @@ export async function markParticipantPaid(
   return {
     participant_id: participantId,
     payment_status: 'confirmed',
+    event_fully_settled: eventFullySettled,
+  };
+}
+
+/** Payer confirms a counterparty obligation without self-report (net offset). */
+export async function payerConfirmOffset(
+  payerId: string,
+  eventId: string,
+  participantId: string,
+  note?: string,
+): Promise<ConfirmPaymentResult> {
+  const eventRow = await fetchEventRow(eventId);
+  await assertEventOwner(eventRow, payerId);
+
+  const participant = await loadParticipantRow(eventId, participantId);
+  const fromStatus = participant.payment_status as PaymentStatus;
+
+  if (fromStatus !== 'pending' && fromStatus !== 'disputed') {
+    throw new AppError(
+      'INVALID_PAYMENT_STATUS',
+      'Offset confirmation requires pending or disputed status',
+      409,
+    );
+  }
+
+  assertTransitionAllowed(fromStatus, 'confirmed');
+
+  const now = new Date().toISOString();
+  const { data: updated, error } = await supabaseAdmin
+    .from('participants')
+    .update({
+      payment_status: 'confirmed',
+      confirmed_at: now,
+    })
+    .eq('id', participantId)
+    .eq('event_id', eventId)
+    .in('payment_status', ['pending', 'disputed'])
+    .select('id, amount_owed')
+    .maybeSingle();
+
+  if (error) {
+    throw new AppError('DB_WRITE_FAILED', error.message, 500);
+  }
+
+  if (!updated) {
+    throw new AppError(
+      'INVALID_PAYMENT_STATUS',
+      'Offset confirmation could not be applied — status may have changed',
+      409,
+    );
+  }
+
+  await writeSettlementLog({
+    eventId,
+    participantId,
+    action: 'confirmed',
+    actorId: payerId,
+    fromStatus,
+    toStatus: 'confirmed',
+    amount: participant.amount_owed,
+    note: note ?? null,
+    metadata: { via: 'net_offset' },
+  });
+
+  const eventFullySettled = await checkAndMarkEventSettled(eventId);
+
+  return {
+    participant_id: participantId,
+    payment_status: 'confirmed',
+    confirmed_at: now,
     event_fully_settled: eventFullySettled,
   };
 }

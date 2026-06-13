@@ -7,6 +7,7 @@ module.exports = {
   scheme: 'letssplyt',
   userInterfaceStyle: 'automatic',
   plugins: [
+    'expo-dev-client',
     [
       'react-native-document-scanner-plugin',
       {

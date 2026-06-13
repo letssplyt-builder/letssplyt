@@ -71,14 +71,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   needsPushPermission: false,
 
   setSession: async (session) => {
-    if (session?.access_token) {
-      await SecureStore.setItemAsync(AUTH_TOKEN_KEY, session.access_token);
-      if (session.refresh_token) {
-        await SecureStore.setItemAsync(AUTH_REFRESH_TOKEN_KEY, session.refresh_token);
+    try {
+      if (session?.access_token) {
+        await SecureStore.setItemAsync(AUTH_TOKEN_KEY, session.access_token);
+        if (session.refresh_token) {
+          await SecureStore.setItemAsync(AUTH_REFRESH_TOKEN_KEY, session.refresh_token);
+        }
+      } else {
+        await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
+        await SecureStore.deleteItemAsync(AUTH_REFRESH_TOKEN_KEY);
       }
-    } else {
-      await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
-      await SecureStore.deleteItemAsync(AUTH_REFRESH_TOKEN_KEY);
+    } catch {
+      // SecureStore can fail on keystore issues — keep in-memory session so the app stays usable.
     }
     set((state) => ({
       session,

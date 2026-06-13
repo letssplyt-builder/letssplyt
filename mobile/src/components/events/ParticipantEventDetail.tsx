@@ -10,9 +10,9 @@ import { glassStyles } from '../../theme/glassStyles';
 import {
   formatEventDate,
   formatMoney,
-  statusChipLabel,
 } from '../../utils/events';
 import {
+  participantEventStatusLabel,
   resolveParticipantShareHero,
   splitModeDescription,
 } from '../../utils/participantEventView';
@@ -88,9 +88,13 @@ export function ParticipantEventDetail({ detail }: ParticipantEventDetailProps) 
     event,
     selfParticipant?.amount_owed,
     event.payer.display_name,
+    selfParticipant?.payment_status,
   );
   const amountReady = hero.amount !== null;
-  const statusLabel = statusChipLabel(event.status);
+  const statusLabel = participantEventStatusLabel(
+    event,
+    selfParticipant?.payment_status,
+  );
   const eventDate = formatEventDate(event.created_at);
 
   const sortedParticipants = [...participants].sort((a, b) => {
@@ -120,7 +124,9 @@ export function ParticipantEventDetail({ detail }: ParticipantEventDetailProps) 
         ) : (
           <Text style={styles.sharePending}>Pending</Text>
         )}
-        <Text style={styles.shareStatus}>{hero.statusLine}</Text>
+        <Text style={hero.paid ? styles.shareStatusPaid : styles.shareStatus}>
+          {hero.statusLine}
+        </Text>
       </View>
 
       <SplitBreakdownSection
@@ -210,6 +216,13 @@ const styles = StyleSheet.create({
   shareStatus: {
     fontSize: 13,
     color: authColors.textOnDarkMuted,
+    textAlign: 'center',
+    lineHeight: 19,
+  },
+  shareStatusPaid: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#34D399',
     textAlign: 'center',
     lineHeight: 19,
   },

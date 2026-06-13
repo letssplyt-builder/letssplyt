@@ -6,7 +6,6 @@ export type HomeStackParamList = {
   Home: undefined;
   MemberDetail: { userId: string };
   GuestDetail: { phoneHash: string };
-  EventDetail: { eventId: string };
 };
 
 export type EventsStackParamList = {

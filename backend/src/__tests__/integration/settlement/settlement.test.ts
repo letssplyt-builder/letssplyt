@@ -47,7 +47,7 @@ describe('Settlement API integration', () => {
     });
   });
 
-  it('full lifecycle: pending → self_reported → confirmed', async () => {
+  it('full lifecycle: pending → confirmed on self-report', async () => {
     mockAuth(PARTICIPANT_USER);
     mockSupabase.__pushMockResultForTable('participants', {
       data: {
@@ -71,6 +71,23 @@ describe('Settlement API integration', () => {
       error: null,
     });
     mockSupabase.__pushMockResultForTable('settlement_log', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('events', {
+      data: { payer_id: PAYER_ID },
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: [
+        {
+          id: PARTICIPANT_ID,
+          user_id: PARTICIPANT_USER,
+          payment_status: 'confirmed',
+          amount_owed: 30,
+        },
+      ],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('events', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('settlement_log', { data: null, error: null });
 
     const selfReport = await request(app)
       .post(`/api/v1/events/${EVENT_ID}/settlement/${PARTICIPANT_ID}/self-report`)
@@ -78,61 +95,11 @@ describe('Settlement API integration', () => {
       .send({ payment_method: 'venmo' });
 
     expect(selfReport.status).toBe(200);
-    expect(selfReport.body.payment_status).toBe('self_reported');
-
-    mockAuth(PAYER_ID);
-    mockSupabase.__pushMockResultForTable('events', {
-      data: {
-        id: EVENT_ID,
-        payer_id: PAYER_ID,
-        title: 'Dinner',
-        status: 'sent',
-        currency: 'USD',
-        locale: 'en-US',
-        deleted_at: null,
-      },
-      error: null,
-    });
-    mockSupabase.__pushMockResultForTable('participants', {
-      data: {
-        id: PARTICIPANT_ID,
-        event_id: EVENT_ID,
-        user_id: PARTICIPANT_USER,
-        display_name: 'Jordan',
-        amount_owed: 30,
-        payment_status: 'self_reported',
-        disputed_count: 0,
-        last_nudged_at: null,
-        nudge_count: 0,
-        guest_pii_token: null,
-        country_code: 'US',
-        join_method: 'manual_phone',
-      },
-      error: null,
-    });
-    mockSupabase.__pushMockResultForTable('participants', {
-      data: { id: PARTICIPANT_ID, amount_owed: 30 },
-      error: null,
-    });
-    mockSupabase.__pushMockResultForTable('settlement_log', { data: null, error: null });
-    mockSupabase.__pushMockResultForTable('participants', {
-      data: [{ id: PARTICIPANT_ID, payment_status: 'confirmed', amount_owed: 30 }],
-      error: null,
-    });
-    mockSupabase.__pushMockResultForTable('events', { data: null, error: null });
-    mockSupabase.__pushMockResultForTable('settlement_log', { data: null, error: null });
-
-    const confirm = await request(app)
-      .post(`/api/v1/events/${EVENT_ID}/settlement/${PARTICIPANT_ID}/confirm`)
-      .set(AUTH_PAYER)
-      .send();
-
-    expect(confirm.status).toBe(200);
-    expect(confirm.body.payment_status).toBe('confirmed');
-    expect(confirm.body.event_fully_settled).toBe(true);
+    expect(selfReport.body.payment_status).toBe('confirmed');
+    expect(selfReport.body.event_fully_settled).toBe(true);
   });
 
-  it('full lifecycle: pending → self_reported → disputed → pending', async () => {
+  it('full lifecycle: pending → confirmed → disputed', async () => {
     mockAuth(PARTICIPANT_USER);
     mockSupabase.__pushMockResultForTable('participants', {
       data: {
@@ -156,6 +123,21 @@ describe('Settlement API integration', () => {
       error: null,
     });
     mockSupabase.__pushMockResultForTable('settlement_log', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('events', {
+      data: { payer_id: PAYER_ID },
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: [
+        {
+          id: PARTICIPANT_ID,
+          user_id: PARTICIPANT_USER,
+          payment_status: 'confirmed',
+          amount_owed: 20,
+        },
+      ],
+      error: null,
+    });
 
     await request(app)
       .post(`/api/v1/events/${EVENT_ID}/settlement/${PARTICIPANT_ID}/self-report`)
@@ -182,7 +164,7 @@ describe('Settlement API integration', () => {
         user_id: PARTICIPANT_USER,
         display_name: 'Jordan',
         amount_owed: 20,
-        payment_status: 'self_reported',
+        payment_status: 'confirmed',
         disputed_count: 0,
         last_nudged_at: null,
         nudge_count: 0,
@@ -201,10 +183,10 @@ describe('Settlement API integration', () => {
     const dispute = await request(app)
       .post(`/api/v1/events/${EVENT_ID}/settlement/${PARTICIPANT_ID}/dispute`)
       .set(AUTH_PAYER)
-      .send({ note: 'Amount looks wrong' });
+      .send({ note: 'Not received' });
 
     expect(dispute.status).toBe(200);
-    expect(dispute.body.payment_status).toBe('pending');
+    expect(dispute.body.payment_status).toBe('disputed');
     expect(dispute.body.disputed_count).toBe(1);
   });
 
@@ -287,10 +269,24 @@ describe('Settlement API integration', () => {
       error: null,
     });
     mockSupabase.__pushMockResultForTable('settlement_log', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('events', {
+      data: { payer_id: PAYER_ID },
+      error: null,
+    });
     mockSupabase.__pushMockResultForTable('participants', {
       data: [
-        { id: PARTICIPANT_ID, payment_status: 'confirmed', amount_owed: 25 },
-        { id: PARTICIPANT_ID_OPTED, payment_status: 'opted_out', amount_owed: 10 },
+        {
+          id: PARTICIPANT_ID,
+          user_id: PARTICIPANT_USER,
+          payment_status: 'confirmed',
+          amount_owed: 25,
+        },
+        {
+          id: PARTICIPANT_ID_OPTED,
+          user_id: null,
+          payment_status: 'opted_out',
+          amount_owed: 10,
+        },
       ],
       error: null,
     });

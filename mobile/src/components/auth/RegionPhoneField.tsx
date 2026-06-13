@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   AUTH_COUNTRIES,
+  handleUsNationalPhoneInput,
   SUPPORTED_AUTH_REGIONS,
+  US_NATIONAL_DISPLAY_MAX_LENGTH,
   type AuthCountryCode,
 } from '../../utils/phone';
 import { authColors } from '../../theme/colors';
@@ -89,15 +91,15 @@ export function RegionPhoneField({
           accessibilityLabel="Phone number"
           accessibilityHint={`Enter your ${meta.label} mobile number`}
           keyboardType="phone-pad"
-          placeholder="555 000 0000"
+          placeholder="(555) - 000 - 0000"
           placeholderTextColor="rgba(255, 255, 255, 0.38)"
           value={value}
-          onChangeText={(text) => onChangeText(text.replace(/[^\d\s()-]/g, ''))}
+          onChangeText={(text) => onChangeText(handleUsNationalPhoneInput(text))}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           style={styles.input}
           autoFocus
-          maxLength={16}
+          maxLength={US_NATIONAL_DISPLAY_MAX_LENGTH}
         />
       </Animated.View>
     </View>

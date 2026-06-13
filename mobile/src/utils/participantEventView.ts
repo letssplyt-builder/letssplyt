@@ -1,13 +1,16 @@
-import type { EventRecord, SplitMode } from '@letssplyt/shared/event.types';
+import type { EventRecord } from '@letssplyt/shared/event.types';
+import { isViewerPaymentComplete } from './settlementDisplay';
+import { statusChipLabel } from './events';
 
 export interface ParticipantShareHero {
   label: string;
   amount: number | null;
   statusLine: string;
   pending: boolean;
+  paid?: boolean;
 }
 
-export function splitModeDescription(splitMode: SplitMode | null): string | null {
+export function splitModeDescription(splitMode: EventRecord['split_mode']): string | null {
   switch (splitMode) {
     case 'equal':
       return 'Split evenly among all members';
@@ -24,10 +27,21 @@ export function resolveParticipantShareHero(
   event: EventRecord,
   amountOwed: number | null | undefined,
   creatorName: string,
+  paymentStatus?: string | null,
 ): ParticipantShareHero {
   const creator = creatorName.trim() || 'the organiser';
+  const paid = isViewerPaymentComplete(paymentStatus);
 
   if (amountOwed !== null && amountOwed !== undefined) {
+    if (paid) {
+      return {
+        label: 'Your share',
+        amount: amountOwed,
+        statusLine: 'Paid',
+        pending: false,
+        paid: true,
+      };
+    }
     return {
       label: 'Your share',
       amount: amountOwed,
@@ -71,10 +85,20 @@ export function resolveParticipantShareHero(
   };
 }
 
+export function participantEventStatusLabel(
+  event: EventRecord,
+  paymentStatus?: string | null,
+): string {
+  if (isViewerPaymentComplete(paymentStatus)) {
+    return 'Settled';
+  }
+  return statusChipLabel(event.status, { role: 'participant', viewerPaymentStatus: paymentStatus });
+}
+
 function paymentStatusLine(status: EventRecord['status']): string {
   switch (status) {
     case 'sent':
-      return 'Payment request sent';
+      return 'Payment request';
     case 'settled':
     case 'archived':
       return 'Event settled';

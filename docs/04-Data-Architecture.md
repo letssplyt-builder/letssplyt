@@ -1549,10 +1549,10 @@ CREATE POLICY "analytics_insert_authenticated" ON analytics_events
 | State | Meaning |
 |-------|---------|
 | `pending` | Message sent; participant has not acted |
-| `self_reported` | Participant tapped "I paid" and selected a method |
+| `self_reported` | Participant tapped "I paid" (legacy — app self-report now sets `confirmed` directly while still recording `self_reported_at` / `self_reported_method`) |
 | `payer_marked` | Payer marked this participant paid (cash or in-person confirmation) |
-| `confirmed` | Payer explicitly confirmed the self-report |
-| `disputed` | Payer rejected the self-report |
+| `confirmed` | Payment accepted — via app self-report, payer mark-paid, payer confirm (legacy `self_reported`), or net offset |
+| `disputed` | Payer disputed a confirmed/self-reported payment; participant may self-report again |
 | `opted_out` | Participant replied STOP; no further messages will be sent |
 | `settled` | All confirmed; event fully settled |
 
@@ -1560,19 +1560,20 @@ CREATE POLICY "analytics_insert_authenticated" ON analytics_events
 
 | From | To | Trigger Event | Actor |
 |------|-----|---------------|-------|
-| `pending` | `self_reported` | Participant taps "I paid" | Participant |
-| `pending` | `confirmed` | Payer directly marks a cash payment (bypasses self-report) | Payer |
+| `pending` | `confirmed` | App participant self-reports **or** payer directly marks paid | Participant / Payer |
+| `pending` | `self_reported` | Legacy self-report path (retained in state machine) | Participant |
 | `pending` | `payer_marked` | Payer taps "Mark as paid" (cash) | Payer |
 | `pending` | `opted_out` | Twilio STOP webhook fires | System |
-| `self_reported` | `confirmed` | Payer taps "Confirm payment" | Payer |
+| `disputed` | `confirmed` | Participant self-reports again after dispute | Participant |
+| `self_reported` | `confirmed` | Payer taps "Confirm payment" (legacy) | Payer |
 | `self_reported` | `disputed` | Payer taps "Dispute" | Payer |
-| `disputed` | `pending` | Payer disputes → participant must re-pay from scratch | System |
+| `confirmed` | `disputed` | Payer disputes a confirmed payment | Payer |
 | `payer_marked` | `confirmed` | Automatic — system confirms immediately on payer_marked | System |
 | `confirmed` (all) | `settled` | System checks: when ALL participants reach `confirmed`, each transitions to `settled` and event.status → `'settled'` | System |
 
-The `DISPUTED → PENDING` transition aligns with PRD §10: after a payer disputes a claim (e.g. the payment did not arrive), the participant's status resets to `pending` and they must re-pay from scratch. This prevents a dispute from permanently blocking settlement while ensuring the payer retains control.
+**Outstanding balances** (Home hero, counterparties, member detail `outstanding[]`) count only `pending` and `disputed` — not `self_reported` or `confirmed`.
 
-The `pending → confirmed` direct path allows a payer to mark a cash payment confirmed without waiting for self-report, bypassing the self-report step entirely for in-person cash settlements.
+App self-report (`POST .../self-report`) transitions `pending` or `disputed` → `confirmed` in one step. Payer dispute transitions `confirmed` or `self_reported` → `disputed` (does **not** reset to `pending`).
 
 The `opted_out` state is terminal. A participant in `opted_out` cannot be nudged, cannot self-report, and the payer must manually mark them as settled or write off their share.
 

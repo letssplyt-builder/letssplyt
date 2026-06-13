@@ -3,11 +3,29 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import { MemberDetailScreen } from '../../../screens/home/MemberDetailScreen';
 import { useSettlementStore } from '../../../store/settlementStore';
 
-const mockNavigate = jest.fn();
+const mockTabNavigate = jest.fn();
 
-jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({ navigate: mockNavigate, goBack: jest.fn() }),
-}));
+function createHomeNavigationMock() {
+  return {
+    navigate: jest.fn(),
+    goBack: jest.fn(),
+    getState: () => ({
+      routeNames: ['Home', 'MemberDetail'],
+      index: 1,
+      routes: [],
+      key: 'home-stack',
+    }),
+    getParent: () => ({
+      getState: () => ({
+        routeNames: ['HomeTab', 'EventsTab'],
+        index: 0,
+        routes: [],
+        key: 'main-tabs',
+      }),
+      navigate: mockTabNavigate,
+    }),
+  };
+}
 
 describe('MemberDetailScreen', () => {
   beforeEach(() => {
@@ -37,10 +55,10 @@ describe('MemberDetailScreen', () => {
     } as never);
   });
 
-  it('opens event on Home stack without polluting Events tab', async () => {
+  it('opens event on the Events stack (single EventDetail instance)', async () => {
     render(
       <MemberDetailScreen
-        navigation={{ navigate: mockNavigate, goBack: jest.fn() } as never}
+        navigation={createHomeNavigationMock() as never}
         route={{ key: 'MemberDetail-1', name: 'MemberDetail', params: { userId: 'member-1' } }}
       />,
     );
@@ -48,10 +66,9 @@ describe('MemberDetailScreen', () => {
     await waitFor(() => expect(screen.getByText('Friday Dinner')).toBeTruthy());
     fireEvent.press(screen.getByText('Friday Dinner'));
 
-    expect(mockNavigate).toHaveBeenCalledWith('EventDetail', { eventId: 'event-1' });
-    expect(mockNavigate).not.toHaveBeenCalledWith(
-      'EventsTab',
-      expect.objectContaining({ screen: 'EventDetail' }),
-    );
+    expect(mockTabNavigate).toHaveBeenCalledWith('EventsTab', {
+      screen: 'EventDetail',
+      params: { eventId: 'event-1' },
+    });
   });
 });

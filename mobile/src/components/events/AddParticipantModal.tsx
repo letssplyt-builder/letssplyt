@@ -15,9 +15,11 @@ import { authColors } from '../../theme/colors';
 import {
   AUTH_COUNTRIES,
   DEFAULT_AUTH_REGION,
+  handleUsNationalPhoneInput,
   type AuthCountryCode,
   toE164FromNational,
   toE164FromPhoneInput,
+  US_NATIONAL_DISPLAY_MAX_LENGTH,
 } from '../../utils/phone';
 
 type ModalStep = 'choose' | 'manual';
@@ -225,10 +227,11 @@ export function AddParticipantModal({
               <Text style={styles.label}>Phone ({AUTH_COUNTRIES[region].dial})</Text>
               <TextInput
                 value={phone}
-                onChangeText={setPhone}
-                placeholder={AUTH_COUNTRIES[region].placeholder}
+                onChangeText={(text) => setPhone(handleUsNationalPhoneInput(text))}
+                placeholder="(555) - 000 - 0000"
                 placeholderTextColor={authColors.textOnDarkFaint}
                 keyboardType="phone-pad"
+                maxLength={US_NATIONAL_DISPLAY_MAX_LENGTH}
                 style={styles.input}
                 editable={!busy}
               />

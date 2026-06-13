@@ -3,7 +3,29 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react-nativ
 import { GuestDetailScreen } from '../../../screens/home/GuestDetailScreen';
 import { useSettlementStore } from '../../../store/settlementStore';
 
-const mockNavigate = jest.fn();
+const mockTabNavigate = jest.fn();
+
+function createHomeNavigationMock() {
+  return {
+    navigate: jest.fn(),
+    goBack: jest.fn(),
+    getState: () => ({
+      routeNames: ['Home', 'GuestDetail'],
+      index: 1,
+      routes: [],
+      key: 'home-stack',
+    }),
+    getParent: () => ({
+      getState: () => ({
+        routeNames: ['HomeTab', 'EventsTab'],
+        index: 0,
+        routes: [],
+        key: 'main-tabs',
+      }),
+      navigate: mockTabNavigate,
+    }),
+  };
+}
 
 describe('GuestDetailScreen', () => {
   beforeEach(() => {
@@ -30,10 +52,10 @@ describe('GuestDetailScreen', () => {
     } as never);
   });
 
-  it('opens event on Home stack without polluting Events tab', async () => {
+  it('opens event on the Events stack (single EventDetail instance)', async () => {
     render(
       <GuestDetailScreen
-        navigation={{ navigate: mockNavigate, goBack: jest.fn() } as never}
+        navigation={createHomeNavigationMock() as never}
         route={{
           key: 'GuestDetail-1',
           name: 'GuestDetail',
@@ -45,10 +67,9 @@ describe('GuestDetailScreen', () => {
     await waitFor(() => expect(screen.getByText('Lunch')).toBeTruthy());
     fireEvent.press(screen.getByText('Lunch'));
 
-    expect(mockNavigate).toHaveBeenCalledWith('EventDetail', { eventId: 'event-guest-1' });
-    expect(mockNavigate).not.toHaveBeenCalledWith(
-      'EventsTab',
-      expect.objectContaining({ screen: 'EventDetail' }),
-    );
+    expect(mockTabNavigate).toHaveBeenCalledWith('EventsTab', {
+      screen: 'EventDetail',
+      params: { eventId: 'event-guest-1' },
+    });
   });
 });

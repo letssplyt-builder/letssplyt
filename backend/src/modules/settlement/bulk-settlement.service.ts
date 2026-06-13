@@ -1,10 +1,12 @@
 import { AppError } from '../../infrastructure/errors';
 import { getGuestDetail } from './guest-detail.service';
 import { getMemberDetail } from './member-detail.service';
+import { isOutstandingPaymentStatus } from './outstanding';
 import {
   confirmPayment,
   disputePayment,
   markParticipantPaid,
+  payerConfirmOffset,
   selfReportPayment,
   type MarkParticipantPaidInput,
   type SelfReportInput,
@@ -30,6 +32,36 @@ export interface BulkConfirmAllResult {
 export interface BulkDisputeAllResult {
   updated_count: number;
   results: BulkSettlementResultItem[];
+}
+
+function collectMemberDisputeTargets(
+  detail: Awaited<ReturnType<typeof getMemberDetail>>,
+): Array<{ event_id: string; participant_id: string }> {
+  const rows = [...detail.outstanding, ...detail.history];
+  return rows
+    .filter(
+      (row) =>
+        row.direction === 'owed_to_me' &&
+        (row.payment_status === 'confirmed' || row.payment_status === 'self_reported'),
+    )
+    .map((row) => ({
+      event_id: row.event_id,
+      participant_id: row.participant_id,
+    }));
+}
+
+function collectGuestDisputeTargets(
+  detail: Awaited<ReturnType<typeof getGuestDetail>>,
+): Array<{ event_id: string; participant_id: string }> {
+  const rows = [...detail.outstanding, ...detail.history];
+  return rows
+    .filter(
+      (row) => row.payment_status === 'confirmed' || row.payment_status === 'self_reported',
+    )
+    .map((row) => ({
+      event_id: row.event_id,
+      participant_id: row.participant_id,
+    }));
 }
 
 function isSkippableBulkError(err: unknown): boolean {
@@ -61,29 +93,91 @@ async function applyBulkAction<T extends BulkSettlementResultItem>(
   return { updated_count: results.length, results };
 }
 
-export async function memberSelfReportAll(
+export async function memberNetSettle(
   viewerId: string,
   counterpartyUserId: string,
   input: SelfReportInput,
 ): Promise<BulkSelfReportAllResult> {
   const detail = await getMemberDetail(viewerId, counterpartyUserId);
-  const targets = detail.outstanding.filter(
-    (row) => row.direction === 'i_owe' && row.payment_status === 'pending',
+
+  const owedToMe = detail.outstanding.filter(
+    (row) => row.direction === 'owed_to_me' && isOutstandingPaymentStatus(row.payment_status),
+  );
+  const iOwe = detail.outstanding.filter(
+    (row) => row.direction === 'i_owe' && isOutstandingPaymentStatus(row.payment_status),
   );
 
-  const { updated_count, results } = await applyBulkAction(
-    targets,
-    async (eventId, participantId) => {
-      const result = await selfReportPayment(viewerId, eventId, participantId, input);
-      return {
-        event_id: eventId,
-        participant_id: participantId,
+  const owedToMeTotal = owedToMe.reduce((sum, row) => sum + row.amount, 0);
+  const iOweTotal = iOwe.reduce((sum, row) => sum + row.amount, 0);
+  const netAmount = owedToMeTotal - iOweTotal;
+
+  if (netAmount > 0) {
+    throw new AppError(
+      'NET_POSITIVE',
+      'Counterparty owes you net — use mark paid or wait for them to pay',
+      400,
+    );
+  }
+
+  if (iOwe.length > 0 && !input.payment_method) {
+    throw new AppError('VALIDATION_ERROR', 'payment_method is required when you owe', 400);
+  }
+
+  const results: BulkSettlementResultItem[] = [];
+
+  for (const row of owedToMe) {
+    try {
+      const result = await payerConfirmOffset(
+        viewerId,
+        row.event_id,
+        row.participant_id,
+        'net_settlement_offset',
+      );
+      results.push({
+        event_id: row.event_id,
+        participant_id: row.participant_id,
         payment_status: result.payment_status,
-      };
-    },
-  );
+      });
+    } catch (err) {
+      if (isSkippableBulkError(err)) continue;
+      throw err;
+    }
+  }
 
-  return { updated_count, results };
+  const paymentInput: SelfReportInput =
+    netAmount === 0 && iOwe.length > 0
+      ? { payment_method: 'other', note: 'net_settlement_offset' }
+      : input;
+
+  for (const row of iOwe) {
+    try {
+      const result = await selfReportPayment(
+        viewerId,
+        row.event_id,
+        row.participant_id,
+        paymentInput,
+      );
+      results.push({
+        event_id: row.event_id,
+        participant_id: row.participant_id,
+        payment_status: result.payment_status,
+      });
+    } catch (err) {
+      if (isSkippableBulkError(err)) continue;
+      throw err;
+    }
+  }
+
+  return { updated_count: results.length, results };
+}
+
+/** @deprecated Alias — implements true net settlement between members. */
+export async function memberSelfReportAll(
+  viewerId: string,
+  counterpartyUserId: string,
+  input: SelfReportInput,
+): Promise<BulkSelfReportAllResult> {
+  return memberNetSettle(viewerId, counterpartyUserId, input);
 }
 
 export async function memberConfirmAll(
@@ -130,9 +224,7 @@ export async function memberDisputeAll(
   input: { note?: string },
 ): Promise<BulkDisputeAllResult> {
   const detail = await getMemberDetail(viewerId, counterpartyUserId);
-  const targets = detail.outstanding.filter(
-    (row) => row.direction === 'owed_to_me' && row.payment_status === 'self_reported',
-  );
+  const targets = collectMemberDisputeTargets(detail);
 
   const { updated_count, results } = await applyBulkAction(
     targets,
@@ -230,7 +322,7 @@ export async function guestDisputeAll(
   input: { note?: string },
 ): Promise<BulkDisputeAllResult> {
   const detail = await getGuestDetail(viewerId, phoneHash);
-  const targets = detail.outstanding.filter((row) => row.payment_status === 'self_reported');
+  const targets = collectGuestDisputeTargets(detail);
 
   const { updated_count, results } = await applyBulkAction(
     targets,

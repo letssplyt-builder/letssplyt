@@ -12,13 +12,13 @@ import type {
   EventListItem,
   EventListResponse,
   EventRecord,
-  EventSettlementSummary,
   JoinTokenInfo,
   LockEventResponse,
   ParticipantAssignedItem,
   ReopenEventResponse,
 } from '@letssplyt/shared/event.types';
 import { fetchReceiptReviewSnapshot } from '../receipts/receipt-review.read';
+import { buildEventSettlementSummary } from '../settlement/settlement-summary';
 
 const DEFAULT_LIST_LIMIT = 20;
 const MAX_LIST_LIMIT = 50;
@@ -216,34 +216,6 @@ async function assertEventAccess(event: EventRow, userId: string): Promise<void>
   }
 }
 
-function buildSettlementSummary(
-  participants: Array<{ payment_status: string; amount_owed: number | null }>,
-  totalAmount: number | null,
-): EventSettlementSummary {
-  const total = totalAmount ?? 0;
-  let collected = 0;
-  let confirmed_count = 0;
-  let pending_count = 0;
-
-  for (const participant of participants) {
-    const amount = participant.amount_owed ?? 0;
-    if (participant.payment_status === 'confirmed' || participant.payment_status === 'settled') {
-      collected += amount;
-      confirmed_count += 1;
-    } else if (participant.payment_status === 'pending') {
-      pending_count += 1;
-    }
-  }
-
-  return {
-    total,
-    collected,
-    outstanding: Math.max(0, total - collected),
-    confirmed_count,
-    pending_count,
-  };
-}
-
 async function insertCreatorParticipant(userId: string, eventId: string): Promise<void> {
   const { data: user, error: userError } = await supabaseAdmin
     .from('users')
@@ -420,6 +392,16 @@ export async function listEvents(
   const events: EventListItem[] = await Promise.all(
     pageRows.map(async (row) => {
       const isCreator = row.payer_id === userId;
+      let viewer_payment_status: string | null | undefined = undefined;
+      if (!isCreator) {
+        const { data: viewerRow } = await supabaseAdmin
+          .from('participants')
+          .select('payment_status')
+          .eq('event_id', row.id)
+          .eq('user_id', userId)
+          .maybeSingle();
+        viewer_payment_status = (viewerRow?.payment_status as string | null) ?? null;
+      }
       return {
         id: row.id,
         title: row.title,
@@ -429,6 +411,7 @@ export async function listEvents(
         created_at: row.created_at,
         role: isCreator ? 'creator' : 'participant',
         creator_name: isCreator ? null : (creatorNames.get(row.payer_id) ?? null),
+        viewer_payment_status,
       };
     }),
   );
@@ -490,7 +473,7 @@ export async function getEventById(userId: string, eventId: string): Promise<Eve
   const { data: participantRows, error: participantsError } = await supabaseAdmin
     .from('participants')
     .select(
-      'id, user_id, display_name, join_method, payment_status, amount_owed, message_sent_at, message_delivered_at, message_failed',
+      'id, user_id, display_name, join_method, payment_status, amount_owed, message_sent_at, message_delivered_at, message_failed, self_reported_method',
     )
     .eq('event_id', eventId)
     .order('created_at', { ascending: true });
@@ -507,6 +490,7 @@ export async function getEventById(userId: string, eventId: string): Promise<Eve
 
   const participants = rows.map((row) => ({
     id: row.id as string,
+    user_id: row.user_id as string | null,
     display_name: resolveLinkedDisplayName(
       {
         user_id: row.user_id as string | null,
@@ -522,6 +506,7 @@ export async function getEventById(userId: string, eventId: string): Promise<Eve
     message_sent_at: row.message_sent_at as string | null,
     message_delivered_at: row.message_delivered_at as string | null,
     message_failed: Boolean(row.message_failed),
+    self_reported_method: row.self_reported_method as string | null,
   }));
 
   const selfParticipant = participants.find((participant) => participant.is_self);
@@ -530,7 +515,7 @@ export async function getEventById(userId: string, eventId: string): Promise<Eve
     isPayer && eventRow.status === 'open' ? await fetchActiveJoinToken(eventId) : null;
   const summary =
     isPayer && eventRow.status !== 'open'
-      ? buildSettlementSummary(participants, eventRow.total_amount)
+      ? buildEventSettlementSummary(participants, eventRow.total_amount)
       : null;
 
   let my_items: ParticipantAssignedItem[] | undefined;

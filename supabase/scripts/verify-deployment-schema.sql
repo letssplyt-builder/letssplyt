@@ -98,6 +98,11 @@ SELECT
   'guest_pii' AS check_name,
   CASE WHEN to_regclass('public.guest_pii') IS NOT NULL THEN 'ok' ELSE 'MISSING TABLE' END AS status;
 
+-- ─── 7b. ai_audit_log (migration #1 — if missing, run repair-ai-audit-log.sql) ─
+SELECT
+  'ai_audit_log' AS check_name,
+  CASE WHEN to_regclass('public.ai_audit_log') IS NOT NULL THEN 'ok' ELSE 'MISSING TABLE' END AS status;
+
 -- ─── 8. Receipt items columns (E07) ─────────────────────────────────────────
 WITH expected_columns AS (
   SELECT unnest(ARRAY[

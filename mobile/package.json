@@ -5,6 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "expo start",
+    "start:dev-client": "expo start --dev-client",
+    "android:reverse": "adb reverse tcp:8081 tcp:8081 && adb reverse tcp:3000 tcp:3000",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts,.tsx",
     "test": "jest --passWithNoTests",

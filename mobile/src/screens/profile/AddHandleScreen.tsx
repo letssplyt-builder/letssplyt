@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { CommonActions } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { PaymentProvider } from '@letssplyt/shared/profile.types';
@@ -54,17 +55,26 @@ export function AddHandleScreen({ navigation, route }: Props) {
 
     setIsSaving(true);
     try {
+      const toastMessage =
+        isEditMode && route.params?.handleId
+          ? 'Payment method updated successfully'
+          : 'Payment method added successfully';
+
       if (isEditMode && route.params?.handleId) {
         await updateHandle(route.params.handleId, result.normalized);
-        navigation.navigate('Profile', {
-          toastMessage: 'Payment method updated successfully',
-        });
       } else {
         await addHandle(selectedProvider, result.normalized);
-        navigation.navigate('Profile', {
-          toastMessage: 'Payment method added successfully',
-        });
       }
+
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 1,
+          routes: [
+            { name: 'MainTabs' },
+            { name: 'Profile', params: { toastMessage } },
+          ],
+        }),
+      );
     } catch (err) {
       if (isApiRequestError(err) && err.code === 'DUPLICATE_PROVIDER') {
         setValidationError(
