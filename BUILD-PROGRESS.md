@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
 **Last updated:** 2026-06-07
-**Current story:** E10-S01 — QStash Job Handlers (nudge-check, purge-guest-pii, create-analytics-partition)
+**Current story:** E10-S02 — Push Notifications (token registration, send from backend, foreground/background/killed)
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -77,7 +77,7 @@
 ## TIER 3 — Operations
 
 ### Epic 10: Background Jobs & Push Notifications
-- [ ] E10-S01 — QStash Job Handlers (nudge-check, purge-guest-pii, create-analytics-partition)
+- [x] E10-S01 — QStash Job Handlers (purge-guest-pii, create-analytics-partition; nudge deferred) (2026-06-07)
 - [ ] E10-S02 — Push Notifications (token registration, send from backend, foreground/background/killed)
 
 ### Epic 11: Account Management
@@ -105,8 +105,8 @@
 |---|---|---|---|---|
 | Tier 1 — Foundation | 4 | 16 | 16 | 0 |
 | Tier 2 — Core Flow | 5 | 24 | 20 | 4 |
-| Tier 3 — Operations | 4 | 13 | 1 | 12 |
-| **Total** | **13** | **53** | **31** | **22** |
+| Tier 3 — Operations | 4 | 13 | 2 | 11 |
+| **Total** | **13** | **53** | **32** | **21** |
 
 ---
 
@@ -141,4 +141,5 @@
 - [2026-06-07] — E09-S01 — Per-event settlement API complete: mark-paid/cash, migrations #19–#20 (`settlement_log` audit columns + `disputed` action), `smoke:settlement` 22/22, backend 277 tests.
 - [2026-06-07] — E09-S01 — Per-event settlement API: mark-paid/cash endpoint, migrations #19–#20 (`settlement_log` audit + `disputed` action), `npm run smoke:settlement` 22/22, backend 277 tests.
 - [2026-06-07] — E11-S01 — Biometric auth (Option B: skip keeps plain refresh; enroll gates refresh behind OS biometrics). Idle app lock (5 min). `secureTokenStorage`, `authToken.resolveAccessToken`, BiometricOptIn/Lock screens, in-memory Supabase session, OTP verify `device_id`/`platform`, non-fatal `registerDeviceAfterOtp`, navigation reset fixes, logout best-effort. Migration #22 `device_sessions` trust columns. Docs 02/05/08/09/12. Tests: mobile 233, backend 304 passing.
+- [2026-06-07] — E10-S01 — QStash jobs: `purge-guest-pii` + `create-analytics-partition` (signed endpoints, auto-nudge deferred). `smoke:jobs` live-tested purge on dev Supabase. 314 backend tests. Configure QStash schedules on staging when ready.
 - [2026-06-07] — Product/docs — Epic 9 realigned to 4 stories: E09-S01 per-event API, **E09-S02 bulk settle-all**, E09-S03 ledger (partial E07-S03), E09-S04 mobile actions (partial E07-S03). Total stories 53.

@@ -2651,9 +2651,40 @@ mobile/src/__tests__/components/events/EventDetailScreen.test.tsx
 
 ### E10-S01 — QStash Job Handlers
 
-**Description:** Three background job handlers as Express endpoints. QStash calls them on schedule via webhook. All must verify the QStash signature before processing, making them safe against spoofed requests.
+**Description:** Background job handlers as QStash-signed Express endpoints. **Auto nudge (`nudge-check`) deferred** — manual nudge from settlement API remains. Ships: guest PII purge + analytics partition creation.
 
-**Prompt:**
+**Implemented endpoints:**
+- `POST /api/v1/jobs/purge-guest-pii` — deletes `guest_pii` where `purge_after < NOW()` (participant names retained)
+- `POST /api/v1/jobs/create-analytics-partition` — calls `create_analytics_partition` RPC for next month (or explicit `year`/`month`)
+
+**Files:**
+- `backend/src/modules/jobs/qstash.receiver.ts`
+- `backend/src/modules/jobs/purge-pii.job.ts`
+- `backend/src/modules/jobs/partition.job.ts`
+- `backend/src/modules/jobs/jobs.controller.ts`
+- `backend/src/modules/jobs/jobs.routes.ts`
+
+**QStash schedules (Upstash dashboard):**
+- `purge-guest-pii`: `0 2 * * *` (daily 02:00 UTC)
+- `create-analytics-partition`: `0 0 25 * *` (25th of month 00:00 UTC)
+
+**Acceptance Criteria:**
+1. POST `/jobs/purge-guest-pii` with invalid QStash signature → 401
+2. POST `/jobs/purge-guest-pii` with valid signature → `{ purged: N }`; rows without `purge_after` are not deleted
+3. POST `/jobs/create-analytics-partition` → partition created via RPC
+4. `nudge-check` — **not in scope** (deferred)
+
+**Tests:**
+```
+backend/src/__tests__/unit/jobs/purge-pii.job.test.ts
+backend/src/__tests__/unit/jobs/partition.job.test.ts
+backend/src/__tests__/unit/jobs/jobs.routes.test.ts
+```
+
+**Deferred (original prompt — do not build yet):**
+- `POST /api/v1/jobs/nudge-check` — scheduled auto-nudge SMS
+
+**Prompt (historical — nudge portion deferred):**
 *"Build backend/src/modules/jobs/ with three QStash job handlers, each as a POST Express endpoint. All must verify QStash signature using @upstash/qstash Receiver.verify() with QSTASH_CURRENT_SIGNING_KEY and QSTASH_NEXT_SIGNING_KEY from process.env. (1) POST /api/v1/jobs/nudge-check: find participants WHERE payment_status IN ('pending','self_reported') AND events.created_at < NOW() - INTERVAL '48 hours' AND (last_nudged_at IS NULL OR last_nudged_at < NOW() - INTERVAL '48 hours'). For each: decrypt phone, send Twilio nudge SMS to participant, write notification_log row, update last_nudged_at. Batch in groups of 10 (Twilio rate limit awareness). Return { processed: count }. (2) POST /api/v1/jobs/purge-guest-pii: find guest_pii WHERE purge_after IS NOT NULL AND purge_after < NOW(). For each: delete receipt images from Supabase Storage (bucket 'receipts', prefix=[event_id]/), DELETE the guest_pii row (CASCADE deletes participant row via FK). Return { purged: count }. (3) POST /api/v1/jobs/create-analytics-partition: call supabaseAdmin.rpc('create_analytics_partition', { partition_name: 'analytics_events_YYYY_MM', start_date: first day of next month, end_date: first day of month after next }). Return { partition_created: name }. Create backend/src/modules/jobs/jobs.routes.ts registering all three. No authenticate middleware on these routes — QStash signature IS the authentication."*
 
 **Files created:**

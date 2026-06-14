@@ -15,6 +15,7 @@ import receiptsRoutes from './modules/receipts/receipts.routes';
 import settlementRoutes from './modules/settlement/settlement.routes';
 import twilioWebhookRouter from './modules/webhooks/twilio.routes';
 import breakdownRoutes from './modules/messages/breakdown.routes';
+import jobsRoutes from './modules/jobs/jobs.routes';
 import { errorHandler } from './modules/auth/auth.controller';
 
 const app = express();
@@ -45,6 +46,9 @@ app.use(
     credentials: true,
   }),
 );
+
+// QStash job endpoints need the raw body for signature verification.
+app.use('/api/v1/jobs', express.raw({ type: 'application/json' }), jobsRoutes);
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false }));
