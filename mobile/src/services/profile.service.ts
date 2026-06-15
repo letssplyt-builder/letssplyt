@@ -12,9 +12,22 @@ export async function fetchMyProfile(): Promise<PublicUserProfile> {
 }
 
 export async function updateMyProfile(
-  body: Partial<Pick<PublicUserProfile, 'display_name' | 'avatar_colour'>>,
+  body: Partial<
+    Pick<
+      PublicUserProfile,
+      | 'display_name'
+      | 'avatar_colour'
+      | 'push_notifications_enabled'
+      | 'payment_alert_notifications_enabled'
+      | 'share_alert_notifications_enabled'
+    >
+  >,
 ): Promise<PublicUserProfile> {
   return apiPatch<PublicUserProfile>('/users/me', body);
+}
+
+export async function deleteAccount(): Promise<void> {
+  await apiPostAuth<{ deleted: true }>('/users/me/delete', { confirm: true });
 }
 
 export async function fetchMyHandles(): Promise<PaymentHandle[]> {

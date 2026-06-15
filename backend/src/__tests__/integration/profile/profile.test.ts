@@ -15,6 +15,9 @@ const PUBLIC_USER = {
   total_events_created: 0,
   total_events_joined: 0,
   created_at: '2026-01-01T00:00:00.000Z',
+  push_notifications_enabled: true,
+  payment_alert_notifications_enabled: true,
+  share_alert_notifications_enabled: true,
 };
 
 function mockAuth(): void {

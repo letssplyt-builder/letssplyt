@@ -235,6 +235,9 @@ export const mockSupabase = {
           data: { properties: { hashed_token: 'test-token-hash', action_link: 'http://test' } },
           error: null,
         }),
+      deleteUser: jest
+        .fn<(userId: string) => Promise<{ data: { user: { id: string } }; error: null }>>()
+        .mockResolvedValue({ data: { user: { id: 'test-user-id' } }, error: null }),
     },
     verifyOtp: jest
       .fn<

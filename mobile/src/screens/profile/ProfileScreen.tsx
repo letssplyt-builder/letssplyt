@@ -18,23 +18,22 @@ import { BottomToast } from '../../components/BottomToast';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { FadeSlideIn } from '../../components/auth/FadeSlideIn';
 import { SwipeableHandleRow } from '../../components/profile/SwipeableHandleRow';
-import { navigateToHomeTab } from '../../navigation/eventNavigation';
-import type { ProfileStackParamList } from '../../navigation/types';
+import { useAppInsets } from '../../hooks/useAppInsets';
+import type { SettingsStackParamList } from '../../navigation/types';
 import { useAuthStore } from '../../store/authStore';
 import { useProfileStore } from '../../store/profileStore';
 import { initialsFromDisplayName, providerLabel } from '../../utils/profile';
 import { authColors } from '../../theme/colors';
 
-type Props = NativeStackScreenProps<ProfileStackParamList, 'Profile'>;
+type Props = NativeStackScreenProps<SettingsStackParamList, 'Profile'>;
 
 export function ProfileScreen({ navigation, route }: Props) {
   const authUser = useAuthStore((state) => state.user);
-  const logout = useAuthStore((state) => state.logout);
   const { user, handles, isLoading, loadProfile, deleteHandle, reorderHandles, updateDisplayName } =
     useProfileStore();
+  const { screenScrollBottomPadding } = useAppInsets();
   const [isEditingName, setIsEditingName] = useState(false);
   const [draftName, setDraftName] = useState('');
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -46,13 +45,16 @@ export function ProfileScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     void loadProfile().catch(() => {
-      Alert.alert('Could not load profile', 'Pull to refresh by reopening this screen.');
+      const hasProfile = Boolean(useProfileStore.getState().user ?? useAuthStore.getState().user);
+      if (!hasProfile) {
+        Alert.alert('Could not load profile', 'Check your connection and try again.');
+      }
     });
   }, [loadProfile]);
 
-  const displayUser = user ?? authUser;
-  const avatarColour = displayUser?.avatar_colour ?? '#6366F1';
-  const displayName = displayUser?.display_name ?? 'User';
+  const displayUser = user;
+  const avatarColour = displayUser?.avatar_colour ?? authUser?.avatar_colour ?? '#6366F1';
+  const displayName = displayUser?.display_name ?? authUser?.display_name ?? 'User';
 
   const commitName = async () => {
     const trimmed = draftName.trim();
@@ -103,31 +105,19 @@ export function ProfileScreen({ navigation, route }: Props) {
     [navigation],
   );
 
-  const handleLogout = async () => {
-    if (isLoggingOut) return;
-    setIsLoggingOut(true);
-    try {
-      await logout();
-    } catch {
-      Alert.alert('Could not log out', 'Please try again.');
-    } finally {
-      setIsLoggingOut(false);
-    }
-  };
-
   const listHeader = (
     <View style={styles.headerBlock}>
       <FadeSlideIn delay={0}>
         <Pressable
           accessibilityRole="button"
-          onPress={() => navigateToHomeTab(navigation)}
+          onPress={() => navigation.goBack()}
           style={styles.back}
         >
           <Text style={styles.backText}>← Back</Text>
         </Pressable>
       </FadeSlideIn>
 
-      {isLoading && !user ? (
+      {isLoading && !user && !authUser ? (
         <ActivityIndicator color={authColors.textOnDark} style={styles.loader} />
       ) : (
         <>
@@ -188,15 +178,6 @@ export function ProfileScreen({ navigation, route }: Props) {
         <Text style={styles.trustIcon}>🔒</Text>
         <Text style={styles.trustText}>AES-256 encrypted · Never shared without your action</Text>
       </View>
-
-      <Pressable
-        accessibilityRole="button"
-        disabled={isLoggingOut}
-        onPress={() => void handleLogout()}
-        style={styles.logoutButton}
-      >
-        <Text style={styles.logoutText}>{isLoggingOut ? 'Logging out…' : 'Log out'}</Text>
-      </Pressable>
     </View>
   );
 
@@ -214,7 +195,10 @@ export function ProfileScreen({ navigation, route }: Props) {
         renderItem={renderHandle}
         ListHeaderComponent={listHeader}
         ListFooterComponent={listFooter}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: screenScrollBottomPadding },
+        ]}
         showsVerticalScrollIndicator={false}
       />
     </AuthGradientLayout>
@@ -227,7 +211,6 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 28,
-    paddingBottom: 32,
   },
   headerBlock: {
     paddingTop: 4,
@@ -336,19 +319,5 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: authColors.textOnDarkMuted,
     lineHeight: 16,
-  },
-  logoutButton: {
-    marginTop: 8,
-    paddingVertical: 14,
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: authColors.glassBorder,
-    alignItems: 'center',
-    backgroundColor: authColors.glass,
-  },
-  logoutText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: authColors.textOnDarkMuted,
   },
 });

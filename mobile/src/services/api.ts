@@ -75,6 +75,8 @@ function resolveErrorMessage(
       );
     case 'INVALID_HANDLE':
       return apiMessage ?? 'That payment handle is not valid for this provider.';
+    case 'OUTSTANDING_BALANCE':
+      return apiMessage ?? 'You must settle all outstanding payments before deleting your account.';
     default:
       return apiMessage ?? (isVerify ? verifyDefault : sendCodeDefault);
   }
@@ -168,9 +170,20 @@ export async function apiPatch<TResponse>(
   );
 }
 
-export async function apiDelete(path: string): Promise<void> {
+export async function apiDelete(
+  path: string,
+  body?: Record<string, unknown>,
+): Promise<void> {
   const headers = await getAuthHeaders();
-  await requestApi<void>(path, { method: 'DELETE', headers }, "Couldn't delete. Try again.");
+  await requestApi<void>(
+    path,
+    {
+      method: 'DELETE',
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    },
+    "Couldn't delete. Try again.",
+  );
 }
 
 export async function apiPostAuth<TResponse>(

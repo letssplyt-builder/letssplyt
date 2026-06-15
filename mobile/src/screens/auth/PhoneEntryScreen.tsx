@@ -97,7 +97,24 @@ export function PhoneEntryScreen({ navigation, route }: Props) {
               loading={isLoading}
               onPress={() => void handleSendCode()}
             />
-            <Text style={styles.legal}>By continuing you agree to our Terms & Privacy</Text>
+            <Text style={styles.legal}>
+              By continuing you agree to our{' '}
+              <Text
+                accessibilityRole="link"
+                style={styles.legalLink}
+                onPress={() => navigation.navigate('LegalDocument', { document: 'terms' })}
+              >
+                Terms
+              </Text>
+              {' & '}
+              <Text
+                accessibilityRole="link"
+                style={styles.legalLink}
+                onPress={() => navigation.navigate('LegalDocument', { document: 'privacy' })}
+              >
+                Privacy
+              </Text>
+            </Text>
           </View>
         </FadeSlideIn>
       }
@@ -207,5 +224,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 11,
     color: authColors.textOnDarkFaint,
+    lineHeight: 16,
+  },
+  legalLink: {
+    color: '#A5F3FC',
+    fontWeight: '600',
   },
 });

@@ -30,6 +30,8 @@ const EXPECTED_MIGRATIONS = [
   '20260618000000_event_delete_fk_cascade.sql',
   '20260619000000_device_sessions_trust_columns.sql',
   '20260620000000_user_notifications.sql',
+  '20260621000000_user_notification_preferences.sql',
+  '20260622000000_users_phone_encrypted_nullable_on_delete.sql',
 ] as const;
 
 const REPO_ROOT = path.resolve(__dirname, '../../../../..');

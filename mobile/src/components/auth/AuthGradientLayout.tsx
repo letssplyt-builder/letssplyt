@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Animated, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { systemFooterPadding } from '../../constants/layout';
+import { systemFooterPadding, stickyFooterPadding } from '../../constants/layout';
 import { authColors } from '../../theme/colors';
 
 type BottomSafeAreaMode = 'tabBar' | 'system';
@@ -81,8 +81,10 @@ export function AuthGradientLayout({
     bottomSafeArea === 'system'
       ? (['top', 'left', 'right', 'bottom'] as const)
       : (['top', 'left', 'right'] as const);
-  const systemFooterPad =
-    bottomSafeArea === 'system' ? systemFooterPadding(insets.bottom) : undefined;
+  const footerBottomPad =
+    bottomSafeArea === 'system'
+      ? systemFooterPadding(insets.bottom)
+      : stickyFooterPadding(insets.bottom);
 
   return (
     <View style={styles.root}>
@@ -104,7 +106,7 @@ export function AuthGradientLayout({
           <View
             style={[
               styles.footer,
-              systemFooterPad !== undefined && { paddingBottom: systemFooterPad },
+              { paddingBottom: footerBottomPad },
               footerStyle,
             ]}
           >

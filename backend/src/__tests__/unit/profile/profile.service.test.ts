@@ -20,6 +20,9 @@ const PUBLIC_USER = {
   total_events_created: 2,
   total_events_joined: 5,
   created_at: '2026-01-01T00:00:00.000Z',
+  push_notifications_enabled: true,
+  payment_alert_notifications_enabled: true,
+  share_alert_notifications_enabled: true,
 };
 
 function mockAuthenticatedUser(): void {
@@ -45,6 +48,29 @@ describe('profile.service', () => {
       expect(profile).not.toHaveProperty('phone_hash');
       expect(profile).not.toHaveProperty('phone_encrypted');
       expect(profile).not.toHaveProperty('name_encrypted');
+    });
+
+    it('falls back to base columns when notification preference columns are missing', async () => {
+      mockSupabase.__pushMockResultForTable('users', {
+        data: null,
+        error: { code: '42703', message: 'column push_notifications_enabled does not exist' },
+      });
+      mockSupabase.__pushMockResultForTable('users', {
+        data: {
+          id: USER_ID,
+          display_name: 'Alex R.',
+          avatar_colour: '#6366F1',
+          avatar_url: null,
+          total_events_created: 2,
+          total_events_joined: 5,
+          created_at: '2026-01-01T00:00:00.000Z',
+        },
+        error: null,
+      });
+
+      const profile = await getMe(USER_ID, JWT);
+
+      expect(profile).toEqual(PUBLIC_USER);
     });
   });
 

@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { PAYMENT_PROVIDERS } from '@letssplyt/shared/profile.types';
 import { getUserBalance } from './balance.service';
+import { deleteUserAccount } from './delete-account.service';
 import {
   createHandle,
   deleteHandle,
@@ -17,6 +18,13 @@ const patchMeSchema = z.object({
   display_name: z.string().max(50).optional(),
   expo_push_token: z.string().max(200).optional(),
   avatar_colour: z.string().optional(),
+  push_notifications_enabled: z.boolean().optional(),
+  payment_alert_notifications_enabled: z.boolean().optional(),
+  share_alert_notifications_enabled: z.boolean().optional(),
+});
+
+const deleteMeSchema = z.object({
+  confirm: z.literal(true),
 });
 
 const createHandleSchema = z.object({
@@ -224,6 +232,25 @@ export async function handleGetBalance(
   try {
     const balance = await getUserBalance(req.user!.id);
     res.status(200).json(balance);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleDeleteMe(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const parsed = deleteMeSchema.safeParse(req.body);
+    if (!parsed.success) {
+      validationError(res, parsed.error.issues);
+      return;
+    }
+
+    const result = await deleteUserAccount(req.user!.id);
+    res.status(200).json(result);
   } catch (err) {
     next(err);
   }

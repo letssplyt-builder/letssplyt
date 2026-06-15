@@ -64,6 +64,21 @@ describe('PhoneEntryScreen', () => {
     expect(screen.queryByText('New account')).toBeNull();
   });
 
+  it('navigates to legal documents when Terms or Privacy links are pressed', () => {
+    render(
+      <PhoneEntryScreen
+        navigation={navigation as never}
+        route={{ key: 'PhoneEntry', name: 'PhoneEntry', params: {} }}
+      />,
+    );
+
+    fireEvent.press(screen.getByText('Terms'));
+    expect(navigation.navigate).toHaveBeenCalledWith('LegalDocument', { document: 'terms' });
+
+    fireEvent.press(screen.getByText('Privacy'));
+    expect(navigation.navigate).toHaveBeenCalledWith('LegalDocument', { document: 'privacy' });
+  });
+
   it('always requests OTP with register context', async () => {
     mockApiPost.mockResolvedValue({
       sent: true,

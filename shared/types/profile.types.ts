@@ -19,6 +19,9 @@ export interface PublicUserProfile {
   total_events_created: number;
   total_events_joined: number;
   created_at: string;
+  push_notifications_enabled: boolean;
+  payment_alert_notifications_enabled: boolean;
+  share_alert_notifications_enabled: boolean;
 }
 
 export interface PaymentHandle {

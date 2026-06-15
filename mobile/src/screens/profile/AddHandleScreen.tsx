@@ -10,13 +10,13 @@ import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { FadeSlideIn } from '../../components/auth/FadeSlideIn';
 import { GlassHandleInput } from '../../components/profile/GlassHandleInput';
 import { PrimaryButton } from '../../components/PrimaryButton';
-import type { ProfileStackParamList } from '../../navigation/types';
+import type { SettingsStackParamList } from '../../navigation/types';
 import { isApiRequestError } from '../../services/api';
 import { useProfileStore } from '../../store/profileStore';
 import { PROVIDER_OPTIONS, providerLabel } from '../../utils/profile';
 import { authColors } from '../../theme/colors';
 
-type Props = NativeStackScreenProps<ProfileStackParamList, 'AddHandle'>;
+type Props = NativeStackScreenProps<SettingsStackParamList, 'AddHandle'>;
 
 export function AddHandleScreen({ navigation, route }: Props) {
   const addHandle = useProfileStore((state) => state.addHandle);

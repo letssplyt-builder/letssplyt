@@ -33,19 +33,29 @@ export type EventsStackParamList = {
   };
 };
 
-export type ProfileStackParamList = {
+export type LegalDocumentScreenParams = { document: 'terms' | 'privacy' };
+
+export type SettingsStackParamList = {
+  Settings: undefined;
   Profile: { toastMessage?: string } | undefined;
   AddHandle: {
     handleId?: string;
     provider?: PaymentProvider;
     handleValue?: string;
   };
+  DeleteWarn: undefined;
+  DeleteConfirm: undefined;
+  Deleted: undefined;
+  LegalDocument: LegalDocumentScreenParams;
 };
+
+/** @deprecated Use SettingsStackParamList */
+export type ProfileStackParamList = SettingsStackParamList;
 
 export type MainTabParamList = {
   HomeTab: NavigatorScreenParams<HomeStackParamList> | undefined;
   EventsTab: NavigatorScreenParams<EventsStackParamList> | undefined;
-  ProfileTab: NavigatorScreenParams<ProfileStackParamList> | undefined;
+  SettingsTab: NavigatorScreenParams<SettingsStackParamList> | undefined;
 };
 
 export type RootStackParamList = {
@@ -63,6 +73,7 @@ export type RootStackParamList = {
   AppJoin: { token: string };
   AppJoined: { eventId: string; eventName: string };
   AppLocked: { creatorName?: string; eventName?: string };
+  LegalDocument: LegalDocumentScreenParams;
 };
 
 /** @deprecated Use RootStackParamList */

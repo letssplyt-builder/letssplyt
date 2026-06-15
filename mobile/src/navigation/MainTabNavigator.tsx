@@ -7,7 +7,7 @@ import { TAB_BAR_CONTENT_HEIGHT, TAB_BAR_PADDING_TOP } from '../constants/layout
 import { useAppInsets } from '../hooks/useAppInsets';
 import { HomeStackNavigator } from './HomeStackNavigator';
 import { EventsStackNavigator } from './EventsStackNavigator';
-import { ProfileStackNavigator } from './ProfileStackNavigator';
+import { SettingsStackNavigator } from './SettingsStackNavigator';
 import { authColors } from '../theme/colors';
 import type { MainTabParamList } from './types';
 
@@ -112,29 +112,29 @@ export function MainTabNavigator() {
         })}
       />
       <Tab.Screen
-        name="ProfileTab"
-        component={ProfileStackNavigator}
+        name="SettingsTab"
+        component={SettingsStackNavigator}
         options={{
-          tabBarLabel: 'Profile',
-          tabBarIcon: ({ focused }) => <TabIcon label="◎" focused={focused} />,
+          tabBarLabel: 'Settings',
+          tabBarIcon: ({ focused }) => <TabIcon label="⚙" focused={focused} />,
         }}
         listeners={({ navigation }) => ({
           tabPress: (e) => {
             e.preventDefault();
             const state = navigation.getState();
-            const profileTabRoute = state.routes.find((route) => route.name === 'ProfileTab');
-            const profileStackKey = profileTabRoute?.state?.key;
-            const profileStackIndex = profileTabRoute?.state?.index ?? 0;
-            if (profileStackKey && profileStackIndex > 0) {
+            const settingsTabRoute = state.routes.find((route) => route.name === 'SettingsTab');
+            const settingsStackKey = settingsTabRoute?.state?.key;
+            const settingsStackIndex = settingsTabRoute?.state?.index ?? 0;
+            if (settingsStackKey && settingsStackIndex > 0) {
               navigation.dispatch({
                 ...CommonActions.reset({
                   index: 0,
-                  routes: [{ name: 'Profile' }],
+                  routes: [{ name: 'Settings' }],
                 }),
-                target: profileStackKey,
+                target: settingsStackKey,
               });
             }
-            navigation.navigate('ProfileTab', { screen: 'Profile' });
+            navigation.navigate('SettingsTab', { screen: 'Settings' });
           },
         })}
       />

@@ -3,6 +3,7 @@ import { authenticate } from '../../middleware/authenticate';
 import {
   handleCreateHandle,
   handleDeleteHandle,
+  handleDeleteMe,
   handleGetBalance,
   handleGetHandles,
   handleGetMe,
@@ -29,6 +30,8 @@ router.get('/me', handleGetMe);
 router.get('/me/balance', handleGetBalance);
 router.get('/me/counterparties', handleGetCounterparties);
 router.patch('/me', handlePatchMe);
+router.delete('/me', handleDeleteMe);
+router.post('/me/delete', handleDeleteMe);
 router.post('/me/push-token', handlePostPushToken);
 router.get('/me/handles', handleGetHandles);
 router.post('/me/handles', handleCreateHandle);

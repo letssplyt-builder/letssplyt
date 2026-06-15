@@ -9,8 +9,11 @@ import type {
   PublicUserProfile,
 } from '@letssplyt/shared/profile.types';
 
-const USER_PUBLIC_COLUMNS =
+const USER_BASE_COLUMNS =
   'id, display_name, avatar_colour, avatar_url, total_events_created, total_events_joined, created_at';
+
+const USER_PUBLIC_COLUMNS =
+  `${USER_BASE_COLUMNS}, push_notifications_enabled, payment_alert_notifications_enabled, share_alert_notifications_enabled`;
 
 type UserRow = PublicUserProfile;
 
@@ -18,6 +21,9 @@ export interface UpdateMeInput {
   display_name?: string;
   avatar_colour?: string;
   expo_push_token?: string;
+  push_notifications_enabled?: boolean;
+  payment_alert_notifications_enabled?: boolean;
+  share_alert_notifications_enabled?: boolean;
 }
 
 export interface UpdateMeHeaders {
@@ -34,6 +40,9 @@ function mapUserRow(row: UserRow): PublicUserProfile {
     total_events_created: row.total_events_created,
     total_events_joined: row.total_events_joined,
     created_at: row.created_at,
+    push_notifications_enabled: row.push_notifications_enabled ?? true,
+    payment_alert_notifications_enabled: row.payment_alert_notifications_enabled ?? true,
+    share_alert_notifications_enabled: row.share_alert_notifications_enabled ?? true,
   };
 }
 
@@ -46,11 +55,31 @@ export async function getMe(userId: string, jwt: string): Promise<PublicUserProf
     .is('deleted_at', null)
     .single();
 
-  if (error || !data) {
+  if (data) {
+    return mapUserRow(data as UserRow);
+  }
+
+  const { data: legacyData, error: legacyError } = await client
+    .from('users')
+    .select(USER_BASE_COLUMNS)
+    .eq('id', userId)
+    .is('deleted_at', null)
+    .single();
+
+  if (legacyData) {
+    return mapUserRow({
+      ...(legacyData as UserRow),
+      push_notifications_enabled: true,
+      payment_alert_notifications_enabled: true,
+      share_alert_notifications_enabled: true,
+    });
+  }
+
+  if (error || legacyError) {
     throw new NotFoundError('User profile not found');
   }
 
-  return mapUserRow(data as UserRow);
+  throw new NotFoundError('User profile not found');
 }
 
 export async function upsertDeviceSession(
@@ -135,12 +164,21 @@ export async function updateMe(
     );
   }
 
-  const userUpdates: Record<string, string> = {};
+  const userUpdates: Record<string, string | boolean> = {};
   if (input.display_name !== undefined) {
     userUpdates.display_name = input.display_name;
   }
   if (input.avatar_colour !== undefined) {
     userUpdates.avatar_colour = input.avatar_colour;
+  }
+  if (input.push_notifications_enabled !== undefined) {
+    userUpdates.push_notifications_enabled = input.push_notifications_enabled;
+  }
+  if (input.payment_alert_notifications_enabled !== undefined) {
+    userUpdates.payment_alert_notifications_enabled = input.payment_alert_notifications_enabled;
+  }
+  if (input.share_alert_notifications_enabled !== undefined) {
+    userUpdates.share_alert_notifications_enabled = input.share_alert_notifications_enabled;
   }
 
   if (Object.keys(userUpdates).length > 0) {

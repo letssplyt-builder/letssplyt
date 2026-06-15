@@ -11,6 +11,7 @@ import {
   setSupabaseSessionPersistenceListener,
 } from '../lib/supabaseAuthStorage';
 import { useNotificationStore } from './notificationStore';
+import { useProfileStore } from './profileStore';
 import { useSettlementStore } from './settlementStore';
 import {
   AUTH_REFRESH_TOKEN_KEY,
@@ -376,6 +377,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     clearSupabaseMemorySession();
     useNotificationStore.getState().clear();
     useSettlementStore.getState().reset();
+    useProfileStore.getState().reset();
     const supabase = getSupabase();
     if (supabase) {
       try {

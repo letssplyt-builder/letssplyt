@@ -12,6 +12,7 @@ import { AppJoinScreen } from '../screens/join/AppJoinScreen';
 import { AppLockedScreen } from '../screens/join/AppLockedScreen';
 import { MainTabNavigator } from './MainTabNavigator';
 import { PushPermissionScreen } from '../screens/profile/PushPermissionScreen';
+import { LegalDocumentScreen } from '../screens/profile/LegalDocumentScreen';
 import { useAppLock } from '../hooks/useAppLock';
 import { usePushNotifications } from '../hooks/usePushNotifications';
 import { Toast } from '../components/Toast';
@@ -127,6 +128,7 @@ export function RootNavigator() {
         <RootStack.Screen name="BiometricLock" component={BiometricLockScreen} />
         <RootStack.Screen name="Welcome" component={WelcomeScreen} />
         <RootStack.Screen name="PhoneEntry" component={PhoneEntryScreen} />
+        <RootStack.Screen name="LegalDocument" component={LegalDocumentScreen} />
         <RootStack.Screen name="OTPVerify" component={OTPVerifyScreen} />
         <RootStack.Screen name="BiometricOptIn" component={BiometricOptInScreen} />
         <RootStack.Screen name="PushPermission" component={PushPermissionScreen} />

@@ -18,6 +18,10 @@ interface ProfileState {
   deleteHandle: (id: string) => Promise<void>;
   reorderHandles: (orderedIds: string[]) => Promise<void>;
   updateDisplayName: (displayName: string) => Promise<void>;
+  updateNotificationPreferences: (
+    prefs: Partial<Pick<PublicUserProfile, 'push_notifications_enabled'>>,
+  ) => Promise<void>;
+  reset: () => void;
 }
 
 function sortHandles(handles: PaymentHandle[]): PaymentHandle[] {
@@ -30,17 +34,35 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
   isLoading: false,
 
   loadProfile: async () => {
+    if (get().isLoading) return;
+
     set({ isLoading: true });
+    const profileErrors: unknown[] = [];
+
     try {
-      const [user, handles] = await Promise.all([
-        profileService.fetchMyProfile(),
-        profileService.fetchMyHandles(),
-      ]);
-      set({ user, handles: sortHandles(handles), isLoading: false });
+      try {
+        const profileUser = await profileService.fetchMyProfile();
+        set({ user: profileUser });
+      } catch (err) {
+        profileErrors.push(err);
+      }
+
+      try {
+        const handles = await profileService.fetchMyHandles();
+        set({ handles: sortHandles(handles) });
+      } catch {
+        // Handles can load independently — profile name/avatar still usable.
+      }
+
+      if (profileErrors.length > 0 && !get().user) {
+        throw profileErrors[0];
+      }
     } catch (err) {
       set({ isLoading: false });
       throw err;
     }
+
+    set({ isLoading: false });
   },
 
   setUser: (user) => set({ user }),
@@ -135,4 +157,25 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     const updated = await profileService.updateMyProfile({ display_name: displayName });
     set({ user: updated });
   },
+
+  updateNotificationPreferences: async (prefs) => {
+    const previous = get().user;
+    if (!previous) {
+      const updated = await profileService.updateMyProfile(prefs);
+      set({ user: updated });
+      return;
+    }
+
+    set({ user: { ...previous, ...prefs } });
+
+    try {
+      const updated = await profileService.updateMyProfile(prefs);
+      set({ user: updated });
+    } catch (err) {
+      set({ user: previous });
+      throw err;
+    }
+  },
+
+  reset: () => set({ user: null, handles: [], isLoading: false }),
 }));

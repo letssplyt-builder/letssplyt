@@ -33,7 +33,7 @@ describe('eventNavigation', () => {
     const tabNavigation = {
       navigate: tabNavigate,
       getState: jest.fn(() => ({
-        routeNames: ['HomeTab', 'EventsTab', 'ProfileTab'],
+        routeNames: ['HomeTab', 'EventsTab', 'SettingsTab'],
         index: 0,
       })),
       getParent: jest.fn(),
@@ -53,7 +53,7 @@ describe('eventNavigation', () => {
     const tabNavigation = {
       navigate: tabNavigate,
       getState: jest.fn(() => ({
-        routeNames: ['HomeTab', 'EventsTab', 'ProfileTab'],
+        routeNames: ['HomeTab', 'EventsTab', 'SettingsTab'],
         index: 0,
       })),
       getParent: jest.fn(),
@@ -98,12 +98,12 @@ describe('eventNavigation', () => {
     const tabNavigation = {
       navigate: tabNavigate,
       getState: jest.fn(() => ({
-        routeNames: ['HomeTab', 'EventsTab', 'ProfileTab'],
+        routeNames: ['HomeTab', 'EventsTab', 'SettingsTab'],
         index: 2,
       })),
       getParent: jest.fn(),
     };
-    const { navigation } = createMockNavigation(['Profile', 'AddHandle'], 0, tabNavigation);
+    const { navigation } = createMockNavigation(['Settings', 'Profile'], 0, tabNavigation);
 
     navigateToHomeTab(navigation as never);
 
