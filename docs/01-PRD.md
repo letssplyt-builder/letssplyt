@@ -187,11 +187,12 @@ People pay via their preferred app (Venmo, PayPal, etc.). Registered participant
 
 ```
 event.created          → Ledger Service (update "owed to me")
-participant.added      → Notification Service (welcome push if registered)
-payment.self_reported  → Notification Service (push to payer: "X says they paid")
-payment.confirmed      → Ledger Service (update both dashboards)
-payment.disputed       → Notification Service (push to participant: "payer disputed")
-event.all_settled      → Notification Service ("you're all square!")
+participant.added      → Notification Service (inbox + push: added_to_event for registered members)
+payment.self_reported  → Notification Service (inbox + push to creator: member_paid; member auto-confirmed — no confirm push)
+payment.confirmed      → Ledger Service (update both dashboards) — no push to member (MVP policy)
+payment.disputed       → Notification Service (push to participant: disputed — future)
+event.all_settled      → Notification Service (inbox + push to creator: event_fully_settled)
+share.sent             → Notification Service (inbox + push to members: share_ready / share_edited)
 ```
 
 ### Tech Stack Summary

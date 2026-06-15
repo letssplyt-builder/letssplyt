@@ -18,6 +18,7 @@ import { CreateEventModal } from '../../components/events/CreateEventModal';
 import { EventFab } from '../../components/events/EventFab';
 import { QRDisplayModal } from '../../components/events/QRDisplayModal';
 import { SegmentedControl } from '../../components/events/SegmentedControl';
+import { NotificationBellButton } from '../../components/notifications/NotificationBellButton';
 import { CounterpartyRow } from '../../components/settlement/CounterpartyRow';
 import { useAppInsets } from '../../hooks/useAppInsets';
 import { openEventDetail } from '../../navigation/eventNavigation';
@@ -243,18 +244,11 @@ export function HomeScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <View>
+          <View style={styles.headerText}>
             <Text style={glassStyles.heading}>Hi{user ? `, ${user.display_name}` : ''}</Text>
             <Text style={glassStyles.subheading}>Your dashboard</Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Open profile"
-            onPress={() => navigation.navigate('Profile')}
-            style={glassStyles.ghostButton}
-          >
-            <Text style={glassStyles.ghostButtonText}>Profile</Text>
-          </Pressable>
+          <NotificationBellButton onPress={() => navigation.navigate('Notifications')} />
         </View>
 
         <BalanceHeroCard
@@ -318,8 +312,12 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: 16,
+  },
+  headerText: {
+    flex: 1,
+    paddingRight: 8,
   },
   listArea: {
     marginTop: 16,

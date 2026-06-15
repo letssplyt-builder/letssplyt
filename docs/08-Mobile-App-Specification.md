@@ -64,6 +64,7 @@ RootNavigator (NativeStack)
 │   ├── HomeTab         (icon: home)
 │   │   └── HomeStack (NativeStack)
 │   │       ├── HomeScreen               ← net balance + Members|Guests toggle + counterparty lists
+│   │       ├── NotificationsScreen      ← in-app inbox (also reachable from Events stack)
 │   │       ├── MemberDetailScreen       ← registered counterparty drill-down (P32)
 │   │       ├── GuestDetailScreen        ← phone-guest drill-down (P33); name-only guests skip this
 │   │       └── PayNowScreen             ← optional: payer payment handles when viewer owes (from Member detail)
@@ -71,6 +72,7 @@ RootNavigator (NativeStack)
 │   ├── EventsTab       (icon: list)
 │   │   └── EventsStack (NativeStack)
 │   │       ├── EventsScreen             ← Active|Settled toggle + created/joined sections
+│   │       ├── NotificationsScreen      ← same inbox UI as Home stack
 │   │       ├── EventDetailScreen        ← payer or participant view (joining / settlement)
 │   │       ├── ReceiptScanScreen        ← native doc scanner launcher
 │   │       ├── ReceiptPreviewScreen     ← confirm cropped scan before upload
@@ -268,7 +270,18 @@ Do not use Redux or Context API for application state. Zustand provides the righ
 | Supabase client | In-memory session adapter (`mobile/src/lib/supabaseAuthStorage.ts`) — not SecureStore-backed; `initAuthListener` wires `TOKEN_REFRESHED` only; **does not** clear credentials on `SIGNED_OUT` (logout calls `clearSession` explicitly) |
 | Cold start | `bootstrapFromStorage()` — plain mode: silent restore; biometric mode: show `BiometricLockScreen` until `unlockApp()` succeeds |
 | Idle lock | `useAppLock` hook — 5 min background → `lockApp()` clears memory session; unlock via biometrics or device PIN |
-| Logout | `logout()` — best-effort `supabase.auth.signOut()`; **always** `clearSession()` locally even if network fails |
+| Logout | `logout()` — best-effort `supabase.auth.signOut()`; **always** `clearSession()` locally even if network fails; clears `notificationStore` and `settlementStore` |
+
+**Notification store (`mobile/src/store/notificationStore.ts`):**
+
+| Concern | Implementation |
+|---|---|
+| Badge count | `unreadCount` — optimistic decrement in `markRead()`; synced from API response |
+| List | `loadNotifications()` on `NotificationsScreen` focus |
+| Initial badge | `MainTabNavigator` calls `loadUnreadCount()` once on mount (not on every bell focus) |
+| Race safety | Stale `loadNotifications` / `loadUnreadCount` do not overwrite in-flight mark-read; local read state merged over stale server rows |
+| Mark read API | `PATCH /users/me/notifications/:id/read` via `apiPatchAuth` in `notifications.service.ts` |
+| Logout | `clear()` resets inbox state |
 
 ```typescript
 // mobile/src/stores/eventStore.ts
@@ -803,7 +816,8 @@ Refer to `prototype/home.html` (dashboard states). **MVP: USD only.**
 2. **Members | Guests** segmented toggle (below hero)
 3. **List area** (content depends on toggle)
 4. **FAB** bottom right: "＋ New event" → `CreateEventModal`
-5. Pull to refresh refreshes balance + active toggle list (iOS `RefreshControl`; Android uses `useFocusEffect` on focus instead)
+5. **Notification bell** (top right): `NotificationBellButton` — red badge when `unreadCount > 0`; tap → `NotificationsScreen`
+6. Pull to refresh refreshes balance + active toggle list (iOS `RefreshControl`; Android uses `useFocusEffect` on focus instead)
 
 **`settlementStore.loadCounterparties`** clears in-memory lists before fetch to avoid stale rows after settlement (prevents Android `IndexOutOfBoundsException` during stack transitions).
 
@@ -834,7 +848,16 @@ Refer to `prototype/home.html` (dashboard states). **MVP: USD only.**
 - Members / both sections empty: "No outstanding balances with members."
 - Guests empty: "No guests owe you right now."
 
-**Error state:** Banner below toggle: "Couldn't load balances. Pull to retry."
+**Error state:** Banner below toggle: "Couldn't load balances. Pull to retry." Successful `loadCounterparties` always clears `counterpartyError` (prevents stale error after pull-to-refresh race).
+
+#### NotificationsScreen
+
+- Accessible from bell on **HomeScreen** or **EventsScreen** (duplicated on Home and Events stacks)
+- `GET /users/me/notifications` on focus; unread dot on unread rows
+- Tap row → `markRead` if unread → if `event_id` present, `navigateFromNotification()` (resets source stack, opens `EventsTab → EventDetail`)
+- Badge updates **immediately** via `notificationStore` optimistic decrement (not via refetch-on-focus on the bell)
+
+---
 
 **Accessibility:** Toggle: `accessibilityRole="tab"`. Counterparty row: `accessibilityLabel="[Name], [spoken amount], [owe you | you owe]"`.
 
@@ -1128,12 +1151,12 @@ Entry: after `POST /receipts/parse` (`ReceiptPreviewScreen`) or from Event Detai
 
 #### ProfileScreen
 
-- User avatar (coloured circle with initials) + display name + phone
+- User avatar (coloured circle with initials) + display name
 - Payment handles section: list of handles with provider icons, drag to reorder, swipe to delete
 - "+ Add payment method" → AddHandleScreen
-- "Edit name" inline — on save, `PATCH /users/me` updates `users.display_name` and the backend syncs all linked `participants.display_name` rows. Other users' event member lists show the new name (Realtime on participant `UPDATE` + live resolution on `GET /events/:id`). No per-event rename UI.
-- "Enable notifications" link → triggers `Notifications.requestPermissionsAsync()` (only shown if permission is not yet granted)
-- "Delete account" link (destructive, at bottom, requires confirmation) → DeleteWarnScreen
+- "Edit name" inline — on save, `PATCH /users/me` syncs participant display names
+- "← Back" → `navigateToHomeTab()` (switches to Dashboard tab — **do not** `navigate('MainTabs')` from nested Profile stack)
+- Log out → `authStore.logout()` → Welcome (clears notification + settlement stores)
 
 **Error state:** If handle list fails to load: "Couldn't load payment methods. Pull to retry."
 
@@ -1734,8 +1757,17 @@ Described in Section 3 (PushPermissionScreen). The screen appears once — after
 
 ### Push Notification Handlers (foreground, background, and killed state)
 
+**As built (E10-S02):** `usePushNotifications` in `RootNavigator` when authenticated.
+
+- **Foreground receive:** `addNotificationReceivedListener` → `pushToastStore` top toast + `loadUnreadCount()`
+- **Tap (foreground/background):** `addNotificationResponseReceivedListener` + cold-start `getLastNotificationResponseAsync` → `navigationRef.navigate('MainTabs', { screen: 'EventsTab', params: { screen: 'EventDetail', params: { eventId } } })` when `data.event_id` present
+- **Token registration:** `registerPushToken` via `POST /users/me/push-token` when permission granted (not `PATCH /users/me`)
+- **Dev:** `APP_ENV=development` → backend logs push only; mobile still registers token
+
+**Push data payload:** `{ type, event_id, event_title? }` — `event_id` drives deep link navigation.
+
 ```typescript
-// Push notification handler setup (call once in App.tsx useEffect)
+// Legacy example below — prefer event_id in data payload (as built)
 export function setupPushNotificationHandlers() {
   // FOREGROUND: app is open and visible
   Notifications.setNotificationHandler({

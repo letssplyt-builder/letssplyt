@@ -34,6 +34,21 @@ function mockAuth(userId: string): void {
   });
 }
 
+function pushEventForSelfReportPush(): void {
+  mockSupabase.__pushMockResultForTable('events', {
+    data: {
+      id: EVENT_ID,
+      payer_id: PAYER_ID,
+      title: 'Dinner',
+      status: 'sent',
+      currency: 'USD',
+      locale: 'en-US',
+      deleted_at: null,
+    },
+    error: null,
+  });
+}
+
 describe('Settlement API integration', () => {
   beforeEach(() => {
     mockSupabase.__resetMock();
@@ -87,6 +102,7 @@ describe('Settlement API integration', () => {
       error: null,
     });
     mockSupabase.__pushMockResultForTable('events', { data: null, error: null });
+    pushEventForSelfReportPush();
     mockSupabase.__pushMockResultForTable('settlement_log', { data: null, error: null });
 
     const selfReport = await request(app)
@@ -138,6 +154,8 @@ describe('Settlement API integration', () => {
       ],
       error: null,
     });
+    mockSupabase.__pushMockResultForTable('events', { data: null, error: null });
+    pushEventForSelfReportPush();
 
     await request(app)
       .post(`/api/v1/events/${EVENT_ID}/settlement/${PARTICIPANT_ID}/self-report`)

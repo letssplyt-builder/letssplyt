@@ -4,12 +4,14 @@ import type { ReceiptParseResponse } from '@letssplyt/shared/receipt.types';
 
 export type HomeStackParamList = {
   Home: undefined;
+  Notifications: undefined;
   MemberDetail: { userId: string };
   GuestDetail: { phoneHash: string };
 };
 
 export type EventsStackParamList = {
   Events: undefined;
+  Notifications: undefined;
   EventDetail: { eventId: string };
   ReceiptScan: { eventId: string };
   ReceiptPreview: { eventId: string; imageUri: string };
@@ -31,9 +33,19 @@ export type EventsStackParamList = {
   };
 };
 
+export type ProfileStackParamList = {
+  Profile: { toastMessage?: string } | undefined;
+  AddHandle: {
+    handleId?: string;
+    provider?: PaymentProvider;
+    handleValue?: string;
+  };
+};
+
 export type MainTabParamList = {
   HomeTab: NavigatorScreenParams<HomeStackParamList> | undefined;
   EventsTab: NavigatorScreenParams<EventsStackParamList> | undefined;
+  ProfileTab: NavigatorScreenParams<ProfileStackParamList> | undefined;
 };
 
 export type RootStackParamList = {
@@ -51,12 +63,6 @@ export type RootStackParamList = {
   AppJoin: { token: string };
   AppJoined: { eventId: string; eventName: string };
   AppLocked: { creatorName?: string; eventName?: string };
-  Profile: { toastMessage?: string } | undefined;
-  AddHandle: {
-    handleId?: string;
-    provider?: PaymentProvider;
-    handleValue?: string;
-  };
 };
 
 /** @deprecated Use RootStackParamList */

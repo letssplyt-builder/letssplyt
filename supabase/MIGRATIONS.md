@@ -59,6 +59,7 @@ If CLI reports *"Found local migration files to be inserted before the last migr
 | 20 | `20260617000001_settlement_log_action_disputed.sql` | E09-S01 | `settlement_log.action` CHECK includes `disputed` | `DROP CONSTRAINT IF EXISTS` |
 | 21 | `20260618000000_event_delete_fk_cascade.sql` | E07+ | `notification_log` / `settlement_log` `ON DELETE CASCADE` on `event_id`; `sms_opt_outs.event_id` `ON DELETE SET NULL` | `DROP CONSTRAINT IF EXISTS` |
 | 22 | `20260619000000_device_sessions_trust_columns.sql` | E11 | `device_sessions` OTP/biometric trust timestamps | `ADD COLUMN IF NOT EXISTS` |
+| 23 | `20260620000000_user_notifications.sql` | E10 | In-app notification center inbox | `CREATE TABLE user_notifications` |
 
 ---
 

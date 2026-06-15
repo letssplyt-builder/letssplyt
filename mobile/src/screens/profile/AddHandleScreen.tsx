@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { CommonActions } from '@react-navigation/native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { PaymentProvider } from '@letssplyt/shared/profile.types';
@@ -11,13 +10,13 @@ import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { FadeSlideIn } from '../../components/auth/FadeSlideIn';
 import { GlassHandleInput } from '../../components/profile/GlassHandleInput';
 import { PrimaryButton } from '../../components/PrimaryButton';
-import type { RootStackParamList } from '../../navigation/types';
+import type { ProfileStackParamList } from '../../navigation/types';
 import { isApiRequestError } from '../../services/api';
 import { useProfileStore } from '../../store/profileStore';
 import { PROVIDER_OPTIONS, providerLabel } from '../../utils/profile';
 import { authColors } from '../../theme/colors';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'AddHandle'>;
+type Props = NativeStackScreenProps<ProfileStackParamList, 'AddHandle'>;
 
 export function AddHandleScreen({ navigation, route }: Props) {
   const addHandle = useProfileStore((state) => state.addHandle);
@@ -66,15 +65,7 @@ export function AddHandleScreen({ navigation, route }: Props) {
         await addHandle(selectedProvider, result.normalized);
       }
 
-      navigation.dispatch(
-        CommonActions.reset({
-          index: 1,
-          routes: [
-            { name: 'MainTabs' },
-            { name: 'Profile', params: { toastMessage } },
-          ],
-        }),
-      );
+      navigation.navigate('Profile', { toastMessage });
     } catch (err) {
       if (isApiRequestError(err) && err.code === 'DUPLICATE_PROVIDER') {
         setValidationError(

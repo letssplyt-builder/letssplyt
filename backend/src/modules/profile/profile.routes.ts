@@ -12,11 +12,19 @@ import {
   handleUpdateHandle,
 } from './profile.controller';
 import { handleGetCounterparties } from '../settlement/settlement.controller';
+import {
+  handleGetNotifications,
+  handleGetUnreadCount,
+  handleMarkNotificationRead,
+} from '../notifications/notifications.controller';
 
 const router = Router();
 
 router.use(authenticate);
 
+router.get('/me/notifications', handleGetNotifications);
+router.get('/me/notifications/unread-count', handleGetUnreadCount);
+router.patch('/me/notifications/:id/read', handleMarkNotificationRead);
 router.get('/me', handleGetMe);
 router.get('/me/balance', handleGetBalance);
 router.get('/me/counterparties', handleGetCounterparties);

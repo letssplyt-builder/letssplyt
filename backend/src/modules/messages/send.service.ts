@@ -9,6 +9,7 @@ import {
   fetchEventRow,
 } from '../events/event.service';
 import { buildMessagePreviewsForEvent, buildRevisionMessagesForParticipants } from './messages.service';
+import { notifyMemberShareEdited, notifyMemberShareReady } from './messages-push';
 import { resolveParticipantPhoneContext } from './participant-phone';
 
 export type SendResultStatus =
@@ -184,6 +185,21 @@ export async function sendEventMessages(
 
   await completeEventSend(eventId);
 
+  const { data: appMemberRows, error: appMembersError } = await supabaseAdmin
+    .from('participants')
+    .select('user_id, amount_owed')
+    .eq('event_id', eventId)
+    .not('user_id', 'is', null);
+
+  if (!appMembersError) {
+    for (const memberRow of appMemberRows ?? []) {
+      const memberUserId = memberRow.user_id as string | null;
+      if (!memberUserId || memberUserId === eventRow.payer_id) continue;
+      if (Number(memberRow.amount_owed ?? 0) <= 0) continue;
+      notifyMemberShareReady(memberUserId, eventRow.title, eventId);
+    }
+  }
+
   return {
     sent_count: sentCount,
     skipped_count: skippedCount,
@@ -325,6 +341,13 @@ export async function resendRevisionMessages(
         .update({ message_failed: true })
         .eq('id', participantId);
       results.push({ participant_id: participantId, status: 'failed' });
+    }
+  }
+
+  for (const row of revisionRows) {
+    const memberUserId = row.user_id as string | null;
+    if (memberUserId && memberUserId !== eventRow.payer_id) {
+      notifyMemberShareEdited(memberUserId, eventRow.title, eventId);
     }
   }
 

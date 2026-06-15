@@ -531,6 +531,7 @@ doppler run -- npm run smoke:expenses-reset   # POST /events/:id/expenses/reset 
 doppler run -- npm run smoke:messages-preview # preview + send + delivery (E08-S01–S05)
 doppler run -- npm run smoke:split-revision   # post-send confirm + selective resend (E08-S07)
 doppler run -- npm run smoke:settlement       # self-report, confirm, dispute, nudge, mark-paid (E09-S01)
+doppler run -- npm run smoke:notifications    # inbox list, unread count, mark-read (E10-S02)
 
 # Start mobile (in another terminal):
 cd mobile
@@ -741,7 +742,7 @@ When adding a migration, also update:
 2. Update `supabase/MIGRATIONS.md` and `migration-manifest.test.ts`.
 3. Test locally: `npx supabase db push` (against your dev Supabase project). Run `verify-deployment-schema.sql` and confirm all checks pass.
 5. Merge the feature branch into `develop`. On merge to `staging`, CI/CD automatically runs `npx supabase db push --db-url $SUPABASE_DB_URL_STAGING`.
-6. Run `verify-deployment-schema.sql` on staging; run smoke tests (`smoke:receipts-confirm`, `smoke:splits`, `smoke:expenses-reset`, `smoke:messages-preview`, `smoke:split-revision`, `smoke:settlement`).
+6. Run `verify-deployment-schema.sql` on staging; run smoke tests (`smoke:receipts-confirm`, `smoke:splits`, `smoke:expenses-reset`, `smoke:messages-preview`, `smoke:split-revision`, `smoke:settlement`, `smoke:notifications`).
 7. Open a PR from `staging` into `main`. On merge to `main`, CI/CD takes a backup, then runs `npx supabase db push --db-url $SUPABASE_DB_URL_PRODUCTION`.
 8. Run `verify-deployment-schema.sql` on production before declaring the deploy complete.
 

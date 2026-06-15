@@ -7,6 +7,11 @@ import { assertEventOwner, fetchEventRow } from '../events/event.service';
 import { buildNudgeMessage } from '../messages/nudge.builder';
 import { resolveParticipantPhoneContext } from '../messages/participant-phone';
 import {
+  notifyCreatorMemberPaid,
+  notifyCreatorEventFullySettled,
+  notifyMemberNudge,
+} from './settlement-push';
+import {
   assertTransitionAllowed,
   isSettlementCompleteStatus,
   type PaymentStatus,
@@ -110,7 +115,7 @@ async function writeSettlementLog(params: {
 async function checkAndMarkEventSettled(eventId: string): Promise<boolean> {
   const { data: payerRow, error: payerError } = await supabaseAdmin
     .from('events')
-    .select('payer_id')
+    .select('payer_id, title')
     .eq('id', eventId)
     .maybeSingle();
 
@@ -171,6 +176,12 @@ async function checkAndMarkEventSettled(eventId: string): Promise<boolean> {
     note: 'Event fully settled',
   });
 
+  const payerIdFromEvent = payerRow?.payer_id as string | undefined;
+  const eventTitle = (payerRow?.title as string) ?? 'Event';
+  if (payerIdFromEvent) {
+    notifyCreatorEventFullySettled(payerIdFromEvent, eventTitle, eventId);
+  }
+
   return true;
 }
 
@@ -192,6 +203,7 @@ export async function selfReportPayment(
   eventId: string,
   participantId: string,
   input: SelfReportInput,
+  options?: { suppressCreatorPaymentPush?: boolean },
 ): Promise<SelfReportResult> {
   if (!SELF_REPORT_METHODS.has(input.payment_method)) {
     throw new AppError('VALIDATION_ERROR', 'Invalid payment_method', 400);
@@ -254,6 +266,19 @@ export async function selfReportPayment(
   });
 
   const eventFullySettled = await checkAndMarkEventSettled(eventId);
+
+  const eventRow = await fetchEventRow(eventId);
+  if (!options?.suppressCreatorPaymentPush && eventRow.payer_id !== userId) {
+    notifyCreatorMemberPaid(
+      eventRow.payer_id,
+      participant.display_name,
+      participant.amount_owed ?? 0,
+      eventRow.currency ?? 'USD',
+      eventRow.locale ?? 'en-US',
+      eventRow.title,
+      eventId,
+    );
+  }
 
   return {
     participant_id: participantId,
@@ -702,6 +727,17 @@ export async function nudgeParticipant(
     amount: participant.amount_owed,
     metadata: { twilio_sid: twilioResult.sid, channel: twilioResult.channel },
   });
+
+  if (participant.user_id) {
+    notifyMemberNudge(
+      participant.user_id,
+      amount,
+      currency,
+      locale,
+      eventRow.title,
+      eventId,
+    );
+  }
 
   return {
     sent: true,

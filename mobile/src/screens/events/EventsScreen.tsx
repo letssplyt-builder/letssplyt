@@ -16,6 +16,7 @@ import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { CreateEventModal } from '../../components/events/CreateEventModal';
 import { EventFab } from '../../components/events/EventFab';
 import { EventRoleSection } from '../../components/events/EventRoleSection';
+import { NotificationBellButton } from '../../components/notifications/NotificationBellButton';
 import { QRDisplayModal } from '../../components/events/QRDisplayModal';
 import { SegmentedControl } from '../../components/events/SegmentedControl';
 import { useAppInsets } from '../../hooks/useAppInsets';
@@ -131,7 +132,7 @@ export function EventsScreen({ navigation }: Props) {
       <StatusBar style="light" />
       <ScrollView
         contentContainerStyle={[
-          styles.list,
+          styles.content,
           { paddingBottom: screenScrollBottomPadding },
         ]}
         refreshControl={
@@ -147,7 +148,10 @@ export function EventsScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <Text style={styles.title}>Events</Text>
+          <View style={styles.headerRow}>
+            <Text style={glassStyles.heading}>Events</Text>
+            <NotificationBellButton onPress={() => navigation.navigate('Notifications')} />
+          </View>
           <SegmentedControl
             segments={['active', 'settled'] as const}
             labels={{ active: 'Active', settled: 'Settled' }}
@@ -217,20 +221,18 @@ const styles = StyleSheet.create({
   layout: {
     paddingHorizontal: 0,
   },
-  header: {
+  content: {
     paddingHorizontal: 28,
     paddingTop: 8,
-    paddingBottom: 12,
+  },
+  header: {
+    marginBottom: 16,
     gap: 12,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: authColors.textOnDark,
-  },
-  list: {
-    flexGrow: 1,
-    paddingHorizontal: 28,
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
   },
   loader: {
     marginVertical: 16,

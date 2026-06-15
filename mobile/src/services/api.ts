@@ -184,3 +184,16 @@ export async function apiPostAuth<TResponse>(
     "Couldn't complete the request. Try again.",
   );
 }
+
+/** Authenticated GET — alias for {@link apiGet}. */
+export async function apiGetAuth<TResponse>(path: string): Promise<TResponse> {
+  return apiGet<TResponse>(path);
+}
+
+/** Authenticated PATCH — alias for {@link apiPatch}. */
+export async function apiPatchAuth<TResponse>(
+  path: string,
+  body: Record<string, unknown>,
+): Promise<TResponse> {
+  return apiPatch<TResponse>(path, body);
+}

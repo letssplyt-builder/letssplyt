@@ -1,19 +1,21 @@
 import { useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import * as Device from 'expo-device';
+import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import type { RootStackParamList } from '../../navigation/types';
+import { getDeviceId } from '../../services/deviceId';
 import { registerPushToken } from '../../services/profile.service';
 import { useAuthStore } from '../../store/authStore';
 import { colors } from '../../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PushPermission'>;
 
-function resolveDeviceId(): string {
-  return Device.modelId ?? Device.osBuildId ?? `${Platform.OS}-device`;
+function resolveProjectId(): string | undefined {
+  const extra = Constants.expoConfig?.extra as { eas?: { projectId?: string } } | undefined;
+  return extra?.eas?.projectId ?? Constants.easConfig?.projectId;
 }
 
 export function PushPermissionScreen({ navigation }: Props) {
@@ -36,9 +38,13 @@ export function PushPermissionScreen({ navigation }: Props) {
           : await Notifications.requestPermissionsAsync();
 
       if (status === 'granted') {
-        const tokenResult = await Notifications.getExpoPushTokenAsync();
+        const projectId = resolveProjectId();
+        const tokenResult = await Notifications.getExpoPushTokenAsync(
+          projectId ? { projectId } : undefined,
+        );
+        const deviceId = await getDeviceId();
         await registerPushToken({
-          device_id: resolveDeviceId(),
+          device_id: deviceId,
           token: tokenResult.data,
           platform: Platform.OS === 'ios' ? 'ios' : 'android',
         });

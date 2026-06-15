@@ -249,6 +249,59 @@ Registers or updates the Expo push token for this device. The `device_id` allows
 
 ---
 
+### GET `/users/me/notifications`
+**Auth:** `[AUTH]`
+
+Returns the in-app notification inbox for the authenticated user. Unread items are those with `read_at IS NULL` created within the last 30 days. Read items remain visible for 24 hours after `read_at`.
+
+**Response `200`:**
+```typescript
+{
+  notifications: InboxNotification[];
+  unread_count: number;  // unread rows in 30-day window (matches badge)
+}
+
+interface InboxNotification {
+  id: string;
+  type: 'member_paid' | 'event_fully_settled' | 'member_paid_all' | 'added_to_event' | 'nudge' | 'share_ready' | 'share_edited';
+  title: string;
+  body: string;
+  event_id: string | null;
+  read_at: string | null;
+  created_at: string;
+  is_read: boolean;      // derived: read_at !== null
+}
+```
+
+---
+
+### GET `/users/me/notifications/unread-count`
+**Auth:** `[AUTH]`
+
+Badge count for the notification bell (unread rows in the 30-day window).
+
+**Response `200`:**
+```typescript
+{ unread_count: number; }
+```
+
+---
+
+### PATCH `/users/me/notifications/:id/read`
+**Auth:** `[AUTH]`
+
+Marks a single inbox row as read (`read_at = NOW()`). Idempotent only before first read — second call returns `404 NOT_FOUND`.
+
+**Response `200`:**
+```typescript
+{ ok: true; unread_count: number; }
+```
+
+**Error codes:**
+- `NOT_FOUND` 404 — notification not found or already read
+
+---
+
 ### GET `/users/me/data`
 **Auth:** `[AUTH]` | **Rate limit:** 1 request per user per 24 hours
 
@@ -1861,6 +1914,9 @@ Android Digital Asset Links JSON. Required for App Links (Android). The backend 
 | GET | /users/me | AUTH | — |
 | PATCH | /users/me | AUTH | — |
 | POST | /users/me/push-token | AUTH | — |
+| GET | /users/me/notifications | AUTH | — |
+| GET | /users/me/notifications/unread-count | AUTH | — |
+| PATCH | /users/me/notifications/:id/read | AUTH | — |
 | GET | /users/me/balance | AUTH | — |
 | GET | /users/me/counterparties | AUTH | — |
 | GET | /users/me/data | AUTH | 1/user/24hr |

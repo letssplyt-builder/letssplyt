@@ -2,6 +2,7 @@ import { AppError, Errors, NotFoundError } from '../../infrastructure/errors';
 import { encrypt, encryptPhone, hashPhone } from '../../infrastructure/security';
 import { supabaseAdmin } from '../../infrastructure/supabase';
 import type { JoinMethod, ManualParticipantResponse } from '@letssplyt/shared/participant.types';
+import { notifyMemberAddedToEvent } from '../participants/participant-push';
 import { assertEventOwner, fetchEventRow } from './event.service';
 
 type ManualJoinMethod = Extract<JoinMethod, 'manual_phone' | 'manual_name_only'>;
@@ -195,6 +196,8 @@ export async function addManualParticipant(
     if (participantError || !participant) {
       throw new AppError('PARTICIPANT_CREATE_FAILED', 'Could not add participant', 500);
     }
+
+    notifyMemberAddedToEvent(registeredUser.id, eventRow.title, eventId);
 
     return mapManualParticipant(participant);
   }

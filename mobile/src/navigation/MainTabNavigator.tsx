@@ -1,10 +1,13 @@
+import { useEffect } from 'react';
 import { CommonActions } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StyleSheet, Text } from 'react-native';
+import { useNotificationStore } from '../store/notificationStore';
 import { TAB_BAR_CONTENT_HEIGHT, TAB_BAR_PADDING_TOP } from '../constants/layout';
 import { useAppInsets } from '../hooks/useAppInsets';
 import { HomeStackNavigator } from './HomeStackNavigator';
 import { EventsStackNavigator } from './EventsStackNavigator';
+import { ProfileStackNavigator } from './ProfileStackNavigator';
 import { authColors } from '../theme/colors';
 import type { MainTabParamList } from './types';
 
@@ -21,6 +24,11 @@ function TabIcon({ label, focused }: { label: string; focused: boolean }) {
 export function MainTabNavigator() {
   const { tabBarPaddingBottom } = useAppInsets();
   const tabBarHeight = TAB_BAR_PADDING_TOP + TAB_BAR_CONTENT_HEIGHT + tabBarPaddingBottom;
+  const loadUnreadCount = useNotificationStore((state) => state.loadUnreadCount);
+
+  useEffect(() => {
+    void loadUnreadCount();
+  }, [loadUnreadCount]);
 
   return (
     <Tab.Navigator
@@ -86,7 +94,47 @@ export function MainTabNavigator() {
         listeners={({ navigation }) => ({
           tabPress: (e) => {
             e.preventDefault();
+            const state = navigation.getState();
+            const eventsTabRoute = state.routes.find((route) => route.name === 'EventsTab');
+            const eventsStackKey = eventsTabRoute?.state?.key;
+            const eventsStackIndex = eventsTabRoute?.state?.index ?? 0;
+            if (eventsStackKey && eventsStackIndex > 0) {
+              navigation.dispatch({
+                ...CommonActions.reset({
+                  index: 0,
+                  routes: [{ name: 'Events' }],
+                }),
+                target: eventsStackKey,
+              });
+            }
             navigation.navigate('EventsTab', { screen: 'Events' });
+          },
+        })}
+      />
+      <Tab.Screen
+        name="ProfileTab"
+        component={ProfileStackNavigator}
+        options={{
+          tabBarLabel: 'Profile',
+          tabBarIcon: ({ focused }) => <TabIcon label="◎" focused={focused} />,
+        }}
+        listeners={({ navigation }) => ({
+          tabPress: (e) => {
+            e.preventDefault();
+            const state = navigation.getState();
+            const profileTabRoute = state.routes.find((route) => route.name === 'ProfileTab');
+            const profileStackKey = profileTabRoute?.state?.key;
+            const profileStackIndex = profileTabRoute?.state?.index ?? 0;
+            if (profileStackKey && profileStackIndex > 0) {
+              navigation.dispatch({
+                ...CommonActions.reset({
+                  index: 0,
+                  routes: [{ name: 'Profile' }],
+                }),
+                target: profileStackKey,
+              });
+            }
+            navigation.navigate('ProfileTab', { screen: 'Profile' });
           },
         })}
       />

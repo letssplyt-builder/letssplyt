@@ -59,6 +59,9 @@ jest.mock('expo-notifications', () => ({
   getPermissionsAsync: jest.fn().mockResolvedValue({ status: 'undetermined' }),
   getExpoPushTokenAsync: jest.fn().mockResolvedValue({ data: 'ExponentPushToken[test]' }),
   setNotificationHandler: jest.fn(),
+  getLastNotificationResponseAsync: jest.fn().mockResolvedValue(null),
+  addNotificationReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
 }));
 
 jest.mock('expo-device', () => ({
@@ -66,6 +69,16 @@ jest.mock('expo-device', () => ({
   osBuildId: 'test-build-id',
   osName: 'iOS',
 }));
+
+jest.mock('@expo/vector-icons', () => {
+  const React = require('react');
+  const { Text } = require('react-native');
+  const MockIcon = ({ name }: { name: string }) =>
+    React.createElement(Text, { accessibilityLabel: `icon-${name}` }, name);
+  return {
+    Ionicons: MockIcon,
+  };
+});
 
 jest.mock('react-native-gesture-handler', () => {
   const React = require('react');

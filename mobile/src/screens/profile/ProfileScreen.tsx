@@ -18,13 +18,14 @@ import { BottomToast } from '../../components/BottomToast';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { FadeSlideIn } from '../../components/auth/FadeSlideIn';
 import { SwipeableHandleRow } from '../../components/profile/SwipeableHandleRow';
-import type { RootStackParamList } from '../../navigation/types';
+import { navigateToHomeTab } from '../../navigation/eventNavigation';
+import type { ProfileStackParamList } from '../../navigation/types';
 import { useAuthStore } from '../../store/authStore';
 import { useProfileStore } from '../../store/profileStore';
 import { initialsFromDisplayName, providerLabel } from '../../utils/profile';
 import { authColors } from '../../theme/colors';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Profile'>;
+type Props = NativeStackScreenProps<ProfileStackParamList, 'Profile'>;
 
 export function ProfileScreen({ navigation, route }: Props) {
   const authUser = useAuthStore((state) => state.user);
@@ -119,9 +120,7 @@ export function ProfileScreen({ navigation, route }: Props) {
       <FadeSlideIn delay={0}>
         <Pressable
           accessibilityRole="button"
-          onPress={() =>
-            navigation.navigate('MainTabs', { screen: 'HomeTab', params: { screen: 'Home' } })
-          }
+          onPress={() => navigateToHomeTab(navigation)}
           style={styles.back}
         >
           <Text style={styles.backText}>← Back</Text>

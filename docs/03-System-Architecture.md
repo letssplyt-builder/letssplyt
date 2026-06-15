@@ -446,8 +446,9 @@ letssplyt/
           analytics.service.ts     ← writeEvent(), writeFunnelCheckpoint()
           analytics.test.ts
         notifications/
-          notifications.service.ts ← Twilio calls, opt-out check (checkOptOut always runs first)
-          notifications.test.ts
+          inbox-notification.service.ts ← user_notifications inbox (E10-S02)
+          notifications.controller.ts   ← GET/PATCH inbox API
+          settlement-push.ts / participant-push.ts / messages-push.ts ← trigger helpers
         jobs/
           nudge.scheduler.ts       ← enqueues QStash nudge job (T+48hr)
           nudge.controller.ts      ← consumer endpoint: POST /api/v1/jobs/nudge-check

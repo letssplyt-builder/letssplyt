@@ -11,10 +11,10 @@ import { AppJoinedScreen } from '../screens/join/AppJoinedScreen';
 import { AppJoinScreen } from '../screens/join/AppJoinScreen';
 import { AppLockedScreen } from '../screens/join/AppLockedScreen';
 import { MainTabNavigator } from './MainTabNavigator';
-import { AddHandleScreen } from '../screens/profile/AddHandleScreen';
-import { ProfileScreen } from '../screens/profile/ProfileScreen';
 import { PushPermissionScreen } from '../screens/profile/PushPermissionScreen';
 import { useAppLock } from '../hooks/useAppLock';
+import { usePushNotifications } from '../hooks/usePushNotifications';
+import { Toast } from '../components/Toast';
 import { useAuthStore } from '../store/authStore';
 import { useJoinStore } from '../store/joinStore';
 import { resolveAuthenticatedRoute } from './authFlowNavigation';
@@ -37,7 +37,11 @@ export function RootNavigator() {
 
   const wasAuthenticatedRef = useRef(false);
 
+  const showLockScreen = !isBootstrapping && hasStoredCredentials && !isUnlocked;
+  const isAuthenticated = Boolean(isUnlocked && session?.access_token);
+
   useAppLock();
+  usePushNotifications(isAuthenticated);
 
   useEffect(() => {
     const { unsubscribe } = initAuthListener();
@@ -47,9 +51,6 @@ export function RootNavigator() {
   useEffect(() => {
     void bootstrapFromStorage();
   }, [bootstrapFromStorage]);
-
-  const showLockScreen = !isBootstrapping && hasStoredCredentials && !isUnlocked;
-  const isAuthenticated = Boolean(isUnlocked && session?.access_token);
 
   useEffect(() => {
     if (!navigationRef.isReady() || isBootstrapping) return;
@@ -114,6 +115,7 @@ export function RootNavigator() {
 
   return (
     <NavigationContainer ref={navigationRef} linking={linking}>
+      <Toast />
       <RootStack.Navigator
         screenOptions={{
           headerShown: false,
@@ -136,8 +138,6 @@ export function RootNavigator() {
         />
         <RootStack.Screen name="AppJoined" component={AppJoinedScreen} />
         <RootStack.Screen name="AppLocked" component={AppLockedScreen} />
-        <RootStack.Screen name="Profile" component={ProfileScreen} />
-        <RootStack.Screen name="AddHandle" component={AddHandleScreen} />
       </RootStack.Navigator>
     </NavigationContainer>
   );

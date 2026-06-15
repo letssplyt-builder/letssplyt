@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { AppError } from '../../../infrastructure/errors';
+import { mockSupabase } from '../../mocks/supabase.mock';
 import {
   guestMarkPaidAll,
   memberConfirmAll,
@@ -25,6 +26,10 @@ jest.mock('../../../modules/settlement/settlement.service', () => ({
   payerConfirmOffset: jest.fn(),
 }));
 
+jest.mock('../../../modules/settlement/settlement-push', () => ({
+  notifyCreatorMemberPaidAll: jest.fn(),
+}));
+
 import { getGuestDetail } from '../../../modules/settlement/guest-detail.service';
 import { getMemberDetail } from '../../../modules/settlement/member-detail.service';
 import {
@@ -34,6 +39,7 @@ import {
   payerConfirmOffset,
   selfReportPayment,
 } from '../../../modules/settlement/settlement.service';
+import { notifyCreatorMemberPaidAll } from '../../../modules/settlement/settlement-push';
 
 const VIEWER_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const COUNTERPARTY_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
@@ -45,6 +51,7 @@ const PART_B = 'part-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 describe('bulk-settlement.service', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockSupabase.__resetMock();
   });
 
   it('net-settle offsets owed_to_me and confirms i_owe rows', async () => {
@@ -92,6 +99,10 @@ describe('bulk-settlement.service', () => {
       confirmed_at: '2026-01-01T00:00:00.000Z',
       event_fully_settled: false,
     });
+    mockSupabase.__setMockResultForTable('users', {
+      data: { display_name: 'Viewer' },
+      error: null,
+    });
 
     const result = await memberNetSettle(VIEWER_ID, COUNTERPARTY_ID, {
       payment_method: 'venmo',
@@ -99,8 +110,21 @@ describe('bulk-settlement.service', () => {
 
     expect(result.updated_count).toBe(2);
     expect(payerConfirmOffset).toHaveBeenCalledTimes(1);
-    expect(selfReportPayment).toHaveBeenCalledTimes(1);
+    expect(selfReportPayment).toHaveBeenCalledWith(
+      VIEWER_ID,
+      EVENT_A,
+      PART_A,
+      { payment_method: 'venmo' },
+      { suppressCreatorPaymentPush: true },
+    );
     expect(result.results.every((row) => row.payment_status === 'confirmed')).toBe(true);
+    expect(notifyCreatorMemberPaidAll).toHaveBeenCalledWith(
+      COUNTERPARTY_ID,
+      'Viewer',
+      50,
+      'USD',
+      'en-US',
+    );
   });
 
   it('self-report-all delegates to net settle', async () => {

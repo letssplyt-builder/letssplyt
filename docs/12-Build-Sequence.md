@@ -2723,48 +2723,80 @@ backend/src/__tests__/unit/jobs/partition.job.test.ts
 
 ---
 
-### E10-S02 — Push Notifications
+### E10-S02 — Push Notifications + In-App Notification Center
 
-**Description:** Full push notification pipeline — token registration, sending from backend, and handling on mobile in all three app states (foreground, background, killed/cold start).
+**Description:** Expo push pipeline (token registration, foreground toast, tap → EventDetail), in-app notification inbox with bell badge on Dashboard and Events, and revised push/inbox policy aligned with auto-settling member self-reports.
 
-**Prompt:**
-*"Implement Expo push notifications end-to-end. (1) Backend push service in backend/src/infrastructure/push.service.ts: sendPush(userId: string, title: string, body: string, data: Record<string,string>): Promise<void>. Looks up expo_push_token from device_sessions WHERE user_id=userId ORDER BY last_active_at DESC LIMIT 1. If no token found, silently returns (user has not granted permission). Calls Expo Push API: POST https://exp.host/--/api/v2/push/send with { to: token, title, body, data, sound: 'default' }. Handles ExpoPushTicket errors (DeviceNotRegistered → deletes stale token from device_sessions). (2) Trigger push in settlement.service.ts: when creator confirms a self-report → call sendPush(participant.user_id, 'Payment confirmed', 'Your payment for [event] has been confirmed by [creator]', { type: 'payment_confirmed', event_id }). When nudge sent via nudge.job.ts → call sendPush(participant.user_id, 'Payment reminder', 'You still owe [amount] for [event]', { type: 'nudge', event_id, amount }). (3) Mobile: on app launch after auth, call Notifications.requestPermissionsAsync(). If granted: Notifications.getExpoPushTokenAsync({ projectId: Constants.expoConfig.extra.eas.projectId }). Call PATCH /users/me with { expo_push_token: token }. (4) Mobile notification handlers: Notifications.addNotificationReceivedListener for foreground → show in-app toast using a custom Toast component (fixed position at top of screen, auto-dismiss after 4 seconds). Notifications.addNotificationResponseReceivedListener for background/killed → navigate to EventDetailScreen using notification.request.content.data.event_id. Both listeners registered in App root, cleaned up on unmount."*
+**Implementation (as built):**
 
-**Files created:**
-- `backend/src/infrastructure/push.service.ts`
-- `mobile/src/components/Toast.tsx`
-- `mobile/src/hooks/usePushNotifications.ts`
-- Updates to `mobile/src/navigation/RootNavigator.tsx` (register listeners)
-- Updates to `backend/src/modules/settlement/settlement.service.ts` (trigger push on confirm)
+| Area | Files |
+|---|---|
+| Backend push | `backend/src/infrastructure/push.service.ts`, `push-notify.ts`, `inbox-notify.ts` |
+| Inbox service | `backend/src/modules/notifications/inbox-notification.service.ts`, `notifications.controller.ts` |
+| Push triggers | `settlement-push.ts`, `participant-push.ts`, `messages-push.ts` |
+| Mobile push | `mobile/src/hooks/usePushNotifications.ts`, `Toast.tsx`, `pushToastStore.ts` |
+| Inbox UI | `NotificationBellButton.tsx`, `NotificationsScreen.tsx`, `notificationStore.ts` |
+| Navigation | `eventNavigation.ts` (`openEventDetail`, `navigateFromNotification`, `navigateToHomeTab`), `MainTabNavigator` tab stack reset |
+| Schema | `supabase/migrations/20260620000000_user_notifications.sql` |
+| Shared types | `shared/types/notification.types.ts` |
+
+**Push + inbox policy (approved):**
+
+| Recipient | Trigger | Inbox `type` |
+|---|---|---|
+| Creator | Member self-reports payment (per event) | `member_paid` |
+| Creator | Event fully settled | `event_fully_settled` |
+| Creator | Member bulk self-report all events | `member_paid_all` |
+| Member | Added to event (registered user manual add) | `added_to_event` |
+| Member | Organizer nudge | `nudge` |
+| Member | Share sent (first send) | `share_ready` |
+| Member | Share edited post-send | `share_edited` |
+
+**Removed (do not re-add):** push to member on creator payment confirm; push to creator "tap to confirm" on self-report (member self-report auto-settles to `confirmed`).
+
+**Inbox visibility rules:** Unread badge counts notifications from the last **30 days** with `read_at IS NULL`. List shows unread + read items from the last 30 days where read within **24 hours** (`read_at` null OR `read_at` within 24h). Mark-read via `PATCH /users/me/notifications/:id/read`.
+
+**Mobile UX:** Bell on Dashboard and Events headers; Profile is a bottom tab (no Profile button on Dashboard). Badge reads from `notificationStore` (optimistic decrement on tap); initial count on `MainTabNavigator` mount. Tapping a notification with `event_id` resets the source stack and opens `EventsTab → EventDetail`.
 
 **Acceptance Criteria:**
-1. After granting push permission on device, `SELECT expo_push_token FROM device_sessions` shows a valid `ExponentPushToken[xxx]` value
-2. Creator confirms a self-report → participant's phone shows a push notification within 10 seconds
-3. Tap the push notification with app closed → app opens directly to EventDetailScreen for that event
-4. Receive push notification while app is open (foreground) → in-app toast appears at top of screen
-5. Device with no push permission → backend silently skips (no error thrown)
-6. Wire push notifications to the following triggers (add these to settlement.service.ts in this story):
-   a. Participant self-reports payment → push to event creator: '{Name} says they've paid {amount}. Tap to confirm.' (deep-links to event settlement screen)
-   b. Creator confirms participant payment → push to participant: 'Your payment for {event} has been confirmed!'
-   c. Event settles fully (all participants confirmed or opted out) → push to creator: '{event} is fully settled!'
+1. After granting push permission, `device_sessions.expo_push_token` is populated (`POST /users/me/push-token`)
+2. Foreground push → in-app toast; tap push (background/killed) → `EventDetail` for `data.event_id`
+3. `APP_ENV=development` → push logged only, not sent to Expo
+4. Inbox APIs return list + unread count; mark-read decrements badge in real time
+5. Logout from Profile works after notification → event navigation (no invalid `MainTabs` navigate)
+6. Dashboard tab / Events tab reset deep stacks; pull-to-refresh clears stale counterparty errors
 
-**Tests required:**
+**Tests required (all passing):**
 ```
 backend/src/__tests__/unit/infrastructure/push.service.test.ts
-  - looks up push token from device_sessions
-  - calls Expo Push API with correct payload
-  - silently skips when no push token found
-  - removes stale token on DeviceNotRegistered error
-  - sends correct data payload for payment_confirmed type
-  - sends correct data payload for nudge type
+backend/src/__tests__/unit/notifications/inbox-notification.service.test.ts
+backend/src/__tests__/integration/notifications/notifications.test.ts
+  - GET list with is_read + unread_count
+  - GET unread-count
+  - PATCH mark-read returns updated unread_count
+  - PATCH already-read returns 404
 
 mobile/src/__tests__/hooks/usePushNotifications.test.ts
-  - requests permission on mount
-  - calls PATCH /users/me with token when permission granted
-  - does not register token when permission denied
-  - registers foreground listener on mount
-  - unregisters listener on unmount (no memory leak)
+mobile/src/__tests__/unit/store/notificationStore.test.ts
+  - markRead optimistic + API success
+  - stale loadNotifications does not overwrite local read
+  - loadUnreadCount skipped during in-flight markRead
+  - API failure reverts optimistic update
+mobile/src/__tests__/unit/services/notifications.service.test.ts
+  - markNotificationRead uses apiPatchAuth (PATCH /notifications/:id/read)
+mobile/src/__tests__/unit/navigation/eventNavigation.test.ts
+mobile/src/__tests__/components/notifications/NotificationBellButton.test.tsx
+
+Live smoke (backend running + Supabase):
+  doppler run -- npm run smoke:notifications
+  - seed inbox rows, unread count, mark-read decrements, idempotent 404
 ```
+
+**Manual regression scenarios (from QA):**
+- Badge decrements immediately when tapping notifications (not only on screen focus refetch)
+- Navigate notification → event → Profile → logout → Welcome
+- Dashboard error after deep navigation recovers on pull-to-refresh
+- Back from Profile uses `navigateToHomeTab` (not root `MainTabs` navigate)
 
 ---
 

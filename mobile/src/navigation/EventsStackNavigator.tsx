@@ -8,6 +8,7 @@ import { SplitEntryScreen } from '../screens/splits/SplitEntryScreen';
 import { DeliveryTrackingScreen } from '../screens/messages/DeliveryTrackingScreen';
 import { MessagePreviewScreen } from '../screens/messages/MessagePreviewScreen';
 import { SplitReviewScreen } from '../screens/splits/SplitReviewScreen';
+import { NotificationsScreen } from '../screens/notifications/NotificationsScreen';
 import type { EventsStackParamList } from './types';
 
 const EventsStack = createNativeStackNavigator<EventsStackParamList>();
@@ -16,6 +17,7 @@ export function EventsStackNavigator() {
   return (
     <EventsStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <EventsStack.Screen name="Events" component={EventsScreen} />
+      <EventsStack.Screen name="Notifications" component={NotificationsScreen} />
       <EventsStack.Screen name="EventDetail" component={EventDetailScreen} />
       <EventsStack.Screen name="ReceiptScan" component={ReceiptScanScreen} />
       <EventsStack.Screen name="ReceiptPreview" component={ReceiptPreviewScreen} />

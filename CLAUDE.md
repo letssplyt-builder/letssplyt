@@ -1,7 +1,7 @@
 # LetsSplyt — Persistent Project Brief
 **Read this file at the start of EVERY session before writing any code.**
 **Then read `BUILD-PROGRESS.md` to see where we left off.**
-**Then read the next pending story from `files/12-Build-Sequence.md` and build it.**
+**Then read the next pending story from `docs/12-Build-Sequence.md` and build it.**
 
 ---
 
@@ -113,28 +113,28 @@ letssplyt/
 
 ## Document Map
 
-> **Note:** Files are stored in the `files/` subdirectory. The paths below reference logical document names.
+> **Note:** Product docs live in the `docs/` directory.
 
 | Document | Read it for |
 |---|---|
-| `files/01-PRD.md` | Why we're building this, product decisions |
-| `files/02-User-Flows.md` | Every user action and screen state |
-| `files/03-System-Architecture.md` | Service structure, TypeScript config |
-| `files/04-Data-Architecture.md` | **AUTHORITATIVE schema** — any schema question, answer is here |
-| `files/05-API-Specification.md` | Every endpoint, request/response shapes |
-| `files/06-Integration-Contracts.md` | Twilio, Gemini, Anthropic, QStash, Expo Push exact API contracts |
-| `files/07-AI-Agent-Specification.md` | A1/A2/A3 implementations, prompts, factory |
-| `files/08-Mobile-App-Specification.md` | Navigation, all screen specs, Zustand stores |
-| `files/09-Security-And-Privacy.md` | PII model, encryption implementations |
-| `files/10-Engineering-Operations.md` | CI/CD, EAS builds, local startup, monitoring |
-| `files/12-Build-Sequence.md` | **YOUR BUILD GUIDE** — 52 stories with prompts, acceptance criteria, tests |
+| `docs/01-PRD.md` | Why we're building this, product decisions |
+| `docs/02-User-Flows.md` | Every user action and screen state |
+| `docs/03-System-Architecture.md` | Service structure, TypeScript config |
+| `docs/04-Data-Architecture.md` | **AUTHORITATIVE schema** — any schema question, answer is here |
+| `docs/05-API-Specification.md` | Every endpoint, request/response shapes |
+| `docs/06-Integration-Contracts.md` | Twilio, Gemini, Anthropic, QStash, Expo Push exact API contracts |
+| `docs/07-AI-Agent-Specification.md` | A1/A2/A3 implementations, prompts, factory |
+| `docs/08-Mobile-App-Specification.md` | Navigation, all screen specs, Zustand stores |
+| `docs/09-Security-And-Privacy.md` | PII model, encryption implementations |
+| `docs/10-Engineering-Operations.md` | CI/CD, EAS builds, local startup, monitoring |
+| `docs/12-Build-Sequence.md` | **YOUR BUILD GUIDE** — stories with prompts, acceptance criteria, tests |
 | `prototype/` | HTML mockups — match visual design for every screen |
 
 ---
 
 ## Session Rules
 
-1. **Start every session:** Read this file → read `BUILD-PROGRESS.md` → find the next `[ ]` story → read it in `files/12-Build-Sequence.md`.
+1. **Start every session:** Read this file → read `BUILD-PROGRESS.md` → find the next `[ ]` story → read it in `docs/12-Build-Sequence.md`.
 
 2. **Build one story at a time.** Complete it fully before starting the next.
 

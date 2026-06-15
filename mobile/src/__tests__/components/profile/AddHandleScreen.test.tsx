@@ -5,8 +5,8 @@ import { ApiRequestError } from '../../../services/api';
 import { useProfileStore } from '../../../store/profileStore';
 
 const mockGoBack = jest.fn();
-const mockDispatch = jest.fn();
-const mockNavigation = { goBack: mockGoBack, dispatch: mockDispatch };
+const mockNavigate = jest.fn();
+const mockNavigation = { goBack: mockGoBack, navigate: mockNavigate };
 const mockRoute = { key: 'AddHandle', name: 'AddHandle' as const, params: {} };
 
 describe('AddHandleScreen', () => {
@@ -80,7 +80,7 @@ describe('AddHandleScreen', () => {
     addHandleSpy.mockRestore();
   });
 
-  it('resets stack to Profile with toast after successful save', async () => {
+  it('navigates to Profile with toast after successful save', async () => {
     jest.spyOn(useProfileStore.getState(), 'addHandle').mockResolvedValue();
 
     render(<AddHandleScreen navigation={mockNavigation as never} route={mockRoute as never} />);
@@ -88,7 +88,9 @@ describe('AddHandleScreen', () => {
     fireEvent.press(screen.getByText('Save'));
 
     await waitFor(() => {
-      expect(mockDispatch).toHaveBeenCalled();
+      expect(mockNavigate).toHaveBeenCalledWith('Profile', {
+        toastMessage: 'Payment method added successfully',
+      });
     });
   });
 
@@ -108,7 +110,7 @@ describe('AddHandleScreen', () => {
     await waitFor(() => {
       expect(screen.getByText(/You already have Venmo on your profile/)).toBeTruthy();
     });
-    expect(mockDispatch).not.toHaveBeenCalled();
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('edit mode calls updateHandle instead of addHandle', async () => {

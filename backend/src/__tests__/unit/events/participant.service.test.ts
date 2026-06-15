@@ -3,6 +3,12 @@ import { hashPhone } from '../../../infrastructure/security';
 import { mockSupabase } from '../../mocks/supabase.mock';
 import { addManualParticipant, deleteParticipant } from '../../../modules/events/participant.service';
 
+jest.mock('../../../modules/participants/participant-push', () => ({
+  notifyMemberAddedToEvent: jest.fn(),
+}));
+
+import { notifyMemberAddedToEvent } from '../../../modules/participants/participant-push';
+
 const USER_ID = 'payer-user-1';
 const OTHER_USER_ID = 'other-user-2';
 const EVENT_ID = 'event-11111111-1111-1111-1111-111111111111';
@@ -116,6 +122,7 @@ describe('participant.service', () => {
 
       expect(result.display_name).toBe('Jordan');
       expect(result.join_method).toBe('manual_phone');
+      expect(notifyMemberAddedToEvent).toHaveBeenCalledWith(REGISTERED_USER_ID, 'Dinner', EVENT_ID);
 
       const participantInsert = mockSupabase.from.mock.results
         .map((r) => (r.type === 'return' ? r.value : null))

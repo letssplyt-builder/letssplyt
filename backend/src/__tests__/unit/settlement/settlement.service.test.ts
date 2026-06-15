@@ -20,9 +20,21 @@ jest.mock('../../../modules/messages/participant-phone', () => ({
   resolveParticipantPhoneContext: jest.fn(),
 }));
 
+jest.mock('../../../modules/settlement/settlement-push', () => ({
+  notifyCreatorMemberPaid: jest.fn(),
+  notifyCreatorEventFullySettled: jest.fn(),
+  notifyCreatorMemberPaidAll: jest.fn(),
+  notifyMemberNudge: jest.fn(),
+}));
+
 import { isPhoneOptedOut } from '../../../infrastructure/notification/opt-out';
 import { sendTwilioMessage } from '../../../infrastructure/notification/twilio-messaging';
 import { resolveParticipantPhoneContext } from '../../../modules/messages/participant-phone';
+import {
+  notifyCreatorEventFullySettled,
+  notifyCreatorMemberPaid,
+  notifyMemberNudge,
+} from '../../../modules/settlement/settlement-push';
 
 const PAYER_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const PARTICIPANT_USER = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
@@ -89,6 +101,7 @@ describe('settlement.service', () => {
   });
 
   it('self-report confirms payment immediately', async () => {
+    pushEvent();
     pushParticipantRow();
     mockSupabase.__pushMockResultForTable('participants', {
       data: { id: PARTICIPANT_ID, amount_owed: 25 },
@@ -96,7 +109,7 @@ describe('settlement.service', () => {
     });
     mockSupabase.__pushMockResultForTable('settlement_log', { data: null, error: null });
     mockSupabase.__pushMockResultForTable('events', {
-      data: { payer_id: PAYER_ID },
+      data: { payer_id: PAYER_ID, title: 'Dinner' },
       error: null,
     });
     mockSupabase.__pushMockResultForTable('participants', {
@@ -110,6 +123,7 @@ describe('settlement.service', () => {
       ],
       error: null,
     });
+    pushEvent();
 
     const result = await selfReportPayment(PARTICIPANT_USER, EVENT_ID, PARTICIPANT_ID, {
       payment_method: 'venmo',
@@ -117,6 +131,15 @@ describe('settlement.service', () => {
 
     expect(result.payment_status).toBe('confirmed');
     expect(mockSupabase.from).toHaveBeenCalledWith('settlement_log');
+    expect(notifyCreatorMemberPaid).toHaveBeenCalledWith(
+      PAYER_ID,
+      'Jordan',
+      25,
+      'USD',
+      'en-US',
+      'Dinner',
+      EVENT_ID,
+    );
   });
 
   it('confirm sets event settled when last owing participant confirms', async () => {
@@ -128,7 +151,7 @@ describe('settlement.service', () => {
     });
     mockSupabase.__pushMockResultForTable('settlement_log', { data: null, error: null });
     mockSupabase.__pushMockResultForTable('events', {
-      data: { payer_id: PAYER_ID },
+      data: { payer_id: PAYER_ID, title: 'Dinner' },
       error: null,
     });
     mockSupabase.__pushMockResultForTable('participants', {
@@ -149,6 +172,7 @@ describe('settlement.service', () => {
 
     expect(result.payment_status).toBe('confirmed');
     expect(result.event_fully_settled).toBe(true);
+    expect(notifyCreatorEventFullySettled).toHaveBeenCalledWith(PAYER_ID, 'Dinner', EVENT_ID);
   });
 
   it('confirm rejects when status is already confirmed', async () => {
@@ -204,7 +228,7 @@ describe('settlement.service', () => {
     });
     mockSupabase.__pushMockResultForTable('settlement_log', { data: null, error: null });
     mockSupabase.__pushMockResultForTable('events', {
-      data: { payer_id: PAYER_ID },
+      data: { payer_id: PAYER_ID, title: 'Dinner' },
       error: null,
     });
     mockSupabase.__pushMockResultForTable('participants', {

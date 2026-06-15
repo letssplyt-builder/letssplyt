@@ -3,6 +3,7 @@ import { jest } from '@jest/globals';
 export type MockResult = {
   data: unknown;
   error: null | { code: string; message: string };
+  count?: number;
 };
 
 const defaultResult: MockResult = { data: null, error: null };
@@ -24,6 +25,7 @@ function createChainable(table: string): ChainableMock {
   const chain: ChainableMock = {
     select: jest.fn<ChainMethod>().mockReturnThis(),
     eq: jest.fn<ChainMethod>().mockReturnThis(),
+    gt: jest.fn<ChainMethod>().mockReturnThis(),
     lt: jest.fn<ChainMethod>().mockReturnThis(),
     neq: jest.fn<ChainMethod>().mockReturnThis(),
     in: jest.fn<ChainMethod>().mockReturnThis(),
@@ -64,6 +66,7 @@ const defaultChainable = createChainable('__default__');
 export interface ChainableMock {
   select: jest.Mock<ChainMethod>;
   eq: jest.Mock<ChainMethod>;
+  gt: jest.Mock<ChainMethod>;
   lt: jest.Mock<ChainMethod>;
   neq: jest.Mock<ChainMethod>;
   in: jest.Mock<ChainMethod>;

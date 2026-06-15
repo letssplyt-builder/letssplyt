@@ -1,7 +1,9 @@
 import { AppError } from '../../infrastructure/errors';
+import { supabaseAdmin } from '../../infrastructure/supabase';
 import { getGuestDetail } from './guest-detail.service';
 import { getMemberDetail } from './member-detail.service';
 import { isOutstandingPaymentStatus } from './outstanding';
+import { notifyCreatorMemberPaidAll } from './settlement-push';
 import {
   confirmPayment,
   disputePayment,
@@ -93,6 +95,20 @@ async function applyBulkAction<T extends BulkSettlementResultItem>(
   return { updated_count: results.length, results };
 }
 
+async function fetchUserDisplayName(userId: string): Promise<string> {
+  const { data, error } = await supabaseAdmin
+    .from('users')
+    .select('display_name')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error || !data?.display_name) {
+    return 'Someone';
+  }
+
+  return data.display_name as string;
+}
+
 export async function memberNetSettle(
   viewerId: string,
   counterpartyUserId: string,
@@ -156,6 +172,7 @@ export async function memberNetSettle(
         row.event_id,
         row.participant_id,
         paymentInput,
+        { suppressCreatorPaymentPush: true },
       );
       results.push({
         event_id: row.event_id,
@@ -166,6 +183,27 @@ export async function memberNetSettle(
       if (isSkippableBulkError(err)) continue;
       throw err;
     }
+  }
+
+  const paidIoweTotal = iOwe.reduce((sum, row) => {
+    const paid = results.some(
+      (entry) =>
+        entry.event_id === row.event_id &&
+        entry.participant_id === row.participant_id &&
+        entry.payment_status === 'confirmed',
+    );
+    return paid ? sum + row.amount : sum;
+  }, 0);
+
+  if (paidIoweTotal > 0) {
+    const memberName = await fetchUserDisplayName(viewerId);
+    notifyCreatorMemberPaidAll(
+      counterpartyUserId,
+      memberName,
+      paidIoweTotal,
+      detail.currency,
+      'en-US',
+    );
   }
 
   return { updated_count: results.length, results };

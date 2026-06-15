@@ -36,7 +36,67 @@ export function openEventDetail(
     return;
   }
 
-  navigation.navigate('EventDetail', { eventId });
+  const state = navigation.getState?.();
+  if (state?.routeNames?.includes('EventDetail')) {
+    navigation.navigate('EventDetail', { eventId });
+    return;
+  }
+
+  console.warn('openEventDetail: could not resolve Events stack navigator');
+}
+
+/**
+ * Leave the inbox without leaving a deep stack, then open the event on EventsTab.
+ */
+export function navigateFromNotification(
+  navigation: NavigationProp<ParamListBase>,
+  eventId: string,
+): void {
+  const state = navigation.getState?.();
+  const routeNames = state?.routeNames ?? [];
+
+  if (routeNames.includes('Events') && routeNames.includes('EventDetail')) {
+    navigation.dispatch(
+      CommonActions.reset({
+        index: 1,
+        routes: [
+          { name: 'Events' },
+          { name: 'EventDetail', params: { eventId } },
+        ],
+      }),
+    );
+    return;
+  }
+
+  if (routeNames.includes('Home')) {
+    if ((state?.index ?? 0) > 0) {
+      navigation.dispatch(
+        CommonActions.reset({
+          index: 0,
+          routes: [{ name: 'Home' }],
+        }),
+      );
+    }
+
+    const tabNavigation = getTabNavigation(navigation);
+    if (tabNavigation) {
+      tabNavigation.navigate('EventsTab', { screen: 'EventDetail', params: { eventId } });
+      return;
+    }
+  }
+
+  openEventDetail(navigation, eventId);
+}
+
+/** Switch to the Dashboard tab (Home stack root). */
+export function navigateToHomeTab(navigation: NavigationProp<ParamListBase>): void {
+  const tabNavigation = getTabNavigation(navigation);
+  if (tabNavigation) {
+    tabNavigation.navigate('HomeTab', { screen: 'Home' });
+    return;
+  }
+
+  console.warn('navigateToHomeTab: tab navigator not found');
 }
 
 /**

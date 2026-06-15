@@ -26,6 +26,7 @@ interface SettlementState {
   loadEventLedger: () => Promise<void>;
   getIOweForEvent: (eventId: string) => IOweEntry | undefined;
   clearDetail: () => void;
+  reset: () => void;
 }
 
 export const useSettlementStore = create<SettlementState>((set, get) => ({
@@ -56,10 +57,15 @@ export const useSettlementStore = create<SettlementState>((set, get) => ({
           membersOweYou: data.owe_you,
           membersYouOwe: data.you_owe,
           isLoadingCounterparties: false,
+          counterpartyError: false,
         });
       } else {
         const data = await settlementService.fetchGuestCounterparties();
-        set({ guests: data.guests, isLoadingCounterparties: false });
+        set({
+          guests: data.guests,
+          isLoadingCounterparties: false,
+          counterpartyError: false,
+        });
       }
     } catch {
       set({ counterpartyError: true, isLoadingCounterparties: false });
@@ -110,4 +116,19 @@ export const useSettlementStore = create<SettlementState>((set, get) => ({
   },
 
   clearDetail: () => set({ memberDetail: null, guestDetail: null }),
+
+  reset: () =>
+    set({
+      membersOweYou: [],
+      membersYouOwe: [],
+      guests: [],
+      memberDetail: null,
+      guestDetail: null,
+      owedToMeRows: [],
+      iOweRows: [],
+      isLoadingCounterparties: false,
+      isLoadingDetail: false,
+      isLoadingLedger: false,
+      counterpartyError: false,
+    }),
 }));

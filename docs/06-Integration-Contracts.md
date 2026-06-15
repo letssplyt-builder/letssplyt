@@ -1933,9 +1933,25 @@ export async function handleNudgeCheck(req: Request, res: Response): Promise<voi
 
 ### What LetsSplyt Uses It For
 
-Sends in-app push notifications to registered app users for: payment self-report received, payment confirmed, payment disputed, nudge suggestions (to the payer, not the participant), and event fully settled. Push notifications are only sent to users who have the LetsSplyt app installed and have granted notification permission.
+Sends Expo push notifications and writes parallel **in-app inbox** rows (`user_notifications`) for registered app users. Push supplements Twilio SMS — guests receive SMS only.
 
-**Important distinction:** Push notifications supplement Twilio messages — they do not replace them. Guests (without the app) receive Twilio SMS only. App users receive both Twilio SMS and push notifications for relevant events.
+**Active triggers (E10-S02 as built):**
+
+| Trigger | Recipient | Inbox `type` | Push `data.type` |
+|---|---|---|---|
+| Member self-reports (per event) | Creator | `member_paid` | `member_paid` |
+| Event fully settled | Creator | `event_fully_settled` | `event_fully_settled` |
+| Bulk self-report all | Creator | `member_paid_all` | `member_paid_all` |
+| Manual add registered user | Member | `added_to_event` | `added_to_event` |
+| Organizer nudge | Member | `nudge` | `nudge` |
+| Messages sent (first) | Member | `share_ready` | `share_ready` |
+| Share revised post-send | Member | `share_edited` | `share_edited` |
+
+**Not sent (removed from MVP policy):** push to member on creator payment confirm; push to creator "tap to confirm" on self-report.
+
+**In-app inbox API:** `GET /users/me/notifications`, `GET /users/me/notifications/unread-count`, `PATCH /users/me/notifications/:id/read`. Mobile bell badge reads `unread_count`; mark-read uses `apiPatchAuth`.
+
+**Important distinction:** Push notifications supplement Twilio messages — they do not replace them. Guests (without the app) receive Twilio SMS only. App users receive Twilio SMS plus push/inbox for relevant events.
 
 ### Which Environments
 
