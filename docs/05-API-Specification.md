@@ -199,25 +199,37 @@ Logout — invalidates current refresh token on server.
   id: string;
   display_name: string;
   avatar_colour: string;
+  avatar_url: string | null;
+  total_events_created: number;
+  total_events_joined: number;
   created_at: string;
+  push_notifications_enabled: boolean;
+  payment_alert_notifications_enabled: boolean;
+  share_alert_notifications_enabled: boolean;
 }
 ```
+
+`GET /users/me` falls back gracefully if notification preference columns are missing (pre-migration DBs).
 
 ---
 
 ### PATCH `/users/me`
 **Auth:** `[AUTH]`
 
-Update display name or avatar colour. Push token registration is a separate concern — use `POST /users/me/push-token` instead.
+Update display name, avatar colour, or notification preferences. Push token registration is a separate concern — use `POST /users/me/push-token` instead.
 
 **Request body (all fields optional):**
 ```typescript
 {
   display_name?: string;       // max 50 chars
   avatar_colour?: string;      // hex colour e.g. "#6366F1"
-  // NOTE: expo_push_token is NOT accepted here — use POST /users/me/push-token (device lifecycle, not user profile)
+  push_notifications_enabled?: boolean;   // master toggle (Settings screen)
+  payment_alert_notifications_enabled?: boolean;
+  share_alert_notifications_enabled?: boolean;
 }
 ```
+
+When `push_notifications_enabled` is set, the backend mirrors the value to payment/share alert flags (single-toggle UX on mobile).
 
 **Response `200`:** updated user object (same shape as GET /users/me)
 
@@ -412,9 +424,14 @@ Powers the Home dashboard **Members** and **Guests** toggles. All amounts in USD
 ---
 
 ### DELETE `/users/me`
+### POST `/users/me/delete`
 **Auth:** `[AUTH]`
 
-GDPR right to erasure. Soft-deletes user, hard-deletes payment handles, anonymises participant names to "Deleted User", removes analytics events older than 30 days.
+Both routes invoke the same handler. Mobile uses **POST** `/users/me/delete` with JSON body (reliable on React Native). **DELETE** `/users/me` accepts the same `{ confirm: true }` body.
+
+GDPR right to erasure. Tombstones the user row, hard-deletes payment handles, anonymises linked participant names, removes device sessions and in-app notifications, deletes the Supabase Auth user.
+
+**Precondition:** `GET /users/me/balance` must show `you_owe === 0`. Otherwise **409** `OUTSTANDING_BALANCE`.
 
 **Request body:**
 ```typescript
@@ -430,6 +447,13 @@ GDPR right to erasure. Soft-deletes user, hard-deletes payment handles, anonymis
   anonymised_participant_records: number;
 }
 ```
+
+**Error codes:**
+- `OUTSTANDING_BALANCE` 409 — `you_owe > 0`; body includes `{ you_owe, currency }`
+- `USER_ANONYMISE_FAILED` 500 — tombstone update failed (see server logs)
+- `VALIDATION_ERROR` 400 — `confirm` missing or not `true`
+
+**Tombstone behaviour:** `phone_hash` → `DELETED-{random hex}`; `display_name` → `Deleted User`; `deleted_at` set; `phone_encrypted` → NULL when column allows, else `'DELETED'` fallback; optional `name_encrypted` wipe when column exists.
 
 ---
 
@@ -1920,7 +1944,8 @@ Android Digital Asset Links JSON. Required for App Links (Android). The backend 
 | GET | /users/me/balance | AUTH | — |
 | GET | /users/me/counterparties | AUTH | — |
 | GET | /users/me/data | AUTH | 1/user/24hr |
-| DELETE | /users/me | AUTH | — |
+| DELETE | /users/me | AUTH | `{ confirm: true }` |
+| POST | /users/me/delete | AUTH | `{ confirm: true }` |
 | GET | /users/me/handles | AUTH | — |
 | POST | /users/me/handles | AUTH | — |
 | PATCH | /users/me/handles/:id | AUTH | — |

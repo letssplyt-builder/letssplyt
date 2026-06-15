@@ -149,4 +149,37 @@ describe('Profile API integration', () => {
     expect(response.status).toBe(403);
     expect(response.body.error.code).toBe('FORBIDDEN');
   });
+
+  it('POST /users/me/delete returns 409 when you_owe is greater than zero', async () => {
+    mockAuth();
+    mockSupabase.__pushMockResultForTable('events', { data: [], error: null });
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: [{ amount_owed: 1500, event_id: 'owe-event-1' }],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('events', {
+      data: [{ id: 'owe-event-1', payer_id: 'other-payer-id' }],
+      error: null,
+    });
+
+    const response = await request(app)
+      .post('/api/v1/users/me/delete')
+      .set(AUTH_HEADER)
+      .send({ confirm: true });
+
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe('OUTSTANDING_BALANCE');
+  });
+
+  it('POST /users/me/delete returns 400 when confirm is missing', async () => {
+    mockAuth();
+
+    const response = await request(app)
+      .post('/api/v1/users/me/delete')
+      .set(AUTH_HEADER)
+      .send({});
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+  });
 });

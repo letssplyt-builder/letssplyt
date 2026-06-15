@@ -201,12 +201,19 @@ CREATE TABLE users (
   -- Global SMS opt-out flag — set when Twilio STOP webhook fires
   is_opted_out          BOOLEAN     NOT NULL DEFAULT FALSE,
 
-  -- Soft delete — set by DELETE /users/me; row is never hard-deleted
+  -- Notification preferences (E11-S02; migration 20260621000000)
+  push_notifications_enabled              BOOLEAN NOT NULL DEFAULT TRUE,
+  payment_alert_notifications_enabled     BOOLEAN NOT NULL DEFAULT TRUE,
+  share_alert_notifications_enabled       BOOLEAN NOT NULL DEFAULT TRUE,
+
+  -- Soft delete — set by DELETE/POST /users/me; row is never hard-deleted
   deleted_at            TIMESTAMPTZ,
 
   created_at            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at            TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- phone_encrypted: NOT NULL at creation; migration 20260622000000 allows NULL for GDPR tombstone on delete.
 ```
 
 ---

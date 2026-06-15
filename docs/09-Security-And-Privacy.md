@@ -721,18 +721,20 @@ The Digital Personal Data Protection Act 2023 applies to LetsSplyt because the a
 |---|---|
 | Right to access | `GET /users/me/data` — returns all data held about the authenticated user as JSON: profile, payment handles (encrypted, shown as provider labels only), events, participants rows, settlement history |
 | Right to correction | `PATCH /users/me` — user can update display name, full name, payment handles |
-| Right to erasure | `DELETE /users/me` (P31) — see deletion procedure below |
+| Right to erasure | `POST /users/me/delete` or `DELETE /users/me` with `{ confirm: true }` — see deletion procedure below |
 | Right to grievance redress | Privacy contact email in Privacy Policy; response within 72 hours |
 
-**Account deletion procedure (P31):**
-1. Set `users.deleted_at = NOW()` (soft delete — preserves foreign key integrity)
-2. Wipe `users.phone_encrypted` = `'[DELETED]'` and `users.phone_hash` = random 64-char hex (breaks lookup without removing the row)
-3. Wipe `users.name_encrypted` = `NULL`
-4. Set `users.display_name` = `'Deleted User'`
-5. Hard-delete all rows in `user_payment_handles` for this user
-6. For participant rows referencing this user: set `display_name` = `'Deleted User'`; `user_id` remains for foreign key integrity but the profile is anonymised
-7. Hard-delete analytics events created more than 30 days ago by this user (events within 30 days are retained for fraud investigation, then dropped on the next monthly cleanup)
-8. Return HTTP 200; invalidate all active sessions by deleting refresh tokens from Supabase Auth
+**Account deletion procedure (Settings → Delete Account):**
+1. Reject if `GET /users/me/balance` shows `you_owe > 0` (**409** `OUTSTANDING_BALANCE`)
+2. Set `users.deleted_at = NOW()` (soft delete — preserves foreign key integrity)
+3. Tombstone `users.phone_encrypted` → NULL when allowed, else `'DELETED'`; `users.phone_hash` → `DELETED-{random hex}`
+4. Wipe `users.name_encrypted` → NULL when column exists
+5. Set `users.display_name` = `'Deleted User'`
+6. Hard-delete all rows in `user_payment_handles` for this user
+7. For participant rows referencing this user: set `display_name` = `'Deleted User'`; `user_id` remains for FK integrity
+8. Hard-delete `device_sessions` and `user_notifications` for this user
+9. Call `supabase.auth.admin.deleteUser` — removes auth identity so the phone can register again
+10. Return HTTP 200 `{ deleted: true, anonymised_participant_records }`
 
 **Data Fiduciary obligations:**
 
@@ -866,7 +868,7 @@ If you are located in the European Union and believe your rights have not been h
 
 | Data Type | Retention Period | Deletion Trigger | Method |
 |---|---|---|---|
-| User account (phone, name) | Until deletion request | User submits P31 (`DELETE /users/me`) | Wipe `phone_encrypted`, anonymise `display_name`, delete payment handles, set `deleted_at` |
+| User account (phone, name) | Until deletion request | Settings → Delete Account (`POST /users/me/delete`) | Tombstone `phone_encrypted`, anonymise `display_name`, delete payment handles, set `deleted_at`, delete auth user |
 | User payment handles | Until deletion or user removes handle | P31 or user removes in app | Hard delete from `user_payment_handles` |
 | Guest PII (`guest_pii` rows) | 90 days after event settles | `purge_after < NOW()` — nightly QStash job at 02:00 UTC | Hard delete from `guest_pii` table |
 | Receipt images (Supabase Storage) | 90 days after event settles | Event `fully_settled_at` + 90 days — nightly QStash job | Supabase Storage delete via service role |

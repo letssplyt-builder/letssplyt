@@ -2862,46 +2862,78 @@ backend/src/__tests__/unit/auth/auth.service.test.ts
 
 ### E11-S02 — Settings Screen + Delete Account
 
-**Description:** Settings screen with preferences and the three-screen account deletion flow. Account deletion must immediately wipe PII and anonymise all records per GDPR/DPDP requirements.
+**Description:** Settings bottom tab with preferences, in-app legal docs, and the three-screen account deletion flow. Account deletion must wipe PII and anonymise records per GDPR requirements. Deletion blocked when user has outstanding balance (`you_owe > 0`).
 
-**Prompt:**
-*"Build SettingsScreen and the delete account flow. (1) SettingsScreen (mobile/src/screens/profile/SettingsScreen.tsx): notification preferences toggle (stores preference in Zustand, calls PATCH /users/me), biometric auth toggle (calls useBiometricAuth hook to enable/disable, shows instruction if biometrics not enrolled on device), app version (from Constants.expoConfig.version), Privacy Policy link (Linking.openURL to your domain/privacy), Terms of Service link, Logout button (POST /api/v1/auth/logout → clear SecureStore → navigate to WelcomeScreen), Delete account link (destructive red text → navigate to DeleteWarnScreen). (2) DeleteWarnScreen: shows what gets deleted (your account, payment handles, personal data). Two buttons: Cancel (safe, goes back) and Continue → (destructive red, navigates to DeleteConfirmScreen). (3) DeleteConfirmScreen: instruction to type 'DELETE', TextInput, Delete button disabled until field === 'DELETE' exactly, on tap: DELETE /api/v1/users/me (authenticated) → navigates to DeletedScreen. (4) DeletedScreen: 'Account deleted.' text, 'Thank you for using LetsSplyt.' subtitle, navigate to WelcomeScreen after 3 seconds using setTimeout. (5) Backend DELETE /api/v1/users/me: uses supabaseAdmin to: (a) DELETE FROM user_payment_handles WHERE user_id=req.user.id, (b) UPDATE users SET phone_encrypted=NULL, phone_hash='DELETED-'+gen_random_uuid()::text, display_name='Deleted User', deleted_at=NOW() WHERE id=req.user.id, (c) DELETE FROM device_sessions WHERE user_id=req.user.id, (d) Call supabase.auth.admin.deleteUser(req.user.id). Return { deleted: true }."*
+**Implementation (as built — supersedes original prompt):**
 
-**Files created:**
+| Area | As built |
+|---|---|
+| **Navigation** | Bottom tab **Settings** (replaces Profile tab). `SettingsStackNavigator`: Settings → Profile → AddHandle → LegalDocument → DeleteWarn → DeleteConfirm → Deleted. `LegalDocument` also on root auth stack for PhoneEntry links. |
+| **SettingsScreen** | Sections: Account (→ Profile), Legal (in-app docs), Notifications (single push toggle), Security (biometric via `authStore`, not `useBiometricAuth` hook), version, Logout, Delete account. Logout **not** on ProfileScreen. |
+| **Legal docs** | `LegalDocumentScreen` + `LegalDocumentBody`; markdown synced via `mobile/scripts/sync-legal-docs.mjs` → `mobile/src/content/legal/`. Not `Linking.openURL`. |
+| **Phone entry** | Tappable **Terms** & **Privacy** links → root `LegalDocumentScreen` (TCPA/clickwrap access before OTP). |
+| **Delete gate** | `DeleteWarnScreen` + `DeleteConfirmScreen` call `GET /users/me/balance`; block when `you_owe > 0`. |
+| **Delete API** | Mobile: `POST /api/v1/users/me/delete` `{ confirm: true }`. Backend also accepts `DELETE /users/me` with same body. |
+| **Delete service** | `backend/src/modules/profile/delete-account.service.ts` — balance check, delete handles, anonymise participants, tombstone user (NULL/`DELETED` fallbacks, optional `name_encrypted`), delete sessions/notifications, `auth.admin.deleteUser`. |
+| **Migrations** | `#24` `user_notification_preferences` on `users`; `#25` `phone_encrypted` nullable for tombstone. |
+
+**Files created/updated:**
 - `mobile/src/screens/profile/SettingsScreen.tsx`
 - `mobile/src/screens/profile/DeleteWarnScreen.tsx`
 - `mobile/src/screens/profile/DeleteConfirmScreen.tsx`
 - `mobile/src/screens/profile/DeletedScreen.tsx`
-- `backend/src/modules/auth/auth.service.ts` (updated with delete endpoint)
+- `mobile/src/screens/profile/LegalDocumentScreen.tsx`
+- `mobile/src/navigation/SettingsStackNavigator.tsx`
+- `mobile/src/components/settings/SettingRows.tsx`
+- `mobile/src/components/legal/LegalDocumentBody.tsx`
+- `mobile/src/content/legal/*` + `mobile/scripts/sync-legal-docs.mjs`
+- `backend/src/modules/profile/delete-account.service.ts`
+- `backend/src/modules/profile/notification-preferences.service.ts`
+- `supabase/migrations/20260621000000_user_notification_preferences.sql`
+- `supabase/migrations/20260622000000_users_phone_encrypted_nullable_on_delete.sql`
 
 **Acceptance Criteria:**
-1. Settings screen shows app version number
-2. Delete account → DeleteWarnScreen → type "DELETE" exactly → button enables → tap → account deleted
-3. After deletion: `SELECT * FROM users WHERE id=...` shows `display_name='Deleted User'`, `phone_encrypted=NULL`, `deleted_at` is set
-4. After deletion: `SELECT * FROM user_payment_handles WHERE user_id=...` returns 0 rows
-5. Trying to log in with the deleted user's phone after deletion → new account created (deleted user is gone)
+1. Settings tab shows version, notification toggle, biometric toggle, legal links, logout, delete account
+2. Profile reachable from Settings → Account; back returns to Settings
+3. Phone entry screen has tappable Terms & Privacy opening in-app legal docs
+4. Delete blocked when `you_owe > 0` on warn and confirm screens
+5. Delete account → type `DELETE` → `POST /users/me/delete` → DeletedScreen → Welcome after 3s
+6. After deletion: `users` row has `display_name='Deleted User'`, `deleted_at` set, `phone_encrypted` NULL or `'DELETED'`, tombstone `phone_hash`
+7. After deletion: `user_payment_handles` empty; auth user removed (same phone can register again)
 
 **Tests required:**
 ```
 backend/src/__tests__/unit/auth/delete.service.test.ts
-  - deletes all payment handles
-  - wipes phone_encrypted (sets to NULL)
-  - sets phone_hash to DELETED-{uuid} (tombstone)
-  - sets display_name to 'Deleted User'
-  - sets deleted_at timestamp
-  - deletes device_sessions
+  - OUTSTANDING_BALANCE when you_owe > 0
+  - deletes payment handles, tombstones user, deletes device_sessions
+  - phone_encrypted NULL with DELETED fallback
+  - retries without name_encrypted on PGRST204
   - calls supabase admin deleteUser
 
+backend/src/__tests__/integration/profile/profile.test.ts
+  - POST /users/me/delete returns 409 when you_owe > 0
+  - POST /users/me/delete without confirm returns 400
+
 mobile/src/__tests__/components/profile/DeleteConfirmScreen.test.tsx
-  - delete button disabled initially
-  - delete button disabled when text is not exactly 'DELETE'
-  - delete button enabled when text is 'DELETE'
-  - calls delete service on tap
-  - navigates to DeletedScreen on success
+  - delete button disabled/enabled by DELETE text
+  - calls deleteAccount on tap; navigates to Deleted on success
 
 mobile/src/__tests__/components/profile/DeletedScreen.test.tsx
-  - navigates to WelcomeScreen after 3 seconds
+  - clearSession after 3 seconds
+
+mobile/src/__tests__/components/profile/DeleteWarnScreen.test.tsx
+  - blocks Continue when you_owe > 0
+  - navigates to DeleteConfirm when balance is zero
+
+mobile/src/__tests__/components/profile/SettingsScreen.test.tsx
+  - renders sections; legal rows navigate to LegalDocument
+
+mobile/src/screens/auth/PhoneEntryScreen.test.tsx
+  - Terms/Privacy links navigate to LegalDocument
 ```
+
+**Prompt (historical — superseded by implementation above):**
+*"Build SettingsScreen and the delete account flow..."* — **do not** use `useBiometricAuth` hook or `Linking.openURL` for legal docs; **do** use Settings tab, balance gate, `POST /users/me/delete`, and in-app legal screens as documented above.
 
 ---
 

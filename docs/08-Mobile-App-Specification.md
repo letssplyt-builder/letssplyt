@@ -60,8 +60,8 @@ RootNavigator (NativeStack)
 │
 ├── BiometricLockScreen    ← shown when stored credentials exist but app is locked (cold start or idle)
 │
-├── MainTabs           ← shown when session is valid and unlocked (BottomTabNavigator) — **3 tabs** (Home, Events, Profile)
-│   ├── HomeTab         (icon: home)
+├── MainTabs           ← shown when session is valid and unlocked (BottomTabNavigator) — **3 tabs** (Dashboard, Events, Settings)
+│   ├── HomeTab         (icon: home) — tab label **Dashboard**
 │   │   └── HomeStack (NativeStack)
 │   │       ├── HomeScreen               ← net balance + Members|Guests toggle + counterparty lists
 │   │       ├── NotificationsScreen      ← in-app inbox (also reachable from Events stack)
@@ -81,10 +81,18 @@ RootNavigator (NativeStack)
 │   │       ├── SplitReviewScreen        ← final per-person amounts
 │   │       └── MessageSendingScreen     ← sending progress + green checks
 │   │
-│   └── ProfileTab      (icon: person)
-│       └── ProfileStack (NativeStack)
-│           ├── ProfileScreen
-│           └── AddHandleScreen
+│   └── SettingsTab     (icon: settings)
+│       └── SettingsStack (NativeStack)
+│           ├── SettingsScreen           ← root: account, legal, notifications, security, logout, delete
+│           ├── ProfileScreen            ← name + payment handles (from Settings → Profile)
+│           ├── AddHandleScreen
+│           ├── LegalDocumentScreen      ← in-app Terms / Privacy (synced markdown)
+│           ├── DeleteWarnScreen
+│           ├── DeleteConfirmScreen
+│           └── DeletedScreen
+│
+Root auth stack also includes:
+│   └── LegalDocumentScreen   ← PhoneEntryScreen Terms/Privacy links (unauthenticated)
 │
 └── Modal screens (presented over any context):
     ├── AppJoinScreen           ← universal link opens here when app is installed
@@ -98,14 +106,6 @@ RootNavigator (NativeStack)
 ```
 
 AppJoinScreen receives `token` as a route param from the deep link. It calls `POST /api/v1/join/:token` (the combined mobile join endpoint) with body `{ user_id: supabase_uid }` to join the event, then navigates to AppJoinedScreen on success.
-
-Also in ProfileStack (accessed from ProfileScreen → "Delete account"):
-```
-ProfileStack (continued)
-├── DeleteWarnScreen
-├── DeleteConfirmScreen
-└── DeletedScreen
-```
 
 ---
 
@@ -717,6 +717,7 @@ The backend still supports `context: 'login'` for other entry points (e.g. web j
 - Title: "Enter your phone number"
 - Input: US phone field (`RegionPhoneField`, MVP US-only)
 - CTA: "Send Code"
+- Footer legal line: "By continuing you agree to our **Terms** & **Privacy**" — both words are tappable links → `LegalDocumentScreen` on the root auth stack (`document: 'terms' | 'privacy'`)
 - On submit: `POST /auth/otp/request` with `context: 'register'` → navigate to OTPVerifyScreen with `accountExists` when applicable
 - Optional route param: `initialPhone` (E.164) to pre-fill after errors elsewhere
 
@@ -1147,7 +1148,25 @@ Entry: after `POST /receipts/parse` (`ReceiptPreviewScreen`) or from Event Detai
 
 ---
 
-### ProfileStack
+### SettingsStack
+
+#### SettingsScreen (bottom tab root)
+
+Grouped sections on the auth gradient layout (scrollable above tab bar):
+
+| Section | Contents |
+|---|---|
+| **Account** | Profile row → `ProfileScreen` (name, avatar, payment handles) |
+| **Legal** | Terms & Conditions, Privacy Policy → `LegalDocumentScreen` (in-app synced markdown, not external browser) |
+| **Notifications** | Single toggle: **Push notifications** — `PATCH /users/me` with `push_notifications_enabled`; controls inbox + push delivery preference |
+| **Security** | Biometric sign-in toggle — `authStore.enrollBiometricStorage` / `skipBiometricStorage` (same as E11-S01; alert if biometrics not enrolled on device) |
+| **Footer** | App version (`Constants.expoConfig.version`), **Log out** (`authStore.logout`), **Delete account** (destructive link → `DeleteWarnScreen`) |
+
+Logout and delete live here — **not** on ProfileScreen.
+
+---
+
+### ProfileStack (within SettingsStack)
 
 #### ProfileScreen
 
@@ -1155,10 +1174,18 @@ Entry: after `POST /receipts/parse` (`ReceiptPreviewScreen`) or from Event Detai
 - Payment handles section: list of handles with provider icons, drag to reorder, swipe to delete
 - "+ Add payment method" → AddHandleScreen
 - "Edit name" inline — on save, `PATCH /users/me` syncs participant display names
-- "← Back" → `navigateToHomeTab()` (switches to Dashboard tab — **do not** `navigate('MainTabs')` from nested Profile stack)
-- Log out → `authStore.logout()` → Welcome (clears notification + settlement stores)
+- "← Back" → `SettingsScreen` (within Settings stack)
+- **No logout** on this screen (Settings handles logout)
 
 **Error state:** If handle list fails to load: "Couldn't load payment methods. Pull to retry."
+
+---
+
+#### LegalDocumentScreen
+
+- Back → previous screen (Settings or PhoneEntry)
+- Renders `LegalDocumentBody` from synced markdown sections (`npm run sync:legal-docs` in `mobile/`)
+- Params: `{ document: 'terms' | 'privacy' }`
 
 ---
 
@@ -1175,21 +1202,27 @@ Entry: after `POST /receipts/parse` (`ReceiptPreviewScreen`) or from Event Detai
 
 #### Delete Account Flow
 
+**Gate:** Deletion is blocked when `GET /users/me/balance` returns `you_owe > 0` (same ledger logic as Dashboard). User must settle all outstanding amounts first.
+
 **DeleteWarnScreen:**
-- Warning: "This will permanently delete your account, payment handles, and all your data."
-- Lists what will be deleted (account, payment handles, event history, message history)
-- "Cancel" (safe, goes back) | "Continue →" (proceeds to DeleteConfirmScreen)
+- Fetches balance on mount
+- If `you_owe > 0`: shows outstanding balance card + **Go back** only (no Continue)
+- If balance check fails: inline error, Continue disabled
+- If allowed: lists what is removed (profile, handles, notifications, participant name → "Deleted User")
+- **Cancel** (go back) | **Continue** → `DeleteConfirmScreen`
 
 **DeleteConfirmScreen:**
-- "Are you absolutely sure?"
-- Requires the user to type "DELETE" into a text field to confirm
-- "Delete my account" CTA (red, only enabled when "DELETE" typed) → DELETE `/users/me`
-- On success → DeletedScreen
+- Re-checks balance on mount (alerts and goes back if `you_owe > 0`)
+- Type **DELETE** (trimmed, case-insensitive match) to enable delete button
+- `POST /api/v1/users/me/delete` with `{ confirm: true }` (mobile uses POST for reliable JSON body on React Native)
+- On `OUTSTANDING_BALANCE` 409 → alert with amount, navigate back
+- On success → `DeletedScreen`
 
 **DeletedScreen:**
-- "Account deleted"
-- "Your data has been removed. Thank you for using LetsSplyt."
-- No navigation — app resets to AuthStack (PhoneEntryScreen) after 3 seconds
+- "Account deleted" confirmation
+- After 3 seconds: `clearSession()` + clear profile store → app returns to Welcome (unauthenticated)
+
+**Backend (`delete-account.service.ts`):** Hard-delete handles; anonymise `participants.display_name`; tombstone `users` row (`phone_hash` → `DELETED-{random}`, `display_name` → `Deleted User`, `deleted_at` set, `phone_encrypted` NULL or `'DELETED'` fallback); delete `device_sessions` + `user_notifications`; `auth.admin.deleteUser`. Returns `{ deleted: true, anonymised_participant_records }`.
 
 ---
 
