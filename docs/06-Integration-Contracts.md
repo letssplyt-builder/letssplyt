@@ -19,275 +19,79 @@ Each of the nine sections below covers one external service. Every section conta
 
 ---
 
-## Integration 1 — Twilio Verify (OTP Delivery)
+## Integration 1 — Custom OTP + SMS Provider Factory
 
 ### What LetsSplyt Uses It For
 
-Sends one-time passcodes (OTP) to phone numbers during registration and login, and verifies the codes entered by users.
+Generates, stores (hashed), and verifies 6-digit OTP codes for app login/register and web join. OTP delivery uses the configured SMS provider — not Twilio Verify.
 
-### Which Environments
+Implementation: `backend/src/infrastructure/otp/otp.service.ts` (`sendOTP`, `verifyOTP`, `purgeExpiredOTPs`).
 
-| Environment | Account Type | SMS Behaviour |
-|-------------|-------------|---------------|
-| Development | Twilio TEST credentials (`ACtest...`) | No real SMS sent; any 6-digit code verifies successfully against the magic test number |
-| Staging | Twilio LIVE credentials | Real SMS sent to real phones; costs real money; use your own test phone numbers |
-| Production | Twilio LIVE credentials, A2P 10DLC registered | Real SMS sent to real users; carrier-filtered without 10DLC registration |
+SMS transport: `createSMSProvider()` in `backend/src/infrastructure/sms/factory.ts`:
 
-### Authentication
+| `SMS_PROVIDER` | Adapter | Use |
+|---|---|---|
+| `twilio` (default) | `TwilioSMSProvider` | Twilio Programmable Messaging |
+| `telnyx` | `TelnyxSMSProvider` | Telnyx Messages API (SMS only) |
 
-Credentials come from Doppler. The Node.js backend reads them from environment:
+All outbound messages use `sendOutboundMessage()` in `outbound-messaging.service.ts`.
 
-```bash
-TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-TWILIO_AUTH_TOKEN=your_auth_token_here
-TWILIO_VERIFY_SERVICE_SID=VAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-```
-
-- In **development**, OTP uses **dev bypass by default** (`otpMode: dev-bypass` in backend startup logs). Twilio **test credentials cannot call the Verify API** (error `20008`). The backend skips Twilio: `POST /auth/otp/request` returns `{ sent: true }` and `POST /auth/otp/verify` accepts any 6-digit code. Use your real phone number on a physical device — no SMS is sent. Set `OTP_DEV_BYPASS=false` and `TWILIO_USE_LIVE_VERIFY=true` only if you intentionally test with **live** Twilio credentials and a real Verify Service SID.
-- In **staging/production**, use real LIVE credentials and your real `TWILIO_VERIFY_SERVICE_SID` from the Twilio console.
-- Never commit these values. Never hardcode them. They live only in Doppler.
-
-### SDK / Library
+### Environment variables (Doppler)
 
 ```bash
-npm install twilio@^5.0.0
+PII_HMAC_SALT=...
+SMS_PROVIDER=twilio|telnyx
+OTP_DEV_BYPASS=true|false
+MESSAGING_DEV_BYPASS=true|false
+# Twilio: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER, TWILIO_WHATSAPP_NUMBER
+# Telnyx: TELNYX_API_KEY, TELNYX_FROM_NUMBER
 ```
 
-### Key API Calls
+`TWILIO_VERIFY_SERVICE_SID` is removed.
 
-#### Call 1: Create Verification (Send OTP)
+### Database — otp_verifications
 
-Sends an OTP via SMS (or WhatsApp if the channel is available) to the specified phone number.
+Migration `20260623000000_otp_verifications.sql`. Codes stored as HMAC-SHA256 hashes only.
 
-**When called:** `POST /auth/otp/request` and `POST /join/:token/otp/request`
+QStash: `POST /api/v1/jobs/purge-expired-otps` schedule `*/15 * * * *` → `{ ok: true, deleted: N }`.
 
-**Request:**
-```typescript
-client.verify.v2
-  .services(TWILIO_VERIFY_SERVICE_SID)
-  .verifications
-  .create({
-    to: '+15550001234',          // E.164 format, validated with libphonenumber before this call
-    channel: 'sms',              // 'sms' | 'whatsapp' — default 'sms' for US, 'whatsapp' for international if enabled
-  });
-```
+### OTP errors
 
-**Response shape (Twilio SDK object, key fields):**
-```typescript
-{
-  sid: 'VExxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-  accountSid: 'ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-  serviceSid: 'VAxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-  to: '+15550001234',
-  channel: 'sms',
-  status: 'pending',             // always 'pending' on success
-  valid: false,                  // false until verified
-  dateCreated: Date,
-  dateUpdated: Date,
-  url: 'https://verify.twilio.com/v2/Services/.../Verifications/VE...',
-}
-```
+`INVALID_CODE` 400, `CODE_EXPIRED` 400, `OTP_MAX_ATTEMPTS` 429.
 
-**What LetsSplyt returns to the client:**
-```typescript
-{
-  sent: true,
-  channel: 'sms',               // or 'whatsapp'
-  expires_in_seconds: 600,      // OTP valid for 10 minutes (Twilio default)
-}
-```
+### Telnyx webhooks
 
-#### Call 2: Create Verification Check (Verify Code)
-
-Checks whether the code entered by the user matches the pending OTP.
-
-**When called:** `POST /auth/otp/verify` and `POST /join/:token/otp/verify`
-
-**Request:**
-```typescript
-client.verify.v2
-  .services(TWILIO_VERIFY_SERVICE_SID)
-  .verificationChecks
-  .create({
-    to: '+15550001234',          // same phone as the verification request
-    code: '123456',              // 6-digit code entered by user
-  });
-```
-
-**Response shape:**
-```typescript
-{
-  sid: 'VExxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx',
-  to: '+15550001234',
-  channel: 'sms',
-  status: 'approved',           // 'approved' = correct; 'pending' = wrong code
-  valid: true,                  // true only when status = 'approved'
-  dateCreated: Date,
-  dateUpdated: Date,
-}
-```
-
-- If `status === 'approved'` and `valid === true`: OTP is correct, proceed with auth flow.
-- If `status === 'pending'` and `valid === false`: OTP is wrong. Increment attempt counter.
-
-### Environment Behaviour
-
-**Development — OTP dev bypass (default):**
-
-When `APP_ENV=development` (or unset locally), the backend **defaults to OTP dev bypass** unless `OTP_DEV_BYPASS=false` or `TWILIO_USE_LIVE_VERIFY=true`. No Twilio call is made; any 6-digit code verifies. Use any valid E.164 phone (including your real number on a physical device). No SMS is sent; no Twilio credits are consumed.
-
-Twilio magic test numbers (`+15005550006`, etc.) apply only to **SMS/Messages** endpoints with test credentials — **not** to Verify. Do not expect Verify + test credentials to work.
-
-**Live Verify in local dev (optional):**
-
-Set `TWILIO_USE_LIVE_VERIFY=true`, `OTP_DEV_BYPASS=false`, and use **live** `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, and `TWILIO_VERIFY_SERVICE_SID` from Doppler. Real SMS will be sent and billed.
-
-**Staging/Production:**
-
-Real SMS is sent. The Verify service SID must be configured in the Twilio console with:
-- Service name: `letssplyt-verify`
-- Code length: 6
-- Code expiry: 10 minutes (600 seconds)
-- Max attempts: 5 (Twilio enforces this; your app also enforces rate limits independently)
-
-### Rate Limiting
-
-LetsSplyt enforces its own rate limiting in Redis **before** calling Twilio. Twilio also enforces limits independently:
-
-- Twilio hard limit: 5 OTP requests per phone number per hour
-- Twilio hard limit: max 5 verification check attempts per code (after which the code is invalidated)
-- LetsSplyt Redis limit (enforced first): `5 requests per phone per hour`, `3 check attempts per phone per 10 minutes`
-
-The Redis check must happen before the Twilio API call. If Redis says rate-limited, return `429` immediately without touching Twilio.
-
-### Error Handling
-
-| Twilio Error Code | Meaning | App Behaviour |
-|-------------------|---------|---------------|
-| `60200` | Invalid parameter (malformed phone, wrong channel) | Return `400 INVALID_PHONE` to client |
-| `60202` | Max check attempts reached for this code | Return `429 OTP_MAX_ATTEMPTS` to client; code is now dead |
-| `60203` | OTP expired (>10 minutes old) | Return `400 CODE_EXPIRED` to client |
-| `60212` | Channel unavailable (e.g. WhatsApp not enabled for this number) | Fallback: retry with `channel: 'sms'` |
-| `20429` | Too many requests (Twilio-side rate limit hit) | Return `429 OTP_RATE_LIMITED`; log server-side |
-| Network errors | Timeout or connection failure | Retry once after 1 second; if still failing, return `503` |
-
-Never expose the raw Twilio error message to the client. Map to your own error codes.
-
-### TypeScript Code Example
-
-```typescript
-// backend/src/modules/auth/auth.service.ts
-
-import twilio from 'twilio';
-import type { Request } from 'express';
-
-const client = twilio(
-  process.env.TWILIO_ACCOUNT_SID!,
-  process.env.TWILIO_AUTH_TOKEN!,
-);
-
-const VERIFY_SERVICE_SID = process.env.TWILIO_VERIFY_SERVICE_SID!;
-
-export async function sendOtp(phoneE164: string, channel: 'sms' | 'whatsapp' = 'sms'): Promise<{
-  sent: boolean;
-  channel: 'sms' | 'whatsapp';
-  expiresInSeconds: number;
-}> {
-  // Opt-out check MUST happen before this call — see notifications.service.ts checkOptOut()
-  // Redis rate limit check MUST happen before this call — see auth.middleware.ts
-
-  try {
-    const verification = await client.verify.v2
-      .services(VERIFY_SERVICE_SID)
-      .verifications
-      .create({ to: phoneE164, channel });
-
-    return {
-      sent: true,
-      channel: verification.channel as 'sms' | 'whatsapp',
-      expiresInSeconds: 600,
-    };
-  } catch (err: unknown) {
-    const twilioErr = err as { code?: number; message?: string };
-    if (twilioErr.code === 60212) {
-      // Channel unavailable — retry with SMS
-      const fallback = await client.verify.v2
-        .services(VERIFY_SERVICE_SID)
-        .verifications
-        .create({ to: phoneE164, channel: 'sms' });
-      return { sent: true, channel: 'sms', expiresInSeconds: 600 };
-    }
-    throw err; // re-throw; caller maps to AppError
-  }
-}
-
-export async function verifyOtp(phoneE164: string, code: string): Promise<boolean> {
-  try {
-    const check = await client.verify.v2
-      .services(VERIFY_SERVICE_SID)
-      .verificationChecks
-      .create({ to: phoneE164, code });
-
-    return check.status === 'approved' && check.valid === true;
-  } catch (err: unknown) {
-    const twilioErr = err as { code?: number };
-    if (twilioErr.code === 60202) {
-      throw new AppError('OTP_MAX_ATTEMPTS', 'Too many attempts. Request a new code.');
-    }
-    if (twilioErr.code === 60203) {
-      throw new AppError('CODE_EXPIRED', 'Code has expired. Request a new one.');
-    }
-    throw err;
-  }
-}
-```
+`POST {APP_URL}/api/v1/webhooks/telnyx/messaging` — see `docs/Telnyx Implementation/Telnyx-Setup-Guide.md` §9.
 
 ---
 
-## Twilio Verify Service — One Service, Two Use Cases
-
-A single Twilio Verify Service (TWILIO_VERIFY_SERVICE_SID) handles both:
-1. User registration/login OTP (POST /auth/otp/request)
-2. Guest web join OTP (POST /join/:token — name + phone form submission)
-
-This is intentional. Both use cases have the same verification pattern (phone → 6-digit code → verified).
-The same rate limits apply to both (5 requests per phone per hour configured in Twilio console).
-
-If you need different rate limits or sender names per use case in the future,
-create a second service and add TWILIO_GUEST_VERIFY_SERVICE_SID to Doppler.
-For MVP, one service is sufficient.
-
----
-
-## Integration 2 — Twilio Programmable Messaging (Split Message Delivery)
+## Integration 2 — Outbound Messaging (Twilio + Telnyx)
 
 ### What LetsSplyt Uses It For
 
-Sends the payment request message to every event participant after the payer confirms the split. Also sends nudge reminders. This is the primary outbound communication channel — not just OTP. Every split message goes through Twilio.
+Sends payment-request SMS after split confirm, OTP codes (Integration 1), nudge reminders, and STOP/START confirmation replies. Transport is **`SMS_PROVIDER`** via `createSMSProvider()` — not hardcoded Twilio.
 
-### Message Flow (Important Distinction)
-
-Twilio Verify (Integration 1) handles OTP only. Twilio Programmable Messaging handles all split messages:
+### Message Flow
 
 ```
 1. Split confirmed by payer
 2. A3 composes personalised message text for each participant
-3. A3 generates payment link URLs from the participant's country and the payer's handles
-4. Backend assembles: AI greeting + amount + payment links = full message text
-5. Backend calls Twilio Messages API for each participant individually
-6. Twilio auto-routes:
-     US numbers    → SMS (A2P 10DLC registered sender)
-     International → WhatsApp (if WhatsApp Business enabled) → SMS fallback
-7. Twilio POSTs delivery status updates to /webhooks/twilio/delivery
+3. Backend assembles message + breakdown link (GET /split/:token)
+4. sendOutboundMessage() per participant (opt-out check first)
+5. Provider delivery webhook updates notification_log + participants
 ```
+
+**Twilio path:** SMS for US/CA; WhatsApp-first for international with SMS fallback. Webhooks: `/api/v1/webhooks/twilio/delivery`, `/webhooks/twilio/opt-out`.
+
+**Telnyx path:** SMS only. Webhook: `/api/v1/webhooks/telnyx/messaging` (`message.finalized`, `message.received`).
 
 ### Which Environments
 
 | Environment | Behaviour |
 |-------------|-----------|
-| Development | Uses Twilio test credentials. Messages to test numbers are accepted but never delivered. Use `+15005550006` as sender, `+15005550001`–`+15005550004` as recipients. |
-| Staging | Uses LIVE credentials. Real messages sent to real phones. Costs real money. |
-| Production | Uses LIVE credentials. A2P 10DLC registered. Without 10DLC registration, US carriers will filter messages. |
+| Development | `SMS_PROVIDER=telnyx` + on-net numbers, or `twilio` + magic numbers. `MESSAGING_DEV_BYPASS=true` skips provider API (logs only). |
+| Staging | LIVE credentials; real messages. Telnyx toll-free verified for off-net. |
+| Production | LIVE credentials; Twilio 10DLC or Telnyx campaign registered. |
 
 ### Authentication
 

@@ -29,7 +29,7 @@ Create Event → QR displayed → participants scan (app or browser) → members
 
 **Mobile:** React Native + **Expo SDK 54** (must match the installed Expo Go app version), TypeScript strict, React Navigation v7, Zustand (state), expo-secure-store (tokens — NEVER AsyncStorage), expo-camera, expo-notifications, expo-local-authentication. **Do NOT use Expo Router.**
 
-**Backend:** Node.js + Express + TypeScript, single Node.js process (services = TypeScript modules, direct imports — NOT microservices, NOT Redis pub/sub), @supabase/supabase-js v2 (NOT Prisma), @upstash/qstash (background jobs).
+**Backend:** Node.js + Express + TypeScript, single Node.js process (services = TypeScript modules, direct imports — NOT microservices, NOT Redis pub/sub), @supabase/supabase-js v2 (NOT Prisma), @upstash/qstash (background jobs). SMS: `SMS_PROVIDER` factory (`twilio` | `telnyx`) via `createSMSProvider()`; custom OTP in `otp.service.ts` (not Twilio Verify).
 
 **Database:** Supabase (PostgreSQL + Auth + Realtime + Storage). RLS on every table. Realtime on `participants`. Storage bucket `receipts` (private).
 

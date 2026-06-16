@@ -11,6 +11,7 @@
  */
 import { Client } from '@upstash/qstash';
 import { runAnalyticsPartitionCreation } from '../src/modules/jobs/partition.job';
+import { runExpiredOtpPurge } from '../src/modules/jobs/purge-otp.job';
 import { runGuestPiiPurge } from '../src/modules/jobs/purge-pii.job';
 import { supabaseAdmin } from '../src/infrastructure/supabase';
 
@@ -133,6 +134,34 @@ async function smokeDirectPurge(): Promise<void> {
   }
 }
 
+async function smokeDirectOtpPurge(): Promise<void> {
+  const phoneHash = `smoke-otp-${Date.now()}`;
+  const past = new Date(Date.now() - 60_000).toISOString();
+
+  const { data: inserted, error: insertError } = await supabaseAdmin
+    .from('otp_verifications')
+    .insert({
+      phone_hash: phoneHash,
+      code_hash: 'deadbeef',
+      expires_at: past,
+    })
+    .select('id')
+    .single();
+
+  if (insertError || !inserted?.id) {
+    fail('seed expired otp', insertError?.message ?? 'no id');
+    return;
+  }
+  pass('seed expired otp', inserted.id as string);
+
+  const { deleted } = await runExpiredOtpPurge();
+  if (deleted < 1) {
+    fail('direct otp purge count', `expected >= 1, got ${deleted}`);
+    return;
+  }
+  pass('direct otp purge', `deleted=${deleted}`);
+}
+
 async function smokeHttpEndpoints(): Promise<void> {
   const hasSigningKeys =
     Boolean(process.env.QSTASH_CURRENT_SIGNING_KEY) &&
@@ -170,6 +199,21 @@ async function smokeHttpEndpoints(): Promise<void> {
     pass('HTTP purge', `purged=${purgeRes.body.purged}`);
   } else {
     fail('HTTP purge', `status ${purgeRes.status}`);
+  }
+
+  const otpPurgeRes = await requestJob('/api/v1/jobs/purge-expired-otps', {});
+  if (!hasSigningKeys && process.env.APP_ENV === 'development') {
+    if (otpPurgeRes.status === 200) {
+      pass('HTTP purge-expired-otps (dev, no keys)', `deleted=${otpPurgeRes.body.deleted}`);
+    } else {
+      fail('HTTP purge-expired-otps (dev, no keys)', `status ${otpPurgeRes.status}`);
+    }
+  } else if (otpPurgeRes.status === 401) {
+    pass('HTTP purge-expired-otps unsigned blocked', '401 as expected');
+  } else if (otpPurgeRes.status === 200) {
+    pass('HTTP purge-expired-otps', `deleted=${otpPurgeRes.body.deleted}`);
+  } else {
+    fail('HTTP purge-expired-otps', `status ${otpPurgeRes.status}`);
   }
 }
 
@@ -219,6 +263,7 @@ async function main(): Promise<void> {
   console.log('1) Direct job handlers (Supabase — no HTTP, no QStash schedule)');
   await smokeDirectPartition();
   await smokeDirectPurge();
+  await smokeDirectOtpPurge();
   console.log('');
 
   console.log('2) HTTP endpoints (backend must be running)');

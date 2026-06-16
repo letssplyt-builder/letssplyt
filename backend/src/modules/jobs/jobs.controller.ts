@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
 import { runAnalyticsPartitionCreation } from './partition.job';
 import { parseQStashJsonBody } from './qstash.receiver';
+import { runExpiredOtpPurge } from './purge-otp.job';
 import { runGuestPiiPurge } from './purge-pii.job';
 
 const purgeBodySchema = z.object({
@@ -62,6 +63,19 @@ export async function handleCreateAnalyticsPartition(
       startDate: result.startDate,
       endDate: result.endDate,
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handlePurgeExpiredOtps(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const result = await runExpiredOtpPurge();
+    res.json(result);
   } catch (err) {
     next(err);
   }

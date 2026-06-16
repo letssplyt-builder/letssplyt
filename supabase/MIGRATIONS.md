@@ -62,6 +62,11 @@ If CLI reports *"Found local migration files to be inserted before the last migr
 | 23 | `20260620000000_user_notifications.sql` | E10 | In-app notification center inbox | `CREATE TABLE user_notifications` |
 | 24 | `20260621000000_user_notification_preferences.sql` | E11-S02 | User notification preference toggles on `users` | `ADD COLUMN IF NOT EXISTS` |
 | 25 | `20260622000000_users_phone_encrypted_nullable_on_delete.sql` | E11-S02 | `users.phone_encrypted` nullable for GDPR tombstone on delete | `ALTER COLUMN DROP NOT NULL` |
+| 26 | `20260623000000_otp_verifications.sql` | E11-S04 | Custom OTP table | `CREATE TABLE otp_verifications` |
+| 27 | `20260624000000_sms_opt_outs_phone_encrypted.sql` | E11-S06 | `sms_opt_outs.phone_encrypted` for STOP upsert | `ADD COLUMN IF NOT EXISTS` |
+| 28 | `20260624000001_participants_opted_out.sql` | E11-S06 | `participants.opted_out` boolean | `ADD COLUMN IF NOT EXISTS` |
+| 29 | `20260624000002_participants_payment_status_opted_out.sql` | E11-S06 | `payment_status` CHECK includes `opted_out` | `DROP CONSTRAINT IF EXISTS` |
+| 30 | `20260625000000_repair_create_analytics_partition.sql` | E10/E12 repair | `create_analytics_partition` RPC if missing from remote | `CREATE OR REPLACE FUNCTION` |
 
 ---
 

@@ -26,7 +26,12 @@ jest.mock('../../../modules/jobs/partition.job', () => ({
   ),
 }));
 
+jest.mock('../../../modules/jobs/purge-otp.job', () => ({
+  runExpiredOtpPurge: jest.fn(() => Promise.resolve({ ok: true, deleted: 2 })),
+}));
+
 import { runGuestPiiPurge } from '../../../modules/jobs/purge-pii.job';
+import { runExpiredOtpPurge } from '../../../modules/jobs/purge-otp.job';
 import { runAnalyticsPartitionCreation } from '../../../modules/jobs/partition.job';
 
 function createApp(): express.Express {
@@ -89,5 +94,20 @@ describe('jobs routes', () => {
     expect(res.body.partition).toBe('analytics_events_2026_07');
     expect(res.body.created).toBe(true);
     expect(runAnalyticsPartitionCreation).toHaveBeenCalledWith({ year: 2026, month: 8 });
+  });
+
+  it('runs purge-expired-otps with valid signature', async () => {
+    const app = createApp();
+    const body = JSON.stringify({});
+
+    const res = await request(app)
+      .post('/api/v1/jobs/purge-expired-otps')
+      .set('upstash-signature', 'valid-sig')
+      .set('Content-Type', 'application/json')
+      .send(body);
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ ok: true, deleted: 2 });
+    expect(runExpiredOtpPurge).toHaveBeenCalledTimes(1);
   });
 });

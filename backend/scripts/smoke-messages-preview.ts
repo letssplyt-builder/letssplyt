@@ -107,7 +107,16 @@ async function ensurePayerHandle(accessToken: string): Promise<boolean> {
 }
 
 async function main(): Promise<void> {
-  console.log(`Smoke: messages preview + send + delivery (E08-S01–S05) (${BASE_URL})\n`);
+  const smsProvider = process.env.SMS_PROVIDER ?? 'twilio';
+  const messagingBypass = process.env.MESSAGING_DEV_BYPASS ?? '(default)';
+  console.log(`Smoke: messages preview + send + delivery (E08-S01–S05) (${BASE_URL})`);
+  console.log(`SMS_PROVIDER=${smsProvider} MESSAGING_DEV_BYPASS=${messagingBypass}`);
+  if (smsProvider === 'telnyx') {
+    console.log(
+      'Telnyx dev: assign Number A to Messaging Profile Senders; use on-net Number B as guest phone; set MESSAGING_DEV_BYPASS=false for live API.',
+    );
+  }
+  console.log('');
 
   let eventId: string | null = null;
 

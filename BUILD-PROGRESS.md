@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
 **Last updated:** 2026-06-07
-**Current story:** E11-S07 — QStash OTP Cleanup, Docs, Smoke & Rollout
+**Current story:** E12-S01 — Analytics Event Ingestion + Health Check
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -112,6 +112,32 @@
 | Tier 2 — Core Flow | 5 | 24 | 20 | 4 |
 | Tier 3 — Operations | 4 | 18 | 4 | 14 |
 | **Total** | **13** | **58** | **34** | **24** |
+
+---
+
+## Telnyx rollout checklist (E11-S07)
+
+**Dev (on-net) — completed**
+- [x] `SMS_PROVIDER=telnyx` in Doppler dev
+- [x] Number A on `letssplyt-dev` Messaging Profile (Senders)
+- [x] Outbound payment SMS to Number B (`+16693084085`)
+- [x] Delivery webhook handler verified (synthetic + DB `message_delivered_at`)
+- [x] STOP/START webhook handler verified (curl + DB; real SMS optional)
+- [x] `npx supabase db push` (opt-out schema repairs)
+- [x] QStash job `POST /api/v1/jobs/purge-expired-otps` (schedule `*/15 * * * *` in Upstash dashboard)
+
+**Staging (off-net) — before TFN traffic**
+- [ ] Toll-free verified on Telnyx
+- [ ] `SMS_PROVIDER=telnyx` in Doppler staging
+- [ ] Webhook: `{APP_URL}/api/v1/webhooks/telnyx/messaging`
+- [ ] OTP + payment SMS to personal mobile
+- [ ] Real STOP/START from handset
+- [ ] Run `npm run smoke:messages-preview` with live credentials
+
+**Production**
+- [ ] 10DLC brand + campaign OR Telnyx production campaign active
+- [ ] Legal: run `mobile npm run sync:legal-docs` with Telnyx Privacy variant if switching processor
+- [ ] Rollback plan: `SMS_PROVIDER=twilio` in Doppler + redeploy
 
 ---
 
