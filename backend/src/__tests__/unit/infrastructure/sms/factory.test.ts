@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { createSMSProvider, resetSMSProvider } from '../../../../infrastructure/sms/factory';
+import { TelnyxSMSProvider } from '../../../../infrastructure/sms/providers/telnyx.provider';
 import { TwilioSMSProvider } from '../../../../infrastructure/sms/providers/twilio.provider';
 
 describe('createSMSProvider', () => {
@@ -31,9 +32,13 @@ describe('createSMSProvider', () => {
     expect(provider).toBeInstanceOf(TwilioSMSProvider);
   });
 
-  it('throws when SMS_PROVIDER=telnyx before E11-S05', () => {
+  it('returns TelnyxSMSProvider when SMS_PROVIDER=telnyx', () => {
     process.env.SMS_PROVIDER = 'telnyx';
-    expect(() => createSMSProvider()).toThrow(/E11-S05/);
+    process.env.TELNYX_API_KEY = 'KEYtest_telnyx_api_key';
+    process.env.TELNYX_FROM_NUMBER = '+14155550001';
+    const provider = createSMSProvider();
+    expect(provider).toBeInstanceOf(TelnyxSMSProvider);
+    expect(provider.name).toBe('telnyx');
   });
 
   it('throws when SMS_PROVIDER is unknown', () => {

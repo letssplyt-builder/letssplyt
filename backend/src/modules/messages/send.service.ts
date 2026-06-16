@@ -2,7 +2,7 @@ import type { AiStage } from '@letssplyt/shared/event.types';
 import { AppError } from '../../infrastructure/errors';
 import { isPhoneOptedOut } from '../../infrastructure/notification/opt-out';
 import { isMessagingDevBypassEnabled } from '../../infrastructure/notification/messaging-dev-bypass';
-import { sendTwilioMessage } from '../../infrastructure/notification/twilio-messaging';
+import { sendOutboundMessage } from '../../infrastructure/notification/outbound-messaging.service';
 import { supabaseAdmin } from '../../infrastructure/supabase';
 import {
   assertEventOwner,
@@ -130,7 +130,7 @@ export async function sendEventMessages(
     }
 
     try {
-      const twilioResult = await sendTwilioMessage(
+      const outboundResult = await sendOutboundMessage(
         phoneContext.phoneE164,
         phoneContext.channel,
         preview.message_text,
@@ -143,7 +143,7 @@ export async function sendEventMessages(
         .update({
           message_sent_at: sentAt,
           ...(devBypass ? { message_delivered_at: sentAt } : {}),
-          message_channel: twilioResult.channel,
+          message_channel: outboundResult.channel,
           message_failed: false,
         })
         .eq('id', participantId);
@@ -157,9 +157,9 @@ export async function sendEventMessages(
         event_id: eventId,
         participant_id: participantId,
         type: 'split_received_sms',
-        channel: twilioResult.channel,
+        channel: outboundResult.channel,
         status: 'sent',
-        twilio_sid: twilioResult.sid,
+        twilio_sid: outboundResult.messageId,
         sent_at: new Date().toISOString(),
       });
 
@@ -171,7 +171,7 @@ export async function sendEventMessages(
       results.push({
         participant_id: participantId,
         status: 'sent',
-        twilio_sid: twilioResult.sid,
+        twilio_sid: outboundResult.messageId,
       });
     } catch {
       failedCount += 1;
@@ -291,7 +291,7 @@ export async function resendRevisionMessages(
     }
 
     try {
-      const twilioResult = await sendTwilioMessage(
+      const outboundResult = await sendOutboundMessage(
         phoneContext.phoneE164,
         pkg.channel,
         pkg.message_text,
@@ -304,7 +304,7 @@ export async function resendRevisionMessages(
         .update({
           message_sent_at: sentAt,
           ...(devBypass ? { message_delivered_at: sentAt } : {}),
-          message_channel: twilioResult.channel,
+          message_channel: outboundResult.channel,
           message_failed: false,
         })
         .eq('id', participantId);
@@ -318,9 +318,9 @@ export async function resendRevisionMessages(
         event_id: eventId,
         participant_id: participantId,
         type: 'split_received_sms',
-        channel: twilioResult.channel,
+        channel: outboundResult.channel,
         status: 'sent',
-        twilio_sid: twilioResult.sid,
+        twilio_sid: outboundResult.messageId,
         sent_at: sentAt,
       });
 
@@ -332,7 +332,7 @@ export async function resendRevisionMessages(
       results.push({
         participant_id: participantId,
         status: 'sent',
-        twilio_sid: twilioResult.sid,
+        twilio_sid: outboundResult.messageId,
       });
     } catch {
       failedCount += 1;

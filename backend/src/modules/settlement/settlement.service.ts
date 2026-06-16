@@ -1,7 +1,7 @@
 import { formatCurrency } from '../../infrastructure/security';
 import { AppError } from '../../infrastructure/errors';
 import { isPhoneOptedOut } from '../../infrastructure/notification/opt-out';
-import { sendTwilioMessage } from '../../infrastructure/notification/twilio-messaging';
+import { sendOutboundMessage } from '../../infrastructure/notification/outbound-messaging.service';
 import { supabaseAdmin } from '../../infrastructure/supabase';
 import { assertEventOwner, fetchEventRow } from '../events/event.service';
 import { buildNudgeMessage } from '../messages/nudge.builder';
@@ -680,7 +680,7 @@ export async function nudgeParticipant(
     eventTitle: eventRow.title,
   });
 
-  const twilioResult = await sendTwilioMessage(
+  const outboundResult = await sendOutboundMessage(
     phoneContext.phoneE164,
     phoneContext.channel,
     messageText,
@@ -707,9 +707,9 @@ export async function nudgeParticipant(
     event_id: eventId,
     participant_id: participantId,
     type: 'nudge_sms',
-    channel: twilioResult.channel,
+    channel: outboundResult.channel,
     status: 'sent',
-    twilio_sid: twilioResult.sid,
+    twilio_sid: outboundResult.messageId,
     sent_at: sentAt,
   });
 
@@ -725,7 +725,7 @@ export async function nudgeParticipant(
     fromStatus: participant.payment_status,
     toStatus: participant.payment_status,
     amount: participant.amount_owed,
-    metadata: { twilio_sid: twilioResult.sid, channel: twilioResult.channel },
+    metadata: { twilio_sid: outboundResult.messageId, channel: outboundResult.channel },
   });
 
   if (participant.user_id) {
@@ -741,8 +741,8 @@ export async function nudgeParticipant(
 
   return {
     sent: true,
-    channel: twilioResult.channel,
-    twilio_sid: twilioResult.sid,
+    channel: outboundResult.channel,
+    twilio_sid: outboundResult.messageId,
     next_nudge_available_at: nextNudgeAvailableAt,
   };
 }

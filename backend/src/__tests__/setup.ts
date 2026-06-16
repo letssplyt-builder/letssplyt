@@ -13,8 +13,9 @@ process.env.TWILIO_ACCOUNT_SID = 'ACtest';
 process.env.TWILIO_AUTH_TOKEN = 'test-auth-token';
 process.env.TWILIO_PHONE_NUMBER = '+15005550006';
 process.env.TWILIO_WHATSAPP_NUMBER = '+15005550006';
+process.env.TELNYX_API_KEY = 'KEYtest_telnyx_api_key';
+process.env.TELNYX_FROM_NUMBER = '+14155550001';
 process.env.APP_URL = 'http://localhost:3000';
-process.env.SMS_PROVIDER = 'twilio';
 process.env.SMS_PROVIDER = 'twilio';
 process.env.AI_PROVIDER_A1 = 'gemini';
 process.env.AI_MODEL_A1 = 'gemini-2.5-flash';
@@ -26,6 +27,8 @@ process.env.APP_DOMAIN = 'http://localhost:3000';
 process.env.APP_ENV = 'test';
 process.env.PORT = '3001';
 process.env.GEMINI_API_KEY = 'test-gemini-key';
+
+jest.mock('telnyx', () => require('./mocks/telnyx.mock').telnyxMockFactory());
 
 jest.mock('twilio', () => require('./mocks/twilio.mock').twilioMockFactory());
 

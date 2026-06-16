@@ -1,735 +1,773 @@
 # LetsSplyt — Telnyx Setup Guide
 
-**Environments covered:** Development · Staging · Production  
-**Who this is for:** Pawan (solo developer), setting up Telnyx from scratch  
-**Time to complete:** ~2 hours for dev + staging; ~1 week for production (10DLC approval)
+**Environments:** Development · Staging · Production  
+**Audience:** Solo developer setting up Telnyx with no prior Telnyx experience  
+**Telnyx portal:** [Mission Control](https://portal.telnyx.com/)  
+**LetsSplyt backend webhook path:** `{APP_URL}/api/v1/webhooks/telnyx/messaging`  
+**Document version:** 2.0 — 2026-06-07 (aligned to current Mission Control UI)
 
 ---
 
 ## Table of Contents
 
-1. [Overview and Key Concepts](#1-overview-and-key-concepts)
-2. [Account Setup](#2-account-setup)
-3. [Development Environment](#3-development-environment)
-4. [Staging Environment](#4-staging-environment)
-5. [A2P 10DLC Registration (required for production off-net SMS)](#5-a2p-10dlc-registration)
-6. [Production Environment](#6-production-environment)
-7. [Doppler Configuration](#7-doppler-configuration)
-8. [Webhook Setup](#8-webhook-setup)
-9. [Testing Checklist by Environment](#9-testing-checklist-by-environment)
-10. [Monitoring and Alerts](#10-monitoring-and-alerts)
-11. [Troubleshooting](#11-troubleshooting)
-12. [Cost Reference](#12-cost-reference)
+1. [How LetsSplyt uses Telnyx](#1-how-letssplyt-uses-telnyx)
+2. [Portal map (bookmark these URLs)](#2-portal-map-bookmark-these-urls)
+3. [One-time account setup (all environments)](#3-one-time-account-setup-all-environments)
+4. [Development environment](#4-development-environment)
+5. [Staging environment](#5-staging-environment)
+6. [Production: A2P 10DLC (required for US long-code)](#6-production-a2p-10dlc-required-for-us-long-code)
+7. [Production environment](#7-production-environment)
+8. [Doppler configuration](#8-doppler-configuration)
+9. [Webhooks (delivery + STOP/START)](#9-webhooks-delivery--stopstart)
+10. [Testing checklists](#10-testing-checklists)
+11. [Monitoring](#11-monitoring)
+12. [Troubleshooting](#12-troubleshooting)
+13. [Cost reference](#13-cost-reference)
 
 ---
 
-## 1. Overview and Key Concepts
+## 1. How LetsSplyt uses Telnyx
 
-### What Telnyx Does for LetsSplyt
-
-LetsSplyt uses Telnyx for two SMS operations:
-- **OTP delivery** — sending a 6-digit verification code when a user registers or logs in
-- **Payment request SMS** — sending each participant their share of the bill with payment links
-
-### Key Terms
-
-| Term | What it means |
-|---|---|
-| **Messaging Profile** | A container in Telnyx that groups phone numbers. Controls webhook URL and messaging settings. Each environment (dev, staging, prod) should have its own Messaging Profile. |
-| **A2P 10DLC** | Application-to-Person 10-Digit Long Code. FCC-mandated registration for sending SMS from US long-code numbers to real US phone numbers. Required for production off-net (to non-Telnyx numbers) messaging. |
-| **On-net messaging** | Telnyx-to-Telnyx SMS. No carrier involved. Free. No A2P 10DLC required. Used for dev testing. |
-| **Off-net messaging** | Telnyx-to-carrier SMS (to real phone numbers on AT&T, Verizon, T-Mobile, etc.). Requires A2P 10DLC registration for production. |
-| **TCR** | The Campaign Registry — the industry body that approves A2P 10DLC brands and campaigns. |
-| **Sole Proprietor** | A simplified 10DLC registration path for individual developers without an LLC. No EIN required. Limited to 1 campaign, 1 phone number, and low throughput (~75 msgs/day). Sufficient for LetsSplyt v1. |
-| **E.164** | Phone number format required by Telnyx: `+` followed by country code and number, no spaces or dashes. Example: `+14155550123`. |
-
-### Environment Strategy
-
-```
-Dev       ─── One Telnyx account (personal/dev account)
-               Two numbers: one sender, one test receiver (on-net only)
-               No A2P 10DLC needed for on-net testing
-               SMS_PROVIDER=telnyx
-
-Staging   ─── Same Telnyx account as dev (separate Messaging Profile)
-               Toll-Free number (TFN) — approved in 1-3 days vs 7+ days for 10DLC
-               Can send to real phones once TFN is verified
-               SMS_PROVIDER=telnyx
-
-Production ── Same Telnyx account (separate Messaging Profile)
-               10DLC long-code number registered via Sole Proprietor path
-               Send to any US number once 10DLC campaign is approved
-               SMS_PROVIDER=telnyx
-```
-
----
-
-## 2. Account Setup
-
-### 2.1 Create a Telnyx Account
-
-1. Go to **https://telnyx.com** and click **Get Started Free**
-2. Enter your email and create a password
-3. Verify your email address
-4. Complete the phone number verification step
-5. You are now in the Telnyx Mission Control Portal (their dashboard)
-
-**Billing:** Telnyx is prepaid. You add credits to your account and they are consumed as you send messages. Start with $25-50 for development.
-
-**Add credits:**
-- Dashboard → **Billing** → **Add Funds**
-- Minimum top-up: $20
-- Funds do not expire
-
-### 2.2 Note Your Account ID
-
-- Dashboard → **Account** (top-right avatar) → **Account Settings**
-- Copy your **Account ID** (looks like `ACC-xxxxxxxxxxxx`)
-- You won't need this in code, but it's useful for support tickets
-
----
-
-## 3. Development Environment
-
-**Goal:** Send test SMS messages from your backend to a second Telnyx number you own (on-net), without A2P 10DLC registration. No real carrier involved — free and instant.
-
-### 3.1 Create Your First API Key (Dev)
-
-1. Dashboard → **Auth** → **API Keys**
-2. Click **+ Add API Key**
-3. Name: `letssplyt-dev`
-4. Click **Create Key**
-5. **COPY THE KEY NOW** — it is only shown once
-6. Store it in Doppler as `TELNYX_API_KEY` for the `dev` environment (see Section 7)
-
-### 3.2 Purchase Two Phone Numbers
-
-You need two numbers for on-net dev testing: one that sends (your app's number), one that receives (simulates a real user's phone).
-
-1. Dashboard → **Numbers** → **Search & Buy Numbers**
-2. **First number (sender):**
-   - Country: United States
-   - Number type: Long Code
-   - Features: SMS ✓
-   - Pick any available number
-   - Click **Add to Cart** → **Purchase**
-   - Note this number as your `TELNYX_FROM_NUMBER` (e.g. `+14155550001`)
-
-3. **Second number (receiver/test target):**
-   - Repeat the above
-   - Note this number — you'll use it as the "to" number in dev tests
-   - This number simulates a test user's phone
-
-**Cost:** ~$1.00/month per number on Telnyx (vs ~$1.15 on Twilio).
-
-### 3.3 Create a Dev Messaging Profile
-
-A Messaging Profile groups numbers and defines the webhook URL.
-
-1. Dashboard → **Messaging** → **Messaging Profiles**
-2. Click **+ New Profile**
-3. Name: `letssplyt-dev`
-4. Webhook URL: `https://your-dev-tunnel-url/webhooks/telnyx/messaging`
-   - For local dev: use **ngrok** or **Cloudflare Tunnel** to expose your local backend
-   - Example: `https://abc123.ngrok-free.app/webhooks/telnyx/messaging`
-   - If you're not using webhooks in dev, you can leave this blank for now
-5. Click **Save**
-
-### 3.4 Assign Your Numbers to the Dev Messaging Profile
-
-1. Dashboard → **Numbers** → **My Numbers**
-2. Click on your sender number (`+14155550001`)
-3. In the **Messaging** tab, find **Messaging Profile**
-4. Select `letssplyt-dev` from the dropdown
-5. Click **Save**
-6. Repeat for the receiver number
-
-**Why both?** On-net delivery requires both numbers to be Telnyx numbers. The receiver number doesn't need to be in a profile for receiving, but assigning it makes management easier.
-
-### 3.5 Configure Doppler (Dev)
-
-See Section 7 for full Doppler instructions. Summary for dev:
-
-```
-SMS_PROVIDER=telnyx
-TELNYX_API_KEY=<your dev API key>
-TELNYX_FROM_NUMBER=+14155550001   ← your dev sender number
-```
-
-### 3.6 Test On-Net Messaging
-
-Start your backend locally and send a test SMS via your API:
-
-```bash
-# Using curl (replace with your local backend URL and test number)
-curl -X POST http://localhost:3000/api/auth/send-otp \
-  -H "Content-Type: application/json" \
-  -d '{"phone": "+14155550002"}'   # ← your second Telnyx number
-```
-
-The OTP should arrive at the second Telnyx number. To "check" it, query the `otp_verifications` table directly in Supabase's Table Editor to see the code (hashed), or instrument your dev backend to log the plaintext code (REMOVE this log before staging).
-
-**Alternatively:** Use the Telnyx Portal to check message logs:
-- Dashboard → **Messaging** → **Message Log**
-- You can see all sent/received messages and their status
-
----
-
-## 4. Staging Environment
-
-**Goal:** Send real SMS to actual phone numbers (your personal mobile, test users) so you can test the full OTP and payment SMS flow end-to-end.
-
-**Recommended approach for staging:** Use a **Toll-Free Number (TFN)** instead of a 10DLC long-code. Reasons:
-- TFN Verification takes 1-3 business days (vs 7+ days for 10DLC)
-- No brand/campaign registration required — just a single form
-- Throughput: 3 MPS (sufficient for staging)
-- Cost: ~$2.00/month (vs ~$1.00 for long-code, but the faster approval is worth it)
-
-### 4.1 Purchase a Toll-Free Number (Staging)
-
-1. Dashboard → **Numbers** → **Search & Buy Numbers**
-2. Country: United States
-3. Number type: **Toll-Free**
-4. Features: SMS ✓
-5. Pick any available 800/833/844/855/866/877/888 number
-6. Click **Add to Cart** → **Purchase**
-7. Note the number (e.g. `+18005550100`)
-
-### 4.2 Create a Staging Messaging Profile
-
-1. Dashboard → **Messaging** → **Messaging Profiles**
-2. Click **+ New Profile**
-3. Name: `letssplyt-staging`
-4. Webhook URL: `https://staging.letssplyt.app/webhooks/telnyx/messaging`
-   - Replace with your actual Railway staging URL
-5. Click **Save**
-
-### 4.3 Assign the Staging Number to the Staging Profile
-
-1. Dashboard → **Numbers** → **My Numbers**
-2. Click on your staging toll-free number
-3. **Messaging** tab → Messaging Profile → select `letssplyt-staging`
-4. Click **Save**
-
-### 4.4 Submit Toll-Free Verification
-
-Without verification, toll-free numbers can only send a limited number of messages. Submit for verification to unlock full throughput.
-
-1. Dashboard → **Messaging** → **Toll-Free Verification**
-2. Click **+ New Verification**
-3. Fill in the form:
-
-| Field | What to enter |
-|---|---|
-| **Phone number** | Your staging toll-free number |
-| **Business name** | `LetsSplyt` |
-| **Business address** | Your California address |
-| **Business website** | `https://letssplyt.com` (can be a landing page) |
-| **Message use case** | `Transactional` |
-| **Use case description** | "LetsSplyt is a mobile bill-splitting app. We send two types of SMS: (1) one-time passcodes to verify user phone numbers during registration and login, and (2) personalized payment request messages to users informing them of their share of a restaurant bill." |
-| **Sample message 1** | `Your LetsSplyt verification code is: 847293. Valid for 10 minutes.` |
-| **Sample message 2** | `Hi Alex! Dinner at Nobu: Your share is $42.50. Pay Pawan on Venmo: venmo.com/pawan or CashApp: cash.app/$pawan` |
-| **Opt-in method** | "Users provide their phone number and check a consent checkbox on the registration screen before submitting." |
-| **Opt-out method** | "Reply STOP to opt out. Reply START to re-enable." |
-
-4. Submit and wait 1-3 business days for approval
-5. You'll receive an email when approved
-
-### 4.5 Create a Staging API Key
-
-1. Dashboard → **Auth** → **API Keys**
-2. Click **+ Add API Key**
-3. Name: `letssplyt-staging`
-4. Copy the key immediately
-5. Store in Doppler as `TELNYX_API_KEY` for the `staging` environment
-
-### 4.6 Configure Doppler (Staging)
-
-```
-SMS_PROVIDER=telnyx
-TELNYX_API_KEY=<your staging API key>
-TELNYX_FROM_NUMBER=+18005550100   ← your staging toll-free number
-```
-
----
-
-## 5. A2P 10DLC Registration
-
-**Required for:** Production long-code SMS to US phone numbers on real carriers (AT&T, Verizon, T-Mobile, etc.)
-
-**What it is:** A2P 10DLC is an industry-wide system (mandated by US carriers since Feb 2025) that requires businesses sending application-to-person SMS to register a Brand (who you are) and a Campaign (what you're sending) with The Campaign Registry (TCR). Telnyx handles the TCR submission on your behalf through their portal.
-
-**Timeline:** Allow 5-10 business days for full approval.
-
-### 5.1 Choose the Sole Proprietor Path
-
-Since LetsSplyt is operated by you as an individual (no LLC, no EIN), use the **Sole Proprietor** registration path:
-
-| Feature | Sole Proprietor | Standard |
+| Message type | When it fires | Example |
 |---|---|---|
-| EIN required | No | Yes |
-| ID required | Last 4 digits of SSN | EIN |
-| Max campaigns | 1 | Unlimited |
-| Max phone numbers | 1 | Unlimited |
-| Throughput | ~75 messages/day | 2,400+/day |
-| TCR fee | ~$4/month | ~$10/month |
-| Registration time | ~5-7 days | ~7-10 days |
+| **OTP SMS** | User registers, logs in, or joins via web | `Your LetsSplyt verification code is: 583920. Valid for 10 minutes.` |
+| **Payment request SMS** | Creator sends split after locking group | Share amount + Venmo/CashApp links + breakdown URL |
 
-**Is 75 messages/day enough?** For LetsSplyt v1 launch, yes. 75 messages/day = ~2,250 messages/month. At your realistic usage estimate (6 participants per event, ~8 events per day = ~48 SMS/day), this is sufficient. You can upgrade to a Standard brand later if needed by forming an LLC.
+**One Telnyx account** is enough. Use **separate Messaging Profiles** (and separate phone numbers) per environment: dev, staging, production.
 
-### 5.2 Register Your Brand
+### Environment strategy
 
-1. Dashboard → **Messaging** → **10DLC** → **Brands**
-2. Click **+ Register Brand**
-3. Select **Sole Proprietor**
-4. Fill in the Brand form:
+| Environment | Phone number type | Recipient numbers | Registration needed |
+|---|---|---|---|
+| **Dev** | 2× US long-code (Telnyx numbers) | Second Telnyx number only (**on-net**) | Level 1 verification + payment |
+| **Staging** | 1× US toll-free | Your real mobile (**off-net**) | Toll-free verification (+ BRN fields if required) |
+| **Production** | 1× US long-code | Any US mobile (**off-net**) | 10DLC brand + campaign + number assignment |
 
-| Field | What to enter |
+### Key terms
+
+| Term | Meaning |
 |---|---|
-| **Brand name** | `LetsSplyt` |
-| **First name** | `Pawan` |
-| **Last name** | `Lawale` |
-| **Email** | `builder@letssplyt.com` |
-| **Phone number** | Your personal mobile (E.164 format) |
-| **Country** | United States |
-| **Street address** | Your California street address |
-| **City** | Your city |
-| **State** | CA |
-| **Postal code** | Your zip code |
-| **Last 4 of SSN** | (Your last 4 SSN digits — not stored by Telnyx after submission) |
-| **Website** | `https://letssplyt.com` |
-| **Vertical** | Technology |
-
-5. Click **Submit Brand**
-6. Brand approval takes 1-3 business days
-7. You'll receive a **TCR Brand ID** once approved (save this)
-
-**Note:** If your brand is rejected, the most common reasons are: (a) website not live, (b) privacy policy not accessible at the URL, (c) terms of service not accessible. Make sure `https://letssplyt.com/privacy` and `https://letssplyt.com/terms` are live before submitting.
-
-### 5.3 Register Your Campaign
-
-Once your Brand is approved:
-
-1. Dashboard → **Messaging** → **10DLC** → **Campaigns**
-2. Click **+ Register Campaign**
-3. Fill in the Campaign form:
-
-| Field | What to enter |
-|---|---|
-| **Brand** | Select `LetsSplyt` (from Step 5.2) |
-| **Use case** | `2FA/OTP` — if this must be one, pick this. If you can select multiple, also select `Notifications` |
-| **Campaign name** | `LetsSplyt Transactional` |
-| **Campaign description** | "LetsSplyt is a bill-splitting mobile app. We send two types of transactional SMS messages: (1) one-time passcodes (6-digit codes) to verify user phone numbers during registration and login; (2) personalized payment request messages sent to participants in a shared restaurant bill, informing each person of their specific share and providing payment links to peer-to-peer payment services (Venmo, CashApp, Zelle). All recipients have explicitly consented to receive messages by entering their phone number and checking a consent box during app registration or event join flow. Reply STOP to opt out." |
-| **Sample message 1** | `Your LetsSplyt code: 583920. Expires in 10 minutes. Reply STOP to opt out.` |
-| **Sample message 2** | `Hi Sarah! Dinner at The Slanted Door: Your share is $38.75 (3 items + tip). Pay via Venmo: venmo.com/pawan or CashApp: cash.app/$pawan. Reply STOP to opt out.` |
-| **Embedded links** | Yes (payment links) |
-| **Embedded phone numbers** | No |
-| **Age-gated content** | No |
-| **Direct lending / loan arrangement** | No |
-| **Subscriber optin** | Yes — describe: "Users enter their phone number and check a TCPA consent checkbox on the app registration and guest join screens before submitting. Consent wording: 'By continuing, you agree to receive SMS messages from LetsSplyt including verification codes and payment requests. Msg & data rates may apply. Reply STOP to opt out.'" |
-| **Subscriber optout** | Yes — describe: "Reply STOP to any message. Opt-out processed within 10 business days." |
-| **Subscriber help** | Yes — describe: "Reply HELP for assistance, or contact builder@letssplyt.com." |
-
-4. Click **Submit Campaign**
-5. Campaign approval takes 3-7 business days
-
-**Campaign fee:** ~$10 one-time TCR registration fee, plus ~$4/month recurring brand fee. These are charged directly to your Telnyx account balance.
-
-### 5.4 Assign Your Production Number to the Approved Campaign
-
-Once your campaign is approved:
-
-1. Dashboard → **Messaging** → **10DLC** → **Phone Numbers**
-2. Click **+ Add Phone Number**
-3. Select your production number (see Section 6.2)
-4. Select your approved campaign
-5. Click **Assign**
-
-It may take up to 24 hours for the assignment to propagate to all carriers.
+| **Mission Control** | Telnyx’s web dashboard at `portal.telnyx.com` |
+| **Messaging Profile** | Groups numbers, sets **webhook URL**, inbound/outbound rules. **Every sending number must be assigned to a profile.** |
+| **On-net** | SMS between two Telnyx numbers on the same account. Cheap; good for dev. **Recipient is not configured in Telnyx** — you pass the destination number in your API/app. |
+| **Off-net** | SMS to real carrier numbers (AT&T, Verizon, etc.). Needs toll-free verification or 10DLC. |
+| **10DLC / A2P** | US carrier requirement for application-to-person SMS from 10-digit local numbers |
+| **TCR** | The Campaign Registry — approves 10DLC brands/campaigns |
+| **E.164** | `+` country code + number, no spaces. Example: `+14155550123` |
 
 ---
 
-## 6. Production Environment
+## 2. Portal map (bookmark these URLs)
 
-### 6.1 Create a Production API Key
+Telnyx sometimes rearranges the left sidebar. If you cannot find a menu item, use **Search** in the portal (top) or open the direct link below.
 
-1. Dashboard → **Auth** → **API Keys**
-2. Click **+ Add API Key**
-3. Name: `letssplyt-production`
-4. **Important:** Store this key separately from dev/staging keys. It controls real SMS to real users.
-5. Copy the key immediately and store in Doppler `production` environment
+| What you need | Where to click in the UI | Direct link |
+|---|---|---|
+| **Account verification (Level 1)** | Account / Verifications | https://portal.telnyx.com/#/app/account/verifications |
+| **Add payment / balance** | Billing → Payment | https://portal.telnyx.com/#/app/billing/payment |
+| **API keys (V2)** | Top-right **account menu** → **API Keys** | https://portal.telnyx.com/#/api-keys |
+| **Search & buy numbers** | **Numbers** → **Search numbers** | https://portal.telnyx.com/#/app/numbers/search-numbers |
+| **Your numbers** | **Numbers** → **My numbers** | https://portal.telnyx.com/#/app/numbers/my-numbers |
+| **Messaging profiles** | **Realtime Communications** → **Messaging** → **Programmable Messaging** | https://portal.telnyx.com/#/app/messaging/messaging-profiles |
+| **Per-message SMS log (MDR search)** | **Debugging** → **Detail Record Search** — set **Record type** to **Messaging** | Use portal **Search** (top) and type `Detail Record Search` if the menu moved |
+| **Messaging deliverability (summary)** | **Reports** → **Reporting** → **Message Deliverability** tab | https://portal.telnyx.com/#/app/reporting/messaging-deliverability |
+| **MDR / usage exports** | **Reports** → **Reporting** → **Detail Requests** or **Usage Reports** | https://portal.telnyx.com/#/app/reporting/detail-requests |
 
-### 6.2 Purchase a Production Long-Code Number
+**Note:** Telnyx removed the old **Messaging → Message log** page. The URL `portal.telnyx.com/#/app/messaging/log` no longer works in the current Mission Control UI (2025+ redesign). Use **Detail Record Search** to see individual sent/received messages and delivery status.
+| **Toll-free verification** | **Messaging** → **Toll-Free** (or **Programmable Messaging** → Toll-Free) | https://portal.telnyx.com/#/app/programmable-messaging/toll-free-messaging |
+| **10DLC brands** | **Messaging** → **10DLC** → **Brands** | https://portal.telnyx.com/#/messaging-10dlc/brands |
+| **10DLC campaigns** | **Messaging** → **10DLC** → **Campaigns** | https://portal.telnyx.com/#/messaging-10dlc/campaigns |
 
-1. Dashboard → **Numbers** → **Search & Buy Numbers**
-2. Country: United States
-3. Number type: Long Code
-4. Features: SMS ✓ (Voice is optional)
-5. Pick a number — consider selecting one with an area code local to California (area code 415, 650, 408, 510) to give a sense of locality
-6. Add to cart and purchase
-7. Note the number (e.g. `+14085550200`)
+**Left-sidebar path for messaging profiles (video-accurate):**
 
-### 6.3 Create a Production Messaging Profile
+`Realtime Communications` → `Messaging` → `Programmable Messaging` → `Add new profile`
 
-1. Dashboard → **Messaging** → **Messaging Profiles**
-2. Click **+ New Profile**
-3. Name: `letssplyt-production`
-4. Webhook URL: `https://letssplyt.app/webhooks/telnyx/messaging`
-   - Use your production Railway URL (the `APP_URL` value in Doppler)
-5. **Inbound settings:** 
-   - Inbound Webhook URL: same as above (Telnyx sends both inbound messages and delivery receipts to this URL)
-6. Click **Save**
+---
 
-### 6.4 Assign the Production Number to the Production Profile
+## 3. One-time account setup (all environments)
 
-1. Dashboard → **Numbers** → **My Numbers**
-2. Click your production number
-3. **Messaging** tab → Messaging Profile → `letssplyt-production`
-4. Click **Save**
-5. Then assign to your 10DLC campaign (see Section 5.4)
+Complete these **once** before buying numbers or sending SMS.
 
-### 6.5 Configure Doppler (Production)
+### 3.1 Create account
 
-```
+1. Go to https://telnyx.com/sign-up
+2. Enter email, password, complete email verification
+3. Complete any signup phone verification Telnyx requests
+4. You land in **Mission Control**
+
+### 3.2 Level 1 account verification (required)
+
+Telnyx requires **Level 1 verification** before you can assign messaging profiles to phone numbers.
+
+1. Open https://portal.telnyx.com/#/app/account/verifications
+2. Complete **Level 1** (business/individual details as prompted)
+3. Wait until status shows verified (often minutes; sometimes 1–2 business days)
+
+If number assignment fails with a verification error, return here first.
+
+### 3.3 Add payment method and balance
+
+Telnyx is **prepaid**. You need a positive balance to buy numbers and send messages.
+
+1. Open https://portal.telnyx.com/#/app/billing/payment
+2. Add a **payment method**
+3. **Add funds** — start with **$25–50** for dev + staging experiments
+4. Optional: enable **Auto reload** (e.g. reload $50 when balance &lt; $10) under Billing
+
+### 3.4 Understand API keys (V2)
+
+LetsSplyt uses **API V2 keys** as `Authorization: Bearer …` in the Telnyx SDK.
+
+**Create a key (repeat per environment label in Section 8):**
+
+1. Open https://portal.telnyx.com/#/api-keys  
+   - Or: click your **name / account icon** (top-right) → **API Keys**
+2. Click **Create API Key** (top-right)
+3. **Tag / name:** e.g. `letssplyt-dev` (descriptive label)
+4. Set expiration if you want (or no expiry for server use)
+5. Click **Create**
+6. **Copy the key immediately** — Telnyx shows the full secret **only once**
+7. Store in **Doppler** as `TELNYX_API_KEY` (never commit to git)
+
+**Account owner:** Only the Telnyx account **owner** can create API keys. If you are a sub-user, ask the owner or transfer ownership.
+
+---
+
+## 4. Development environment
+
+**Goal:** Send OTP and payment SMS from your backend to a **second Telnyx number** (on-net). No 10DLC required. No real carrier SMS.
+
+**Doppler `dev` config (after setup):**
+
+```text
 SMS_PROVIDER=telnyx
-TELNYX_API_KEY=<your production API key>
-TELNYX_FROM_NUMBER=+14085550200   ← your production number
+TELNYX_API_KEY=<paste key from letssplyt-dev>
+TELNYX_FROM_NUMBER=+1XXXXXXXXXX   ← sender long-code
 ```
 
-### 6.6 Pre-Launch Checklist
+### 4.1 Create dev API key
 
-Before sending your first production SMS:
+Follow Section 3.4 with name `letssplyt-dev`. Store in Doppler **dev** as `TELNYX_API_KEY`.
 
-- [ ] 10DLC brand is approved (status: `VERIFIED` in Telnyx portal)
-- [ ] 10DLC campaign is approved (status: `ACTIVE` in Telnyx portal)
-- [ ] Production number is assigned to the approved campaign
-- [ ] Production webhook URL is live and returns `200` for a test POST
-- [ ] Doppler production secrets are set and deployed
-- [ ] `SMS_PROVIDER=telnyx` is set in Doppler production
-- [ ] Privacy Policy and Terms of Service are live at `letssplyt.com/privacy` and `letssplyt.com/terms`
-- [ ] STOP/START/HELP keywords are handled by your backend or Telnyx auto-response
-- [ ] Consent capture is live in the app (checkbox on registration screen)
-- [ ] Sent one real OTP to your personal mobile and verified it works end-to-end
-- [ ] Sent one real payment request SMS and verified the links work
+### 4.2 Buy two US long-code numbers (SMS-capable)
 
----
+You need two numbers on your Telnyx account. **Telnyx does not have a “test recipient” field anywhere** — not on the Messaging Profile, not under Senders, not under My Numbers. The **Senders** tab on a Messaging Profile only lists numbers that can **send outbound SMS from** that profile.
 
-## 7. Doppler Configuration
+| Number | Role in LetsSplyt dev | Where it is configured |
+|---|---|---|
+| **Number A** | **Sender** — outbound SMS appears to come from this number | Telnyx: assign to Messaging Profile → appears on **Senders** tab. Doppler: `TELNYX_FROM_NUMBER` |
+| **Number B** | **Simulated user phone** — the destination you type when registering or requesting OTP | **Only in your app or API call** (`phone_e164`). **Not** in Telnyx Messaging Profile UI |
 
-### 7.1 Add Variables to Each Environment
+**Number B setup in Telnyx (minimal):**
 
-In Doppler, navigate to your `letssplyt` project and set these variables per environment.
+1. Buy the second number (steps below) — it must exist on your account with SMS capability.
+2. You do **not** need to add Number B on the Messaging Profile **Senders** tab for on-net OTP tests (A → B).
+3. Optional: assign Number B to `letssplyt-dev` in **My Numbers** if you later want inbound SMS (STOP replies, webhook tests) routed through that profile.
 
-**Dev environment:**
-```
-SMS_PROVIDER              = telnyx
-TELNYX_API_KEY            = KEY_telnyx_dev_xxxxxxxxxxxx
-TELNYX_FROM_NUMBER        = +14155550001
-```
+**Number B setup in LetsSplyt (this is the “test recipient” step):**
 
-**Staging environment:**
-```
-SMS_PROVIDER              = telnyx
-TELNYX_API_KEY            = KEY_telnyx_staging_xxxxxxxxxxxx
-TELNYX_FROM_NUMBER        = +18005550100
-```
-
-**Production environment:**
-```
-SMS_PROVIDER              = telnyx
-TELNYX_API_KEY            = KEY_telnyx_prod_xxxxxxxxxxxx
-TELNYX_FROM_NUMBER        = +14085550200
-```
-
-**All environments — keep (for Twilio fallback):**
-```
-TWILIO_ACCOUNT_SID        = ACyour_account_sid
-TWILIO_AUTH_TOKEN         = your-twilio-auth-token
-TWILIO_FROM_NUMBER        = +15005550006
-```
-
-**All environments — remove:**
-```
-TWILIO_VERIFY_SERVICE_SID    ← delete this variable; Twilio Verify no longer used
-```
-
-### 7.2 Using the Doppler CLI to Set Variables
+When you test OTP, enter Number B as the user’s phone — e.g. in the mobile register screen or:
 
 ```bash
-# Switch to the right environment first
-doppler setup   # if not already done
+curl -X POST http://localhost:3000/api/v1/auth/otp/request \
+  -H "Content-Type: application/json" \
+  -d '{"phone_e164": "+1XXXXXXXXXX", "context": "register"}'
+```
 
-# Set a variable in a specific environment
-doppler secrets set TELNYX_API_KEY="KEY_telnyx_dev_xxxx" --project letssplyt --config dev
+Replace `+1XXXXXXXXXX` with **Number B** (not Number A, not your personal mobile).
+
+**Buy both numbers:**
+
+1. Open https://portal.telnyx.com/#/app/numbers/search-numbers
+2. **Country:** United States
+3. **Type:** Local (long-code) — not toll-free for dev on-net tests
+4. **Features:** Ensure **SMS** is available (look for **SMS** / messaging icon in results — Telnyx labels this “SMS Available”)
+5. Pick a number → **Add to cart** → **Purchase**
+6. Repeat for the second number
+
+**Record both in E.164 form:** `+14155550123` (with `+1`).
+
+Cost: ~$1.00/month per US long-code.
+
+### 4.3 Create Messaging Profile `letssplyt-dev`
+
+1. Open https://portal.telnyx.com/#/app/messaging/messaging-profiles  
+   - Or navigate: **Realtime Communications** → **Messaging** → **Programmable Messaging**
+2. Click **Add new profile** (or **+ New profile**)
+3. **Profile name:** `letssplyt-dev`
+4. **Inbound settings**
+   - **Webhook URL:** leave blank for now **OR** set your ngrok URL (Section 9)  
+   - Format: `https://<your-tunnel>/api/v1/webhooks/telnyx/messaging`
+5. **Outbound settings**
+   - **Allowed destinations:** include **United States** (and any other countries you test)
+6. Confirm profile uses **API V2** (default on new profiles)
+7. Click **Save**
+
+### 4.4 Assign Number A to `letssplyt-dev` (Senders tab)
+
+Only the **sender** must be linked to the Messaging Profile. That is what populates the profile’s **Senders** tab.
+
+**Required — Number A (sender):**
+
+**Method A — from My Numbers list (common UI):**
+
+1. Open https://portal.telnyx.com/#/app/numbers/my-numbers
+2. Find **Number A** (your sender — same as `TELNYX_FROM_NUMBER`)
+3. In the **Messaging Profile** column, click **Select profile** / **Edit** (pencil icon)
+4. Under **SMS Messaging**, choose **`letssplyt-dev`**
+5. If prompted about **MRC (monthly cost)** change, click **Accept**
+6. Click **Save** / **Save changes**
+
+**Method B — from Messaging Profile Senders tab:**
+
+1. Open your `letssplyt-dev` profile → **Senders** tab
+2. **Add sender** / assign number → select **Number A** → Save
+
+**Method C — from number detail page:**
+
+1. My Numbers → click **Number A**
+2. Open **Messaging** or **Settings** tab
+3. Set **Messaging profile** → `letssplyt-dev` → Save
+
+**Verify:** Messaging Profile `letssplyt-dev` → **Senders** tab shows **Number A**. My Numbers row for Number A shows `letssplyt-dev`.
+
+**Optional — Number B:**
+
+Only assign Number B to `letssplyt-dev` if you need inbound SMS on B (STOP/START webhook testing). For on-net OTP delivery checks, **Detail Record Search** is enough — Number B does not need to appear on the Senders tab.
+
+### 4.5 Configure Doppler (dev)
+
+See Section 8. Minimum:
+
+```text
+SMS_PROVIDER=telnyx
+TELNYX_API_KEY=<letssplyt-dev key>
+TELNYX_FROM_NUMBER=+1XXXXXXXXXX    ← Number A only
+```
+
+Keep Twilio vars for fallback until Telnyx is fully validated (Section 8).
+
+### 4.6 Run backend locally with Doppler
+
+```bash
+cd backend
+doppler run -- npm run dev
+```
+
+Confirm startup logs show no Telnyx-related errors. Optional temporary log:
+
+```text
+SMS_PROVIDER=telnyx
+TELNYX_FROM_NUMBER=+1...
+```
+
+(remove after confirming)
+
+### 4.7 Test on-net OTP (after E11-S05 enables Telnyx send)
+
+**Important:** Use **Number B** as `phone_e164` in the app or curl — not your personal mobile. There is no Telnyx setting for this; you simply type Number B when LetsSplyt asks for a phone number.
+
+1. In the app: Register or request OTP with **Number B** in E.164 format
+2. If `OTP_DEV_BYPASS=true` (default local dev): no SMS is sent; any 6-digit code works — Telnyx not exercised
+3. To test real Telnyx send locally:
+   - Set `OTP_DEV_BYPASS=false` in Doppler dev (or env)
+   - Restart backend
+   - Request OTP again for Number B
+
+**Verify delivery:**
+
+1. In Mission Control, open **Detail Record Search** (left menu under **Debugging**, or portal **Search** → type `Detail Record Search`).
+2. Set **Record type** to **Messaging** (MDRs).
+3. Filter **Direction** = **Outbound** and narrow by date or destination number (Number B).
+4. Find your message — **Status** should show **delivered** for on-net tests (may take a few seconds).
+
+Alternate: **Reports** → **Reporting** → **Message Deliverability** shows counts per profile (delivered / not delivered / in-flight) but not each message body.
+
+**Verify OTP code (dev only):**
+
+- Supabase → Table Editor → `otp_verifications` (hashed code only), **or**
+- Temporarily log code in backend during dev (**remove before staging**)
+
+**Correct API path (LetsSplyt):**
+
+```bash
+curl -X POST http://localhost:3000/api/v1/auth/otp/request \
+  -H "Content-Type: application/json" \
+  -d '{"phone_e164": "+1XXXXXXXXXX", "context": "register"}'
+```
+
+Use Number B as `phone_e164`.
+
+### 4.8 Dev checklist
+
+- [ ] Level 1 verification complete
+- [ ] Balance &gt; $0
+- [ ] API key `letssplyt-dev` in Doppler
+- [ ] Two SMS-capable US numbers purchased (A = sender, B = destination in app)
+- [ ] Messaging Profile `letssplyt-dev` created
+- [ ] **Number A** assigned to `letssplyt-dev` (visible on **Senders** tab)
+- [ ] `SMS_PROVIDER=telnyx`, `TELNYX_FROM_NUMBER` set in Doppler dev
+- [ ] Outbound message appears in **Detail Record Search** (Messaging) when sending to Number B
+
+---
+
+## 5. Staging environment
+
+**Goal:** Send SMS to **your real phone** and real testers (off-net). Use a **toll-free** number — faster verification than full 10DLC.
+
+**Railway staging `APP_URL` example:** `https://staging.letssplyt.app`  
+**Webhook URL:** `https://staging.letssplyt.app/api/v1/webhooks/telnyx/messaging`
+
+### 5.1 Create staging API key
+
+1. https://portal.telnyx.com/#/api-keys → **Create API Key**
+2. Name: `letssplyt-staging`
+3. Store in Doppler **staging** as `TELNYX_API_KEY`
+
+You may reuse the dev API key temporarily, but **separate keys** are better for audit and revocation.
+
+### 5.2 Buy one US toll-free number (SMS)
+
+1. https://portal.telnyx.com/#/app/numbers/search-numbers
+2. **Country:** United States
+3. **Type:** **Toll-free** (800, 833, 844, 855, 866, 877, 888)
+4. **SMS** feature required
+5. Purchase one number → record as `+1800…` / `+1888…` etc.
+
+Cost: ~$2.00/month.
+
+### 5.3 Create Messaging Profile `letssplyt-staging`
+
+1. Programmable Messaging → **Add new profile**
+2. Name: `letssplyt-staging`
+3. **Webhook URL:** `https://<your-staging-APP_URL>/api/v1/webhooks/telnyx/messaging`
+4. **Allowed destinations:** United States (minimum)
+5. Save
+
+### 5.4 Assign toll-free number to staging profile
+
+My Numbers → your toll-free number → Messaging Profile → `letssplyt-staging` → Save.
+
+### 5.5 Toll-free verification (required for off-net SMS)
+
+**Unverified toll-free numbers cannot send to real mobiles** (industry rule). Submit verification before staging SMS tests.
+
+1. Open https://portal.telnyx.com/#/app/programmable-messaging/toll-free-messaging  
+   - Or: **Messaging** → **Toll-Free Verification** / **Toll-Free Messaging**
+2. Click **Add** / **New verification** / **Register** (label varies)
+3. Select your **staging toll-free number**
+4. Fill the form (use LetsSplyt-consistent copy):
+
+| Field | Value |
+|---|---|
+| Business name | `LetsSplyt` |
+| Business address | Your California address |
+| Website | `https://letssplyt.com` (or staging marketing URL) |
+| Use case | Transactional |
+| Description | Bill-splitting app. SMS types: (1) 6-digit OTP for login/register/join; (2) personalized payment requests with each guest’s share and P2P payment links. |
+| Sample message 1 | `Your LetsSplyt verification code is: 847293. Valid for 10 minutes. Reply STOP to opt out.` |
+| Sample message 2 | `Hi Alex! Dinner at Nobu: Your share is $42.50. See full split: https://letssplyt.app/split/…. Pay via Venmo/CashApp. Reply STOP to opt out.` |
+| Opt-in | User enters phone on app/web join and accepts Terms/Privacy (TCPA checkbox) before OTP. |
+| Opt-out | Reply STOP to opt out; reply START to resubscribe. |
+
+5. **Business Registration (BRN) fields** — As of **Feb 2026**, Telnyx may require:
+   - `businessRegistrationNumber` (e.g. state registration or other ID for sole prop)
+   - `businessRegistrationType`
+   - `businessRegistrationCountry` (`US`)
+   See Telnyx docs if the form shows these as required.
+
+6. Submit → wait **1–14 business days** (often 3–5)
+7. Status **Verified** in the toll-free portal before relying on staging SMS
+
+Detailed Telnyx article: [Toll Free Verification Request Guide](https://support.telnyx.com/en/articles/10729979-toll-free-verification-request-guide)
+
+### 5.6 Doppler (staging)
+
+```text
+SMS_PROVIDER=telnyx
+TELNYX_API_KEY=<letssplyt-staging key>
+TELNYX_FROM_NUMBER=+1800XXXXXXX   ← staging toll-free
+```
+
+Redeploy Railway staging after updating Doppler.
+
+### 5.7 Staging test flow
+
+1. Install staging app or use web join on staging URL
+2. Register with **your real mobile** number
+3. Receive OTP SMS from toll-free number
+4. Complete OTP verify
+5. Create test event → send payment messages
+6. Confirm SMS content, links, and webhook delivery (Section 9)
+
+### 5.8 Staging checklist
+
+- [ ] Toll-free number on `letssplyt-staging` profile
+- [ ] Toll-free verification status = **Verified**
+- [ ] Doppler staging vars set; Railway redeployed
+- [ ] Webhook URL returns 200 (after E11-S06)
+- [ ] OTP + payment SMS on real phone
+- [ ] STOP reply opts out (after E11-S06)
+
+---
+
+## 6. Production: A2P 10DLC (required for US long-code)
+
+**When:** Before sending production SMS from a **US local (10-digit) number** to real users.
+
+**Timeline:** Plan **5–10 business days** for brand + campaign approval.
+
+**Sole proprietor (no LLC):** Follow Telnyx’s dedicated guide:  
+[Guide to Sole Proprietor 10DLC Brand and Campaign Registration](https://support.telnyx.com/en/articles/13545282-guide-to-sole-proprietor-10dlc-brand-and-campaign-registration)
+
+### 6.1 Register brand
+
+1. Open https://portal.telnyx.com/#/messaging-10dlc/brands
+2. Click **Create a brand** / **Create Brand**
+3. Choose entity type:
+   - **Sole proprietor** if no EIN (limits: ~1 campaign, ~1 number, ~75 msgs/day on sole prop tier — enough for early launch)
+   - **Private / public company** if you have EIN
+4. Fill business details (examples for sole prop):
+
+| Field | Example |
+|---|---|
+| Display / brand name | `LetsSplyt` |
+| Legal name | Your name or `LetsSplyt` per Telnyx form |
+| Email | `builder@letssplyt.com` |
+| Phone | Your mobile E.164 |
+| Address | California business address |
+| Website | `https://letssplyt.com` |
+| Vertical | Technology |
+
+5. Save → wait for identity status in portal (email when updated)
+
+**Before submitting:** Ensure live **Privacy Policy** and **Terms** (e.g. `https://letssplyt.com/privacy` and `/terms` or in-app legal URLs).
+
+### 6.2 Create campaign
+
+1. Open https://portal.telnyx.com/#/messaging-10dlc/campaigns
+2. **Create New Campaign**
+3. Link to your approved **brand**
+4. Use cases: select **2FA/OTP** and **Account notifications** / **Customer care** as allowed (pick all transactional types that match)
+5. **Campaign description** (example):
+
+   LetsSplyt sends transactional SMS only: (1) one-time passcodes for register/login/join; (2) payment requests showing each guest’s share of a restaurant bill with P2P payment links. Users opt in via phone entry + TCPA checkbox on register and web join. Reply STOP to opt out.
+
+6. **Sample messages** — match real templates (include STOP language)
+7. **Embedded links:** Yes (breakdown URLs, Venmo/CashApp links)
+8. **Opt-in / opt-out / help** — describe STOP, START, HELP, and `builder@letssplyt.com`
+9. Submit → wait for campaign status **ACTIVE** (3–7+ business days)
+
+Telnyx overview: [Register for 10DLC Messaging](https://support.telnyx.com/en/articles/6325731-register-for-10dlc-messaging)
+
+### 6.3 Assign production number to campaign
+
+After campaign is **ACTIVE** and production number exists (Section 7):
+
+1. Open https://portal.telnyx.com/#/messaging-10dlc/campaigns
+2. Click your campaign
+3. Scroll to **Assign numbers**
+4. Select Messaging Profile `letssplyt-production` to load numbers
+5. Assign your production long-code number
+6. Allow **up to 24 hours** for carrier propagation
+
+Article: [How to assign a number to a campaign](https://support.telnyx.com/en/articles/6325734-how-to-assign-a-number-to-a-campaign)
+
+---
+
+## 7. Production environment
+
+### 7.1 Create production API key
+
+1. https://portal.telnyx.com/#/api-keys → Create API Key
+2. Name: `letssplyt-production`
+3. Store only in Doppler **production** — never reuse in dev/staging
+
+### 7.2 Buy production US long-code (SMS)
+
+1. Search numbers → US → **Local** → SMS enabled
+2. Prefer California area codes if available (415, 408, 510, etc.)
+3. Purchase → record E.164 (e.g. `+14085551234`)
+
+### 7.3 Create Messaging Profile `letssplyt-production`
+
+1. Add new profile → name `letssplyt-production`
+2. **Webhook URL:** `https://letssplyt.app/api/v1/webhooks/telnyx/messaging`  
+   (use exact `APP_URL` from Doppler production + `/api/v1/webhooks/telnyx/messaging`)
+3. Allowed destinations: United States (add others if product expands)
+4. Save
+
+### 7.4 Assign number to production profile
+
+My Numbers → production number → Messaging Profile → `letssplyt-production` → Save.
+
+### 7.5 Link number to 10DLC campaign
+
+Section 6.3 — required before off-net production SMS from long-code.
+
+### 7.6 Doppler (production)
+
+```text
+SMS_PROVIDER=telnyx
+TELNYX_API_KEY=<letssplyt-production key>
+TELNYX_FROM_NUMBER=+1XXXXXXXXXX
+```
+
+Redeploy production Railway service.
+
+### 7.7 Production pre-launch checklist
+
+- [ ] 10DLC brand verified
+- [ ] 10DLC campaign **ACTIVE**
+- [ ] Production number assigned to campaign
+- [ ] Messaging profile webhook live (200 OK)
+- [ ] Privacy + Terms publicly accessible
+- [ ] App TCPA checkbox on phone entry / web join
+- [ ] STOP/START handled by backend (E11-S06)
+- [ ] One real OTP to your phone — end-to-end
+- [ ] One real payment-request SMS — links work
+
+---
+
+## 8. Doppler configuration
+
+Project: `letssplyt` (or your Doppler project name). Set per **config**: `dev`, `staging`, `production`.
+
+### 8.1 Telnyx variables (per environment)
+
+| Variable | Dev | Staging | Production |
+|---|---|---|---|
+| `SMS_PROVIDER` | `telnyx` | `telnyx` | `telnyx` |
+| `TELNYX_API_KEY` | `letssplyt-dev` key | `letssplyt-staging` key | `letssplyt-production` key |
+| `TELNYX_FROM_NUMBER` | Dev sender long-code | Staging toll-free | Prod long-code |
+
+**Format:** E.164 with `+` — e.g. `+14155550123`
+
+### 8.2 Twilio fallback (keep until Telnyx proven)
+
+LetsSplyt code uses `TWILIO_PHONE_NUMBER` (not `TWILIO_FROM_NUMBER`):
+
+```text
+TWILIO_ACCOUNT_SID=ACyour_account_sid
+TWILIO_AUTH_TOKEN=your-twilio-auth-token
+TWILIO_PHONE_NUMBER=+15005550006
+TWILIO_WHATSAPP_NUMBER=+15005550006   ← if using Twilio international WhatsApp
+```
+
+Set `SMS_PROVIDER=twilio` to roll back transport without code changes.
+
+### 8.3 Remove obsolete variable
+
+Delete from all Doppler configs:
+
+```text
+TWILIO_VERIFY_SERVICE_SID   ← no longer used (custom OTP)
+TWILIO_USE_LIVE_VERIFY      ← remove if present
+```
+
+### 8.4 Doppler CLI examples
+
+```bash
+doppler secrets set SMS_PROVIDER="telnyx" --project letssplyt --config dev
+doppler secrets set TELNYX_API_KEY="KEYxxxx" --project letssplyt --config dev
 doppler secrets set TELNYX_FROM_NUMBER="+14155550001" --project letssplyt --config dev
 
-# Verify
-doppler secrets --project letssplyt --config dev | grep TELNYX
+doppler secrets --project letssplyt --config dev | grep -E 'SMS_PROVIDER|TELNYX'
 ```
 
-### 7.3 Verify the Variable is Available in Your Backend
+### 8.5 Railway
 
-```bash
-# Local dev: start with Doppler
-doppler run -- npm run dev
-
-# In your backend, verify the env var loads:
-# Add a temporary log to app startup:
-console.log('[startup] SMS_PROVIDER:', process.env.SMS_PROVIDER);
-console.log('[startup] TELNYX_FROM_NUMBER:', process.env.TELNYX_FROM_NUMBER);
-# Remove after confirming.
-```
+After changing Doppler, **redeploy** staging/production so containers pick up new secrets.
 
 ---
 
-## 8. Webhook Setup
+## 9. Webhooks (delivery + STOP/START)
 
-### 8.1 What Webhooks Does Telnyx Send?
+### 9.1 What Telnyx sends
 
-Telnyx sends HTTP POST requests to your webhook URL for:
-- `message.sent` — message accepted by Telnyx (not yet delivered)
-- `message.finalized` — delivery outcome: `delivered` or `delivery_failed`
+HTTP **POST** JSON to your Messaging Profile **webhook URL**:
 
-Your backend only needs to handle `message.finalized` to detect failed deliveries. The `telnyxWebhookRouter` created in the Cursor refactor document handles this.
-
-### 8.2 Webhook URL by Environment
-
-| Environment | Webhook URL |
+| Event (API v2) | Purpose |
 |---|---|
-| Dev (local) | `https://<ngrok-subdomain>.ngrok-free.app/webhooks/telnyx/messaging` |
-| Staging | `https://staging.letssplyt.app/webhooks/telnyx/messaging` |
-| Production | `https://letssplyt.app/webhooks/telnyx/messaging` |
+| `message.sent` | Accepted by Telnyx (optional to handle) |
+| `message.finalized` | **Delivered** or **delivery_failed** — update UI green checks |
+| Inbound SMS (`message.received`) | User texts **STOP**, **START**, **HELP** |
 
-Set these in each environment's Messaging Profile (see Sections 3.3, 4.2, 6.3).
+LetsSplyt backend route (implemented in **E11-S06**):
 
-### 8.3 Testing Webhooks Locally
+```text
+POST {APP_URL}/api/v1/webhooks/telnyx/messaging
+```
 
-Use **ngrok** to expose your local backend:
+Use this exact path in every Messaging Profile webhook field.
+
+### 9.2 Configure webhook in Messaging Profile
+
+For each profile (`letssplyt-dev`, `letssplyt-staging`, `letssplyt-production`):
+
+1. Programmable Messaging → open profile → **Edit**
+2. **Inbound / Webhook URL:** `https://<host>/api/v1/webhooks/telnyx/messaging`
+3. **Webhook API version:** `2` (API v2)
+4. Optional: **Failover URL** (second endpoint)
+5. Save
+
+### 9.3 Local dev with ngrok
 
 ```bash
-# Install ngrok: https://ngrok.com/download
+# Terminal 1 — backend
+cd backend && doppler run -- npm run dev
+
+# Terminal 2 — tunnel
 ngrok http 3000
-
-# Copy the HTTPS forwarding URL (e.g. https://abc123.ngrok-free.app)
-# Update the dev Messaging Profile webhook URL to:
-# https://abc123.ngrok-free.app/webhooks/telnyx/messaging
 ```
 
-Or use **Cloudflare Tunnel** (free, no timeout):
+Copy ngrok **https** URL → set webhook to:
 
-```bash
-# Install cloudflared
-cloudflared tunnel --url http://localhost:3000
+```text
+https://abc123.ngrok-free.app/api/v1/webhooks/telnyx/messaging
 ```
 
-### 8.4 Verify the Webhook Works
+Update **letssplyt-dev** profile whenever ngrok URL changes.
 
-After sending a test SMS:
-1. Go to Telnyx Portal → **Messaging** → **Message Log**
-2. Click on a message
-3. Check the **Webhooks** tab — you should see a `200` response from your endpoint
+**Cloudflare Tunnel** (alternative): `cloudflared tunnel --url http://localhost:3000`
 
-If the webhook fails (non-200 response), Telnyx retries with exponential backoff up to 3 times.
+### 9.4 Verify webhook delivery
 
-### 8.5 Production Webhook Security (Optional for MVP — Recommended Before Public Launch)
+1. Send a test SMS
+2. Open **Detail Record Search** → **Messaging** → find the row by time or destination number
+3. Check **Status** (e.g. `delivered`) and copy the **UUID** if you need it for support
+4. For webhook debugging after E11-S06: confirm your backend logs show HTTP 200 from Telnyx delivery events
 
-Telnyx signs webhook requests with an Ed25519 signature. You can verify this to ensure the request actually came from Telnyx and not a malicious actor.
+### 9.5 Security (production)
 
-Telnyx also publishes a fixed CIDR range (`192.76.120.192/27`) that all webhook requests originate from. The simplest approach is to allowlist this IP range at your infrastructure level (Railway environment or a middleware check).
+- Telnyx sends from IP range **`192.76.120.192/27`** — allowlist in Railway or middleware (E11-S06)
+- Optional: verify Ed25519 webhook signatures (Telnyx public key in portal)
 
-**Optional middleware for IP allowlist:**
+---
 
-```typescript
-// backend/src/middleware/telnyx-ip-allowlist.ts
-import { Request, Response, NextFunction } from 'express';
+## 10. Testing checklists
 
-const TELNYX_CIDR = '192.76.120.192';
+### Dev (on-net)
 
-function ipInRange(ip: string): boolean {
-  // Simple check: Telnyx IPs start with 192.76.120.
-  // For a rigorous CIDR check, use the 'ip-cidr' npm package.
-  return ip.startsWith('192.76.120.');
-}
+- [ ] `SMS_PROVIDER=telnyx` in Doppler dev
+- [ ] Number A on `letssplyt-dev` profile (Senders tab)
+- [ ] OTP send to **second Telnyx number** appears in **Detail Record Search** (Messaging)
+- [ ] Payment SMS to second Telnyx number
+- [ ] Webhook 200 (if tunnel configured)
 
-export function telnyxIPGuard(req: Request, res: Response, next: NextFunction): void {
-  const clientIP = req.ip ?? req.socket.remoteAddress ?? '';
-  if (!ipInRange(clientIP)) {
-    res.status(403).json({ error: 'Forbidden' });
-    return;
-  }
-  next();
-}
+### Staging (off-net)
+
+- [ ] Toll-free **Verified**
+- [ ] OTP to personal mobile
+- [ ] Payment SMS to personal mobile
+- [ ] STOP opts out; START clears opt-out (E11-S06)
+
+### Production
+
+- [ ] 10DLC brand + campaign active
+- [ ] Number on campaign + `letssplyt-production` profile
+- [ ] Section 7.7 checklist complete
+
+---
+
+## 11. Monitoring
+
+| Task | Where |
+|---|---|
+| Per-message delivery status | **Debugging** → **Detail Record Search** → Record type **Messaging** |
+| Deliverability summary by profile | https://portal.telnyx.com/#/app/reporting/messaging-deliverability |
+| Delivery analytics | Messaging → Analytics (if available) |
+| Low balance alert | Billing → Notifications / Auto reload |
+| Backend logs | Log `messageId` only — never phone or OTP body |
+
+---
+
+## 12. Troubleshooting
+
+### `403` / “Number not assigned to messaging profile” (API `40300`)
+
+1. My Numbers → confirm number shows correct **Messaging Profile**
+2. Profile name must match the environment you are testing
+3. Confirm **Level 1 verification** complete
+
+### `422` / invalid `from` number (`42200`)
+
+- `TELNYX_FROM_NUMBER` must match the assigned sender exactly (E.164)
+- Number must be SMS-capable and on the profile
+
+### SMS works to Telnyx number but not my iPhone (dev)
+
+You are sending **off-net** without toll-free verification or 10DLC. In dev, only send to your **second Telnyx number**.
+
+### Toll-free / staging messages blocked
+
+- Verification not **Verified**
+- Missing BRN fields on verification form (2026+ requirement)
+
+### 10DLC messages blocked in production
+
+- Campaign not **ACTIVE**
+- Number not assigned to campaign (wait 24h after assignment)
+- Sample messages in campaign don’t match actual content
+
+### Webhook never fires
+
+- Webhook URL wrong (must be public HTTPS, include `/api/v1/webhooks/telnyx/messaging`)
+- Profile not assigned to sending number
+- Local dev: ngrok URL stale
+
+### Wrong OTP API in old notes
+
+LetsSplyt uses:
+
+- `POST /api/v1/auth/otp/request` with `{ "phone_e164": "+1...", "context": "register" }`
+- Not `/api/auth/send-otp`
+
+---
+
+## 13. Cost reference
+
+Approximate USD (Telnyx pricing — confirm in portal):
+
+| Item | Cost |
+|---|---|
+| US long-code | ~$1.00/month |
+| US toll-free | ~$2.00/month |
+| Outbound US SMS | ~$0.004/message |
+| Inbound SMS | ~$0.001/message |
+| 10DLC brand (TCR) | ~$4/month |
+| 10DLC campaign | ~$10 one-time |
+| Toll-free verification | Free |
+
+**Example at 1,000 users/month (OTP + payment SMS):** ~$30–40/month Telnyx vs much higher on Twilio Verify + Messaging.
+
+---
+
+## Quick reference: order of operations
+
+```
+ONE TIME (all envs)
+  1. Sign up → Level 1 verify → Add payment
+  2. Create API keys (dev / staging / prod labels)
+
+DEV
+  3. Buy 2 long-codes → Profile letssplyt-dev → Assign Number A (sender)
+  4. Doppler dev → test on-net: OTP to Number B via app/curl
+
+STAGING
+  5. Buy toll-free → Profile letssplyt-staging → Assign number
+  6. Toll-free verification → wait Verified
+  7. Doppler staging → test to real phone
+
+PRODUCTION
+  8. 10DLC brand → campaign → wait ACTIVE
+  9. Buy long-code → Profile letssplyt-production → Assign number
+  10. Assign number to 10DLC campaign
+  11. Doppler production → pre-launch checklist
 ```
 
-Apply this middleware only to the `/webhooks/telnyx/*` route.
-
 ---
 
-## 9. Testing Checklist by Environment
-
-### Dev — On-Net Testing (No A2P 10DLC)
-
-- [ ] `SMS_PROVIDER=telnyx` confirmed in Doppler dev
-- [ ] API key loads correctly (no startup errors)
-- [ ] Both Telnyx numbers are assigned to the `letssplyt-dev` messaging profile
-- [ ] Register a test user using your second Telnyx number as the phone
-- [ ] OTP SMS arrives at the second Telnyx number (visible in Telnyx Message Log)
-- [ ] OTP code verifies successfully
-- [ ] Create a test event and trigger payment SMS
-- [ ] Payment SMS arrives at the second Telnyx number (visible in Telnyx Message Log)
-- [ ] Webhook receives `message.finalized` with `status: delivered`
-
-### Staging — Off-Net Testing (to Real Phones)
-
-- [ ] Toll-Free Verification is approved
-- [ ] `SMS_PROVIDER=telnyx` confirmed in Doppler staging
-- [ ] Register a test user using your real personal mobile number
-- [ ] OTP SMS arrives on your real phone
-- [ ] OTP code verifies successfully (full flow in the app)
-- [ ] Create a test event and trigger payment SMS
-- [ ] Payment SMS arrives on your real phone
-- [ ] Payment links in the SMS work correctly (open correct payment apps)
-- [ ] Reply STOP from your phone → confirm opt-out is recorded
-- [ ] Reply START from your phone → confirm re-subscribe works
-- [ ] Webhook delivery receipts visible in Railway logs
-
-### Production — Pre-Launch (Once 10DLC Approved)
-
-- [ ] 10DLC brand status: `VERIFIED`
-- [ ] 10DLC campaign status: `ACTIVE`
-- [ ] Production number assigned to approved campaign
-- [ ] All pre-launch checklist items from Section 6.6 completed
-- [ ] Smoke test: send one real OTP to your personal mobile via the production backend
-- [ ] Smoke test: send one real payment SMS via the production backend
-- [ ] Delivery receipt webhook fires for both messages
-
----
-
-## 10. Monitoring and Alerts
-
-### 10.1 Telnyx Message Log
-
-- Portal → **Messaging** → **Message Log**
-- Filter by date range, status, or phone number
-- Shows each message's status: `sent`, `delivered`, `delivery_failed`
-- Export to CSV for bulk analysis
-
-### 10.2 Delivery Failure Rate
-
-A healthy delivery rate is >98% for US numbers. Monitor this weekly:
-- Portal → **Analytics** → **Messaging**
-- If delivery rate drops below 95%, investigate: common causes are invalid numbers, opted-out users, or carrier filtering
-
-### 10.3 Set Up Email Alerts in Telnyx
-
-- Portal → **Account** → **Notifications**
-- Enable alerts for: account balance below threshold ($5 recommended), message delivery failures above a rate
-
-### 10.4 Balance Auto-Reload
-
-To avoid SMS outages from a depleted balance:
-- Portal → **Billing** → **Auto Reload**
-- Set: reload $50 when balance drops below $10
-- This ensures uninterrupted service
-
-### 10.5 Application-Level Logging
-
-In your backend, log (without PII):
-- `[sms] sent messageId=<id> provider=telnyx` — for audit trail
-- `[sms] delivery_failed messageId=<id> errorCode=<code>` — from the webhook handler
-- Never log phone numbers, message content, or OTP codes
-
----
-
-## 11. Troubleshooting
-
-### "403 Forbidden — Number not in Messaging Profile"
-
-Your number is not assigned to a Messaging Profile, or it's assigned to the wrong profile for this API key.
-
-Fix:
-1. Portal → **Numbers** → **My Numbers** → click the number
-2. Check which Messaging Profile it's assigned to
-3. Ensure the Messaging Profile's API key matches the one you're using
-
-### "422 Unprocessable Entity — Invalid phone number"
-
-The `to` number is not in E.164 format. All phone numbers must start with `+` followed by country code.
-
-Fix: check your phone number formatting before calling `sendSMS()`. The `resolveParticipantPhone()` function in `backend/src/infrastructure/security/resolveParticipantPhone.ts` should return E.164 format — verify this.
-
-### "429 Too Many Requests"
-
-You've hit Telnyx's rate limit. Default for a single number: 10 messages per second (MPS).
-
-Fix: implement a retry with backoff. For LetsSplyt, you're unlikely to hit this limit. If you do, it's from a bug (sending too many simultaneous messages).
-
-### OTP Messages Not Arriving in Dev
-
-On-net testing requires both numbers to be Telnyx numbers in a Messaging Profile. If you send to a non-Telnyx number in dev, the message goes off-net and may be filtered without A2P 10DLC.
-
-Fix: use only your second Telnyx number as the test recipient in dev.
-
-### Toll-Free Verification Rejected (Staging)
-
-Most common reasons:
-- Website not live or doesn't describe the app
-- Privacy Policy not accessible at a public URL
-- Sample messages don't match the use case description
-- Opt-in/opt-out description is vague
-
-Fix: publish your Privacy Policy and Terms of Service on `letssplyt.com` and resubmit with more detailed opt-in/opt-out descriptions.
-
-### 10DLC Campaign Rejected (Production)
-
-Most common reasons:
-- Brand website not live
-- Privacy Policy not accessible
-- Sample messages contain promotional content (10DLC transactional campaigns must be purely transactional)
-- Opt-in flow not described clearly enough
-
-Fix: ensure your website, Privacy Policy, and Terms of Service are all live and accessible before submitting. Resubmit with more detail.
-
-### Messages Delivering to Some Carriers but Not Others
-
-This is a carrier filtering issue. Ensure:
-- Your campaign is fully approved (not just "pending")
-- 24 hours have passed since number assignment
-- Your message content matches your registered use case (no promotional text)
-- Messages include STOP opt-out instructions at the end
-
----
-
-## 12. Cost Reference
-
-All prices in USD as of June 2026. Telnyx pricing is usage-based; no monthly minimums.
-
-| Item | Cost | Notes |
-|---|---|---|
-| US long-code number | $1.00/month | Per number |
-| US toll-free number | $2.00/month | Per number |
-| Outbound US SMS | $0.004/message | Long-code or toll-free |
-| Inbound US SMS | $0.001/message | STOP/START/HELP replies |
-| 10DLC brand registration | $4.00/month | TCR fee via Telnyx |
-| 10DLC campaign registration | $10.00 one-time | Per campaign, via Telnyx |
-| Toll-Free Verification | Free | Included |
-
-### Monthly Cost Estimate for LetsSplyt
-
-Based on 1,000 realistic active users (6 participants/event, ~3 events/user/month):
-
-| Item | Calculation | Monthly cost |
-|---|---|---|
-| OTP SMS | 1,000 users × 1 OTP/month | $4.00 |
-| Payment request SMS | 1,000 events × 6 participants | $24.00 |
-| Phone number (prod) | 1 number | $1.00 |
-| 10DLC brand fee | Fixed | $4.00 |
-| **Total** | | **~$33/month** |
-
-At 15,000 users: ~$430/month (vs ~$4,200/month with Twilio).
-
----
-
-*Document version: 1.0 — 2026-06-14*  
-*Telnyx SDK version referenced: telnyx v6.65.0*  
-*A2P 10DLC requirements as of February 2025 (FCC mandatory enforcement date)*
+*Telnyx SDK in repo: `telnyx` npm package*  
+*LetsSplyt implementation stories: E11-S03–S07 in `docs/12-Build-Sequence.md`*  
+*Engineering spec: `docs/Telnyx Implementation/E11-S03-Implementation-Spec.md`*

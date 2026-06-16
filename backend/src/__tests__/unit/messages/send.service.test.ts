@@ -8,8 +8,8 @@ jest.mock('../../../infrastructure/notification/opt-out', () => ({
   isPhoneOptedOut: jest.fn(),
 }));
 
-jest.mock('../../../infrastructure/notification/twilio-messaging', () => ({
-  sendTwilioMessage: jest.fn(),
+jest.mock('../../../infrastructure/notification/outbound-messaging.service', () => ({
+  sendOutboundMessage: jest.fn(),
 }));
 
 jest.mock('../../../modules/messages/participant-phone', () => ({
@@ -19,7 +19,7 @@ jest.mock('../../../modules/messages/participant-phone', () => ({
 import { mockTwilio } from '../../mocks/twilio.mock';
 import { mockSupabase } from '../../mocks/supabase.mock';
 import { isPhoneOptedOut } from '../../../infrastructure/notification/opt-out';
-import { sendTwilioMessage } from '../../../infrastructure/notification/twilio-messaging';
+import { sendOutboundMessage } from '../../../infrastructure/notification/outbound-messaging.service';
 import { buildMessagePreviewsForEvent } from '../../../modules/messages/messages.service';
 import { resolveParticipantPhoneContext } from '../../../modules/messages/participant-phone';
 import { sendEventMessages } from '../../../modules/messages/send.service';
@@ -37,7 +37,7 @@ describe('sendEventMessages', () => {
     jest.clearAllMocks();
     mockSupabase.__resetMock();
     jest.mocked(isPhoneOptedOut).mockResolvedValue(false);
-    jest.mocked(sendTwilioMessage).mockResolvedValue({ sid: 'SMtest123', channel: 'sms' });
+    jest.mocked(sendOutboundMessage).mockResolvedValue({ messageId: 'SMtest123', channel: 'sms' });
     jest.mocked(buildMessagePreviewsForEvent).mockResolvedValue([
       {
         participant_id: PARTICIPANT_A,
@@ -124,10 +124,10 @@ describe('sendEventMessages', () => {
     });
   });
 
-  it('calls Twilio for each participant with a phone', async () => {
+  it('calls outbound messaging for each participant with a phone', async () => {
     const result = await sendEventMessages(PAYER_ID, EVENT_ID);
 
-    expect(sendTwilioMessage).toHaveBeenCalledTimes(1);
+    expect(sendOutboundMessage).toHaveBeenCalledTimes(1);
     expect(mockTwilio.messages.create).not.toHaveBeenCalled();
     expect(result.sent_count).toBe(1);
     expect(result.skipped_count).toBe(1);
@@ -139,7 +139,7 @@ describe('sendEventMessages', () => {
 
     const result = await sendEventMessages(PAYER_ID, EVENT_ID);
 
-    expect(sendTwilioMessage).not.toHaveBeenCalled();
+    expect(sendOutboundMessage).not.toHaveBeenCalled();
     expect(result.skipped_count).toBe(2);
     expect(result.results).toEqual(
       expect.arrayContaining([
@@ -158,17 +158,17 @@ describe('sendEventMessages', () => {
   it('sends SMS body without MMS mediaUrl', async () => {
     await sendEventMessages(PAYER_ID, EVENT_ID);
 
-    expect(sendTwilioMessage).toHaveBeenCalledWith(
+    expect(sendOutboundMessage).toHaveBeenCalledWith(
       '+15005550001',
       'sms',
       expect.stringContaining('Alex'),
     );
-    expect(sendTwilioMessage).toHaveBeenCalledWith(
+    expect(sendOutboundMessage).toHaveBeenCalledWith(
       '+15005550001',
       'sms',
       expect.stringContaining('See full split'),
     );
-    expect(jest.mocked(sendTwilioMessage).mock.calls[0]?.length).toBe(3);
+    expect(jest.mocked(sendOutboundMessage).mock.calls[0]?.length).toBe(3);
   });
 
   it('uses WhatsApp channel for international numbers', async () => {
@@ -234,7 +234,7 @@ describe('sendEventMessages', () => {
 
     await sendEventMessages(PAYER_ID, EVENT_ID);
 
-    expect(sendTwilioMessage).toHaveBeenCalledWith(
+    expect(sendOutboundMessage).toHaveBeenCalledWith(
       '+447700900123',
       'whatsapp',
       expect.stringContaining('Alex'),

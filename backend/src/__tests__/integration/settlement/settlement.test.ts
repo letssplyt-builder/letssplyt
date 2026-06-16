@@ -7,8 +7,8 @@ jest.mock('../../../infrastructure/notification/opt-out', () => ({
   isPhoneOptedOut: jest.fn(),
 }));
 
-jest.mock('../../../infrastructure/notification/twilio-messaging', () => ({
-  sendTwilioMessage: jest.fn(),
+jest.mock('../../../infrastructure/notification/outbound-messaging.service', () => ({
+  sendOutboundMessage: jest.fn(),
 }));
 
 jest.mock('../../../modules/messages/participant-phone', () => ({
@@ -16,7 +16,7 @@ jest.mock('../../../modules/messages/participant-phone', () => ({
 }));
 
 import { isPhoneOptedOut } from '../../../infrastructure/notification/opt-out';
-import { sendTwilioMessage } from '../../../infrastructure/notification/twilio-messaging';
+import { sendOutboundMessage } from '../../../infrastructure/notification/outbound-messaging.service';
 import { resolveParticipantPhoneContext } from '../../../modules/messages/participant-phone';
 
 const PAYER_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
@@ -54,7 +54,7 @@ describe('Settlement API integration', () => {
     mockSupabase.__resetMock();
     jest.clearAllMocks();
     jest.mocked(isPhoneOptedOut).mockResolvedValue(false);
-    jest.mocked(sendTwilioMessage).mockResolvedValue({ sid: 'SMtest', channel: 'sms' });
+    jest.mocked(sendOutboundMessage).mockResolvedValue({ messageId: 'SMtest', channel: 'sms' });
     jest.mocked(resolveParticipantPhoneContext).mockResolvedValue({
       phoneE164: '+15005550002',
       resolvedCountry: 'US',

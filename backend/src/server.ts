@@ -11,7 +11,7 @@ app.listen(PORT, '0.0.0.0', () => {
     port: PORT,
     host: '0.0.0.0',
     appEnv: process.env.APP_ENV ?? '(unset)',
-    otpMode: isOtpDevBypassEnabled() ? 'dev-bypass' : 'twilio-verify',
-    messagingMode: isMessagingDevBypassEnabled() ? 'dev-bypass' : 'twilio-messaging',
+    otpMode: isOtpDevBypassEnabled() ? 'dev-bypass' : 'custom-otp',
+    messagingMode: isMessagingDevBypassEnabled() ? 'dev-bypass' : process.env.SMS_PROVIDER ?? 'twilio',
   });
 });

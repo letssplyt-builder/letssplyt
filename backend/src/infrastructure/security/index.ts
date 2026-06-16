@@ -15,3 +15,4 @@ export {
   resolveParticipantPhone,
   CurrencyFormatError,
 } from './sanitize';
+export { formatPhoneE164 } from './phone-format';

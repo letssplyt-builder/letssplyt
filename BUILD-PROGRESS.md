@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
 **Last updated:** 2026-06-07
-**Current story:** E11-S05 — Telnyx Provider + Outbound Messaging Migration
+**Current story:** E11-S06 — Messaging Webhooks + Inbound STOP/START
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -85,7 +85,7 @@
 - [x] E11-S02 — Settings Screen + Delete Account (3-screen flow, full PII wipe) (2026-06-07)
 - [x] E11-S03 — SMS Provider Abstraction Foundation (factory + Twilio adapter + outbound facade) (2026-06-07)
 - [x] E11-S04 — Custom OTP Service (replaces Twilio Verify; auth + web join) (2026-06-07)
-- [ ] E11-S05 — Telnyx Provider + Outbound Messaging Migration
+- [x] E11-S05 — Telnyx Provider + Outbound Messaging Migration (2026-06-07)
 - [ ] E11-S06 — Messaging Webhooks + Inbound STOP/START
 - [ ] E11-S07 — QStash OTP Cleanup, Docs, Smoke & Rollout
 

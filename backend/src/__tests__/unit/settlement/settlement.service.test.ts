@@ -12,8 +12,8 @@ jest.mock('../../../infrastructure/notification/opt-out', () => ({
   isPhoneOptedOut: jest.fn(),
 }));
 
-jest.mock('../../../infrastructure/notification/twilio-messaging', () => ({
-  sendTwilioMessage: jest.fn(),
+jest.mock('../../../infrastructure/notification/outbound-messaging.service', () => ({
+  sendOutboundMessage: jest.fn(),
 }));
 
 jest.mock('../../../modules/messages/participant-phone', () => ({
@@ -28,7 +28,7 @@ jest.mock('../../../modules/settlement/settlement-push', () => ({
 }));
 
 import { isPhoneOptedOut } from '../../../infrastructure/notification/opt-out';
-import { sendTwilioMessage } from '../../../infrastructure/notification/twilio-messaging';
+import { sendOutboundMessage } from '../../../infrastructure/notification/outbound-messaging.service';
 import { resolveParticipantPhoneContext } from '../../../modules/messages/participant-phone';
 import {
   notifyCreatorEventFullySettled,
@@ -82,7 +82,7 @@ describe('settlement.service', () => {
     mockSupabase.__resetMock();
     jest.clearAllMocks();
     jest.mocked(isPhoneOptedOut).mockResolvedValue(false);
-    jest.mocked(sendTwilioMessage).mockResolvedValue({ sid: 'SMnudge', channel: 'sms' });
+    jest.mocked(sendOutboundMessage).mockResolvedValue({ messageId: 'SMnudge', channel: 'sms' });
     jest.mocked(resolveParticipantPhoneContext).mockResolvedValue({
       phoneE164: '+15005550002',
       resolvedCountry: 'US',
@@ -253,7 +253,7 @@ describe('settlement.service', () => {
     expect(result.event_fully_settled).toBe(true);
   });
 
-  it('nudge sends Twilio message after cooldown expires', async () => {
+  it('nudge sends outbound message after cooldown expires', async () => {
     pushEvent();
     const old = new Date(Date.now() - 49 * 60 * 60 * 1000).toISOString();
     pushParticipantRow({ last_nudged_at: old, nudge_count: 1 });
@@ -268,7 +268,7 @@ describe('settlement.service', () => {
     const result = await nudgeParticipant(PAYER_ID, EVENT_ID, PARTICIPANT_ID);
 
     expect(result.sent).toBe(true);
-    expect(sendTwilioMessage).toHaveBeenCalledTimes(1);
+    expect(sendOutboundMessage).toHaveBeenCalledTimes(1);
     expect(result.next_nudge_available_at).toBeTruthy();
   });
 });

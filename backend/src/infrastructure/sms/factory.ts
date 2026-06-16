@@ -1,4 +1,5 @@
 import type { SMSProvider } from './types';
+import { TelnyxSMSProvider } from './providers/telnyx.provider';
 import { TwilioSMSProvider } from './providers/twilio.provider';
 
 let instance: SMSProvider | null = null;
@@ -17,9 +18,8 @@ export function createSMSProvider(): SMSProvider {
       instance = new TwilioSMSProvider();
       break;
     case 'telnyx':
-      throw new Error(
-        'SMS_PROVIDER=telnyx is not available until E11-S05 (Telnyx provider migration)',
-      );
+      instance = new TelnyxSMSProvider();
+      break;
     default:
       throw new Error(
         `Unknown SMS_PROVIDER: "${provider}". Supported values: "twilio", "telnyx"`,

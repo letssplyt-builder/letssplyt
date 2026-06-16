@@ -1,4 +1,5 @@
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
+import { formatPhoneE164 } from '../../infrastructure/security/phone-format';
 import { decrypt } from '../../infrastructure/security/crypto';
 import { supabaseAdmin } from '../../infrastructure/supabase';
 
@@ -40,6 +41,10 @@ export async function resolveParticipantPhoneContext(
         phoneE164 = decrypt(data.phone_encrypted as string, key);
       }
     }
+  }
+
+  if (phoneE164) {
+    phoneE164 = formatPhoneE164(phoneE164) ?? null;
   }
 
   let resolvedCountry = participant.country_code ?? undefined;
