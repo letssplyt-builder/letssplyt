@@ -1,11 +1,10 @@
 import type { NextFunction, Request, Response } from 'express';
-import { processSmsStopOptOut } from '../../infrastructure/notification/process-sms-opt-out';
+import {
+  handleInboundSmsKeyword,
+  INBOUND_REPLY_STOP,
+} from '../../infrastructure/notification/messaging-inbound.service';
+import { applyDeliveryUpdate } from '../../infrastructure/notification/messaging-delivery.service';
 import { validateTwilioWebhook } from '../../infrastructure/twilio-signature';
-import { hashPhone } from '../../infrastructure/security';
-import { supabaseAdmin } from '../../infrastructure/supabase';
-
-const OPT_OUT_TWIML =
-  '<Response><Message>You have been unsubscribed from LetsSplyt notifications. Reply START to resubscribe.</Message></Response>';
 
 function webhookUrl(req: Request): string {
   const base = process.env.APP_URL?.replace(/\/$/, '') ?? 'http://localhost:3000';
@@ -34,6 +33,10 @@ function mapDeliveryStatus(messageStatus: string): 'sent' | 'delivered' | 'faile
   return 'sent';
 }
 
+function twimlMessage(text: string): string {
+  return `<Response><Message>${text}</Message></Response>`;
+}
+
 export async function handleTwilioOptOut(
   req: Request,
   res: Response,
@@ -51,9 +54,11 @@ export async function handleTwilioOptOut(
       return;
     }
 
-    await processSmsStopOptOut(from);
+    const body = (req.body.Body as string | undefined) ?? 'STOP';
+    const action = await handleInboundSmsKeyword(from, body);
+    const replyText = action.type === 'none' ? INBOUND_REPLY_STOP : action.replyText;
 
-    res.status(200).type('text/xml').send(OPT_OUT_TWIML);
+    res.status(200).type('text/xml').send(twimlMessage(replyText));
   } catch (err) {
     next(err);
   }
@@ -79,50 +84,14 @@ export async function handleTwilioDelivery(
     }
 
     const mappedStatus = mapDeliveryStatus(messageStatus);
-
-    const { data: logRow, error: logFetchError } = await supabaseAdmin
-      .from('notification_log')
-      .select('participant_id')
-      .eq('twilio_sid', messageSid)
-      .maybeSingle();
-
-    if (logFetchError) {
-      res.status(500).send('DB error');
-      return;
-    }
-
-    const updatePayload: Record<string, unknown> = { status: mappedStatus };
-    if (mappedStatus === 'delivered') {
-      updatePayload.delivered_at = new Date().toISOString();
-    }
-
-    const { error: logError } = await supabaseAdmin
-      .from('notification_log')
-      .update(updatePayload)
-      .eq('twilio_sid', messageSid);
-
-    if (logError) {
-      res.status(500).send('DB error');
-      return;
-    }
-
-    const participantId = logRow?.participant_id as string | undefined;
-    if (participantId && mappedStatus === 'delivered') {
-      await supabaseAdmin
-        .from('participants')
-        .update({ message_delivered_at: new Date().toISOString() })
-        .eq('id', participantId);
-    }
-
-    if (participantId && (mappedStatus === 'failed' || mappedStatus === 'bounced')) {
-      await supabaseAdmin
-        .from('participants')
-        .update({ message_failed: true })
-        .eq('id', participantId);
-    }
+    await applyDeliveryUpdate(messageSid, mappedStatus);
 
     res.status(200).send('');
   } catch (err) {
+    if (err instanceof Error && err.message.startsWith('Failed to')) {
+      res.status(500).send('DB error');
+      return;
+    }
     next(err);
   }
 }

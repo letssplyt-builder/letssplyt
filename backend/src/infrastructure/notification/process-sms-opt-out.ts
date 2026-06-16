@@ -1,3 +1,4 @@
+import { formatPhoneE164 } from '../security/phone-format';
 import { hashPhone } from '../security';
 import { supabaseAdmin } from '../supabase';
 
@@ -86,7 +87,12 @@ async function findActiveParticipantsForPhone(phoneHash: string): Promise<OptedO
  * TCPA STOP handler — marks global opt-out and updates all active participant rows for this phone.
  */
 export async function processSmsStopOptOut(phoneE164: string): Promise<OptedOutParticipantRow[]> {
-  const phoneHash = hashPhone(phoneE164);
+  const normalized = formatPhoneE164(phoneE164);
+  if (!normalized) {
+    throw new Error('Invalid phone number for STOP opt-out');
+  }
+
+  const phoneHash = hashPhone(normalized);
   const now = new Date().toISOString();
 
   const { error: optOutError } = await supabaseAdmin.from('sms_opt_outs').upsert(
@@ -137,7 +143,7 @@ export async function processSmsStopOptOut(phoneE164: string): Promise<OptedOutP
       to_status: 'opted_out',
       amount: participant.amount_owed,
       note: 'STOP received via SMS',
-      metadata: { changed_by: 'twilio_stop' },
+      metadata: { changed_by: 'sms_stop' },
     }));
 
     const { error: logError } = await supabaseAdmin.from('settlement_log').insert(settlementRows);

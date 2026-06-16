@@ -14,6 +14,7 @@ import joinWebRoutes from './modules/join/join-web.routes';
 import receiptsRoutes from './modules/receipts/receipts.routes';
 import settlementRoutes from './modules/settlement/settlement.routes';
 import twilioWebhookRouter from './modules/webhooks/twilio.routes';
+import telnyxWebhookRouter from './modules/webhooks/telnyx.routes';
 import breakdownRoutes from './modules/messages/breakdown.routes';
 import jobsRoutes from './modules/jobs/jobs.routes';
 import { errorHandler } from './modules/auth/auth.controller';
@@ -68,6 +69,8 @@ app.get('/health', (_req, res) => {
 
 app.use('/api/v1/webhooks/twilio', twilioWebhookRouter);
 app.use('/webhooks/twilio', twilioWebhookRouter);
+app.use('/api/v1/webhooks/telnyx', telnyxWebhookRouter);
+app.use('/webhooks/telnyx', telnyxWebhookRouter);
 
 app.use('/join', joinWebRoutes);
 app.use('/split', breakdownRoutes);
