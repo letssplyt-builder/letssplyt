@@ -1,5 +1,5 @@
+import { encryptPhone, hashPhone } from '../security';
 import { formatPhoneE164 } from '../security/phone-format';
-import { hashPhone } from '../security';
 import { supabaseAdmin } from '../supabase';
 
 export interface OptedOutParticipantRow {
@@ -98,6 +98,7 @@ export async function processSmsStopOptOut(phoneE164: string): Promise<OptedOutP
   const { error: optOutError } = await supabaseAdmin.from('sms_opt_outs').upsert(
     {
       phone_hash: phoneHash,
+      phone_encrypted: encryptPhone(normalized),
       opt_out_method: 'stop_reply',
       opted_out_at: now,
     },
