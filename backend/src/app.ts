@@ -17,6 +17,9 @@ import twilioWebhookRouter from './modules/webhooks/twilio.routes';
 import telnyxWebhookRouter from './modules/webhooks/telnyx.routes';
 import breakdownRoutes from './modules/messages/breakdown.routes';
 import jobsRoutes from './modules/jobs/jobs.routes';
+import analyticsRoutes from './modules/analytics/analytics.routes';
+import healthRoutes from './modules/health/health.routes';
+import { handleHealthCheck } from './modules/health/health.controller';
 import { errorHandler } from './modules/auth/auth.controller';
 
 const app = express();
@@ -63,8 +66,9 @@ app.use(
 app.use(globalRateLimiter);
 app.use(piiScrubberMiddleware);
 
-app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+app.use('/api/v1/health', healthRoutes);
+app.get('/health', (req, res, next) => {
+  void handleHealthCheck(req, res, next).catch(next);
 });
 
 app.use('/api/v1/webhooks/twilio', twilioWebhookRouter);
@@ -82,6 +86,7 @@ app.use('/api/v1/users', profileRoutes);
 app.use('/api/v1/events', eventRoutes);
 app.use('/api/v1/receipts', receiptsRoutes);
 app.use('/api/v1/settlement', settlementRoutes);
+app.use('/api/v1/analytics', analyticsRoutes);
 
 app.use(errorHandler);
 

@@ -10,6 +10,9 @@ export const mockTelnyxMessages = {
 
 export const mockTelnyxClient = {
   messages: mockTelnyxMessages,
+  messagingProfiles: {
+    list: jest.fn<() => Promise<{ data: unknown[] }>>().mockResolvedValue({ data: [] }),
+  },
 };
 
 export function telnyxMockFactory(): jest.Mock<() => typeof mockTelnyxClient> {

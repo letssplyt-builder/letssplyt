@@ -110,6 +110,12 @@ export interface StorageBucketMock {
       error: null | { message: string };
     }>
   >;
+  list: jest.Mock<
+    (
+      path: string,
+      options?: { limit?: number },
+    ) => Promise<{ data: unknown[] | null; error: null | { message: string; code?: string } }>
+  >;
 }
 
 function createStorageBucket(bucket: string): StorageBucketMock {
@@ -157,6 +163,14 @@ function createStorageBucket(bucket: string): StorageBucketMock {
           error: null,
         }),
       ),
+    list: jest
+      .fn<
+        (
+          path: string,
+          options?: { limit?: number },
+        ) => Promise<{ data: unknown[] | null; error: null | { message: string; code?: string } }>
+      >()
+      .mockResolvedValue({ data: [], error: null }),
   };
 }
 

@@ -24,6 +24,7 @@
     "smoke:bulk-settlement": "ts-node scripts/smoke-bulk-settlement.ts",
     "smoke:ledger": "ts-node scripts/smoke-ledger.ts",
     "smoke:jobs": "ts-node scripts/smoke-jobs.ts",
+    "smoke:analytics-health": "ts-node scripts/smoke-analytics-health.ts",
     "smoke:notifications": "ts-node scripts/smoke-notifications.ts",
     "cleanup:phone": "ts-node scripts/cleanup-auth-by-phone.ts"
   },

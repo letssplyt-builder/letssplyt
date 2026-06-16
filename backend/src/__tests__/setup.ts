@@ -27,6 +27,10 @@ process.env.APP_DOMAIN = 'http://localhost:3000';
 process.env.APP_ENV = 'test';
 process.env.PORT = '3001';
 process.env.GEMINI_API_KEY = 'test-gemini-key';
+process.env.ANALYTICS_SALT =
+  'abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd';
+process.env.UPSTASH_REDIS_REST_URL = 'https://test.upstash.io';
+process.env.UPSTASH_REDIS_REST_TOKEN = 'test-redis-token';
 
 jest.mock('telnyx', () => require('./mocks/telnyx.mock').telnyxMockFactory());
 

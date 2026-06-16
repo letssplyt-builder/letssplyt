@@ -29,6 +29,13 @@ export const mockTwilio = {
       .fn<() => Promise<MessageResult>>()
       .mockResolvedValue({ sid: 'SMtest123', status: 'queued' }),
   },
+  api: {
+    accounts: jest.fn<(sid: string) => { fetch: jest.Mock<() => Promise<{ sid: string }>> }>(
+      (sid: string) => ({
+        fetch: jest.fn<() => Promise<{ sid: string }>>().mockResolvedValue({ sid }),
+      }),
+    ),
+  },
 };
 
 export const mockValidateRequest = jest
