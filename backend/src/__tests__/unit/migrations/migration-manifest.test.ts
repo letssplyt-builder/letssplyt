@@ -32,6 +32,7 @@ const EXPECTED_MIGRATIONS = [
   '20260620000000_user_notifications.sql',
   '20260621000000_user_notification_preferences.sql',
   '20260622000000_users_phone_encrypted_nullable_on_delete.sql',
+  '20260623000000_otp_verifications.sql',
 ] as const;
 
 const REPO_ROOT = path.resolve(__dirname, '../../../../..');

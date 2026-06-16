@@ -1,3 +1,4 @@
+/** @deprecated Use outbound-messaging.service sendOutboundMessage() — removed in E11-S05 */
 import { twilioClient } from '../twilio';
 import {
   createDevBypassMessageSid,

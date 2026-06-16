@@ -28,12 +28,24 @@ jest.mock('../../../modules/participants/participant-link.service', () => ({
   upgradeGuestParticipantsToUser: jest.fn(() => Promise.resolve()),
 }));
 
+jest.mock('../../../infrastructure/otp/otp.service', () => ({
+  sendOTP: jest.fn<() => Promise<void>>(),
+  verifyOTP: jest.fn<() => Promise<void>>(),
+}));
+
+import { sendOTP, verifyOTP } from '../../../infrastructure/otp/otp.service';
+
+const mockSendOTP = jest.mocked(sendOTP);
+const mockVerifyOTP = jest.mocked(verifyOTP);
+
 const PHONE = '+15005550006';
 
 describe('auth.service OTP verify regressions', () => {
   beforeEach(() => {
     mockSupabase.__resetMock();
     jest.clearAllMocks();
+    mockSendOTP.mockReset();
+    mockVerifyOTP.mockReset();
     process.env.APP_ENV = 'test';
   });
 
@@ -251,23 +263,25 @@ describe('auth.service OTP verify regressions', () => {
     });
   });
 
-  describe('sendOtp with live Twilio', () => {
-    it('calls Twilio verifications.create with the normalised phone', async () => {
+  describe('sendOtp with live SMS', () => {
+    it('calls sendOTP with phone hash and E.164', async () => {
       process.env.OTP_DEV_BYPASS = 'false';
-      process.env.TWILIO_USE_LIVE_VERIFY = 'true';
+      mockSendOTP.mockResolvedValue(undefined);
       mockSupabase.__setMockResultForTable('users', { data: null, error: null });
 
       await sendOtp('+15005550006', 'sms', 'register');
 
-      const create = mockTwilio.verify.v2.services().verifications.create;
-      expect(create).toHaveBeenCalledWith({ to: '+15005550006', channel: 'sms' });
+      expect(mockSendOTP).toHaveBeenCalledWith(
+        expect.any(String),
+        '+15005550006',
+      );
     });
   });
 
   describe('verifyOtpAndCreateSession', () => {
-    it('calls Twilio verificationChecks when dev bypass is disabled', async () => {
+    it('calls verifyOTP when dev bypass is disabled', async () => {
       process.env.OTP_DEV_BYPASS = 'false';
-      process.env.TWILIO_USE_LIVE_VERIFY = 'true';
+      mockVerifyOTP.mockResolvedValue(undefined);
       mockSupabase.__setMockResultForTable('users', {
         data: { id: 'user-public-1', display_name: 'Alex', avatar_colour: '#4F46E5' },
         error: null,
@@ -279,15 +293,13 @@ describe('auth.service OTP verify regressions', () => {
 
       await verifyOtpAndCreateSession('+15005550006', '123456', undefined, 'login');
 
-      const checks = mockTwilio.verify.v2.services().verificationChecks.create;
-      expect(checks).toHaveBeenCalledWith({ to: '+15005550006', code: '123456' });
+      expect(mockVerifyOTP).toHaveBeenCalledWith(expect.any(String), '123456');
     });
 
-    it('throws INVALID_CODE when Twilio does not approve the code', async () => {
+    it('throws INVALID_CODE when verifyOTP rejects', async () => {
       process.env.OTP_DEV_BYPASS = 'false';
-      process.env.TWILIO_USE_LIVE_VERIFY = 'true';
-      const checks = mockTwilio.verify.v2.services().verificationChecks.create;
-      checks.mockResolvedValueOnce({ status: 'pending', valid: false });
+      const { AppError } = await import('../../../infrastructure/errors');
+      mockVerifyOTP.mockRejectedValueOnce(new AppError('INVALID_CODE', 'Invalid OTP code', 400));
 
       await expect(
         verifyOtpAndCreateSession('+15005550006', '000000', undefined, 'login'),

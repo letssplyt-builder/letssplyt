@@ -131,6 +131,7 @@ describe('Web join integration', () => {
     mockSupabase.__setMockResultForTable('funnel_checkpoints', { data: null, error: null });
     mockSupabase.__setMockResultForTable('sms_opt_outs', { data: null, error: null });
     mockSupabase.__setMockResultForTable('participants', { data: [], error: null });
+    mockSupabase.__setMockResultForTable('otp_verifications', { data: null, error: null });
 
     const getResponse = await request(app).get(`/join/${TOKEN}`);
     const csrfToken = extractCookie(getResponse.headers['set-cookie'], 'csrf_token');
@@ -151,7 +152,7 @@ describe('Web join integration', () => {
 
     expect(response.status).toBe(200);
     expect(response.text).toContain('Enter your code');
-    expect(mockTwilio.verify.v2.services).toHaveBeenCalled();
+    expect(mockTwilio.messages.create).toHaveBeenCalled();
     expect(mockSupabase.from).toHaveBeenCalledWith('funnel_checkpoints');
     process.env.OTP_DEV_BYPASS = 'true';
   });
@@ -245,6 +246,6 @@ describe('Web join integration', () => {
 
     expect(response.status).toBe(200);
     expect(response.text).toContain("You're in!");
-    expect(mockTwilio.verify.v2.services).not.toHaveBeenCalled();
+    expect(mockTwilio.messages.create).not.toHaveBeenCalled();
   });
 });

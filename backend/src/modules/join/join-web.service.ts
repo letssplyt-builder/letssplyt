@@ -9,7 +9,7 @@ import {
   findParticipantIdByUserInEvent,
   linkParticipantToUser,
 } from '../participants/participant-link.service';
-import { sendOtp, verifyTwilioCodeForJoin } from './join-otp';
+import { sendOtp, verifyOtpCodeForJoin } from './join-otp';
 import { JOIN_COUNTRY_OPTIONS } from './join-countries';
 
 export type JoinPageKind = 'form' | 'expired' | 'locked' | 'not_found';
@@ -405,7 +405,7 @@ export async function verifyJoinOtp(
   const phoneE164 = input.phoneE164.trim();
   const phoneHash = hashPhone(phoneE164);
 
-  const approved = await verifyTwilioCodeForJoin(phoneE164, input.code);
+  const approved = await verifyOtpCodeForJoin(phoneE164, input.code);
   if (!approved) {
     throw new JoinServiceError('INVALID_OTP', 'Incorrect code. Try again.', 400);
   }

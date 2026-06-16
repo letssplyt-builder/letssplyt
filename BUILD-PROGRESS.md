@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
 **Last updated:** 2026-06-07
-**Current story:** E12-S01 — Analytics Event Ingestion + Health Check
+**Current story:** E11-S05 — Telnyx Provider + Outbound Messaging Migration
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -83,6 +83,11 @@
 ### Epic 11: Account Management
 - [x] E11-S01 — Biometric Authentication (Option B skip, idle lock, OTP/logout fixes) (2026-06-07)
 - [x] E11-S02 — Settings Screen + Delete Account (3-screen flow, full PII wipe) (2026-06-07)
+- [x] E11-S03 — SMS Provider Abstraction Foundation (factory + Twilio adapter + outbound facade) (2026-06-07)
+- [x] E11-S04 — Custom OTP Service (replaces Twilio Verify; auth + web join) (2026-06-07)
+- [ ] E11-S05 — Telnyx Provider + Outbound Messaging Migration
+- [ ] E11-S06 — Messaging Webhooks + Inbound STOP/START
+- [ ] E11-S07 — QStash OTP Cleanup, Docs, Smoke & Rollout
 
 ### Epic 12: Launch Readiness
 - [ ] E12-S01 — Analytics Event Ingestion + Health Check
@@ -105,8 +110,8 @@
 |---|---|---|---|---|
 | Tier 1 — Foundation | 4 | 16 | 16 | 0 |
 | Tier 2 — Core Flow | 5 | 24 | 20 | 4 |
-| Tier 3 — Operations | 4 | 13 | 4 | 9 |
-| **Total** | **13** | **53** | **34** | **19** |
+| Tier 3 — Operations | 4 | 18 | 4 | 14 |
+| **Total** | **13** | **58** | **34** | **24** |
 
 ---
 
@@ -144,3 +149,4 @@
 - [2026-06-07] — E10-S02 — Expo push pipeline (`push.service.ts`, dev log-only), in-app inbox (`user_notifications`, GET/PATCH APIs), notification center UI (bell + badge on Dashboard/Events, `NotificationsScreen`, `notificationStore`), revised push policy (member self-report auto-settles — no confirm push to member; creator pushes: member paid, fully settled, member paid all; member pushes: added, nudge, share ready/edited). Navigation fixes (`navigateFromNotification`, `navigateToHomeTab`, tab stack reset). Badge real-time fix (`apiPatchAuth`, store race guards). Tests: backend 329 (unit + integration notifications), mobile 252; `smoke:notifications` live script. Docs: 01–06, 08, 10, 12, 04, MIGRATIONS, BUILD-PROGRESS.
 - [2026-06-07] — Product/docs — Epic 9 realigned to 4 stories: E09-S01 per-event API, **E09-S02 bulk settle-all**, E09-S03 ledger (partial E07-S03), E09-S04 mobile actions (partial E07-S03). Total stories 53.
 - [2026-06-07] — E11-S02 — Settings tab (Account/Legal/Notifications/Security), in-app legal docs (`LegalDocumentScreen` + synced markdown), delete account flow (balance gate, DELETE confirm, tombstone + auth delete), notification prefs migration, `phone_encrypted` nullable migration, delete service fallbacks (PGRST204/`name_encrypted`, DELETED tombstone). Phone entry: tappable Terms & Privacy links on auth stack. Tests: delete.service 10, PhoneEntry 5, DeleteConfirm/Deleted mobile.
+- [2026-06-07] — E11-S03 + E11-S04 — SMS provider factory (Twilio adapter, outbound facade), custom OTP (`otp_verifications`, otp.service), Twilio Verify removed from auth + web join. Telnyx planning docs in `docs/Telnyx Implementation/`. 362 backend tests passing.

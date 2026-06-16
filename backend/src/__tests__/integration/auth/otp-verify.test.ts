@@ -1,8 +1,18 @@
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import request from 'supertest';
 import app from '../../../app';
+import { AppError } from '../../../infrastructure/errors';
 import { mockSupabase } from '../../mocks/supabase.mock';
-import { mockTwilio } from '../../mocks/twilio.mock';
+
+jest.mock('../../../infrastructure/otp/otp.service', () => ({
+  sendOTP: jest.fn(),
+  verifyOTP: jest.fn(),
+  purgeExpiredOTPs: jest.fn(),
+}));
+
+import { verifyOTP } from '../../../infrastructure/otp/otp.service';
+
+const mockVerifyOTP = jest.mocked(verifyOTP);
 
 function queueNewUserMocks(userId = 'new-user-id') {
   mockSupabase.__pushMockResultForTable('users', { data: null, error: null });
@@ -29,8 +39,10 @@ function queueNewUserMocks(userId = 'new-user-id') {
 describe('POST /api/v1/auth/otp/verify', () => {
   beforeEach(() => {
     mockSupabase.__resetMock();
+    mockVerifyOTP.mockReset();
     process.env.APP_ENV = 'test';
     process.env.OTP_DEV_BYPASS = 'true';
+    mockVerifyOTP.mockResolvedValue(undefined);
   });
 
   it('returns 200 with access_token for a valid dev-bypass code', async () => {
@@ -53,12 +65,9 @@ describe('POST /api/v1/auth/otp/verify', () => {
     expect(response.body).not.toHaveProperty('phone_hash');
   });
 
-  it('returns 400 INVALID_CODE when Twilio rejects the code', async () => {
+  it('returns 400 INVALID_CODE when verifyOTP rejects', async () => {
     process.env.OTP_DEV_BYPASS = 'false';
-    process.env.TWILIO_USE_LIVE_VERIFY = 'true';
-
-    const checks = mockTwilio.verify.v2.services().verificationChecks.create;
-    checks.mockResolvedValueOnce({ status: 'pending', valid: false });
+    mockVerifyOTP.mockRejectedValueOnce(new AppError('INVALID_CODE', 'Invalid OTP code', 400));
 
     const response = await request(app)
       .post('/api/v1/auth/otp/verify')

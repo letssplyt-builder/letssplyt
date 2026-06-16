@@ -2,10 +2,10 @@ import { randomUUID } from 'crypto';
 import { parsePhoneNumberFromString } from 'libphonenumber-js';
 import { AppError, RateLimitError } from '../../infrastructure/errors';
 import logger from '../../infrastructure/logger';
+import { sendOTP, verifyOTP } from '../../infrastructure/otp/otp.service';
 import { encryptPhone, hashPhone } from '../../infrastructure/security';
 import { supabaseAdmin } from '../../infrastructure/supabase';
 import { createAdminSession, internalEmailForUserId } from '../../infrastructure/supabase-auth';
-import { twilioClient, getVerifyServiceSid } from '../../infrastructure/twilio';
 import { checkOtpRequestRate, recordFailedOtpVerify } from '../../middleware/rateLimiter';
 import { upgradeGuestParticipantsToUser } from '../participants/participant-link.service';
 import { isOtpDevBypassEnabled } from './otp-dev-bypass';
@@ -137,7 +137,7 @@ export async function sendOtp(
 
   if (isOtpDevBypassEnabled()) {
     logger.info({
-      msg: 'OTP dev bypass — Twilio send skipped (no SMS). Use any 6-digit code on the verify screen.',
+      msg: 'OTP dev bypass — SMS send skipped (no SMS). Use any 6-digit code on the verify screen.',
       phoneHash,
     });
     return {
@@ -148,70 +148,48 @@ export async function sendOtp(
     };
   }
 
-  const verifySid = getVerifyServiceSid();
-  try {
-    const verification = await twilioClient.verify.v2
-      .services(verifySid)
-      .verifications.create({ to: phoneE164, channel });
+  if (channel === 'whatsapp') {
+    logger.info({
+      msg: 'Custom OTP is SMS-only; verification code will be sent via SMS',
+      phoneHash,
+    });
+  }
 
+  try {
+    await sendOTP(phoneHash, phoneE164);
     return {
       sent: true,
-      channel: verification.channel as 'sms' | 'whatsapp',
+      channel: 'sms',
       expires_in_seconds: 600,
       account_exists: accountExists,
     };
   } catch (err: unknown) {
-    const twilioErr = err as { code?: number; message?: string };
     logger.error({
-      msg: 'Twilio OTP send failed',
-      twilioCode: twilioErr.code,
+      msg: 'OTP send failed',
       phoneHash,
-      hint:
-        twilioErr.code === 20008
-          ? 'Twilio Verify does not support test credentials. Use OTP dev bypass (default in development) or set TWILIO_USE_LIVE_VERIFY=true with live creds.'
-          : undefined,
+      error: err instanceof Error ? err.message : String(err),
     });
-    if (twilioErr.code === 60212) {
-      const fallback = await twilioClient.verify.v2
-        .services(verifySid)
-        .verifications.create({ to: phoneE164, channel: 'sms' });
-      return {
-        sent: true,
-        channel: fallback.channel as 'sms' | 'whatsapp',
-        expires_in_seconds: 600,
-        account_exists: accountExists,
-      };
-    }
-    if (twilioErr.code === 60200) {
-      throw new AppError('INVALID_PHONE', 'Invalid phone number', 400);
-    }
-    if (twilioErr.code === 20429) {
-      throw new AppError('OTP_RATE_LIMITED', 'Too many OTP requests', 429);
-    }
     throw new AppError('OTP_UNAVAILABLE', 'Unable to send OTP', 503);
   }
 }
 
-async function verifyTwilioCode(phoneE164: string, code: string): Promise<boolean> {
-  if (isOtpDevBypassEnabled()) {
-    return /^[0-9]{6}$/.test(code);
-  }
-
+async function verifyOtpCode(phoneHash: string, code: string): Promise<void> {
   try {
-    const check = await twilioClient.verify.v2
-      .services(getVerifyServiceSid())
-      .verificationChecks.create({ to: phoneE164, code });
-
-    return check.status === 'approved' && check.valid === true;
-  } catch (err: unknown) {
-    const twilioErr = err as { code?: number };
-    if (twilioErr.code === 60202) {
-      throw new AppError('OTP_MAX_ATTEMPTS', 'Too many attempts. Request a new code.', 429);
+    await verifyOTP(phoneHash, code);
+  } catch (err) {
+    if (err instanceof AppError && err.code === 'INVALID_CODE') {
+      try {
+        recordFailedOtpVerify(phoneHash);
+      } catch (rateErr) {
+        if (rateErr instanceof RateLimitError) {
+          throw new AppError('TOO_MANY_REQUESTS', rateErr.message, 429, {
+            retry_after_seconds: rateErr.retryAfterSeconds,
+          });
+        }
+        throw rateErr;
+      }
     }
-    if (twilioErr.code === 60203) {
-      throw new AppError('CODE_EXPIRED', 'Code has expired. Request a new one.', 400);
-    }
-    return false;
+    throw err;
   }
 }
 
@@ -607,20 +585,7 @@ export async function verifyOtpAndCreateSession(
   const phoneHash = hashPhone(phoneE164);
   const phoneEncrypted = encryptPhone(phoneE164);
 
-  const approved = await verifyTwilioCode(phoneE164, code);
-  if (!approved) {
-    try {
-      recordFailedOtpVerify(phoneHash);
-    } catch (err) {
-      if (err instanceof RateLimitError) {
-        throw new AppError('TOO_MANY_REQUESTS', err.message, 429, {
-          retry_after_seconds: err.retryAfterSeconds,
-        });
-      }
-      throw err;
-    }
-    throw new AppError('INVALID_CODE', 'Invalid OTP code', 400);
-  }
+  await verifyOtpCode(phoneHash, code);
 
   const resolved = await resolveUserAfterOtp(
     phoneE164,

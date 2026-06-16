@@ -2937,6 +2937,144 @@ mobile/src/screens/auth/PhoneEntryScreen.test.tsx
 
 ---
 
+### E11-S03 — SMS Provider Abstraction Foundation
+
+**Description:** Introduce the provider-agnostic SMS layer: `SMSProvider` interface, `createSMSProvider()` factory (mirrors LLM factory), `TwilioSMSProvider` wrapping existing Programmable Messaging + WhatsApp logic, and `sendOutboundMessage()` facade with messaging dev-bypass. **No OTP or Telnyx changes in this story** — call sites still use `sendTwilioMessage` until E11-S05.
+
+**Authoritative specs:**
+- Architecture: `docs/Telnyx Implementation/E11-S03-Architecture.md`
+- Implementation checklist: `docs/Telnyx Implementation/E11-S03-Implementation-Spec.md` §2
+
+**Prompt:**
+*"Build SMS abstraction per E11-S03-Architecture.md §4–§4.3. (1) `backend/src/infrastructure/sms/types.ts` — `SendOutboundMessageParams` with `preferredChannel`, `SendOutboundMessageResult` with `messageId` + `channel`. (2) `factory.ts` — `SMS_PROVIDER` default `twilio`, singleton + `resetSMSProvider()` for tests. (3) `TwilioSMSProvider` — move logic from `twilio-messaging.ts`: `TWILIO_PHONE_NUMBER`, `TWILIO_WHATSAPP_NUMBER`, WhatsApp-first + SMS fallback, `statusCallback` when `APP_URL` is public HTTPS. (4) `outbound-messaging.service.ts` — `sendOutboundMessage(phoneE164, preferredChannel, body)` with `isMessagingDevBypassEnabled()`. (5) Telnyx provider stub or not registered until E11-S05. (6) Mark `twilio-messaging.ts` deprecated; do not migrate send.service yet."*
+
+**Files created:**
+- `backend/src/infrastructure/sms/types.ts`
+- `backend/src/infrastructure/sms/factory.ts`
+- `backend/src/infrastructure/sms/providers/twilio.provider.ts`
+- `backend/src/infrastructure/notification/outbound-messaging.service.ts`
+- `backend/src/__tests__/unit/infrastructure/sms/factory.test.ts`
+- `backend/src/__tests__/unit/infrastructure/sms/providers/twilio.provider.test.ts`
+- `backend/src/__tests__/unit/infrastructure/notification/outbound-messaging.service.test.ts`
+
+**Acceptance Criteria:**
+1. `createSMSProvider()` is the only place providers are instantiated
+2. Twilio provider tests cover SMS, WhatsApp, WhatsApp→SMS fallback, dev bypass via facade
+3. `SMS_PROVIDER=twilio` (default) — no change to production send path (send.service still on old import)
+4. `npm run build` and full backend test suite pass
+
+**Tests required:** See Implementation Spec §2.3 and §8.
+
+---
+
+### E11-S04 — Custom OTP Service (replaces Twilio Verify)
+
+**Description:** Replace Twilio Verify with custom OTP: `otp_verifications` table, `otp.service.ts`, integration in **both** `auth.service.ts` and `join-otp.ts`. OTP delivery uses `createSMSProvider()` (Twilio transport when `SMS_PROVIDER=twilio`). Preserve all mobile/API error codes.
+
+**Authoritative specs:** Architecture §5; Implementation Spec §3.
+
+**Prompt:**
+*"Implement custom OTP per Architecture §5. Migration `otp_verifications`. `sendOTP` / `verifyOTP` / `purgeExpiredOTPs`. Hash codes with HMAC-SHA256(PII_HMAC_SALT). Use existing `checkOtpRequestRate` — no duplicate DB rate limit. Error codes: INVALID_CODE 400, CODE_EXPIRED 400, OTP_MAX_ATTEMPTS 429. Remove all Twilio Verify calls and `TWILIO_VERIFY_SERVICE_SID`. Web join uses same otp.service. OTP always sent via SMS (preferredChannel sms). Dev bypass unchanged."*
+
+**Files created:**
+- `supabase/migrations/20260623000000_otp_verifications.sql`
+- `backend/src/infrastructure/otp/otp.service.ts`
+- `backend/src/__tests__/unit/infrastructure/otp/otp.service.test.ts`
+
+**Files modified:**
+- `backend/src/modules/auth/auth.service.ts`
+- `backend/src/modules/join/join-otp.ts`
+- `backend/src/infrastructure/twilio.ts` (remove Verify helpers)
+- `backend/.env.example`, `backend/src/__tests__/setup.ts`
+- Auth + join tests (see Implementation Spec §3.7)
+
+**Acceptance Criteria:**
+1. `grep TWILIO_VERIFY backend/src` returns nothing
+2. App + web join OTP flows pass integration tests with exact error codes
+3. OTP codes stored hashed only; never logged
+4. `SMS_PROVIDER=twilio` — OTP SMS via Twilio Programmable Messaging (not Verify)
+
+**Tests required:** `otp.service.test.ts` (9+ cases), `auth.service.test.ts`, `otp-verify.test.ts`, `join.service.test.ts`, `web-join.test.ts`.
+
+---
+
+### E11-S05 — Telnyx Provider + Outbound Messaging Migration
+
+**Description:** Implement `TelnyxSMSProvider`, register in factory, migrate `send.service.ts` and `settlement.service.ts` from `sendTwilioMessage` to `sendOutboundMessage`. Delete `twilio-messaging.ts`. Telnyx path is **SMS-only** (international WhatsApp not available).
+
+**Authoritative specs:** Architecture §4.2, §6; Implementation Spec §4; `Telnyx-Setup-Guide.md`.
+
+**Prompt:**
+*"Complete Telnyx outbound per Implementation Spec §4. `TelnyxSMSProvider` using telnyx SDK `messages.send`. Env: TELNYX_API_KEY, TELNYX_FROM_NUMBER. Migrate send.service + settlement nudge to outbound-messaging.service. Store provider message ID in notification_log.twilio_sid. Delete twilio-messaging.ts. When SMS_PROVIDER=telnyx and preferredChannel whatsapp, send SMS and log warn."*
+
+**Files created:**
+- `backend/src/infrastructure/sms/providers/telnyx.provider.ts` (full)
+- `backend/src/__tests__/unit/infrastructure/sms/providers/telnyx.provider.test.ts`
+
+**Files deleted:**
+- `backend/src/infrastructure/notification/twilio-messaging.ts`
+
+**Acceptance Criteria:**
+1. `SMS_PROVIDER=telnyx` routes payment + nudge through Telnyx (mocked in CI)
+2. `SMS_PROVIDER=twilio` preserves WhatsApp-first for international
+3. No `sendTwilioMessage` references in backend/src
+4. Manual on-net dev test documented (two Telnyx numbers)
+
+**Tests required:** telnyx.provider.test.ts, send.service.test.ts, settlement.service.test.ts, factory.test.ts (telnyx case).
+
+---
+
+### E11-S06 — Messaging Webhooks + Inbound STOP/START
+
+**Description:** Shared delivery and inbound handlers so Twilio and Telnyx webhooks update `notification_log` and `participants` identically. Add Telnyx webhook routes. Implement **START** opt-in (gap in current codebase — legal docs already mention START).
+
+**Authoritative specs:** Architecture §7; Implementation Spec §5.
+
+**Prompt:**
+*"Extract `applyDeliveryUpdate` from twilio.controller into messaging-delivery.service.ts. Telnyx controller: message.finalized → delivery; message.received → STOP/START/HELP via messaging-inbound.service. Add processSmsStartOptIn (removes sms_opt_outs, clears users.is_opted_out — does NOT revert participant payment_status). Routes: /api/v1/webhooks/telnyx/messaging + /webhooks/telnyx mirror. Telnyx IP guard 192.76.120.192/27 (skip in development). Twilio opt-out handler uses shared inbound service; keep TwiML response."*
+
+**Files created:**
+- `backend/src/infrastructure/notification/messaging-delivery.service.ts`
+- `backend/src/infrastructure/notification/messaging-inbound.service.ts`
+- `backend/src/infrastructure/notification/process-sms-opt-in.ts`
+- `backend/src/middleware/telnyx-ip-guard.ts`
+- `backend/src/modules/webhooks/telnyx.controller.ts`
+- `backend/src/modules/webhooks/telnyx.routes.ts`
+- Webhook + inbound unit tests (see Implementation Spec §5.7)
+
+**Acceptance Criteria:**
+1. Telnyx delivery webhook sets `message_delivered_at` (parity with Twilio)
+2. STOP on Telnyx and Twilio both record opt-out
+3. START removes `sms_opt_outs` row
+4. Existing twilio.webhook.test.ts still passes
+5. Webhook responds 200 within 5s
+
+---
+
+### E11-S07 — QStash OTP Cleanup, Docs, Smoke & Rollout
+
+**Description:** QStash job for expired OTP rows, update integration contracts and related docs, smoke scripts, legal sync plan, rollout checklist. Coordinate E12-S01 health check to probe active SMS provider.
+
+**Authoritative specs:** Implementation Spec §6; `Telnyx-Setup-Guide.md` §9–§10.
+
+**Prompt:**
+*"Add POST /api/v1/jobs/purge-expired-otps with QStash verification, schedule */15 * * * *. Update docs/06-Integration-Contracts.md (Custom OTP + SMS factory + Telnyx), 03, 04, 05, 09, 10, 11, CLAUDE.md. Update smoke-messages-preview for SMS_PROVIDER. Add rollout checklist to BUILD-PROGRESS. Sync Telnyx Privacy variant when switching production provider (mobile legal sync script)."*
+
+**Files created:**
+- `backend/src/modules/jobs/purge-otp.job.ts` (or handler in jobs.controller)
+
+**Acceptance Criteria:**
+1. QStash job deletes expired otp_verifications rows
+2. docs/06 reflects factory architecture (authoritative integration contract)
+3. Full backend + mobile test suites green
+4. Rollout checklist completed for dev (on-net Telnyx) before staging TFN
+
+**Tests required:** Job handler unit test; documentation review; smoke script run.
+
+**Note for E12-S01:** Health check must use `SMS_PROVIDER` to probe Twilio or Telnyx (not hardcoded Twilio only).
+
+---
+
 ## EPIC 12 — Analytics, Monitoring & Launch Readiness
 **Depends on:** All epics complete
 **Delivers:** Production observability, error monitoring, test coverage reporting, CI/CD fully operational, EAS builds configured
@@ -2946,7 +3084,7 @@ mobile/src/screens/auth/PhoneEntryScreen.test.tsx
 **Description:** Build the analytics endpoint that receives events from the mobile app, and a comprehensive health check endpoint that verifies all external services are reachable.
 
 **Prompt:**
-*"Build analytics and health endpoints. (1) POST /api/v1/analytics/events (authenticated): body { events: [{ name: string, properties: object, timestamp: number }] }. Validates event names against an allowed enum (to prevent injection): defined in backend/src/modules/analytics/events.enum.ts — include all events from docs/10-Engineering-Operations.md Section 5 (receipt_parsed_success, receipt_parsed_failed, split_calculated, messages_sent, payment_self_reported, payment_confirmed, event_created, event_locked, etc.). Hashes user ID with ANALYTICS_SALT before writing to analytics_events (never store raw user_id). Writes batch with supabaseAdmin to analytics_events partition. Returns { recorded: count }. (2) GET /api/v1/health: checks each dependency and returns their status. Checks: database (SELECT 1 from Supabase), storage (list bucket 'receipts'), redis (PING to Upstash), ai_gemini (if APP_ENV !== 'production': call Gemini with empty prompt, check 200 response), twilio (check Twilio account status API). Returns { status: 'ok'|'degraded'|'error', checks: { database: 'ok'|'error', storage: 'ok'|'error', redis: 'ok'|'error', ai: 'ok'|'error', twilio: 'ok'|'error' }, version: package.json version, environment: APP_ENV }. Overall status is 'degraded' if any check fails, 'ok' if all pass. Health endpoint requires NO authentication."*
+*"Build analytics and health endpoints. (1) POST /api/v1/analytics/events (authenticated): body { events: [{ name: string, properties: object, timestamp: number }] }. Validates event names against an allowed enum (to prevent injection): defined in backend/src/modules/analytics/events.enum.ts — include all events from docs/10-Engineering-Operations.md Section 5 (receipt_parsed_success, receipt_parsed_failed, split_calculated, messages_sent, payment_self_reported, payment_confirmed, event_created, event_locked, etc.). Hashes user ID with ANALYTICS_SALT before writing to analytics_events (never store raw user_id). Writes batch with supabaseAdmin to analytics_events partition. Returns { recorded: count }. (2) GET /api/v1/health: checks each dependency and returns their status. Checks: database (SELECT 1 from Supabase), storage (list bucket 'receipts'), redis (PING to Upstash), ai_gemini (if APP_ENV !== 'production': call Gemini with empty prompt, check 200 response), sms (probe active provider per `SMS_PROVIDER`: Twilio account API if `twilio`, Telnyx API if `telnyx` — see E11-S07). Returns { status: 'ok'|'degraded'|'error', checks: { database, storage, redis, ai, sms_provider, sms }, version, environment: APP_ENV }. Overall status is 'degraded' if any check fails, 'ok' if all pass. Health endpoint requires NO authentication."*
 
 **Files created:**
 - `backend/src/modules/analytics/analytics.controller.ts`

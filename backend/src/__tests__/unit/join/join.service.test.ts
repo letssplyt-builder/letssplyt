@@ -81,7 +81,7 @@ describe('join-web.service', () => {
     ).rejects.toMatchObject({ code: 'OPTED_OUT' });
 
     expect(mockSupabase.from).toHaveBeenCalledWith('sms_opt_outs');
-    expect(mockTwilio.verify.v2.services).not.toHaveBeenCalled();
+    expect(mockTwilio.messages.create).not.toHaveBeenCalled();
   });
 
   it('funnel_checkpoint written at phone_entered and join_confirmed', async () => {

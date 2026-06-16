@@ -1,6 +1,6 @@
 import { AppError } from '../../infrastructure/errors';
 import logger from '../../infrastructure/logger';
-import { twilioClient, getVerifyServiceSid } from '../../infrastructure/twilio';
+import { sendOTP, verifyOTP } from '../../infrastructure/otp/otp.service';
 import { isOtpDevBypassEnabled } from '../auth/otp-dev-bypass';
 import { hashPhone } from '../../infrastructure/security';
 import { supabaseAdmin } from '../../infrastructure/supabase';
@@ -36,40 +36,33 @@ export async function sendOtp(phoneE164: string): Promise<JoinOtpSendResult> {
 
   if (isOtpDevBypassEnabled()) {
     logger.info({
-      msg: 'Join OTP dev bypass — Twilio send skipped',
+      msg: 'Join OTP dev bypass — SMS send skipped',
       phoneHash,
     });
     return { sent: true };
   }
 
-  const verifySid = getVerifyServiceSid();
   try {
-    await twilioClient.verify.v2.services(verifySid).verifications.create({
-      to: phoneE164,
-      channel: 'sms',
-    });
+    await sendOTP(phoneHash, phoneE164);
     return { sent: true };
   } catch (err: unknown) {
-    const twilioErr = err as { code?: number };
-    logger.error({ msg: 'Twilio join OTP send failed', twilioCode: twilioErr.code, phoneHash });
-    if (twilioErr.code === 60200) {
-      throw new AppError('INVALID_PHONE', 'Invalid phone number', 400);
+    logger.error({
+      msg: 'Join OTP send failed',
+      phoneHash,
+      error: err instanceof Error ? err.message : String(err),
+    });
+    if (err instanceof AppError && err.code === 'INVALID_PHONE') {
+      throw err;
     }
     return { sent: false, reason: 'OTP_UNAVAILABLE' };
   }
 }
 
-export async function verifyTwilioCodeForJoin(phoneE164: string, code: string): Promise<boolean> {
-  if (isOtpDevBypassEnabled()) {
-    return /^[0-9]{6}$/.test(code);
-  }
-
+export async function verifyOtpCodeForJoin(phoneE164: string, code: string): Promise<boolean> {
+  const phoneHash = hashPhone(phoneE164);
   try {
-    const check = await twilioClient.verify.v2
-      .services(getVerifyServiceSid())
-      .verificationChecks.create({ to: phoneE164, code });
-
-    return check.status === 'approved' && check.valid === true;
+    await verifyOTP(phoneHash, code);
+    return true;
   } catch {
     return false;
   }
