@@ -155,6 +155,9 @@ QSTASH_TOKEN:
 QSTASH_CURRENT_SIGNING_KEY:
 QSTASH_NEXT_SIGNING_KEY:
 
+## Sentry (error monitoring — one DSN covers backend + mobile)
+DSN:
+
 ## Domain Name:
 
 ## Expo Username:
@@ -338,6 +341,31 @@ Database → Replication → enable Realtime for the `participants` table
 
 ---
 
+#### Sentry — Free (error monitoring)
+
+Sentry captures **crashes and unhandled errors** from the backend API and the mobile app. It is **not** used for product analytics (that is `POST /analytics/events` in E12-S01).
+
+**Cost:** Developer plan is **$0** — about 5,000 errors/month on the free tier (enough for dev and early launch). You need **one Sentry account**, not three.
+
+**When to set this up:** After **E12-S02** is built (Sentry SDK wired in code). You can create the account anytime in Part 1; add Doppler secrets when you are ready to verify.
+
+1. Go to **sentry.io** → Sign up (free Developer plan)
+2. Create an **Organization** (e.g. `letssplyt`)
+3. Create **one project** that covers both surfaces:
+   - Platform: **React Native** (works for mobile; backend uses the same DSN)
+   - Project name: e.g. `letssplyt`
+4. After creation, open **Settings → Client Keys (DSN)** and copy the **DSN** — it looks like:
+   `https://xxxxxxxx@o123456.ingest.us.sentry.io/7654321`
+5. Save it in `my-keys.txt` as **Sentry DSN**
+
+**One DSN, three environments:** Use the **same DSN** in Doppler for development, staging, and production. LetsSplyt tags every event with `environment` from `APP_ENV` (backend) and `EXPO_PUBLIC_APP_ENV` (mobile), so the Sentry dashboard can filter `development` vs `staging` vs `production`.
+
+> Optional: create separate Sentry projects per environment if you want completely separate dashboards. For a solo build, one project + environment tags is simpler.
+
+**What if DSN is missing?** The app still runs. Sentry init is skipped; errors only appear in Railway logs / local terminal (structured Pino logging still works).
+
+---
+
 #### Doppler — Free
 1. Go to **doppler.com** → Sign up with Google
 2. Create Project → name: `letssplyt`
@@ -414,6 +442,18 @@ Open doppler.com → letssplyt → **development** environment first. Add each s
 | `QSTASH_TOKEN` | Your QStash Token | Same | Same |
 | `QSTASH_CURRENT_SIGNING_KEY` | Current key | Same | Same |
 | `QSTASH_NEXT_SIGNING_KEY` | Next key | Same | Same |
+
+**Sentry (same DSN in all environments — filter by `environment` tag in Sentry UI):**
+
+| Secret | Development | Staging | Production |
+|---|---|---|---|
+| `SENTRY_DSN` | Your Sentry DSN | Same DSN | Same DSN |
+| `EXPO_PUBLIC_SENTRY_DSN` | Same DSN | Same DSN | Same DSN |
+| `EXPO_PUBLIC_APP_ENV` | `development` | `staging` | `production` |
+
+> `APP_ENV` (already in the table above) sets the backend Sentry `environment` tag. `EXPO_PUBLIC_APP_ENV` does the same for mobile builds. Set both to match each Doppler environment name.
+
+> **EAS builds:** `EXPO_PUBLIC_*` values are baked in at build time. After adding Sentry secrets to Doppler staging/production, run a **new** `eas build` for those environments — restarting Expo Go alone is not enough for staging/production binaries.
 
 **Security keys — generate DIFFERENT values for each environment:**
 
@@ -614,6 +654,42 @@ ngrok config add-authtoken YOUR_TOKEN  # get your token at ngrok.com (free accou
 
 ---
 
+### 2.4B — Sentry Error Monitoring (after E12-S02)
+
+Structured logging (JSON in your terminal / Railway) works without Sentry. Sentry adds a **dashboard** for grouped errors and mobile crash stack traces.
+
+**Prerequisites:** E12-S02 code merged; Sentry account created (Part 1); secrets in Doppler **development**:
+
+```bash
+doppler secrets get SENTRY_DSN --plain          # should print your DSN, not an error
+doppler secrets get EXPO_PUBLIC_SENTRY_DSN --plain
+doppler secrets get EXPO_PUBLIC_APP_ENV --plain # should print development
+```
+
+**Verify backend (local):**
+
+1. Restart the backend so it picks up new secrets:
+   ```bash
+   cd ~/letssplyt/backend
+   doppler run -- npm run dev
+   ```
+2. Trigger the dev-only test route (non-production only):
+   ```bash
+   curl -i http://localhost:3000/api/v1/debug/sentry-test
+   ```
+   Expect **HTTP 500** — that is correct (deliberate throw).
+3. Open **sentry.io** → your project → **Issues** → within ~30 seconds you should see an error tagged `environment: development`.
+
+**Verify mobile (Expo Go or dev client):**
+
+1. Restart Expo after Doppler secrets are set (`npx expo start` with secrets available — use `doppler run -- npx expo start` if needed).
+2. Force a JS error in dev (e.g. temporary test button) or use a staging EAS build for native crash testing.
+3. Confirm the issue appears in Sentry with `environment: development`.
+
+> Sentry free tier allows **one dashboard user**. That is fine while you are building solo.
+
+---
+
 ### 2.5 — Feature Build Instructions
 
 All feature prompts, prototype references, and build instructions are in **`LetsSplyt-Antigravity.html`** (open in your browser).
@@ -639,6 +715,12 @@ All feature prompts, prototype references, and build instructions are in **`Lets
    - `APP_DOMAIN` = `letssplyt.up.railway.app`
    - `EXPO_PUBLIC_API_URL` = `https://letssplyt.up.railway.app/api/v1`
    - `EXPO_PUBLIC_APP_DOMAIN` = `https://letssplyt.up.railway.app`
+5. Confirm **Sentry** secrets exist in Doppler **staging** (same DSN as dev; `APP_ENV=staging`, `EXPO_PUBLIC_APP_ENV=staging`). Railway redeploys after Doppler sync.
+6. After deploy, smoke-test Sentry on staging:
+   ```bash
+   curl -i https://letssplyt.up.railway.app/api/v1/debug/sentry-test
+   ```
+   Check Sentry Issues — event should show `environment: staging` (not `development`).
 
 ---
 
@@ -727,6 +809,8 @@ supabase.com → letssplyt-production → Settings → Billing → Pro ($25/mont
 
 Create a separate Railway service for production. Connect Doppler production environment to it. Update `APP_DOMAIN` in Doppler production.
 
+Confirm **Sentry** secrets in Doppler **production**: same `SENTRY_DSN` and `EXPO_PUBLIC_SENTRY_DSN`, with `APP_ENV=production` and `EXPO_PUBLIC_APP_ENV=production`. The `/api/v1/debug/sentry-test` route is **disabled** in production — verify via a real error in staging first, then rely on Sentry alerts for production.
+
 ---
 
 ### 4.3 — Raise Anthropic Spending Limit
@@ -796,7 +880,7 @@ ios: {
 
 - [ ] Privacy Policy live at your domain/privacy
 - [ ] Terms of Service live at your domain/terms
-- [ ] Sentry error monitoring connected
+- [ ] Sentry connected: `SENTRY_DSN` + `EXPO_PUBLIC_SENTRY_DSN` in all three Doppler environments; test event seen in Sentry with `environment: staging`; production `APP_ENV` / `EXPO_PUBLIC_APP_ENV` = `production` (see §2.4B)
 - [ ] A2P 10DLC approved by Twilio
 - [ ] Production Supabase on Pro plan
 - [ ] Anthropic spending limit set to $100/month
@@ -835,6 +919,11 @@ eas build --profile production --platform ios
 
 # Check Doppler secrets
 doppler secrets --plain
+doppler secrets get SENTRY_DSN --plain
+doppler secrets get EXPO_PUBLIC_SENTRY_DSN --plain
+
+# Verify Sentry (development/staging only — expect HTTP 500)
+curl -i http://localhost:3000/api/v1/debug/sentry-test
 
 # See current Doppler environment
 doppler configure

@@ -73,6 +73,7 @@ module.exports = {
       projectId: '86a779d7-3bdf-4af9-ab0a-0e597e113aaa',
     },
     apiUrl: process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:3000',
+    appEnv: process.env.EXPO_PUBLIC_APP_ENV ?? process.env.APP_ENV ?? 'development',
     supabaseUrl:
       process.env.EXPO_PUBLIC_SUPABASE_URL ?? process.env.SUPABASE_URL ?? '',
     supabasePublishableKey:

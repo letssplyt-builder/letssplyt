@@ -1,5 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
+import * as Sentry from '@sentry/node';
 import { z } from 'zod';
+import logger from '../../infrastructure/logger';
 import { sendOtp, verifyOtpAndCreateSession } from './auth.service';
 import { AppError } from '../../infrastructure/errors';
 
@@ -85,10 +87,17 @@ export async function handleOtpVerify(
 
 export function errorHandler(
   err: unknown,
-  _req: Request,
+  req: Request,
   res: Response,
-  _next: NextFunction,
+  next: NextFunction,
 ): void {
+  logger.error({
+    err,
+    requestId: req.requestId ?? null,
+    userId: req.user?.id ?? null,
+    msg: 'request error',
+  });
+
   if (err instanceof AppError) {
     res.status(err.statusCode).json({
       error: {
@@ -100,10 +109,6 @@ export function errorHandler(
     return;
   }
 
-  res.status(500).json({
-    error: {
-      code: 'INTERNAL_ERROR',
-      message: 'An unexpected error occurred',
-    },
-  });
+  Sentry.captureException(err);
+  next(err);
 }

@@ -1,3 +1,5 @@
+import './infrastructure/sentry.instrument';
+import { isSentryEnabled } from './infrastructure/sentry.instrument';
 import app from './app';
 import logger from './infrastructure/logger';
 import { isMessagingDevBypassEnabled } from './infrastructure/notification/messaging-dev-bypass';
@@ -11,6 +13,7 @@ app.listen(PORT, '0.0.0.0', () => {
     port: PORT,
     host: '0.0.0.0',
     appEnv: process.env.APP_ENV ?? '(unset)',
+    sentryEnabled: isSentryEnabled(),
     otpMode: isOtpDevBypassEnabled() ? 'dev-bypass' : 'custom-otp',
     messagingMode: isMessagingDevBypassEnabled() ? 'dev-bypass' : process.env.SMS_PROVIDER ?? 'twilio',
   });

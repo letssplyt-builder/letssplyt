@@ -2,6 +2,7 @@ import path from 'path';
 import express from 'express';
 import cors from 'cors';
 import pinoHttp from 'pino-http';
+import * as Sentry from '@sentry/node';
 import logger from './infrastructure/logger';
 import { requestIdMiddleware } from './middleware/requestId';
 import { globalRateLimiter } from './middleware/rateLimiter';
@@ -60,7 +61,11 @@ app.use(requestIdMiddleware);
 app.use(
   pinoHttp({
     logger,
-    customProps: (req) => ({ requestId: req.requestId }),
+    genReqId: (req) => req.requestId ?? req.id,
+    customProps: (req) => ({
+      requestId: req.requestId ?? null,
+      userId: req.user?.id ?? null,
+    }),
   }),
 );
 app.use(globalRateLimiter);
@@ -88,6 +93,22 @@ app.use('/api/v1/receipts', receiptsRoutes);
 app.use('/api/v1/settlement', settlementRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
 
+if (process.env.APP_ENV !== 'production') {
+  app.get('/api/v1/debug/sentry-test', async (_req, res) => {
+    const testError = new Error('Sentry deliberate test error (E12-S02)');
+    const eventId = Sentry.captureException(testError);
+    await Sentry.flush(5000);
+    res.status(500).json({
+      error: {
+        code: 'INTERNAL_ERROR',
+        message: 'Sentry deliberate test error (E12-S02)',
+        details: { sentry_event_id: eventId ?? null },
+      },
+    });
+  });
+}
+
+Sentry.setupExpressErrorHandler(app);
 app.use(errorHandler);
 
 export default app;
