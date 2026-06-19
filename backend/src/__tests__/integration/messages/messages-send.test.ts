@@ -152,4 +152,93 @@ describe('Messages send API integration', () => {
 
     expect(response.status).toBe(401);
   });
+
+  it('POST /events/:id/messages/send skips manual_name_only members', async () => {
+    mockAuth(USER_A);
+
+    jest.mocked(buildMessagePreviewsForEvent).mockResolvedValue([
+      {
+        participant_id: PARTICIPANT_MEMBER,
+        display_name: 'Jordan',
+        amount_owed: 40,
+        message_text: 'Hi Jordan — your share is $40.00.',
+        channel: 'sms',
+        payment_links: [],
+        breakdown_url: 'https://letssplyt.app/split/testtoken',
+      },
+    ]);
+    jest.mocked(resolveParticipantPhoneContext).mockImplementation(async (participant) => {
+      if (participant.join_method === 'manual_name_only') {
+        return { phoneE164: null, resolvedCountry: undefined, channel: 'sms' };
+      }
+      return {
+        phoneE164: '+15005550001',
+        resolvedCountry: 'US',
+        channel: 'sms',
+      };
+    });
+
+    mockSupabase.__resetMock();
+    jest.clearAllMocks();
+    mockSupabase.__pushMockResultForTable('events', { data: EVENT_ROW, error: null });
+    mockSupabase.__pushMockResultForTable('users', {
+      data: { display_name: 'Alex Payer' },
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: [
+        {
+          id: PARTICIPANT_ORGANISER,
+          user_id: USER_A,
+          guest_pii_token: null,
+          country_code: 'US',
+          join_method: 'qr_app',
+          display_name: 'Payer',
+          amount_owed: 0,
+        },
+        {
+          id: PARTICIPANT_MEMBER,
+          user_id: MEMBER_USER,
+          guest_pii_token: null,
+          country_code: 'US',
+          join_method: 'qr_app',
+          display_name: 'Jordan',
+          amount_owed: 40,
+        },
+        {
+          id: 'part-cash-3333-3333-3333-333333333333',
+          user_id: null,
+          guest_pii_token: null,
+          country_code: null,
+          join_method: 'manual_name_only',
+          display_name: 'Raj',
+          amount_owed: 0,
+        },
+      ],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('notification_log', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('events', {
+      data: [{ id: EVENT_ID }],
+      error: null,
+    });
+
+    const response = await request(app)
+      .post(`/api/v1/events/${EVENT_ID}/messages/send`)
+      .set(AUTH_A)
+      .send({});
+
+    expect(response.status).toBe(200);
+    expect(response.body.sent_count).toBe(1);
+    expect(response.body.skipped_count).toBe(1);
+    expect(response.body.results).toEqual(
+      expect.arrayContaining([
+        {
+          participant_id: 'part-cash-3333-3333-3333-333333333333',
+          status: 'skipped_no_phone',
+        },
+      ]),
+    );
+  });
 });

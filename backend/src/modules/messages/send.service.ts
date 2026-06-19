@@ -105,11 +105,6 @@ export async function sendEventMessages(
       continue;
     }
 
-    const preview = previewMap.get(participantId);
-    if (!preview) {
-      continue;
-    }
-
     const phoneContext = await resolveParticipantPhoneContext({
       user_id: row.user_id as string | null,
       guest_pii_token: row.guest_pii_token as string | null,
@@ -120,6 +115,11 @@ export async function sendEventMessages(
     if (!phoneContext.phoneE164) {
       skippedCount += 1;
       results.push({ participant_id: participantId, status: 'skipped_no_phone' });
+      continue;
+    }
+
+    const preview = previewMap.get(participantId);
+    if (!preview) {
       continue;
     }
 

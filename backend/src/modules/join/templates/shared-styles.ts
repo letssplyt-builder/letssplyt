@@ -41,7 +41,18 @@ export const JOIN_PAGE_STYLES = `
   .phone-row { display: flex; gap: 8px; }
   .select { width: auto; min-width: 92px; flex-shrink: 0; }
   .phone-input { flex: 1; }
-  .privacy { font-size: 11px; color: #9CA3AF; text-align: center; margin-top: 14px; line-height: 1.5; }
+  .privacy-note {
+    font-size: 12px; color: #6B7280; text-align: center; margin-top: 14px;
+    line-height: 1.55; background: #F9FAFB; border: 1px solid #E5E7EB;
+    border-radius: 12px; padding: 12px 14px;
+  }
+  .legal {
+    font-size: 11px; color: #9CA3AF; text-align: center; margin-top: 14px; line-height: 1.5;
+  }
+  .legal a { color: #0E5C66; font-weight: 600; text-decoration: none; }
+  .sms-consent {
+    font-size: 11px; color: #9CA3AF; text-align: center; margin-top: 8px; line-height: 1.5;
+  }
   .btn {
     width: 100%; padding: 16px; border-radius: 16px; border: none; cursor: pointer;
     background: linear-gradient(135deg, #0E5C66, #1A8F9E);

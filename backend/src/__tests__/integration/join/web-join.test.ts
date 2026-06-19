@@ -64,6 +64,9 @@ describe('Web join integration', () => {
     expect(response.text).toContain('Join the group');
     expect(response.text).toContain('Friday Dinner');
     expect(response.text).toContain('name="display_name"');
+    expect(response.text).toContain('terms.html');
+    expect(response.text).toContain('privacy.html');
+    expect(response.text).toContain('never shared with the organiser');
   });
 
   it('GET /join/:expiredToken → 200 HTML with expiry message (NOT 404)', async () => {

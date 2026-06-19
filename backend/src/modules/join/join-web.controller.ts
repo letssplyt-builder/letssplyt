@@ -25,6 +25,10 @@ function sendHtml(res: Response, html: string, status = 200): void {
   res.status(status).type('html').send(html);
 }
 
+function appBaseUrl(): string {
+  return process.env.APP_URL?.replace(/\/$/, '') ?? '';
+}
+
 function ensureCsrf(req: Request, res: Response): boolean {
   const submitted = typeof req.body?.csrf_token === 'string' ? req.body.csrf_token : undefined;
   if (!validateCsrf(req.headers.cookie, submitted)) {
@@ -33,6 +37,7 @@ function ensureCsrf(req: Request, res: Response): boolean {
       eventTitle: 'Event',
       payerName: 'Someone',
       csrfToken: createCsrfToken(),
+      appBaseUrl: appBaseUrl(),
       errorMessage: 'Session expired. Please try again.',
     }), 403);
     return false;
@@ -82,6 +87,7 @@ export async function getJoinPage(req: Request, res: Response): Promise<void> {
       eventTitle: context!.eventTitle,
       payerName: context!.payerName,
       csrfToken,
+      appBaseUrl: appBaseUrl(),
     }),
   );
 }
@@ -189,6 +195,7 @@ async function handleJoinFormError(
         eventTitle: context?.eventTitle ?? 'Event',
         payerName: context?.payerName ?? 'Someone',
         csrfToken,
+        appBaseUrl: appBaseUrl(),
         errorMessage: err.message,
         displayName: form.displayName,
         countryDial: form.countryDial,

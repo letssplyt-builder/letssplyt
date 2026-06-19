@@ -132,6 +132,33 @@ describe('sendEventMessages', () => {
     expect(result.sent_count).toBe(1);
     expect(result.skipped_count).toBe(1);
     expect(result.event_status).toBe('sent');
+    expect(result.results).toEqual(
+      expect.arrayContaining([
+        { participant_id: PARTICIPANT_B, status: 'skipped_no_phone' },
+      ]),
+    );
+  });
+
+  it('records skipped_no_phone when preview is missing for name-only members', async () => {
+    jest.mocked(buildMessagePreviewsForEvent).mockResolvedValue([
+      {
+        participant_id: PARTICIPANT_A,
+        display_name: 'Alex',
+        amount_owed: 20,
+        message_text: `Hi Alex — your share is $20.00.\n\nSee full split: ${BREAKDOWN_URL}`,
+        channel: 'sms',
+        payment_links: [],
+        breakdown_url: BREAKDOWN_URL,
+      },
+    ]);
+
+    const result = await sendEventMessages(PAYER_ID, EVENT_ID);
+
+    expect(result.results).toContainEqual({
+      participant_id: PARTICIPANT_B,
+      status: 'skipped_no_phone',
+    });
+    expect(sendOutboundMessage).toHaveBeenCalledTimes(1);
   });
 
   it('skips opted-out participants', async () => {
@@ -245,5 +272,95 @@ describe('sendEventMessages', () => {
     await sendEventMessages(PAYER_ID, EVENT_ID);
 
     expect(mockSupabase.from).toHaveBeenCalledWith('events');
+  });
+
+  describe('regression: manual_name_only members must never receive SMS', () => {
+    it('does not send SMS when a stale preview exists for a name-only member', async () => {
+      const result = await sendEventMessages(PAYER_ID, EVENT_ID);
+
+      expect(sendOutboundMessage).toHaveBeenCalledTimes(1);
+      expect(
+        jest.mocked(sendOutboundMessage).mock.calls.some(
+          ([phone, , body]) =>
+            phone === '+15005550001' && typeof body === 'string' && body.includes('Jordan'),
+        ),
+      ).toBe(false);
+      expect(result.results).toContainEqual({
+        participant_id: PARTICIPANT_B,
+        status: 'skipped_no_phone',
+      });
+    });
+
+    it('only attempts outbound delivery for the phone-backed participant', async () => {
+      await sendEventMessages(PAYER_ID, EVENT_ID);
+
+      expect(sendOutboundMessage).toHaveBeenCalledTimes(1);
+      expect(mockSupabase.from).toHaveBeenCalledWith('notification_log');
+      expect(
+        jest.mocked(sendOutboundMessage).mock.calls.every(([phone]) => phone === '+15005550001'),
+      ).toBe(true);
+    });
+
+    it('still completes the event when every non-organiser is name-only', async () => {
+      mockSupabase.__resetMock();
+      jest.mocked(buildMessagePreviewsForEvent).mockResolvedValue([]);
+      jest.mocked(resolveParticipantPhoneContext).mockResolvedValue({
+        phoneE164: null,
+        resolvedCountry: undefined,
+        channel: 'sms',
+      });
+
+      mockSupabase.__pushMockResultForTable('events', {
+        data: {
+          id: EVENT_ID,
+          payer_id: PAYER_ID,
+          title: 'Dinner',
+          status: 'locked',
+          ai_stage: 'messaging',
+          currency: 'USD',
+          locale: 'en-US',
+          total_amount: 20,
+        },
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('participants', {
+        data: [
+          {
+            id: PARTICIPANT_ORGANISER,
+            user_id: PAYER_ID,
+            guest_pii_token: null,
+            country_code: 'US',
+            join_method: 'qr_app',
+            display_name: 'Payer',
+            amount_owed: 0,
+          },
+          {
+            id: PARTICIPANT_B,
+            user_id: null,
+            guest_pii_token: null,
+            country_code: null,
+            join_method: 'manual_name_only',
+            display_name: 'Raj',
+            amount_owed: 20,
+          },
+        ],
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('participants', { data: null, error: null });
+      mockSupabase.__pushMockResultForTable('events', {
+        data: [{ id: EVENT_ID }],
+        error: null,
+      });
+
+      const result = await sendEventMessages(PAYER_ID, EVENT_ID);
+
+      expect(sendOutboundMessage).not.toHaveBeenCalled();
+      expect(result.sent_count).toBe(0);
+      expect(result.skipped_count).toBe(1);
+      expect(result.results).toEqual([
+        { participant_id: PARTICIPANT_B, status: 'skipped_no_phone' },
+      ]);
+      expect(result.event_status).toBe('sent');
+    });
   });
 });

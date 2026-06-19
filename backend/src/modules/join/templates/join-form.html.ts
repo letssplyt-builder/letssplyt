@@ -6,11 +6,15 @@ export function renderJoinFormPage(input: {
   eventTitle: string;
   payerName: string;
   csrfToken: string;
+  appBaseUrl?: string;
   errorMessage?: string;
   displayName?: string;
   countryDial?: string;
   phoneNational?: string;
 }): string {
+  const base = (input.appBaseUrl ?? '').replace(/\/$/, '');
+  const termsUrl = `${base}/terms.html`;
+  const privacyUrl = `${base}/privacy.html`;
   const countryOptions = JOIN_COUNTRY_OPTIONS.map((country) => {
     const selected = input.countryDial === country.dial ? ' selected' : '';
     return `<option value="${escapeHtml(country.dial)}"${selected}>${escapeHtml(country.label)}</option>`;
@@ -58,12 +62,21 @@ export function renderJoinFormPage(input: {
               value="${escapeHtml(input.phoneNational ?? '')}" placeholder="(555) 000-0000">
           </div>
         </div>
-        <p class="privacy">
-          By entering your phone number, you agree to receive a one-time verification code from LetsSplyt.
-          By joining this event, you agree to receive a one-time payment request via SMS from LetsSplyt.
-          Reply STOP to opt out.
+        <p class="privacy-note">
+          Your phone number stays private. LetsSplyt uses it only to verify you and send your payment
+          request — it is never shared with the organiser or other guests.
         </p>
         <button class="btn" type="submit">Join →</button>
+        <p class="legal">
+          By joining you agree to our
+          <a href="${escapeHtml(termsUrl)}" target="_blank" rel="noopener noreferrer">Terms</a>
+          &amp;
+          <a href="${escapeHtml(privacyUrl)}" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
+        </p>
+        <p class="sms-consent">
+          You may receive a one-time verification code and payment request SMS from LetsSplyt.
+          Reply STOP to opt out.
+        </p>
       </form>
     </div>
   </div>

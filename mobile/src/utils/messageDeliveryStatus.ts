@@ -3,6 +3,7 @@ import type { SendResultStatus } from '../services/messages.service';
 export type MessageDeliveryStatus = 'queued' | 'sent' | 'delivered' | 'failed' | 'skipped';
 
 export interface MessageDeliveryFields {
+  join_method?: string;
   message_sent_at?: string | null;
   message_delivered_at?: string | null;
   message_failed?: boolean;
@@ -12,7 +13,11 @@ export function deriveMessageDeliveryStatus(
   fields: MessageDeliveryFields,
   sendResult?: SendResultStatus,
 ): MessageDeliveryStatus {
-  if (sendResult === 'skipped_opt_out' || sendResult === 'skipped_no_phone') {
+  if (
+    fields.join_method === 'manual_name_only' ||
+    sendResult === 'skipped_opt_out' ||
+    sendResult === 'skipped_no_phone'
+  ) {
     return 'skipped';
   }
   if (sendResult === 'failed') {

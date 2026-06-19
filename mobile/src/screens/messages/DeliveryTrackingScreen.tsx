@@ -76,6 +76,7 @@ export function DeliveryTrackingScreen({ navigation, route }: Props) {
         id: string;
         display_name: string;
         is_organiser?: boolean;
+        join_method?: string;
         message_sent_at?: string | null;
         message_delivered_at?: string | null;
         message_failed?: boolean;
@@ -84,6 +85,7 @@ export function DeliveryTrackingScreen({ navigation, route }: Props) {
     ): TrackingRow[] =>
       participants
         .filter((participant) => !participant.is_organiser)
+        .filter((participant) => participant.join_method !== 'manual_name_only')
         .map((participant) => ({
           id: participant.id,
           display_name: participant.display_name,
@@ -157,7 +159,8 @@ export function DeliveryTrackingScreen({ navigation, route }: Props) {
   }, [eventId]);
 
   const allTerminal =
-    rows.length > 0 && rows.every((row) => isTerminalMessageDeliveryStatus(row.status));
+    rows.length === 0 ||
+    rows.every((row) => isTerminalMessageDeliveryStatus(row.status));
   const failedCount = rows.filter((row) => row.status === 'failed').length;
 
   const handleRetry = async (participantId: string) => {

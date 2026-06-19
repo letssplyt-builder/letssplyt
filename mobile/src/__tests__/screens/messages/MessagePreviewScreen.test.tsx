@@ -75,6 +75,25 @@ describe('MessagePreviewScreen', () => {
     expect(send.props.accessibilityState?.disabled ?? send.props.disabled).toBeFalsy();
   });
 
+  it('does not show name-only members when the API omits them from previews', async () => {
+    jest.spyOn(messagesService, 'fetchMessagePreviews').mockResolvedValue({
+      previews: [PREVIEWS[0]!],
+    });
+
+    render(
+      <MessagePreviewScreen
+        navigation={{ goBack: mockGoBack, navigate: mockNavigate } as never}
+        route={{ key: 'MessagePreview-1', name: 'MessagePreview', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Preview message for Alex')).toBeTruthy(),
+    );
+
+    expect(screen.queryByLabelText('Preview message for Jordan')).toBeNull();
+  });
+
   it('sends messages and navigates to delivery tracking', async () => {
     jest.mocked(messagesService.sendEventMessages).mockResolvedValue({
       sent_count: 2,
