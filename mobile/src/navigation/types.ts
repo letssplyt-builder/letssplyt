@@ -69,7 +69,7 @@ export type RootStackParamList = {
   PushPermission: undefined;
   BiometricOptIn: undefined;
   BiometricLock: undefined;
-  MainTabs: undefined;
+  MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
   AppJoin: { token: string };
   AppJoined: { eventId: string; eventName: string };
   AppLocked: { creatorName?: string; eventName?: string };

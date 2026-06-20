@@ -5,6 +5,10 @@ import {
   sendEventMessages,
 } from '../services/messages.service';
 import { finishEventFlowToEventDetail } from '../navigation/eventNavigation';
+import {
+  navigateInEventFlow,
+  replaceInEventFlow,
+} from '../navigation/eventFlowNavigation';
 import { useEventStore } from '../store/eventStore';
 
 export function canParticipantReceiveSms(joinMethod: string): boolean {
@@ -50,7 +54,7 @@ export async function continueMessagingAfterSplitConfirm(
       return;
     }
 
-    navigation.replace('DeliveryTracking', {
+    replaceInEventFlow(navigation, 'DeliveryTracking', {
       eventId,
       sendResults: sendResult.results,
     });
@@ -63,7 +67,7 @@ export async function continueMessagingAfterSplitConfirm(
     return;
   }
 
-  navigation.navigate('MessagePreview', { eventId });
+  navigateInEventFlow(navigation, 'MessagePreview', { eventId });
 }
 
 export async function openMessagePreviewOrComplete(
@@ -82,5 +86,5 @@ export async function openMessagePreviewOrComplete(
     return;
   }
 
-  navigation.navigate('MessagePreview', { eventId });
+  navigateInEventFlow(navigation, 'MessagePreview', { eventId });
 }

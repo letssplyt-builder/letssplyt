@@ -362,7 +362,7 @@ Sentry captures **crashes and unhandled errors** from the backend API and the mo
 
 > Optional: create separate Sentry projects per environment if you want completely separate dashboards. For a solo build, one project + environment tags is simpler.
 
-**What if DSN is missing?** The app still runs. Sentry init is skipped; errors only appear in Railway logs / local terminal (structured Pino logging still works).
+**What if DSN is missing?** The app still runs. Backend and mobile skip `Sentry.init`; mobile also skips `Sentry.wrap` on the root component (`withOptionalSentryWrap` in `App.tsx`). Errors only appear in Railway logs / local terminal (structured Pino logging still works).
 
 ---
 

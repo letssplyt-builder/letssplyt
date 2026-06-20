@@ -187,6 +187,7 @@ describe('payment request gating', () => {
   it('blocks participant pay until share is posted and messages sent', () => {
     expect(canParticipantPayShare(null, 25, 'pending')).toBe(false);
     expect(canParticipantPayShare('2026-01-01T00:00:00.000Z', null, 'pending')).toBe(false);
+    expect(canParticipantPayShare('2026-01-01T00:00:00.000Z', undefined, 'pending')).toBe(false);
     expect(canParticipantPayShare('2026-01-01T00:00:00.000Z', 0, 'pending')).toBe(false);
     expect(canParticipantPayShare('2026-01-01T00:00:00.000Z', 25, 'confirmed')).toBe(false);
     expect(canParticipantPayShare('2026-01-01T00:00:00.000Z', 25, 'pending')).toBe(true);

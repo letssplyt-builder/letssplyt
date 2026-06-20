@@ -28,7 +28,11 @@ export function buildAllPaidMethodOptions(handles: IOwePaymentHandle[]): Array<{
   label: string;
   method: SelfReportPaymentMethod;
 }> {
-  const options = handles.map((handle) => ({
+  const options: Array<{
+    id: string;
+    label: string;
+    method: SelfReportPaymentMethod;
+  }> = handles.map((handle) => ({
     id: handle.provider,
     label: handle.handle_display,
     method: providerToSelfReportMethod(handle.provider),

@@ -30,7 +30,7 @@ export async function calculateSplit(
 ): Promise<SplitCalculateResponse> {
   return apiPostAuth<SplitCalculateResponse>(
     `/events/${eventId}/split/calculate`,
-    body as Record<string, unknown>,
+    body as unknown as Record<string, unknown>,
   );
 }
 

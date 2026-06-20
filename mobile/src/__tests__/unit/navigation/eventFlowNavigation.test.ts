@@ -1,5 +1,5 @@
 import { describe, expect, it, jest } from '@jest/globals';
-import { navigateInEventFlow } from '../../../navigation/eventFlowNavigation';
+import { navigateInEventFlow, replaceInEventFlow } from '../../../navigation/eventFlowNavigation';
 
 describe('navigateInEventFlow', () => {
   it('navigates directly when the screen exists on the current stack', () => {
@@ -51,6 +51,32 @@ describe('navigateInEventFlow', () => {
     expect(tabNavigate).toHaveBeenCalledWith('EventsTab', {
       screen: 'SplitEntry',
       params: { eventId: 'event-1', mode: 'manual' },
+    });
+    expect(navigation.navigate).not.toHaveBeenCalled();
+  });
+});
+
+describe('replaceInEventFlow', () => {
+  it('replaces directly when the screen exists on the current stack', () => {
+    const navigation = {
+      getState: () => ({
+        routeNames: ['Events', 'SplitReview', 'DeliveryTracking'],
+        index: 1,
+        routes: [],
+        key: 'events-stack',
+      }),
+      replace: jest.fn(),
+      navigate: jest.fn(),
+    };
+
+    replaceInEventFlow(navigation as never, 'DeliveryTracking', {
+      eventId: 'event-1',
+      sendResults: [],
+    });
+
+    expect(navigation.replace).toHaveBeenCalledWith('DeliveryTracking', {
+      eventId: 'event-1',
+      sendResults: [],
     });
     expect(navigation.navigate).not.toHaveBeenCalled();
   });

@@ -69,7 +69,10 @@ export async function uploadReceiptToSignedUrl(
 export async function confirmReceipt(
   body: ReceiptConfirmRequest,
 ): Promise<ReceiptConfirmResponse> {
-  return apiPostAuth<ReceiptConfirmResponse>('/receipts/confirm', body);
+  return apiPostAuth<ReceiptConfirmResponse>(
+    '/receipts/confirm',
+    body as unknown as Record<string, unknown>,
+  );
 }
 
 export async function parseReceipt(

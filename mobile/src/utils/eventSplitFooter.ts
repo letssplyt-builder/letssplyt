@@ -145,7 +145,7 @@ export function canParticipantPayShare(
   if (!hasPaymentRequestBeenSent(messagesSentAt)) {
     return false;
   }
-  if (amountOwed === null || amountOwed <= 0) {
+  if (amountOwed == null || amountOwed <= 0) {
     return false;
   }
   return paymentStatus === 'pending' || paymentStatus === 'disputed';
