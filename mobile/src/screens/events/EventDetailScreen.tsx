@@ -48,6 +48,7 @@ import { glassStyles } from '../../theme/glassStyles';
 import { authColors } from '../../theme/colors';
 import { receiptReviewToParseResult } from '../receipts/itemReview.utils';
 import { formatMoney, isPayerParticipant, statusChipLabel } from '../../utils/events';
+import { openMessagePreviewOrComplete } from '../../utils/messageFlow';
 import {
   canEditEventShare,
   canOrganiserNudgeOrMarkCash,
@@ -332,7 +333,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
   };
 
   const openEditShare = async () => {
-    if (event?.messages_sent_at && !canEditShare) {
+    if (currentEvent?.event?.messages_sent_at && !canEditShare) {
       setToast('Split is locked — resolve self-reported or confirmed payments first.');
       return;
     }
@@ -363,7 +364,9 @@ export function EventDetailScreen({ navigation, route }: Props) {
   };
 
   const openMessagePreview = () => {
-    navigateInEventFlow(navigation, 'MessagePreview', { eventId });
+    void openMessagePreviewOrComplete(navigation, eventId, participants).catch(() => {
+      setToast('Could not open messages. Try again.');
+    });
   };
 
   const confirmReopenJoinWindow = () => {

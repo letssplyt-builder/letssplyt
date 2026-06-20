@@ -1116,17 +1116,19 @@ Entry: after `POST /receipts/parse` (`ReceiptPreviewScreen`) or from Event Detai
 
 #### SplitReviewScreen
 
-- Per-person breakdown list: name, item names (if any), amount (tap row to edit in numeric sheet)
-- Sum invariant at bottom: "Total: $X.XX ✓" (red when out of balance)
-- **Pre-send** (`messages_sent_at` null): footer CTA **Preview messages →** → `POST /split/confirm` → `MessagePreviewScreen`
-- **Post-send:** footer CTA **Save and notify →** → `POST /split/confirm` → `POST /splits/resend` → `DeliveryTrackingScreen` (revision SMS to affected participants only; message includes "Your share has been updated.")
+- Event **title** as subtitle (not event id); bill **total** pill in header
+- **Read-only** compact ledger: single card, columns **Member** | **Owes**; optional one-line item summary per row; split total footer with balance check
+- Amount edits happen on **SplitEntryScreen** only — Review is confirm-only
+- **Pre-send** (`messages_sent_at` null): footer CTA **Preview messages →** when any non-organiser can receive SMS; otherwise **Complete event →** (skips preview, calls send with all `skipped_no_phone`, lands on Event Detail). Flow: `POST /split/confirm` → `messageFlow.continueMessagingAfterSplitConfirm`
+- **Post-send:** footer CTA **Save and notify →** → `POST /split/confirm` → `POST /splits/resend` → `DeliveryTrackingScreen` when trackable SMS sent; otherwise Event Detail
+- **Name-only members** (`manual_name_only`): never shown on Message Preview; never queued on Delivery Tracking
 
 **Loading state (skeleton):**
-- Four grey rows (height 60px each) with pulsing animation, representing per-person rows.
+- Four grey rows (height 44px each) with pulsing animation, representing per-person rows.
 
 **Error state:** Confirm or resend failure shows inline error on Review split; user data preserved on screen.
 
-**Accessibility:** Each person row: `accessibilityRole="button"`, `accessibilityLabel="[Name], owes [amount]"`, `accessibilityHint="Tap to edit this person's amount"`. Footer: `accessibilityLabel` **Preview messages** or **Save split and notify affected members**.
+**Accessibility:** Each person row: `accessibilityLabel="[Name], owes [amount]"` (not a button). Footer: `accessibilityLabel` **Preview messages**, **Complete event without sending SMS**, or **Save split and notify affected members**.
 
 ---
 
@@ -2148,6 +2150,8 @@ Payment request messages are **SMS or WhatsApp text only** — no MMS `mediaUrl`
 - Preview API field: **`breakdown_url`** (not `split_image_url`)
 - UI: tappable card "View split breakdown" — opens `breakdown_url` via `Linking.openURL`
 - Do **not** fetch Supabase Storage PNGs or use `<Image>` for split preview on the send path
+- **Empty previews** (all members name-only or no phone): screen auto-completes via `completeEventWithoutSms` — never show a dead-end with disabled Send
+- **Event Detail → Send messages** uses `openMessagePreviewOrComplete` with the same skip logic
 
 #### MessagePreviewModal (sheet, tall)
 

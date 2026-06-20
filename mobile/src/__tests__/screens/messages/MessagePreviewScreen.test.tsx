@@ -1,13 +1,21 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { MessagePreviewScreen } from '../../../screens/messages/MessagePreviewScreen';
+jest.mock('../../../navigation/eventNavigation', () => ({
+  finishEventFlowToEventDetail: jest.fn(),
+}));
+
 import * as messagesService from '../../../services/messages.service';
+import { completeEventWithoutSms } from '../../../utils/messageFlow';
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
 const mockReplace = jest.fn();
 
 jest.mock('../../../services/messages.service');
+jest.mock('../../../utils/messageFlow', () => ({
+  completeEventWithoutSms: jest.fn(),
+}));
 
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({
@@ -92,6 +100,25 @@ describe('MessagePreviewScreen', () => {
     );
 
     expect(screen.queryByLabelText('Preview message for Jordan')).toBeNull();
+  });
+
+  it('auto-completes the event when no previews are available', async () => {
+    jest.spyOn(messagesService, 'fetchMessagePreviews').mockResolvedValue({ previews: [] });
+    jest.mocked(completeEventWithoutSms).mockResolvedValue(undefined);
+
+    render(
+      <MessagePreviewScreen
+        navigation={{ goBack: mockGoBack, navigate: mockNavigate } as never}
+        route={{ key: 'MessagePreview-1', name: 'MessagePreview', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(completeEventWithoutSms).toHaveBeenCalledWith(
+        expect.objectContaining({ navigate: mockNavigate }),
+        'event-1',
+      );
+    });
   });
 
   it('sends messages and navigates to delivery tracking', async () => {

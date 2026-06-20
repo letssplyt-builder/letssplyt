@@ -5,47 +5,368 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Privacy Policy — LetsSplyt</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: #F2F2F7;
-      color: #1a1a2e;
-      line-height: 1.6;
-    }
-    .page { max-width: 640px; margin: 0 auto; padding: 24px 20px 48px; }
-    h1 { font-size: 24px; font-weight: 800; margin-bottom: 8px; }
-    .meta { font-size: 13px; color: #6B7280; margin-bottom: 24px; }
-    h2 { font-size: 17px; font-weight: 700; margin: 24px 0 8px; }
-    p { font-size: 15px; color: #374151; margin-bottom: 12px; }
-    a { color: #0E5C66; }
-  </style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #F2F2F7;
+    color: #1a1a2e;
+    line-height: 1.6;
+  }
+  .legal-nav {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 16px 20px 0;
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-size: 14px;
+  }
+  .legal-nav a {
+    color: #0E5C66;
+    font-weight: 600;
+    text-decoration: none;
+  }
+  .legal-nav a[aria-current="page"] {
+    color: #1a1a2e;
+    text-decoration: underline;
+  }
+  .page {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 20px 20px 48px;
+  }
+  .legal-content h1 {
+    font-size: 26px;
+    font-weight: 800;
+    margin-bottom: 12px;
+    line-height: 1.25;
+  }
+  .legal-content h2 {
+    font-size: 18px;
+    font-weight: 700;
+    margin: 28px 0 10px;
+    line-height: 1.35;
+  }
+  .legal-content h3 {
+    font-size: 16px;
+    font-weight: 700;
+    margin: 20px 0 8px;
+    line-height: 1.35;
+  }
+  .legal-content p,
+  .legal-content li {
+    font-size: 15px;
+    color: #374151;
+    margin-bottom: 12px;
+  }
+  .legal-content ul,
+  .legal-content ol {
+    margin: 0 0 12px 20px;
+  }
+  .legal-content strong { color: #111827; }
+  .legal-content a { color: #0E5C66; }
+  .legal-content blockquote {
+    border-left: 3px solid #A5D8E0;
+    background: #F9FAFB;
+    border-radius: 0 12px 12px 0;
+    padding: 12px 14px;
+    margin: 12px 0;
+    color: #4B5563;
+    font-size: 14px;
+  }
+  .legal-content hr {
+    border: none;
+    border-top: 1px solid #E5E7EB;
+    margin: 24px 0;
+  }
+  .legal-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 16px;
+    font-size: 14px;
+  }
+  .legal-content th,
+  .legal-content td {
+    border: 1px solid #E5E7EB;
+    padding: 10px;
+    text-align: left;
+    vertical-align: top;
+  }
+  .legal-content th {
+    background: #F3F4F6;
+    font-weight: 700;
+    color: #111827;
+  }
+  .legal-footer {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 0 20px 40px;
+    font-size: 13px;
+    color: #6B7280;
+  }
+  .legal-footer a { color: #0E5C66; font-weight: 600; }
+</style>
 </head>
 <body>
-  <div class="page">
+  <nav class="legal-nav" aria-label="Legal documents">
+    <a href="/terms.html">Terms of Service</a>
+    <a href="/privacy.html" aria-current="page">Privacy Policy</a>
+  </nav>
+  <main class="page legal-content">
     <h1>LetsSplyt Privacy Policy</h1>
-    <p class="meta">Effective date: June 7, 2026</p>
+<p><strong>Effective Date:</strong> June 7, 2026<br><strong>Last Updated:</strong> June 7, 2026</p>
+<hr>
+<h2>1. Introduction</h2>
+<p>LetsSplyt (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) operates the LetsSplyt mobile application and related services (collectively, the &quot;Service&quot;). We are committed to protecting your personal information and your right to privacy.</p>
+<p>This Privacy Policy explains what information we collect, why we collect it, how we use and protect it, and what rights you have over it. Please read it carefully before using our Service.</p>
+<p>By using LetsSplyt, you agree to the collection and use of information as described in this policy. If you do not agree, please do not use the Service.</p>
+<hr>
+<h2>2. Who We Are</h2>
+<p>LetsSplyt is operated by Pawan Lawale, an individual based in California, United States.</p>
+<p><strong>Contact:</strong><br>Email: <a href="mailto:builder@letssplyt.com">builder@letssplyt.com</a><br>Address: California, United States</p>
+<hr>
+<h2>3. Information We Collect</h2>
+<h3>3.1 Information You Provide Directly</h3>
+<table>
+<thead>
+<tr>
+<th>Data</th>
+<th>Purpose</th>
+<th>Stored as</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Phone number</strong></td>
+<td>Account creation, OTP verification, identity</td>
+<td>Encrypted (AES-256-GCM) + hashed (SHA-256 HMAC). Never stored in plaintext.</td>
+</tr>
+<tr>
+<td><strong>Display name</strong></td>
+<td>Shown to other group members during a bill-split event</td>
+<td>Plaintext. This is a display name you choose, not your legal name.</td>
+</tr>
+<tr>
+<td><strong>Payment handles</strong> (e.g. Venmo username, CashApp $tag, Zelle contact)</td>
+<td>Shared with other participants so they can pay you</td>
+<td>Encrypted (AES-256-GCM). Never stored in plaintext.</td>
+</tr>
+</tbody></table>
+<h3>3.2 Information Collected Automatically When You Use the Service</h3>
+<ul>
+<li><strong>Event data:</strong> Restaurant bill details, item names, prices, tax, tip, and total amounts you enter or scan</li>
+<li><strong>Participant data:</strong> Names and phone numbers of people you add to a bill-split event on their behalf (see Section 5.1)</li>
+<li><strong>Usage data:</strong> App interactions, feature usage, and error logs. No advertising identifiers are collected.</li>
+<li><strong>Push notification token:</strong> A device token used solely to deliver in-app notifications about your share of a bill</li>
+</ul>
+<h3>3.3 Information Collected from Guests (Non-App Users)</h3>
+<p>If someone adds you to a bill-split event and you do not have the LetsSplyt app:</p>
+<ul>
+<li>We collect your <strong>phone number</strong> to verify your identity via one-time passcode (OTP) and to send you your share of the bill via SMS</li>
+<li>We collect your <strong>display name</strong> as you enter it during the web join flow</li>
+</ul>
+<p>Guest data is automatically and permanently deleted <strong>90 days</strong> after the event closes. See Section 6 (Data Retention).</p>
+<h3>3.4 Receipt Images and AI Processing</h3>
+<p>When you use the receipt scanning feature, you upload a photo of a restaurant receipt. This image is:</p>
+<ul>
+<li>Transmitted securely to our servers over an encrypted connection</li>
+<li>Processed by an AI service (Google Gemini) to extract item names, prices, tax, tip, and currency</li>
+<li>Stored in private, access-controlled cloud storage for the duration of the event</li>
+<li>Deleted when the event is closed or your account is deleted</li>
+</ul>
+<p><strong>Automated processing disclosure:</strong> LetsSplyt uses artificial intelligence to read and interpret receipt images. This automated processing extracts text and numbers from your receipt photo to calculate each person&#39;s share. This AI does not make any decisions about you as an individual — it only reads the contents of a restaurant bill. No profiling, scoring, or legally significant automated decisions are made about any user. You may review, edit, or override all AI-extracted data before any information is sent to other participants.</p>
+<p>We do not use your receipt images or any data derived from them to train AI models.</p>
+<h3>3.5 Biometric Authentication</h3>
+<p>LetsSplyt offers optional biometric authentication (Face ID, Touch ID) as a convenience feature. <strong>LetsSplyt does not collect, transmit, receive, or store any biometric data.</strong> Biometric authentication is performed entirely by your device&#39;s operating system (iOS Secure Enclave or Android Biometric API). We never have access to your biometric information at any point.</p>
+<hr>
+<h2>4. How We Use Your Information</h2>
+<p>We use the information we collect only for the purposes described in this policy:</p>
+<ul>
+<li><strong>To verify your identity</strong> via one-time passcode (OTP) sent by SMS</li>
+<li><strong>To split a bill</strong> — calculating each person&#39;s share and presenting it to the group</li>
+<li><strong>To send payment requests</strong> — delivering a personalised SMS to each participant with their share and payment links</li>
+<li><strong>To process receipt images</strong> — using AI to read item names and prices from a photo you take</li>
+<li><strong>To send push notifications</strong> — notifying you when a payment request is sent or confirmed</li>
+<li><strong>To maintain your account</strong> — storing your display name, phone number, and payment handles so you do not need to re-enter them</li>
+<li><strong>To improve reliability</strong> — using anonymised, aggregated error logs and usage data to fix bugs and improve performance</li>
+</ul>
+<p>We do <strong>not</strong>:</p>
+<ul>
+<li>Sell your personal information to third parties</li>
+<li>Use your data for advertising or marketing</li>
+<li>Share your information with data brokers</li>
+<li>Use your data to train AI models</li>
+</ul>
+<hr>
+<h2>5. How We Share Your Information</h2>
+<p>We share your information only as necessary to operate the Service:</p>
+<h3>5.1 With Other Participants in Your Event</h3>
+<p>When you join or create a bill-split event, your <strong>display name</strong> is visible to other members of that event. Your phone number is never shared with other participants.</p>
+<p><strong>When you add others to an event:</strong> When you enter another person&#39;s name and phone number to add them to a bill-split event, we collect that information on their behalf. Those individuals are notified by SMS that they have been added to an event and are given the opportunity to opt out. By adding another person&#39;s contact details to LetsSplyt, you confirm that you have their permission to do so or that you have a legitimate reason to contact them about a shared bill.</p>
+<h3>5.2 With Service Providers</h3>
+<p>We use the following third-party services to operate LetsSplyt. Each provider is subject to data processing terms governing their use of your data, and may only use your data to provide their specific service to us:</p>
+<table>
+<thead>
+<tr>
+<th>Provider</th>
+<th>Purpose</th>
+<th>Data shared</th>
+<th>Privacy Policy</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Twilio</strong></td>
+<td>Sending OTP verification codes and payment request SMS</td>
+<td>Phone number (encrypted in transit)</td>
+<td><a href="https://www.twilio.com/en-us/legal/privacy">twilio.com/en-us/legal/privacy</a></td>
+</tr>
+<tr>
+<td><strong>Supabase</strong></td>
+<td>Database and file storage (hosted in the United States)</td>
+<td>All account and event data</td>
+<td><a href="https://supabase.com/privacy">supabase.com/privacy</a></td>
+</tr>
+<tr>
+<td><strong>Google (Gemini)</strong></td>
+<td>AI processing of receipt images</td>
+<td>Receipt images, extracted item text</td>
+<td><a href="https://policies.google.com/privacy">policies.google.com/privacy</a></td>
+</tr>
+<tr>
+<td><strong>Expo / React Native</strong></td>
+<td>Mobile app delivery and push notifications</td>
+<td>Push notification device token</td>
+<td><a href="https://expo.dev/privacy">expo.dev/privacy</a></td>
+</tr>
+</tbody></table>
+<h3>5.3 Legal Requirements</h3>
+<p>We may disclose your information if required by law, subpoena, court order, or to protect the rights, property, or safety of LetsSplyt, our users, or the public.</p>
+<h3>5.4 Business Transfers</h3>
+<p>If LetsSplyt is acquired, merged, or its assets are transferred, your information may be transferred as part of that transaction. We will notify you at least 30 days before your data becomes subject to a materially different privacy policy.</p>
+<hr>
+<h2>6. Data Retention</h2>
+<p>We retain your personal information only as long as necessary for the purposes described in this policy.</p>
+<table>
+<thead>
+<tr>
+<th>Data type</th>
+<th>Retention period</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>App user account (display name, phone, payment handles)</td>
+<td>Until you delete your account</td>
+<td>Required to operate your account and fulfil split requests</td>
+</tr>
+<tr>
+<td>Event data (items, amounts, splits)</td>
+<td>Until you delete your account</td>
+<td>Required to maintain your event history and settlement records</td>
+</tr>
+<tr>
+<td>Receipt images</td>
+<td>Until the event closes or your account is deleted</td>
+<td>Required only during active event; no purpose thereafter</td>
+</tr>
+<tr>
+<td>Guest data (display name, phone number)</td>
+<td>90 days after the event closes, then automatically and permanently deleted</td>
+<td>Sufficient time for settlement to complete; retained no longer than necessary</td>
+</tr>
+<tr>
+<td>SMS delivery logs</td>
+<td>30 days</td>
+<td>Retained to investigate delivery failures; no purpose thereafter</td>
+</tr>
+<tr>
+<td>Error and usage logs (anonymised)</td>
+<td>90 days</td>
+<td>Sufficient for reliability analysis; no personal data retained after anonymisation</td>
+</tr>
+</tbody></table>
+<p>When you delete your account, all personal information associated with your account is permanently deleted within 30 days, including your phone number, payment handles, event history, and receipt images. This action is irreversible.</p>
+<hr>
+<h2>7. How We Protect Your Information</h2>
+<p>We implement industry-standard security measures:</p>
+<ul>
+<li><strong>Phone numbers</strong> are never stored in plaintext. They are stored in two encrypted forms: a one-way hash (SHA-256 HMAC) for lookups and an AES-256-GCM encrypted value for retrieval. The encryption keys are stored separately from the data.</li>
+<li><strong>Payment handles</strong> (Venmo usernames, CashApp tags, etc.) are stored AES-256-GCM encrypted.</li>
+<li><strong>All data in transit</strong> is encrypted using TLS 1.2 or higher.</li>
+<li><strong>Receipt images</strong> are stored in a private, access-controlled storage bucket. No public URLs are generated.</li>
+<li><strong>Authentication tokens</strong> are stored in your device&#39;s secure hardware enclave (iOS Secure Enclave / Android Keystore) and are never written to unprotected device storage.</li>
+<li>We do not log phone numbers or payment handles in application logs. Our logging infrastructure automatically scrubs personal information before writing to log storage.</li>
+</ul>
+<p>Despite these measures, no method of electronic storage or transmission over the internet is 100% secure. We cannot guarantee absolute security.</p>
+<p><strong>Security incidents:</strong> In the event of a data breach that affects your personal information, we will notify you as required by applicable state law, including within the timeframes required by California Civil Code §1798.82 and equivalent statutes in other US states. Notification will be provided via the contact information associated with your account.</p>
+<hr>
+<h2>8. Your Rights</h2>
+<h3>8.1 All Users</h3>
+<p>You have the right to:</p>
+<ul>
+<li><strong>Access</strong> your personal information by contacting us at <a href="mailto:builder@letssplyt.com">builder@letssplyt.com</a></li>
+<li><strong>Correct</strong> inaccurate information via the Profile screen in the app</li>
+<li><strong>Delete</strong> your account and all associated data via Settings → Delete Account (processed within 30 days) or by contacting us</li>
+<li><strong>Export</strong> your data by contacting us at <a href="mailto:builder@letssplyt.com">builder@letssplyt.com</a></li>
+</ul>
+<h3>8.2 California Residents (CCPA/CPRA)</h3>
+<p>If you are a California resident, you have the following rights under the California Consumer Privacy Act (CCPA) as amended by the California Privacy Rights Act (CPRA), effective January 1, 2026:</p>
+<ul>
+<li><strong>Right to Know:</strong> You may request a list of the categories and specific pieces of personal information we have collected about you in the past 12 months.</li>
+<li><strong>Right to Delete:</strong> You may request deletion of your personal information. You can do this directly in the app (Settings → Delete Account) or by contacting us at <a href="mailto:builder@letssplyt.com">builder@letssplyt.com</a>.</li>
+<li><strong>Right to Correct:</strong> You may request correction of inaccurate personal information via the Profile screen or by contacting us.</li>
+<li><strong>Right to Opt-Out of Sale or Sharing:</strong> We do not sell or share your personal information for cross-context behavioural advertising. There is nothing to opt out of.</li>
+<li><strong>Right to Limit Use of Sensitive Personal Information:</strong> We do not use sensitive personal information beyond what is necessary to operate the Service. No further limitation is required.</li>
+<li><strong>Right to Non-Discrimination:</strong> We will not deny, charge different prices, or provide a lower level of service to you for exercising your privacy rights.</li>
+<li><strong>Global Privacy Control:</strong> We honour Global Privacy Control (GPC) signals received through your browser or device as a valid opt-out of sale or sharing request.</li>
+</ul>
+<p><strong>How to submit a request:</strong> You may submit a CCPA rights request by either:</p>
+<ol>
+<li>Using the in-app Delete Account feature (Settings → Delete Account), or</li>
+<li>Emailing <a href="mailto:builder@letssplyt.com">builder@letssplyt.com</a> with the subject line &quot;CCPA Rights Request&quot;</li>
+</ol>
+<p>We will respond within 45 days of receiving your request. If we need additional time (up to 90 days total), we will notify you of the extension and the reason within the initial 45-day period. We will not charge a fee for processing your request unless it is manifestly unfounded or excessive.</p>
+<h3>8.3 Other US State Residents</h3>
+<p>Residents of Virginia (VCDPA), Colorado (CPA), Texas (TDPSA), Connecticut (CTDPA), and other US states with applicable privacy laws have similar rights to those described above. Contact us at <a href="mailto:builder@letssplyt.com">builder@letssplyt.com</a> to exercise your rights. We will respond within the timeframe required by your applicable state law.</p>
+<hr>
+<h2>9. Children&#39;s Privacy</h2>
+<p>LetsSplyt is intended for users <strong>18 years of age and older</strong>. We do not knowingly collect personal information from anyone under 18. If we learn we have collected personal information from a person under 18, we will delete it promptly. If you believe we may have collected such information, contact us at <a href="mailto:builder@letssplyt.com">builder@letssplyt.com</a>.</p>
+<hr>
+<h2>10. Third-Party Payment Services</h2>
+<p>LetsSplyt does not process payments. When you tap a payment link in an SMS or in the app, you are redirected to a third-party payment service (such as Venmo, CashApp, Zelle, or Apple Pay). Your payment is made directly through that service, and LetsSplyt never sees, stores, or processes your financial account details, card numbers, or bank information.</p>
+<p>Your use of those payment services is governed entirely by their own terms of service and privacy policies, which we encourage you to review. LetsSplyt has no control over and assumes no responsibility for the privacy practices of those third-party services.</p>
+<hr>
+<h2>11. SMS Communications</h2>
+<p>LetsSplyt sends two types of SMS messages:</p>
+<ol>
+<li><strong>One-time passcodes (OTP):</strong> Verification codes sent when you register or log in to confirm your phone number.</li>
+<li><strong>Payment request messages:</strong> A personalised message sent to each participant in a bill-split event containing their share of the bill and payment links.</li>
+</ol>
+<p>These are transactional messages directly related to your use of the Service. They are not marketing or promotional messages.</p>
+<p><strong>Consent:</strong> Your consent to receive these messages is obtained on the registration screen before your phone number is submitted, in accordance with the Telephone Consumer Protection Act (TCPA).</p>
+<p><strong>Opt-out:</strong> You may opt out of payment request messages at any time by replying <strong>STOP</strong> to any SMS from LetsSplyt. Note that opting out of payment request messages means other users will be unable to send you bill-split requests via SMS. To re-enable SMS, reply <strong>START</strong>.</p>
+<p><strong>Help:</strong> Reply <strong>HELP</strong> to any LetsSplyt SMS for assistance, or contact <a href="mailto:builder@letssplyt.com">builder@letssplyt.com</a>.</p>
+<p><strong>Rates:</strong> Message and data rates may apply. Message frequency varies based on your usage of the Service.</p>
+<hr>
+<h2>12. Data Location</h2>
+<p>Your data is stored and processed in the United States. Our service providers (Twilio, Supabase, Google, Anthropic) operate globally and may process certain data outside the United States. Where they do so, we rely on their data processing terms to ensure equivalent standards of data protection are maintained.</p>
+<hr>
+<h2>13. Changes to This Privacy Policy</h2>
+<p>We may update this Privacy Policy from time to time. When we do, we will update the &quot;Last Updated&quot; date at the top of this page.</p>
+<ul>
+<li><strong>Non-material changes</strong> (e.g. clarifications, corrections): We will update the date. Your continued use of the Service constitutes acceptance.</li>
+<li><strong>Material changes</strong> that affect how previously collected personal information is used: We will provide at least 30 days&#39; advance notice via push notification or in-app notice, and where required by law, obtain your affirmative consent before the changes apply to your existing data.</li>
+</ul>
+<hr>
+<h2>14. Contact Us</h2>
+<p>For privacy questions, data requests, or concerns:</p>
+<p><strong>Email:</strong> <a href="mailto:builder@letssplyt.com">builder@letssplyt.com</a><br><strong>Web:</strong> <a href="https://letssplyt.com">https://letssplyt.com</a></p>
+<p>We aim to respond to all privacy inquiries within 5 business days.</p>
+<hr>
+<p><em>This Privacy Policy was prepared in accordance with the California Consumer Privacy Act (CCPA) as amended by the California Privacy Rights Act (CPRA), effective January 1, 2026; the Telephone Consumer Protection Act (TCPA); the Children&#39;s Online Privacy Protection Act (COPPA); and applicable US state privacy laws including the Virginia Consumer Data Protection Act, Colorado Privacy Act, Texas Data Privacy and Security Act, and Connecticut Data Privacy Act.</em></p>
 
-    <p>
-      LetsSplyt (&quot;we&quot;, &quot;our&quot;, or &quot;us&quot;) operates the LetsSplyt mobile application
-      and related services. We are committed to protecting your personal information and your right to privacy.
-    </p>
-
-    <h2>Phone number privacy</h2>
-    <p>
-      Your phone number is used for account verification, OTP codes, and sending your payment request.
-      It is encrypted in our systems and is <strong>never shared with other participants</strong>, including
-      the event organiser. Other members only see the display name you choose.
-    </p>
-
-    <h2>Contact</h2>
-    <p>
-      Questions about this policy? Email
-      <a href="mailto:builder@letssplyt.com">builder@letssplyt.com</a>.
-    </p>
-
-    <p>
-      The complete Privacy Policy is also available in the LetsSplyt mobile app under Settings → Privacy Policy.
-    </p>
-  </div>
+  </main>
+  <footer class="legal-footer">
+    See also: <a href="/terms.html">Terms of Service</a>
+  </footer>
 </body>
 </html>

@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -27,6 +27,8 @@ import {
 } from '../splits/splitEntry.utils';
 import { useSplitStore } from '../../store/splitStore';
 import { authColors, colors } from '../../theme/colors';
+import { finishEventFlowToEventDetail } from '../../navigation/eventNavigation';
+import { completeEventWithoutSms } from '../../utils/messageFlow';
 
 type Props = NativeStackScreenProps<EventsStackParamList, 'MessagePreview'>;
 
@@ -43,6 +45,7 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
   const [viewedIds, setViewedIds] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const autoCompleteRef = useRef(false);
   const loadPreviews = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -66,6 +69,20 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
   useEffect(() => {
     void loadPreviews();
   }, [loadPreviews]);
+
+  useEffect(() => {
+    if (loading || error || previews.length > 0 || autoCompleteRef.current) {
+      return;
+    }
+
+    autoCompleteRef.current = true;
+    setSending(true);
+    void completeEventWithoutSms(navigation, eventId).catch(() => {
+      autoCompleteRef.current = false;
+      setSendError('Could not complete the event. Tap to retry.');
+      setSending(false);
+    });
+  }, [error, eventId, loading, navigation, previews.length]);
 
   const selected = previews[selectedIndex];
 
@@ -124,10 +141,12 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
         <View style={styles.headerSpacer} />
       </View>
 
-      {loading ? (
+      {loading || (sending && previews.length === 0) ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={authColors.ctaSurface} />
-          <Text style={styles.loadingText}>Crafting your messages…</Text>
+          <Text style={styles.loadingText}>
+            {previews.length === 0 ? 'Completing event…' : 'Crafting your messages…'}
+          </Text>
         </View>
       ) : error ? (
         <View style={styles.centered}>

@@ -847,7 +847,16 @@ eas submit --platform ios
 Both app stores require these pages to be live at public URLs before accepting your app submission. The content is already written in files/09-Security-And-Privacy.md Section 6.
 
 **Option A — Serve from your backend (simplest)**
-Tell Cursor:
+
+Source of truth: `docs/LetsSplyt-Privacy-Policy.md` and `docs/LetsSplyt-Terms-of-Service.md`. From `mobile/` run:
+
+```bash
+npm run sync:legal-docs
+```
+
+This updates in-app legal sections (`mobile/src/content/legal/`) **and** generates `backend/public/privacy.html` and `backend/public/terms.html` (nav cross-links, readable HTML). Express serves them via `app.use(express.static('public'))`.
+
+Tell Cursor (if pages are missing):
 *"Add static HTML pages for Privacy Policy and Terms of Service. Create backend/public/privacy.html and backend/public/terms.html. In app.ts, add: app.use(express.static('public')). The Privacy Policy content is in files/09-Security-And-Privacy.md Section 6 — translate the six policy statement blocks into a readable HTML page. Do the same for Terms of Service."*
 
 Then verify after deploying to production:
