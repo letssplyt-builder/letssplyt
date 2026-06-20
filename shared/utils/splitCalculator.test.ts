@@ -127,6 +127,7 @@ describe('calculateSplits', () => {
       tax: 5,
       fees: 0,
       tip: 10,
+      discounts: 0,
       total: 65,
     };
 
@@ -150,6 +151,7 @@ describe('calculateSplits', () => {
       tax: 0,
       fees: 0,
       tip: 0,
+      discounts: 0,
       total: 10,
     };
 
@@ -171,6 +173,7 @@ describe('calculateSplits', () => {
       tax: 0,
       fees: 0,
       tip: 0,
+      discounts: 0,
       total: 1200,
     };
 
@@ -185,6 +188,7 @@ describe('calculateSplits', () => {
       tax: 0,
       fees: 0,
       tip: 0,
+      discounts: 0,
       total: 10,
     };
     expect(() =>
@@ -202,6 +206,7 @@ describe('calculateSplits', () => {
       tax: 0,
       fees: 0,
       tip: 0,
+      discounts: 0,
       total: 10,
     };
     expect(() =>
@@ -219,6 +224,7 @@ describe('calculateSplits', () => {
       tax: 0,
       fees: 0,
       tip: 0,
+      discounts: 0,
       total: 50,
     };
     expect(() =>
@@ -232,7 +238,7 @@ describe('calculateSplits', () => {
 
   it('throws when no participants provided', () => {
     expect(() =>
-      calculateSplits([], [], { subtotal: 0, tax: 0, fees: 0, tip: 0, total: 0 }, [], 'USD'),
+      calculateSplits([], [], { subtotal: 0, tax: 0, fees: 0, tip: 0, discounts: 0, total: 0 }, [], 'USD'),
     ).toThrow(/At least one participant/);
   });
 
@@ -242,6 +248,7 @@ describe('calculateSplits', () => {
       tax: 0,
       fees: 0,
       tip: 0,
+      discounts: 0,
       total: 12,
     };
     expect(() =>
@@ -257,7 +264,7 @@ describe('calculateSplits', () => {
     const splits = calculateSplits(
       [{ id: 'a', name: 'Item', unit_price: 10, quantity: 1 }],
       [{ item_id: 'a', assigned_to: ['Alex'] }],
-      { subtotal: 10, tax: 0, fees: 0, tip: 0, total: 10 },
+      { subtotal: 10, tax: 0, fees: 0, tip: 0, discounts: 0, total: 10 },
       ['Alex'],
     );
     expect(splits[0].amountOwed).toBe(10);
@@ -267,7 +274,7 @@ describe('calculateSplits', () => {
     const splits = calculateSplits(
       [],
       [],
-      { subtotal: 0, tax: 0, fees: 0, tip: 0, total: 0 },
+      { subtotal: 0, tax: 0, fees: 0, tip: 0, discounts: 0, total: 0 },
       ['Alex', 'Jordan'],
       'USD',
     );
@@ -277,12 +284,80 @@ describe('calculateSplits', () => {
     ]);
   });
 
+  it('prorates discounts like tax and fees in itemised splits', () => {
+    const items: ConfirmedReceiptItem[] = [
+      { id: 'a', name: 'Burger', unit_price: 20, quantity: 1 },
+      { id: 'b', name: 'Pasta', unit_price: 30, quantity: 1 },
+    ];
+    const assignments: Assignment[] = [
+      { item_id: 'a', assigned_to: ['Alex'] },
+      { item_id: 'b', assigned_to: ['Jordan', 'Sam'] },
+    ];
+    const totals: ReceiptTotals = {
+      subtotal: 50,
+      tax: 5,
+      fees: 0,
+      tip: 0,
+      discounts: 10,
+      total: 45,
+    };
+
+    const splits = runItemised(items, assignments, totals);
+    expect(splits.reduce((sum, row) => sum + row.amountOwed, 0)).toBe(45);
+    expect(splits.find((r) => r.participantName === 'Alex')!.amountOwed).toBe(18);
+    expect(splits.find((r) => r.participantName === 'Jordan')!.amountOwed).toBe(13.5);
+  });
+
+  it('allows discounts larger than tax and fees by reducing participant shares', () => {
+    const items: ConfirmedReceiptItem[] = [
+      { id: 'a', name: 'Burger', unit_price: 20, quantity: 1 },
+      { id: 'b', name: 'Pasta', unit_price: 30, quantity: 1 },
+    ];
+    const assignments: Assignment[] = [
+      { item_id: 'a', assigned_to: ['Alex'] },
+      { item_id: 'b', assigned_to: ['Jordan', 'Sam'] },
+    ];
+    const totals: ReceiptTotals = {
+      subtotal: 50,
+      tax: 2,
+      fees: 0,
+      tip: 0,
+      discounts: 15,
+      total: 37,
+    };
+
+    const splits = runItemised(items, assignments, totals);
+    expect(splits.reduce((sum, row) => sum + row.amountOwed, 0)).toBe(37);
+    expect(splits.find((r) => r.participantName === 'Alex')!.amountOwed).toBe(14.8);
+    expect(splits.find((r) => r.participantName === 'Jordan')!.amountOwed).toBe(11.1);
+  });
+
+  it('handles JPY itemised split with discount in major units', () => {
+    const items: ConfirmedReceiptItem[] = [
+      { id: 'a', name: 'Ramen', unit_price: 1200, quantity: 1 },
+    ];
+    const assignments: Assignment[] = [{ item_id: 'a', assigned_to: ['Alex', 'Jordan'] }];
+    const totals: ReceiptTotals = {
+      subtotal: 1200,
+      tax: 0,
+      fees: 0,
+      tip: 0,
+      discounts: 120,
+      total: 1080,
+    };
+
+    const splits = calculateSplits(items, assignments, totals, ['Alex', 'Jordan'], 'JPY');
+    expect(splits.reduce((sum, row) => sum + row.amountOwed, 0)).toBe(1080);
+    expect(splits.map((row) => row.amountOwed).sort((a, b) => b - a)).toEqual([540, 540]);
+  });
+
   it('throws when item has no assignees', () => {
     const totals: ReceiptTotals = {
       subtotal: 10,
       tax: 0,
       fees: 0,
       tip: 0,
+      discounts: 0,
       total: 10,
     };
     expect(() =>

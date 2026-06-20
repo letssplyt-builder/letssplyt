@@ -577,6 +577,8 @@ On successful parse, `persistParseResult()`:
 3. Inserts fee rows (`is_fee = true`) from `result.additional_charges` (name + amount as `unit_price`, `quantity = 1`).
 4. Updates `events`: `tax_amount`, `tip_amount`, `fees_amount` (sum of charges), `total_amount`, `ai_stage = 'parsed'`.
 
+**Receipt discounts** are not extracted by A1. The payer adds them manually on Item Review (`+ Add discount`); confirmed rows persist to `receipt_discounts` and `events.discount_amount`.
+
 ### Image Pipeline
 
 Mobile captures are uploaded to Supabase Storage as raw images. The harness fetches and preprocesses before sending to the AI provider. The flow differs by provider:

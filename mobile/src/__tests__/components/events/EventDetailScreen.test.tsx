@@ -441,9 +441,11 @@ describe('EventDetailScreen', () => {
       receipt_review: {
         items: [{ name: 'Burger', unit_price: 10, quantity: 1 }],
         additional_charges: [],
+        discounts: [],
         tax_amount: 0,
         tip_amount: 0,
         fees_amount: 0,
+        discount_amount: 0,
         currency: 'USD',
       },
     });
@@ -501,9 +503,11 @@ describe('EventDetailScreen', () => {
       receipt_review: {
         items: [{ id: 'item-1', name: 'Burger', unit_price: 10, quantity: 1 }],
         additional_charges: [],
+        discounts: [],
         tax_amount: 0,
         tip_amount: 0,
         fees_amount: 0,
+        discount_amount: 0,
         currency: 'USD',
       },
     });
@@ -586,9 +590,11 @@ describe('EventDetailScreen', () => {
       receipt_review: {
         items: [{ name: 'Burger', unit_price: 10, quantity: 1 }],
         additional_charges: [],
+        discounts: [],
         tax_amount: 0,
         tip_amount: 0,
         fees_amount: 0,
+        discount_amount: 0,
         currency: 'USD',
       },
     });
@@ -613,9 +619,11 @@ describe('EventDetailScreen', () => {
       receipt_review: {
         items: [{ name: 'Burger', unit_price: 10, quantity: 1 }],
         additional_charges: [],
+        discounts: [],
         tax_amount: 0,
         tip_amount: 0,
         fees_amount: 0,
+        discount_amount: 0,
         currency: 'USD',
       },
     });
@@ -640,9 +648,11 @@ describe('EventDetailScreen', () => {
       receipt_review: {
         items: [{ name: 'Burger', unit_price: 10, quantity: 1 }],
         additional_charges: [],
+        discounts: [],
         tax_amount: 1,
         tip_amount: 2,
         fees_amount: 0,
+        discount_amount: 0,
         currency: 'USD',
       },
     });

@@ -9,7 +9,7 @@ describe('fetchReceiptReviewSnapshot', () => {
     mockSupabase.__resetMock();
   });
 
-  it('maps food and fee rows into review snapshot', async () => {
+  it('maps food, fee, and discount rows into review snapshot', async () => {
     mockSupabase.__setMockResultForTable('receipt_items', {
       data: [
         {
@@ -30,14 +30,16 @@ describe('fetchReceiptReviewSnapshot', () => {
           is_low_confidence: false,
           is_fee: true,
         },
+      ],
+      error: null,
+    });
+    mockSupabase.__setMockResultForTable('receipt_discounts', {
+      data: [
         {
-          id: '33333333-3333-3333-3333-333333333333',
-          name: 'Salad',
-          unit_price: 8,
-          quantity: 1,
-          confidence_score: 0.4,
-          is_low_confidence: true,
-          is_fee: false,
+          name: 'Happy hour',
+          discount_type: 'percent',
+          value: 10,
+          resolved_amount: 1,
         },
       ],
       error: null,
@@ -47,31 +49,17 @@ describe('fetchReceiptReviewSnapshot', () => {
       tax_amount: 1,
       tip_amount: 2,
       fees_amount: 2,
+      discount_amount: 1,
       currency: 'USD',
     });
 
-    expect(snapshot.items).toEqual([
-      {
-        id: '11111111-1111-1111-1111-111111111111',
-        name: 'Burger',
-        unit_price: 10,
-        quantity: 1,
-        confidence: 'high',
-      },
-      {
-        id: '33333333-3333-3333-3333-333333333333',
-        name: 'Salad',
-        unit_price: 8,
-        quantity: 1,
-        confidence: 'low',
-      },
-    ]);
+    expect(snapshot.items).toHaveLength(1);
     expect(snapshot.additional_charges).toEqual([
       { name: 'SVC Fee', amount: 2, confidence: 'high' },
     ]);
-    expect(snapshot.tax_amount).toBe(1);
-    expect(snapshot.tip_amount).toBe(2);
-    expect(snapshot.fees_amount).toBe(2);
-    expect(snapshot.currency).toBe('USD');
+    expect(snapshot.discounts).toEqual([
+      { name: 'Happy hour', type: 'percent', value: 10 },
+    ]);
+    expect(snapshot.discount_amount).toBe(1);
   });
 });

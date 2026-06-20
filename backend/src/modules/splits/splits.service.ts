@@ -109,12 +109,13 @@ function buildReceiptTotals(
   const tax = Number(eventRow.tax_amount ?? 0);
   const fees = Number(eventRow.fees_amount ?? 0);
   const tip = Number(eventRow.tip_amount ?? 0);
+  const discounts = Number(eventRow.discount_amount ?? 0);
   const total =
     manualTotal !== undefined
       ? Number(manualTotal.toFixed(2))
-      : Number(eventRow.total_amount ?? subtotal + tax + fees + tip);
+      : Number(eventRow.total_amount ?? subtotal + tax + fees + tip - discounts);
 
-  return { subtotal, tax, fees, tip, total };
+  return { subtotal, tax, fees, tip, discounts, total };
 }
 
 function mapParticipantIdsToNames(

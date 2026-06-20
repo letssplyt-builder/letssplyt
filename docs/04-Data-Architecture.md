@@ -337,6 +337,7 @@ CREATE TABLE events (
   tax_amount              NUMERIC(10,2),                       -- extracted by A1; NULL until parsed (government sales tax / VAT only)
   tip_amount              NUMERIC(10,2),                       -- extracted by A1; NULL until parsed (voluntary gratuity only)
   fees_amount             NUMERIC(10,2),                       -- sum of additional_charges from A1; NULL until parsed
+  discount_amount         NUMERIC(10,2),                       -- sum of resolved receipt discounts; NULL until confirm
   locale                  VARCHAR(10)  NOT NULL DEFAULT 'en-US', -- detected from receipt by A1 (e.g. 'en-US', 'ja-JP')
   last_parse_attempt_id   UUID,                                 -- set by A1 on scan; confirmed by POST /receipt/confirm; prevents stale confirmations
 
@@ -530,9 +531,29 @@ Line items extracted from a scanned receipt by A1, or entered manually by the pa
 | Named surcharges (service charge, city fee, large party fee, …) | `events.fees_amount` **and** `receipt_items` (`is_fee = true`, one row per charge) | `fees_amount` is the sum for math; fee rows keep receipt labels for Item Review |
 | Sales tax / VAT | `events.tax_amount` | Prorated across participants — never a `receipt_items` row |
 | Voluntary gratuity | `events.tip_amount` | Prorated across participants — never a `receipt_items` row |
-| Total | `events.total_amount` | Printed receipt total |
+| Manual discounts (happy hour, comp, coupon, …) | `events.discount_amount` **and** `receipt_discounts` (one row per discount) | Payer-added on Item Review only (not A1); `%` or fixed amount; stacked **sequentially** on items subtotal; prorated in split math like tax/fees/tip |
+| Total | `events.total_amount` | `subtotal − discount_amount + fees + tax + tip` (floored at 0) |
 
 A1 may briefly duplicate a fee in both `items` and `additional_charges`; `dedupeFeeLineItems()` removes the food-line duplicate before persist.
+
+```sql
+-- ─────────────────────────────────────────────────────────────────────────────
+-- receipt_discounts
+-- Manual discounts added on Item Review (POST /receipts/confirm). Not extracted
+-- by A1. Each row stores the payer label, type (% or amount), raw value, and
+-- resolved_amount at confirm time (for % rows, computed from items subtotal).
+-- events.discount_amount = sum(resolved_amount).
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE receipt_discounts (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id         UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  name             VARCHAR(60) NOT NULL,
+  discount_type    VARCHAR(10) NOT NULL CHECK (discount_type IN ('percent', 'amount')),
+  value            NUMERIC(10,4) NOT NULL CHECK (value > 0),
+  resolved_amount  NUMERIC(10,2) NOT NULL CHECK (resolved_amount >= 0),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
 
 **Dev reset:** To wipe receipt scan data while keeping events and participants, run `supabase/scripts/reset-receipt-scans.sql` in the Supabase SQL Editor (MODE A).
 

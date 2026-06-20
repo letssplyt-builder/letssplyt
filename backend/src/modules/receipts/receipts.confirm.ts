@@ -1,6 +1,11 @@
 import { randomUUID } from 'crypto';
 import { z } from 'zod';
 import type { ReceiptConfirmResponse } from '@letssplyt/shared/receipt.types';
+import {
+  computeReceiptGrandTotal,
+  resolveDiscountsTotal,
+  resolveReceiptDiscounts,
+} from '@letssplyt/shared/utils/receiptDiscounts';
 import { AppError, Errors } from '../../infrastructure/errors';
 import { supabaseAdmin } from '../../infrastructure/supabase';
 import {
@@ -21,13 +26,21 @@ const confirmChargeSchema = z.object({
   amount: z.number().nonnegative(),
 });
 
+const confirmDiscountSchema = z.object({
+  name: z.string().min(1).max(60),
+  type: z.enum(['percent', 'amount']),
+  value: z.number().positive(),
+});
+
 export const confirmReceiptBodySchema = z.object({
   event_id: z.string().uuid(),
   items: z.array(confirmItemSchema).min(1),
   additional_charges: z.array(confirmChargeSchema).default([]),
+  discounts: z.array(confirmDiscountSchema).default([]),
   tax: z.number().nonnegative(),
   fees: z.number().nonnegative(),
   tip: z.number().nonnegative(),
+  discount_total: z.number().nonnegative(),
 });
 
 function sumItems(items: z.infer<typeof confirmItemSchema>[]): number {
@@ -57,13 +70,22 @@ export async function confirmReceipt(
 
   const itemsSubtotal = sumItems(body.items);
   const chargesTotal = sumCharges(body.additional_charges);
+  const computedDiscountTotal = resolveDiscountsTotal(body.discounts, itemsSubtotal);
 
   if (Math.abs(chargesTotal - body.fees) > 0.02) {
     throw Errors.validation('fees must equal the sum of additional_charges');
   }
 
-  const totalAmount = Number(
-    (itemsSubtotal + body.tax + body.fees + body.tip).toFixed(2),
+  if (Math.abs(computedDiscountTotal - body.discount_total) > 0.02) {
+    throw Errors.validation('discount_total must equal the resolved sum of discounts');
+  }
+
+  const totalAmount = computeReceiptGrandTotal(
+    itemsSubtotal,
+    body.fees,
+    body.tax,
+    body.tip,
+    body.discount_total,
   );
 
   const { data: claimed, error: claimError } = await supabaseAdmin
@@ -85,13 +107,22 @@ export async function confirmReceipt(
     );
   }
 
-  const { error: deleteError } = await supabaseAdmin
+  const { error: deleteItemsError } = await supabaseAdmin
     .from('receipt_items')
     .delete()
     .eq('event_id', body.event_id);
 
-  if (deleteError) {
-    throw new AppError('DB_WRITE_FAILED', deleteError.message, 500);
+  if (deleteItemsError) {
+    throw new AppError('DB_WRITE_FAILED', deleteItemsError.message, 500);
+  }
+
+  const { error: deleteDiscountsError } = await supabaseAdmin
+    .from('receipt_discounts')
+    .delete()
+    .eq('event_id', body.event_id);
+
+  if (deleteDiscountsError) {
+    throw new AppError('DB_WRITE_FAILED', deleteDiscountsError.message, 500);
   }
 
   const itemRows = body.items.map((item) => ({
@@ -132,6 +163,26 @@ export async function confirmReceipt(
     }
   }
 
+  if (body.discounts.length > 0) {
+    const resolvedDiscounts = resolveReceiptDiscounts(body.discounts, itemsSubtotal);
+    const discountRows = resolvedDiscounts.map((discount) => ({
+      id: randomUUID(),
+      event_id: body.event_id,
+      name: discount.name.trim(),
+      discount_type: discount.type,
+      value: discount.value,
+      resolved_amount: discount.resolved_amount,
+    }));
+
+    const { error: discountInsertError } = await supabaseAdmin
+      .from('receipt_discounts')
+      .insert(discountRows);
+
+    if (discountInsertError) {
+      throw new AppError('DB_WRITE_FAILED', discountInsertError.message, 500);
+    }
+  }
+
   const { error: eventError } = await supabaseAdmin
     .from('events')
     .update({
@@ -139,6 +190,7 @@ export async function confirmReceipt(
       tax_amount: body.tax,
       tip_amount: body.tip,
       fees_amount: body.fees,
+      discount_amount: body.discount_total,
       receipt_scan_attempted: true,
       ai_parse_success: true,
     })

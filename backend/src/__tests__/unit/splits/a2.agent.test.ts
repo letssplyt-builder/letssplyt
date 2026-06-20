@@ -23,6 +23,7 @@ const TOTALS = {
   tax: 2.4,
   fees: 0,
   tip: 3,
+  discounts: 0,
   total: 35.4,
 };
 

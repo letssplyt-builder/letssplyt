@@ -1077,8 +1077,20 @@ Receipt-slip layout on `AuthGradientLayout`: warm paper card on teal gradient. C
 
 - Food lines from parse (`items` → `is_fee = false` in DB)
 - Fee/surcharge lines from `additional_charges` (`is_fee = true` in DB)
-- **+ Add line** / **+ Add fee or surcharge** on the slip
-- Tax and tip editable on slip footer; subtotal + fees + grand total computed live
+- **Discount lines** from `discounts` (`receipt_discounts` table; % or fixed amount, stacked sequentially on subtotal)
+- **+ Add line** / **+ Add fee or surcharge** / **+ Add discount** on the slip
+- Tax and tip editable on slip footer; subtotal, discounts, fees, and grand total computed live
+
+**Discount rules (Item Review):**
+| Rule | Behaviour |
+|---|---|
+| Types | `percent` (% of remaining items subtotal) or `amount` (fixed currency) |
+| Stacking | Multiple discounts apply **in order**; each reduces the subtotal base for the next |
+| Cap | No single discount resolves above the remaining subtotal; total discount cannot exceed subtotal |
+| Grand total | `subtotal − discounts + fees + tax + tip`, floored at **$0.00** |
+| Confirm payload | Only discounts with non-empty name and `value > 0`; `discount_total` must match server resolution |
+| Split math | `discount_amount` prorated across participants like tax/fees/tip (`shared/utils/splitCalculator.ts`) |
+| A1 | Does **not** auto-extract discounts from receipt images (manual only on this screen) |
 - Low-confidence items: amber row + **Check** chip (`confidence: 'low'`)
 - Pull-to-refresh → `GET /events/:id` → applies `receipt_review` (does **not** re-run A1)
 - CTA: **Looks good → assign shares** → `POST /api/v1/receipts/confirm` → `SplitEntryScreen` (`mode: 'itemised'`)

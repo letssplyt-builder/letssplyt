@@ -56,6 +56,7 @@ async function requestJson(
 
 async function cleanup(eventId: string): Promise<void> {
   await supabaseAdmin.from('receipt_items').delete().eq('event_id', eventId);
+  await supabaseAdmin.from('receipt_discounts').delete().eq('event_id', eventId);
   await supabaseAdmin.from('participants').delete().eq('event_id', eventId);
   await supabaseAdmin.from('event_join_tokens').delete().eq('event_id', eventId);
   await supabaseAdmin.from('events').delete().eq('id', eventId);
@@ -191,18 +192,37 @@ async function main(): Promise<void> {
       event_id: eventId,
       items: [{ name: 'Burger', price: 10, quantity: 1 }],
       additional_charges: [{ name: 'SVC Fee', amount: 3 }],
+      discounts: [{ name: '10% off', type: 'percent', value: 10 }],
       tax: 1,
       fees: 3,
       tip: 2,
+      discount_total: 1,
     };
 
     const confirm = await requestJson('POST', '/api/v1/receipts/confirm', confirmBody, accessToken);
     const confirmed = confirm.body.confirmed as boolean | undefined;
     const totalAmount = confirm.body.total_amount as number | undefined;
-    if (confirm.status === 200 && confirmed === true && totalAmount === 16) {
+    if (confirm.status === 200 && confirmed === true && totalAmount === 15) {
       pass('POST /receipts/confirm', `total_amount=${totalAmount}`);
     } else {
       fail('POST /receipts/confirm', `status ${confirm.status} ${JSON.stringify(confirm.body)}`);
+    }
+
+    const afterDiscountReview = await requestJson('GET', `/api/v1/events/${eventId}`, undefined, accessToken);
+    const discountReview = afterDiscountReview.body.receipt_review as
+      | { discounts?: Array<{ name: string; type: string; value: number }> }
+      | undefined;
+    if (
+      afterDiscountReview.status === 200 &&
+      discountReview?.discounts?.length === 1 &&
+      discountReview.discounts[0].name === '10% off'
+    ) {
+      pass('GET /events/:id receipt_review discounts', discountReview.discounts[0].type);
+    } else {
+      fail(
+        'GET /events/:id receipt_review discounts',
+        `status ${afterDiscountReview.status} ${JSON.stringify(discountReview?.discounts)}`,
+      );
     }
 
     const afterConfirm = await requestJson('GET', `/api/v1/events/${eventId}`, undefined, accessToken);
@@ -216,12 +236,12 @@ async function main(): Promise<void> {
 
     const { data: dbEvent } = await supabaseAdmin
       .from('events')
-      .select('ai_stage, total_amount, tax_amount, tip_amount, fees_amount')
+      .select('ai_stage, total_amount, tax_amount, tip_amount, fees_amount, discount_amount')
       .eq('id', eventId)
       .maybeSingle();
 
-    if (dbEvent?.ai_stage === 'parsed_confirmed' && dbEvent.total_amount === 16) {
-      pass('DB events row', `total=${dbEvent.total_amount} tax=${dbEvent.tax_amount}`);
+    if (dbEvent?.ai_stage === 'parsed_confirmed' && dbEvent.total_amount === 15 && dbEvent.discount_amount === 1) {
+      pass('DB events row', `total=${dbEvent.total_amount} discount=${dbEvent.discount_amount}`);
     } else {
       fail('DB events row', JSON.stringify(dbEvent));
     }
@@ -240,7 +260,52 @@ async function main(): Promise<void> {
       fail('DB receipt_items', JSON.stringify(dbItems));
     }
 
-    const reconfirm = await requestJson('POST', '/api/v1/receipts/confirm', confirmBody, accessToken);
+    const { data: dbDiscounts } = await supabaseAdmin
+      .from('receipt_discounts')
+      .select('name, discount_type, value, resolved_amount')
+      .eq('event_id', eventId);
+
+    if (
+      (dbDiscounts ?? []).length === 1 &&
+      dbDiscounts?.[0].name === '10% off' &&
+      dbDiscounts[0].resolved_amount === 1
+    ) {
+      pass('DB receipt_discounts', `${dbDiscounts[0].discount_type} resolved=${dbDiscounts[0].resolved_amount}`);
+    } else {
+      fail('DB receipt_discounts', JSON.stringify(dbDiscounts));
+    }
+
+    const stackedConfirmBody = {
+      event_id: eventId,
+      items: [{ name: 'Burger', price: 10, quantity: 1 }],
+      additional_charges: [{ name: 'SVC Fee', amount: 3 }],
+      discounts: [
+        { name: '10% off', type: 'percent', value: 10 },
+        { name: 'Comp', type: 'amount', value: 2 },
+      ],
+      tax: 1,
+      fees: 3,
+      tip: 2,
+      discount_total: 3,
+    };
+
+    const stackedConfirm = await requestJson(
+      'POST',
+      '/api/v1/receipts/confirm',
+      stackedConfirmBody,
+      accessToken,
+    );
+    const stackedTotal = stackedConfirm.body.total_amount as number | undefined;
+    if (stackedConfirm.status === 200 && stackedTotal === 13) {
+      pass('POST /receipts/confirm stacked discounts', `total_amount=${stackedTotal}`);
+    } else {
+      fail(
+        'POST /receipts/confirm stacked discounts',
+        `status ${stackedConfirm.status} ${JSON.stringify(stackedConfirm.body)}`,
+      );
+    }
+
+    const reconfirm = await requestJson('POST', '/api/v1/receipts/confirm', stackedConfirmBody, accessToken);
     const reconfirmed = reconfirm.body.confirmed as boolean | undefined;
     if (reconfirm.status === 200 && reconfirmed === true) {
       pass('POST /receipts/confirm re-confirm', 'idempotent at parsed_confirmed');

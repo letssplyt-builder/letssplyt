@@ -14,7 +14,8 @@
     "./settlement.types": "./types/settlement.types.ts",
     "./counterparty.types": "./types/counterparty.types.ts",
     "./paymentHandleValidation": "./utils/paymentHandleValidation.ts",
-    "./utils/splitCalculator": "./utils/splitCalculator.ts"
+    "./utils/splitCalculator": "./utils/splitCalculator.ts",
+    "./utils/receiptDiscounts": "./utils/receiptDiscounts.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

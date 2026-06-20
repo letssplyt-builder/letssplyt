@@ -21,6 +21,7 @@ function hasExpensesToReset(row: EventRowWithReceiptFields): boolean {
     row.tax_amount !== null ||
     row.tip_amount !== null ||
     row.fees_amount !== null ||
+    row.discount_amount != null ||
     row.split_mode !== null
   );
 }
@@ -48,6 +49,15 @@ async function resetExpensesViaQueries(eventId: string): Promise<void> {
 
   if (deleteItemsError) {
     throw new AppError('DB_WRITE_FAILED', deleteItemsError.message, 500);
+  }
+
+  const { error: deleteDiscountsError } = await supabaseAdmin
+    .from('receipt_discounts')
+    .delete()
+    .eq('event_id', eventId);
+
+  if (deleteDiscountsError) {
+    throw new AppError('DB_WRITE_FAILED', deleteDiscountsError.message, 500);
   }
 
   const { error: participantsError } = await supabaseAdmin
@@ -89,6 +99,7 @@ async function resetExpensesViaQueries(eventId: string): Promise<void> {
       tax_amount: null,
       tip_amount: null,
       fees_amount: null,
+      discount_amount: null,
       receipt_scan_attempted: false,
       ai_parse_success: null,
       ai_parse_confidence: null,

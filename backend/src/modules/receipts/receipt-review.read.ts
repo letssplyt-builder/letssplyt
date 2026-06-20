@@ -8,6 +8,7 @@ export async function fetchReceiptReviewSnapshot(
     tax_amount: number | null;
     tip_amount: number | null;
     fees_amount: number | null;
+    discount_amount: number | null;
     currency: string;
   },
 ): Promise<ReceiptReviewSnapshot> {
@@ -19,6 +20,16 @@ export async function fetchReceiptReviewSnapshot(
 
   if (error) {
     throw new AppError('DB_READ_FAILED', error.message, 500);
+  }
+
+  const { data: discountRows, error: discountError } = await supabaseAdmin
+    .from('receipt_discounts')
+    .select('name, discount_type, value, resolved_amount')
+    .eq('event_id', eventId)
+    .order('created_at');
+
+  if (discountError) {
+    throw new AppError('DB_READ_FAILED', discountError.message, 500);
   }
 
   const allRows = rows ?? [];
@@ -38,9 +49,15 @@ export async function fetchReceiptReviewSnapshot(
       amount: Number(row.unit_price),
       confidence: row.is_low_confidence ? 'low' : 'high',
     })),
+    discounts: (discountRows ?? []).map((row) => ({
+      name: row.name as string,
+      type: row.discount_type as 'percent' | 'amount',
+      value: Number(row.value),
+    })),
     tax_amount: Number(financials.tax_amount ?? 0),
     tip_amount: Number(financials.tip_amount ?? 0),
     fees_amount: Number(financials.fees_amount ?? 0),
+    discount_amount: Number(financials.discount_amount ?? 0),
     currency: financials.currency,
   };
 }

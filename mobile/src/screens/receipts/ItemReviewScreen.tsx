@@ -22,11 +22,14 @@ import * as receiptsService from '../../services/receipts.service';
 import { authColors } from '../../theme/colors';
 import { glassStyles } from '../../theme/glassStyles';
 import {
+  computeDiscountTotal,
+  computeItemsSubtotal,
   computeReviewTotal,
   createLocalId,
   parseAmountInput,
   parseResultToSnapshot,
   snapshotToEditable,
+  type EditableReviewDiscount,
   type EditableReviewItem,
 } from './itemReview.utils';
 
@@ -44,6 +47,7 @@ export function ItemReviewScreen({ navigation, route }: Props) {
 
   const [items, setItems] = useState<EditableReviewItem[]>(initialEditable.items);
   const [charges, setCharges] = useState<ReceiptAdditionalCharge[]>(initialEditable.charges);
+  const [discounts, setDiscounts] = useState<EditableReviewDiscount[]>(initialEditable.discounts);
   const [taxInput, setTaxInput] = useState(initialEditable.tax);
   const [tipInput, setTipInput] = useState(initialEditable.tip);
   const [confirming, setConfirming] = useState(false);
@@ -51,13 +55,14 @@ export function ItemReviewScreen({ navigation, route }: Props) {
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
 
-  const runningTotal = computeReviewTotal(items, charges, taxInput, tipInput);
+  const runningTotal = computeReviewTotal(items, charges, discounts, taxInput, tipInput);
   const currency = initialSnapshot.currency;
 
   const applySnapshot = useCallback((snapshot: typeof initialSnapshot) => {
     const editable = snapshotToEditable(snapshot);
     setItems(editable.items);
     setCharges(editable.charges);
+    setDiscounts(editable.discounts);
     setTaxInput(editable.tax);
     setTipInput(editable.tip);
     setExpandedKey(null);
@@ -122,6 +127,30 @@ export function ItemReviewScreen({ navigation, route }: Props) {
     setCharges((prev) => [...prev, { name: '', amount: 0 }]);
   };
 
+  const updateDiscount = (localId: string, patch: Partial<EditableReviewDiscount>) => {
+    setDiscounts((prev) =>
+      prev.map((discount) =>
+        discount.localId === localId ? { ...discount, ...patch } : discount,
+      ),
+    );
+  };
+
+  const removeDiscount = (localId: string) => {
+    setDiscounts((prev) => prev.filter((discount) => discount.localId !== localId));
+    if (expandedKey === `discount-${localId}`) {
+      setExpandedKey(null);
+    }
+  };
+
+  const addDiscount = () => {
+    const localId = createLocalId();
+    setDiscounts((prev) => [
+      ...prev,
+      { localId, name: '', type: 'percent', value: 0 },
+    ]);
+    setExpandedKey(`discount-${localId}`);
+  };
+
   const handleConfirm = async () => {
     const validItems = items.filter((item) => item.name.trim().length > 0);
     if (validItems.length === 0) {
@@ -146,6 +175,21 @@ export function ItemReviewScreen({ navigation, route }: Props) {
     const fees = payloadCharges.reduce((sum, charge) => sum + charge.amount, 0);
     const tax = parseAmountInput(taxInput);
     const tip = parseAmountInput(tipInput);
+    const itemsSubtotal = computeItemsSubtotal(validItems);
+    const payloadDiscounts = discounts
+      .filter((discount) => discount.name.trim().length > 0 && discount.value > 0)
+      .map((discount) => ({
+        name: discount.name.trim(),
+        type: discount.type,
+        value: discount.value,
+      }));
+    const discountTotal = computeDiscountTotal(
+      payloadDiscounts.map((discount, index) => ({
+        ...discount,
+        localId: `confirm-${index}`,
+      })),
+      itemsSubtotal,
+    );
 
     setConfirming(true);
     setConfirmError(null);
@@ -154,9 +198,11 @@ export function ItemReviewScreen({ navigation, route }: Props) {
         event_id: eventId,
         items: payloadItems,
         additional_charges: payloadCharges,
+        discounts: payloadDiscounts,
         tax,
         fees: Number(fees.toFixed(2)),
         tip,
+        discount_total: discountTotal,
       });
       navigation.replace('SplitEntry', { eventId, mode: 'itemised' });
     } catch {
@@ -215,6 +261,7 @@ export function ItemReviewScreen({ navigation, route }: Props) {
           currency={currency}
           items={items}
           charges={charges}
+          discounts={discounts}
           taxInput={taxInput}
           tipInput={tipInput}
           runningTotal={runningTotal}
@@ -226,6 +273,9 @@ export function ItemReviewScreen({ navigation, route }: Props) {
           onChargeChange={updateCharge}
           onChargeRemove={removeCharge}
           onAddCharge={addCharge}
+          onDiscountChange={updateDiscount}
+          onDiscountRemove={removeDiscount}
+          onAddDiscount={addDiscount}
           onTaxChange={setTaxInput}
           onTipChange={setTipInput}
         />

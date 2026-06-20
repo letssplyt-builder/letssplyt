@@ -91,6 +91,7 @@ function run(): void {
     tax: 4.16,
     fees: 2,
     tip: 6.4,
+    discounts: 0,
     total: 64.56,
   };
 
@@ -109,7 +110,7 @@ function run(): void {
   const sharedItemSplits = calculateSplits(
     [{ id: 'wine', name: 'Wine', unit_price: 10, quantity: 1 }],
     [{ item_id: 'wine', assigned_to: participants }],
-    { subtotal: 10, tax: 0, fees: 0, tip: 0, total: 10 },
+    { subtotal: 10, tax: 0, fees: 0, tip: 0, discounts: 0, total: 10 },
     participants,
     'USD',
   );
@@ -126,7 +127,7 @@ function run(): void {
   const ramenSplits = calculateSplits(
     [{ id: 'ramen', name: 'Ramen', unit_price: 1200, quantity: 1 }],
     [{ item_id: 'ramen', assigned_to: participants }],
-    { subtotal: 1200, tax: 0, fees: 0, tip: 0, total: 1200 },
+    { subtotal: 1200, tax: 0, fees: 0, tip: 0, discounts: 0, total: 1200 },
     participants,
     'JPY',
   );
@@ -150,7 +151,7 @@ function run(): void {
     calculateSplits(
       [{ id: 'a', name: 'Item', unit_price: 10, quantity: 1 }],
       [{ item_id: 'a', assigned_to: ['Alex'] }],
-      { subtotal: 50, tax: 0, fees: 0, tip: 0, total: 50 },
+      { subtotal: 50, tax: 0, fees: 0, tip: 0, discounts: 0, total: 50 },
       ['Alex'],
       'USD',
     );

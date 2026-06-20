@@ -262,6 +262,7 @@ describe('event.service', () => {
       tax_amount: 1,
       tip_amount: 2,
       fees_amount: 2,
+      discount_amount: null,
       receipt_scan_attempted: true,
     };
 
@@ -302,6 +303,7 @@ describe('event.service', () => {
         ],
         error: null,
       });
+      mockSupabase.__pushMockResultForTable('receipt_discounts', { data: [], error: null });
 
       const detail = await getEventById(USER_ID, EVENT_ID);
 
@@ -316,9 +318,11 @@ describe('event.service', () => {
           },
         ],
         additional_charges: [],
+        discounts: [],
         tax_amount: 1,
         tip_amount: 2,
         fees_amount: 2,
+        discount_amount: 0,
         currency: 'USD',
       });
     });
@@ -363,6 +367,7 @@ describe('event.service', () => {
         ],
         error: null,
       });
+      mockSupabase.__pushMockResultForTable('receipt_discounts', { data: [], error: null });
 
       const detail = await getEventById(USER_ID, EVENT_ID);
 

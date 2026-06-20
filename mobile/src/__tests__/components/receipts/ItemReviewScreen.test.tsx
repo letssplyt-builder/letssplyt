@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { RefreshControl } from 'react-native';
 import { ItemReviewScreen } from '../../../screens/receipts/ItemReviewScreen';
 import * as receiptsService from '../../../services/receipts.service';
+import * as eventService from '../../../services/event.service';
 
 const mockNavigate = jest.fn();
 const mockReplace = jest.fn();
@@ -99,6 +101,8 @@ describe('ItemReviewScreen', () => {
         tax: 1,
         tip: 2,
         fees: 2,
+        discounts: [],
+        discount_total: 0,
       }),
     );
     await waitFor(() => {
@@ -114,5 +118,101 @@ describe('ItemReviewScreen', () => {
     fireEvent.press(screen.getByLabelText('Delete Salad'));
     expect(screen.queryByText('Salad')).toBeNull();
     expect(screen.getByLabelText('Total $15.00')).toBeTruthy();
+  });
+
+  it('confirm sends percent discount in the confirm payload', async () => {
+    renderScreen();
+
+    fireEvent.press(screen.getByLabelText('Add discount'));
+    fireEvent.changeText(screen.getByPlaceholderText('Discount description'), 'Happy hour');
+    fireEvent.changeText(screen.getByPlaceholderText('10'), '10');
+    fireEvent.press(screen.getByLabelText('Confirm items'));
+
+    await waitFor(() => {
+      expect(receiptsService.confirmReceipt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event_id: 'event-1',
+          discounts: [{ name: 'Happy hour', type: 'percent', value: 10 }],
+          discount_total: 1.8,
+        }),
+      );
+    });
+  });
+
+  it('confirm sends stacked percent and amount discounts', async () => {
+    renderScreen();
+
+    fireEvent.press(screen.getByLabelText('Add discount'));
+    fireEvent.changeText(screen.getByPlaceholderText('Discount description'), 'Happy hour');
+    fireEvent.changeText(screen.getByPlaceholderText('10'), '10');
+    fireEvent.press(screen.getByLabelText('Done editing'));
+
+    fireEvent.press(screen.getByLabelText('Add discount'));
+    const nameFields = screen.getAllByPlaceholderText('Discount description');
+    fireEvent.changeText(nameFields[nameFields.length - 1], 'Comp');
+    fireEvent.press(screen.getAllByText('$').at(-1)!);
+    fireEvent.changeText(screen.getByPlaceholderText('5.00'), '3');
+    fireEvent.press(screen.getByLabelText('Confirm items'));
+
+    await waitFor(() => {
+      expect(receiptsService.confirmReceipt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          discounts: [
+            { name: 'Happy hour', type: 'percent', value: 10 },
+            { name: 'Comp', type: 'amount', value: 3 },
+          ],
+          discount_total: 4.8,
+        }),
+      );
+    });
+  });
+
+  it('confirm omits discounts with empty name or zero value', async () => {
+    renderScreen();
+
+    fireEvent.press(screen.getByLabelText('Add discount'));
+    fireEvent.changeText(screen.getByPlaceholderText('10'), '15');
+    fireEvent.press(screen.getByLabelText('Confirm items'));
+
+    await waitFor(() => {
+      expect(receiptsService.confirmReceipt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          discounts: [],
+          discount_total: 0,
+        }),
+      );
+    });
+  });
+
+  it('pull-to-refresh applies receipt_review discounts from the server', async () => {
+    jest.mocked(eventService.fetchEventById).mockResolvedValue({
+      event: {
+        id: 'event-1',
+        title: 'Dinner',
+        status: 'locked',
+        ai_stage: 'parsed',
+        currency: 'USD',
+      },
+      participants: [],
+      receipt_review: {
+        items: [{ id: 'item-1', name: 'Burger', unit_price: 10, quantity: 1, confidence: 'high' }],
+        additional_charges: [],
+        discounts: [{ name: 'Comp', type: 'amount', value: 2 }],
+        tax_amount: 0,
+        tip_amount: 0,
+        fees_amount: 0,
+        discount_amount: 2,
+        currency: 'USD',
+      },
+    } as never);
+
+    const { UNSAFE_getByType } = renderScreen();
+    const refreshControl = UNSAFE_getByType(RefreshControl);
+    await refreshControl.props.onRefresh();
+
+    await waitFor(() => {
+      expect(screen.getByText('Comp')).toBeTruthy();
+      expect(screen.getByLabelText('Total $8.00')).toBeTruthy();
+    });
   });
 });

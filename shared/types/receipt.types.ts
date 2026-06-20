@@ -21,13 +21,23 @@ export interface ReceiptAdditionalCharge {
   confidence?: 'high' | 'low';
 }
 
+export type ReceiptDiscountType = 'percent' | 'amount';
+
+export interface ReceiptDiscountLine {
+  name: string;
+  type: ReceiptDiscountType;
+  value: number;
+}
+
 /** Editable receipt snapshot for Item Review (from parse or GET event). */
 export interface ReceiptReviewSnapshot {
   items: ReceiptParseResultItem[];
   additional_charges: ReceiptAdditionalCharge[];
+  discounts: ReceiptDiscountLine[];
   tax_amount: number;
   tip_amount: number;
   fees_amount: number;
+  discount_amount: number;
   currency: string;
 }
 
@@ -43,13 +53,21 @@ export interface ReceiptConfirmChargeInput {
   amount: number;
 }
 
+export interface ReceiptConfirmDiscountInput {
+  name: string;
+  type: ReceiptDiscountType;
+  value: number;
+}
+
 export interface ReceiptConfirmRequest {
   event_id: string;
   items: ReceiptConfirmItemInput[];
   additional_charges: ReceiptConfirmChargeInput[];
+  discounts: ReceiptConfirmDiscountInput[];
   tax: number;
   fees: number;
   tip: number;
+  discount_total: number;
 }
 
 export interface ReceiptConfirmResponse {

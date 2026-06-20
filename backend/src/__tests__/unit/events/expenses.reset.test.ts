@@ -26,6 +26,7 @@ const LOCKED_EVENT = {
   tax_amount: null,
   tip_amount: null,
   fees_amount: null,
+  discount_amount: null,
   receipt_scan_attempted: false,
 };
 
@@ -34,6 +35,7 @@ const RESET_EVENT = {
   ai_stage: 'none',
   split_mode: null,
   total_amount: null,
+  discount_amount: null,
   receipt_scan_attempted: false,
 };
 
@@ -65,6 +67,7 @@ describe('resetEventExpenses', () => {
     mockSupabase.__pushMockResultForTable('events', { data: LOCKED_EVENT, error: null });
     mockSupabase.__pushMockResultForTable('receipt_items', { data: [{ id: 'item-1' }], error: null });
     mockSupabase.__pushMockResultForTable('receipt_items', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('receipt_discounts', { data: null, error: null });
     mockSupabase.__pushMockResultForTable('participants', { data: null, error: null });
     mockSupabase.__pushMockResultForTable('ai_audit_log', { data: null, error: null });
     mockSupabase.__pushMockResultForTable('events', { data: { id: EVENT_ID }, error: null });

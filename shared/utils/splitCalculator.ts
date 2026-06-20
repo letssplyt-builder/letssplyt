@@ -20,6 +20,8 @@ export interface ReceiptTotals {
   tax: number;
   fees: number;
   tip: number;
+  /** Total discount off the bill (positive number). Prorated like tax/fees in itemised splits. */
+  discounts: number;
   total: number;
 }
 
@@ -153,8 +155,8 @@ export function calculateSplits(
     );
   }
 
-  const taxFeesAndTipMinor = toMinorUnits(
-    totals.tax + totals.fees + totals.tip,
+  const taxFeesTipAndDiscountMinor = toMinorUnits(
+    totals.tax + totals.fees + totals.tip - totals.discounts,
     currencyCode,
   );
 
@@ -166,7 +168,7 @@ export function calculateSplits(
         ? itemMinor / assignedSubtotalMinor
         : 1 / participantNames.length;
     const totalMajor = fromMinorUnits(
-      itemMinor + taxFeesAndTipMinor * proportion,
+      itemMinor + taxFeesTipAndDiscountMinor * proportion,
       currencyCode,
     );
     finalAmounts.set(name, totalMajor);

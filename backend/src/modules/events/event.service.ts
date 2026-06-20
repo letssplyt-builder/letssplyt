@@ -31,6 +31,7 @@ export type EventRowWithReceiptFields = EventRow & {
   tax_amount: number | null;
   tip_amount: number | null;
   fees_amount: number | null;
+  discount_amount: number | null;
   receipt_scan_attempted: boolean;
 };
 
@@ -87,7 +88,7 @@ export async function fetchEventRow(eventId: string): Promise<EventRowWithReceip
   const { data, error } = await supabaseAdmin
     .from('events')
     .select(
-      'id, payer_id, title, event_date, total_amount, currency, status, split_mode, ai_stage, locale, locked_at, messages_sent_at, fully_settled_at, created_at, updated_at, deleted_at, tax_amount, tip_amount, fees_amount, receipt_scan_attempted',
+      'id, payer_id, title, event_date, total_amount, currency, status, split_mode, ai_stage, locale, locked_at, messages_sent_at, fully_settled_at, created_at, updated_at, deleted_at, tax_amount, tip_amount, fees_amount, discount_amount, receipt_scan_attempted',
     )
     .eq('id', eventId)
     .is('deleted_at', null)
@@ -537,6 +538,7 @@ export async function getEventById(userId: string, eventId: string): Promise<Eve
       tax_amount: eventRow.tax_amount,
       tip_amount: eventRow.tip_amount,
       fees_amount: eventRow.fees_amount,
+      discount_amount: eventRow.discount_amount,
       currency: eventRow.currency,
     });
   }

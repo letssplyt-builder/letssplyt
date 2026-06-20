@@ -29,6 +29,7 @@ const LOCKED_CALCULATED_EVENT = {
   tax_amount: null,
   tip_amount: null,
   fees_amount: null,
+  discount_amount: null,
   receipt_scan_attempted: false,
 };
 
@@ -37,6 +38,7 @@ const RESET_EVENT = {
   ai_stage: 'none',
   split_mode: null,
   total_amount: null,
+  discount_amount: null,
   receipt_scan_attempted: false,
 };
 
@@ -94,6 +96,7 @@ describe('POST /events/:id/expenses/reset', () => {
         ai_stage: 'none',
         split_mode: null,
         total_amount: null,
+        discount_amount: null,
         receipt_scan_attempted: false,
       },
       error: null,

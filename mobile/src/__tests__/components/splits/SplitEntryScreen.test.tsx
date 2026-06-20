@@ -48,9 +48,11 @@ const eventDetail = {
       { id: 'item-2', name: 'Salad', unit_price: 12, quantity: 1, confidence: 'high' as const },
     ],
     additional_charges: [],
+    discounts: [],
     tax_amount: 0,
     tip_amount: 0,
     fees_amount: 0,
+    discount_amount: 0,
     currency: 'USD',
   },
 };

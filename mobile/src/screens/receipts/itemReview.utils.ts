@@ -1,14 +1,24 @@
 import type {
   ReceiptAdditionalCharge,
+  ReceiptDiscountLine,
   ReceiptParseResponse,
   ReceiptParseResultItem,
   ReceiptReviewSnapshot,
 } from '@letssplyt/shared/receipt.types';
+import {
+  computeReceiptGrandTotal,
+  resolveDiscountAmount,
+  resolveDiscountsTotal,
+} from '@letssplyt/shared/utils/receiptDiscounts';
 
 export type EditableReviewItem = ReceiptParseResultItem & {
   localId: string;
   id?: string;
   is_fee: boolean;
+};
+
+export type EditableReviewDiscount = ReceiptDiscountLine & {
+  localId: string;
 };
 
 export function createLocalId(): string {
@@ -18,6 +28,7 @@ export function createLocalId(): string {
 export function snapshotToEditable(snapshot: ReceiptReviewSnapshot): {
   items: EditableReviewItem[];
   charges: ReceiptAdditionalCharge[];
+  discounts: EditableReviewDiscount[];
   tax: string;
   tip: string;
 } {
@@ -27,9 +38,14 @@ export function snapshotToEditable(snapshot: ReceiptReviewSnapshot): {
     is_fee: false,
   }));
   const charges = snapshot.additional_charges.map((charge) => ({ ...charge }));
+  const discounts = snapshot.discounts.map((discount, index) => ({
+    ...discount,
+    localId: `discount-${index}-${discount.name}`,
+  }));
   return {
     items,
     charges,
+    discounts,
     tax: formatAmountInput(snapshot.tax_amount),
     tip: formatAmountInput(snapshot.tip_amount),
   };
@@ -41,9 +57,11 @@ export function parseResultToSnapshot(
   return {
     items: parseResult.items,
     additional_charges: parseResult.additional_charges,
+    discounts: parseResult.discounts ?? [],
     tax_amount: parseResult.tax_amount,
     tip_amount: parseResult.tip_amount,
     fees_amount: parseResult.fees_amount,
+    discount_amount: parseResult.discount_amount ?? 0,
     currency: parseResult.currency,
   };
 }
@@ -69,17 +87,36 @@ export function computeChargesTotal(charges: ReceiptAdditionalCharge[]): number 
   return Number(total.toFixed(2));
 }
 
+export function computeDiscountTotal(
+  discounts: EditableReviewDiscount[],
+  itemsSubtotal: number,
+): number {
+  return resolveDiscountsTotal(discounts, itemsSubtotal);
+}
+
+export function computeDiscountLineAmount(
+  discount: EditableReviewDiscount,
+  itemsSubtotal: number,
+  priorDiscounts: EditableReviewDiscount[],
+): number {
+  const priorTotal = resolveDiscountsTotal(priorDiscounts, itemsSubtotal);
+  const remaining = Number(Math.max(0, itemsSubtotal - priorTotal).toFixed(2));
+  return resolveDiscountAmount(discount, remaining);
+}
+
 export function computeReviewTotal(
   items: EditableReviewItem[],
   charges: ReceiptAdditionalCharge[],
+  discounts: EditableReviewDiscount[],
   taxInput: string,
   tipInput: string,
 ): number {
   const subtotal = computeItemsSubtotal(items);
   const fees = computeChargesTotal(charges);
+  const discountTotal = computeDiscountTotal(discounts, subtotal);
   const tax = parseAmountInput(taxInput);
   const tip = parseAmountInput(tipInput);
-  return Number((subtotal + fees + tax + tip).toFixed(2));
+  return computeReceiptGrandTotal(subtotal, fees, tax, tip, discountTotal);
 }
 
 /** Build parse-shaped payload for ItemReview from GET event receipt_review. */
@@ -91,8 +128,13 @@ export function receiptReviewToParseResult(
     (sum, item) => sum + item.unit_price * item.quantity,
     0,
   );
-  const totalAmount = Number(
-    (itemsSubtotal + review.tax_amount + review.fees_amount + review.tip_amount).toFixed(2),
+  const discountTotal = review.discount_amount ?? resolveDiscountsTotal(review.discounts, itemsSubtotal);
+  const totalAmount = computeReceiptGrandTotal(
+    itemsSubtotal,
+    review.fees_amount,
+    review.tax_amount,
+    review.tip_amount,
+    discountTotal,
   );
   return {
     items: review.items,

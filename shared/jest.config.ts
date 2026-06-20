@@ -5,7 +5,7 @@ const config: Config = {
   testEnvironment: 'node',
   roots: ['<rootDir>/utils'],
   testMatch: ['**/*.test.ts'],
-  collectCoverageFrom: ['utils/splitCalculator.ts'],
+  collectCoverageFrom: ['utils/splitCalculator.ts', 'utils/receiptDiscounts.ts'],
 };
 
 export default config;

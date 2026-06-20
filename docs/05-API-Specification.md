@@ -683,15 +683,21 @@ Full event detail with participants and settlement status.
       amount: number;
       confidence?: 'high' | 'low';
     }>;
+    discounts: Array<{
+      name: string;
+      type: 'percent' | 'amount';
+      value: number;
+    }>;
     tax_amount: number;
     tip_amount: number;
     fees_amount: number;
+    discount_amount: number;
     currency: string;
   };
 }
 ```
 
-`receipt_review` is built from `receipt_items` (food vs `is_fee` rows) plus `events.tax_amount` / `tip_amount` / `fees_amount`. Used by Item Review pull-to-refresh and Event Detail **Review items** / **Edit share** CTAs. Does **not** re-run A1.
+`receipt_review` is built from `receipt_items` (food vs `is_fee` rows), `receipt_discounts`, plus `events.tax_amount` / `tip_amount` / `fees_amount` / `discount_amount`. Used by Item Review pull-to-refresh and Event Detail **Review items** / **Edit share** CTAs. Does **not** re-run A1.
 
 ---
 
@@ -758,7 +764,7 @@ Clears all expense and split data for the event so the creator can start again w
 
 **Side effects:**
 - Deletes all `receipt_items` for the event (`item_assignments` cascade)
-- Clears event receipt/AI fields: `total_amount`, `tax_amount`, `tip_amount`, `fees_amount`, `split_mode`, `receipt_scan_attempted`, `ai_parse_success`, `ai_parse_confidence`, `last_parse_attempt_id`, `ai_stage → 'none'`
+- Clears event receipt/AI fields: `total_amount`, `tax_amount`, `tip_amount`, `fees_amount`, `discount_amount`, `split_mode`, `receipt_scan_attempted`, `ai_parse_success`, `ai_parse_confidence`, `last_parse_attempt_id`, `ai_stage → 'none'`
 - Clears participant split fields: `amount_owed`, `payment_status → 'pending'`, message/self-report/confirm timestamps
 - Deletes `ai_audit_log` rows for the event
 - Deletes receipt images from Storage bucket `receipts/{eventId}/` (best-effort)
@@ -1146,22 +1152,32 @@ Payer confirms (and optionally edits) parsed receipt lines before split assignme
   event_id: string;
   items: Array<{ id?: string; name: string; price: number; quantity: number }>;
   additional_charges: Array<{ name: string; amount: number }>;
+  discounts: Array<{ name: string; type: 'percent' | 'amount'; value: number }>;
   tax: number;
   fees: number;   // must equal sum(additional_charges) ± 0.02
   tip: number;
+  discount_total: number; // must equal sequentially resolved sum of discounts on items subtotal ± 0.02
 }
 ```
 
+**Total formula:** `total_amount = max(0, sum(items) − discount_total + fees + tax + tip)`.
+
+**Discount resolution (server and mobile must match `shared/utils/receiptDiscounts.ts`):**
+- **percent:** `remaining_subtotal × (value / 100)`, rounded to 2 dp
+- **amount:** fixed `value`, capped at `remaining_subtotal`
+- Multiple discounts apply **sequentially** (each reduces the remaining subtotal for the next)
+- Empty-name or zero-value discounts are omitted by the mobile client before submit
+
 **Atomic guard:** `UPDATE events SET ai_stage = 'parsed_confirmed' WHERE id = event_id AND ai_stage IN ('parsed', 'parsed_confirmed')` — allows first confirm and re-itemization edits.
 
-**Side effects:** Deletes existing `receipt_items` for the event; inserts food rows (`is_fee = false`) and fee rows (`is_fee = true`); updates `events.total_amount`, `tax_amount`, `tip_amount`, `fees_amount`, `receipt_scan_attempted`, `ai_parse_success`.
+**Side effects:** Deletes existing `receipt_items` and `receipt_discounts` for the event; inserts food rows (`is_fee = false`), fee rows (`is_fee = true`), and discount rows; updates `events.total_amount`, `tax_amount`, `tip_amount`, `fees_amount`, `discount_amount`, `receipt_scan_attempted`, `ai_parse_success`.
 
 **Response `200`:**
 ```typescript
 { confirmed: true; total_amount: number; }
 ```
 
-**Error codes:** `INVALID_AI_STAGE` 400 (not `parsed` / `parsed_confirmed`), `EVENT_NOT_LOCKED` 400, `VALIDATION_ERROR` 400 (e.g. fees mismatch), `FORBIDDEN` 403
+**Error codes:** `INVALID_AI_STAGE` 400 (not `parsed` / `parsed_confirmed`), `EVENT_NOT_LOCKED` 400, `VALIDATION_ERROR` 400 (e.g. fees or `discount_total` mismatch), `FORBIDDEN` 403
 
 ---
 

@@ -10,10 +10,14 @@ import {
 import { Swipeable } from 'react-native-gesture-handler';
 import Svg, { Path } from 'react-native-svg';
 import type { ReceiptAdditionalCharge } from '@letssplyt/shared/receipt.types';
+import type { ReceiptDiscountType } from '@letssplyt/shared/receipt.types';
 import {
+  computeDiscountLineAmount,
+  computeDiscountTotal,
   computeItemsSubtotal,
   formatAmountInput,
   parseAmountInput,
+  type EditableReviewDiscount,
   type EditableReviewItem,
 } from '../../screens/receipts/itemReview.utils';
 import { formatMoney } from '../../utils/events';
@@ -282,6 +286,102 @@ function ChargeLineRow({
   );
 }
 
+function DiscountLineRow({
+  discount,
+  currency,
+  resolvedAmount,
+  isExpanded,
+  onToggle,
+  onCollapse,
+  onChange,
+  onRemove,
+}: {
+  discount: EditableReviewDiscount;
+  currency: string;
+  resolvedAmount: number;
+  isExpanded: boolean;
+  onToggle: () => void;
+  onCollapse: () => void;
+  onChange: (patch: Partial<EditableReviewDiscount>) => void;
+  onRemove: () => void;
+}) {
+  if (isExpanded) {
+    return (
+      <View style={[styles.lineRow, styles.lineRowExpanded, styles.discountRow]}>
+        <ExpandedEditToolbar
+          onDone={onCollapse}
+          onDelete={onRemove}
+          deleteAccessibilityLabel={`Delete ${discount.name || 'discount'}`}
+        />
+        <View style={styles.expandedBlock}>
+          <TextInput
+            style={styles.expandedNameInput}
+            value={discount.name}
+            onChangeText={(text) => onChange({ name: text })}
+            placeholder="Discount description"
+            placeholderTextColor={PAPER.inkFaint}
+          />
+          <View style={styles.discountTypeRow}>
+            {(['percent', 'amount'] as ReceiptDiscountType[]).map((type) => {
+              const selected = discount.type === type;
+              return (
+                <Pressable
+                  key={type}
+                  onPress={() => onChange({ type })}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected }}
+                  style={[styles.discountTypeBtn, selected && styles.discountTypeBtnSelected]}
+                >
+                  <Text
+                    style={[
+                      styles.discountTypeBtnText,
+                      selected && styles.discountTypeBtnTextSelected,
+                    ]}
+                  >
+                    {type === 'percent' ? '%' : '$'}
+                  </Text>
+                </Pressable>
+              );
+            })}
+            <TextInput
+              style={styles.discountValueInput}
+              value={formatAmountInput(discount.value)}
+              keyboardType="decimal-pad"
+              onChangeText={(text) => onChange({ value: parseAmountInput(text) })}
+              placeholder={discount.type === 'percent' ? '10' : '5.00'}
+              placeholderTextColor={PAPER.inkFaint}
+            />
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  const label =
+    discount.type === 'percent'
+      ? `${discount.name || 'Discount'} (${formatAmountInput(discount.value)}%)`
+      : discount.name || 'Discount';
+
+  return (
+    <Pressable
+      onPress={onToggle}
+      accessibilityRole="button"
+      accessibilityLabel={`${label}, tap to edit`}
+      accessibilityState={{ expanded: false }}
+      style={[styles.lineRow, styles.discountRow]}
+    >
+      <View style={styles.compactRow}>
+        <Text style={[styles.lineLabel, styles.discountLabel]} numberOfLines={2}>
+          {label}
+        </Text>
+        <Text style={[styles.lineAmount, styles.discountAmount]}>
+          −{formatMoney(resolvedAmount, currency)}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
 function AmountLine({
   label,
   value,
@@ -343,6 +443,7 @@ export interface ReceiptReviewSlipProps {
   currency: string;
   items: EditableReviewItem[];
   charges: ReceiptAdditionalCharge[];
+  discounts: EditableReviewDiscount[];
   taxInput: string;
   tipInput: string;
   runningTotal: number;
@@ -352,6 +453,9 @@ export interface ReceiptReviewSlipProps {
   onChargeChange: (index: number, patch: Partial<ReceiptAdditionalCharge>) => void;
   onChargeRemove: (index: number) => void;
   onAddCharge: () => void;
+  onDiscountChange: (localId: string, patch: Partial<EditableReviewDiscount>) => void;
+  onDiscountRemove: (localId: string) => void;
+  onAddDiscount: () => void;
   onTaxChange: (text: string) => void;
   onTipChange: (text: string) => void;
   expandedKey: string | null;
@@ -363,6 +467,7 @@ export function ReceiptReviewSlip({
   currency,
   items,
   charges,
+  discounts,
   taxInput,
   tipInput,
   runningTotal,
@@ -372,6 +477,9 @@ export function ReceiptReviewSlip({
   onChargeChange,
   onChargeRemove,
   onAddCharge,
+  onDiscountChange,
+  onDiscountRemove,
+  onAddDiscount,
   onTaxChange,
   onTipChange,
   expandedKey,
@@ -379,6 +487,7 @@ export function ReceiptReviewSlip({
 }: ReceiptReviewSlipProps) {
   const subtotal = computeItemsSubtotal(items);
   const feesTotal = charges.reduce((sum, c) => sum + c.amount, 0);
+  const discountTotal = computeDiscountTotal(discounts, subtotal);
 
   const toggle = (key: string) => {
     onExpandedKeyChange(expandedKey === key ? null : key);
@@ -445,10 +554,49 @@ export function ReceiptReviewSlip({
       </Pressable>
 
       <ReceiptDivider />
+
       <View style={styles.summaryLine}>
         <Text style={styles.summaryLabel}>Subtotal</Text>
         <Text style={styles.summaryAmount}>{formatMoney(subtotal, currency)}</Text>
       </View>
+
+      {discounts.map((discount, index) => (
+        <DiscountLineRow
+          key={discount.localId}
+          discount={discount}
+          currency={currency}
+          resolvedAmount={computeDiscountLineAmount(
+            discount,
+            subtotal,
+            discounts.slice(0, index),
+          )}
+          isExpanded={expandedKey === `discount-${discount.localId}`}
+          onToggle={() => toggle(`discount-${discount.localId}`)}
+          onCollapse={collapse}
+          onChange={(patch) => onDiscountChange(discount.localId, patch)}
+          onRemove={() => onDiscountRemove(discount.localId)}
+        />
+      ))}
+
+      <Pressable
+        style={styles.addLineBtnMuted}
+        onPress={() => {
+          onAddDiscount();
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="Add discount"
+      >
+        <Text style={styles.addLineBtnMutedText}>+ Add discount</Text>
+      </Pressable>
+
+      {discountTotal > 0 ? (
+        <View style={styles.summaryLine}>
+          <Text style={styles.summaryLabel}>Discounts</Text>
+          <Text style={[styles.summaryAmount, styles.discountAmount]}>
+            −{formatMoney(discountTotal, currency)}
+          </Text>
+        </View>
+      ) : null}
       {feesTotal > 0 ? (
         <View style={styles.summaryLine}>
           <Text style={styles.summaryLabel}>Fees</Text>
@@ -749,6 +897,58 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
     color: PAPER.accent,
+    fontVariant: ['tabular-nums'],
+  },
+  discountRow: {
+    backgroundColor: 'rgba(5, 150, 105, 0.06)',
+    borderRadius: 12,
+    paddingHorizontal: 8,
+    marginHorizontal: -4,
+  },
+  discountLabel: {
+    color: '#047857',
+  },
+  discountAmount: {
+    color: '#047857',
+  },
+  discountTypeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  discountTypeBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: PAPER.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFF',
+  },
+  discountTypeBtnSelected: {
+    borderColor: '#047857',
+    backgroundColor: 'rgba(5, 150, 105, 0.12)',
+  },
+  discountTypeBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: PAPER.inkMuted,
+  },
+  discountTypeBtnTextSelected: {
+    color: '#047857',
+  },
+  discountValueInput: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '700',
+    color: PAPER.ink,
+    borderWidth: 1,
+    borderColor: PAPER.line,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    backgroundColor: '#FFF',
     fontVariant: ['tabular-nums'],
   },
 });
