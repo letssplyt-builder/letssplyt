@@ -54,7 +54,7 @@ export function resolveParticipantShareHero(
     return {
       label: 'Your share',
       amount: null,
-      statusLine: `Group is still open. Waiting for ${creator} to lock the group and calculate your share.`,
+      statusLine: `This event is still open. Waiting for ${creator} to lock it and calculate your share.`,
       pending: true,
     };
   }

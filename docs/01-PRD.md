@@ -135,12 +135,13 @@ After sharing the QR, the payer can navigate away freely. When they return — b
 - **QR code + copy/share link** at the top (while the token is still valid). A subtle expiry timer reminds the payer how long the link has left.
 - **If the QR has expired**, the QR section is replaced with an amber "Expired" state and a single "Regenerate QR & link" button — generating a fresh token instantly.
 - **Members list** below the QR, starting with the organiser (auto-added on create), then everyone who has joined via QR scan or manual add. Each row shows a join-method chip (e.g. Organiser, QR Web, Manual). The organiser row has no remove control.
-- **"+ Add manually" button** on the member list header. Tapping opens a two-choice picker:
-  - *With phone number* — from contacts or manual entry, **no OTP** (payer vouches). If the number already has a LetsSplyt account, link by `user_id` immediately. If not, store in `guest_pii` for SMS only — they remain pure guests until they verify via OTP elsewhere (web join or app). They receive a text invite when messages are sent.
-  - *Name only — no phone* — for cash payers and in-person guests. No message is ever sent to this person. The payer tells them their share verbally and marks their payment in the app on their behalf.
+- **"+ Add manually" button** below the members list. Opens `AddMembersSheet` (bottom sheet) with two tabs:
+  - **Contacts** — multi-select from the device contact list (name + phone pre-filled, no OTP; payer vouches). Search filters the list.
+  - **By name** — enter one or more people manually (name required, phone optional). **+ Add another person** adds rows. Tap **Done** to add everyone in one batch.
+  - If the phone matches an existing LetsSplyt account, link by `user_id` immediately. If not, store in `guest_pii` for SMS only. Name-only members never receive a message; payer settles them in cash.
 
-**Step 5 — Payer locks the group.**
-When the payer is satisfied that everyone who needs to be in the group is in, they tap "Everyone's here — Lock & split" from Event Detail. The lock button stays disabled until the member list has at least two people (organiser plus one other). This closes the join window — no new members can join and no one can leave. Locking is the explicit gate before splitting begins. (Payer can reopen for 24 hours if someone was missed.)
+**Step 5 — Payer locks the event.**
+When the payer is satisfied that everyone who needs to be in the event is in, they tap **Lock event →** from Event Detail. The lock button stays disabled until the member list has at least two people (organiser plus one other). This closes the join window — no new members can join and no one can leave. Locking is the explicit gate before splitting begins. (Payer can reopen for 24 hours if someone was missed.)
 
 **Step 6 — Receipt scanning and split.**
 Payer photographs the receipt. AI (A1) reads every line item. Payer assigns items to people via drag-and-drop or natural language ("Rohan had the pasta and two beers"). AI (A2) calculates each person's exact share including proportional tax and tip.

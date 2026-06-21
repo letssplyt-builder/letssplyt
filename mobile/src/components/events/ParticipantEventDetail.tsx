@@ -136,7 +136,7 @@ export function ParticipantEventDetail({ detail }: ParticipantEventDetailProps) 
         amountReady={amountReady}
       />
 
-      <Text style={glassStyles.sectionTitle}>Group · {participants.length}</Text>
+      <Text style={glassStyles.sectionTitle}>Members · {participants.length}</Text>
       <View style={styles.memberList}>
         {sortedParticipants.map((participant: EventParticipantSummary) => (
           <EventMemberRow

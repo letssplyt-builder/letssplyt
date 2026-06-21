@@ -223,7 +223,7 @@ export function DeliveryTrackingScreen({ navigation, route }: Props) {
         {allTerminal ? (
           <Text style={styles.subtitle}>All messages sent</Text>
         ) : (
-          <Text style={styles.subtitle}>Sending to your group…</Text>
+          <Text style={styles.subtitle}>Sending to members…</Text>
         )}
       </View>
 

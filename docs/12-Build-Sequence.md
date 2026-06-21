@@ -1557,8 +1557,7 @@ backend/src/__tests__/integration/events/participants.test.ts
 - `mobile/src/screens/EventsScreen.tsx`
 - `mobile/src/components/events/CreateEventModal.tsx`
 - `mobile/src/components/events/QRDisplayModal.tsx`
-- `mobile/src/screens/EventDetailScreen.tsx`
-- `mobile/src/components/events/AddParticipantModal.tsx`
+- `mobile/src/screens/events/EventDetailScreen.tsx`
 - `mobile/src/store/eventStore.ts`
 - `mobile/src/__tests__/unit/store/eventStore.test.ts`
 - `mobile/src/__tests__/components/events/CreateEventModal.test.tsx`
@@ -1569,7 +1568,7 @@ backend/src/__tests__/integration/events/participants.test.ts
 2. Type "Friday Dinner" and tap Create → QR code modal appears with a scannable QR code encoding the join URL
 3. Open the join URL on another device's browser → web join form loads correctly
 4. When the browser device joins, the member list on the creator's phone updates AUTOMATICALLY within 2 seconds (Realtime working)
-5. Lock group button is disabled when 0 members are shown, enabled when 1 or more members are present
+5. Lock event button is disabled when fewer than 2 members (organiser + one other); enabled when 2+ members present
 6. Tap Lock → event status transitions → screen moves to settlement phase view
 7. Balance card calls `GET /api/v1/users/me/balance` but gracefully degrades: if the endpoint returns 404 or the call fails, show 'Balance unavailable' placeholder. Do NOT hard-fail. The endpoint is built in E09-S03.
 8. Do NOT call any settlement endpoint that isn't built yet. Use a stub response shape for the balance card.
@@ -1606,70 +1605,66 @@ mobile/src/__tests__/components/events/EventDetailScreen.test.tsx
 **Description:** Complete the MVP member-management flows deferred from E05-S03. Covers User Flows P09 (contact picker), P11 (remove before lock), and P13a (reopen join window after lock). Primarily mobile UI + `eventStore`/`event.service` wiring; also refines `POST /events/:id/participants/manual` so a phone number that matches an existing `users.phone_hash` links `participants.user_id` (registered user sees the event on login — no OTP, no new account). Unregistered numbers still use `guest_pii` for SMS only.
 
 **Prompt:**
-*"Complete MVP event member management on LetsSplyt mobile. Refer to prototype/participant.html and docs/08-Mobile-App-Specification.md (AddParticipantModal + EventDetailScreen joining/settlement phases). (1) AddParticipantModal — add a two-choice entry step: 'From contacts' | 'Enter manually'. 'Enter manually' keeps the existing E05-S03 form (name, phone with country picker, 'Name only' toggle). 'From contacts' uses expo-contacts: request permission once (handle denied → show inline message with link to Settings), open the native contact picker (Contacts.presentContactPickerAsync or equivalent), pre-fill display_name and phone from the selected contact, normalize to E.164 via existing phone utils, then POST /api/v1/events/:id/participants/manual with join_method='manual_phone'. Payer vouches — no OTP. Add NSContactsUsageDescription (iOS) and READ_CONTACTS (Android) to mobile/app.config.js. (2) EventDetailScreen — joining phase (status='open'): each participant row (except the payer themselves) shows a remove control (swipe-to-delete or explicit remove button). Tap → confirm Alert 'Remove [name] from this event?' → DELETE /api/v1/events/:id/participants/:participantId via event.service.deleteParticipant. On success, optimistically remove from list then re-fetch. Hide remove for locked events. Show toast on 400 CANNOT_REMOVE_ACTIVE_PARTICIPANT or GROUP_IS_LOCKED. (3) EventDetailScreen — locked phase: when status='locked' and user is payer, show 'Reopen join window' button (docs/08 spec). Calls POST /api/v1/events/:id/reopen via new event.service.reopenEvent(). On success: event status returns to 'open', new join_url/token shown, screen returns to joining phase with QR/link visible. Show helper text: 'Reopens QR and link for 24 hours for latecomers.' (4) eventStore: add removeParticipant(eventId, participantId) and reopenEvent(eventId) actions. (5) event.service.ts: add reopenEvent() calling POST /events/:id/reopen (regenerateJoinToken already exists for expired open-event tokens — do not conflate). (6) participant.service.ts — refine addManualParticipant for join_method='manual_phone': hash phone with hashPhone(), look up users by phone_hash. If a registered user exists: insert participant with user_id set, guest_pii_token=null, join_method='manual_phone' (payer-entered display_name); duplicate check by user_id and phone_hash. If no registered user: existing guest_pii flow (user_id=null). Never create a users row on manual add — account creation remains OTP-only (QR join / app registration). SMS delivery: registered participants via resolveParticipantPhone(user_id); guests via guest_pii.phone_encrypted."*
+*"Complete MVP event member management on LetsSplyt mobile. Refer to prototype/participant.html and docs/08-Mobile-App-Specification.md (AddMembersSheet + EventDetailScreen joining/settlement phases). (1) AddMembersSheet — bottom sheet opened from **+ Add manually** on Event Detail (joining phase). Two tabs via SegmentedControl: **Contacts** (search + multi-select checklist from expo-contacts) and **By name** (one name + optional phone row initially; **+ Add another person** for more). **Done · add N members** batches sequential POST /api/v1/events/:id/participants/manual calls. Shared batch/dedupe logic in groupBuilder.utils.ts. Request contacts permission once (denied → inline notice + Settings link; user can use By name). (2) EventDetailScreen — joining phase: centered QR + copy/share, members list, **+ Add manually**, **Lock event →** (disabled until organiser + ≥1 other). Each participant row (except organiser) shows remove control → confirm Alert → DELETE participant. (3) Locked phase: **Reopen join window** for payer → POST /events/:id/reopen. (4) eventStore: removeParticipant, reopenEvent. (5) participant.service.ts — manual add links registered users by phone_hash → user_id; guests → guest_pii."*
 
 **Files created/updated:**
-- `mobile/src/components/events/AddParticipantModal.tsx` (contact picker path)
-- `mobile/src/screens/events/EventDetailScreen.tsx` (remove + reopen)
-- `mobile/src/services/event.service.ts` (`reopenEvent`)
+- `mobile/src/components/events/AddMembersSheet.tsx` (tabbed bottom sheet — replaces AddParticipantModal / GroupBuilderPanel)
+- `mobile/src/components/events/groupBuilder.utils.ts` (batch payload collection, dedupe, phone validation)
+- `mobile/src/screens/events/EventDetailScreen.tsx` (QR hero, members, add sheet, lock event, remove, reopen)
+- `mobile/src/components/events/EventMemberRow.tsx`
+- `mobile/src/services/event.service.ts` (`reopenEvent`, `addManualParticipant`)
 - `mobile/src/store/eventStore.ts` (`removeParticipant`, `reopenEvent`)
 - `mobile/app.config.js` (contacts permission strings)
 - `backend/src/modules/events/participant.service.ts` (registered-user linking on manual add)
-- `backend/src/__tests__/unit/events/participant.service.test.ts` (registered vs guest paths)
-- `backend/src/__tests__/integration/events/participants.test.ts` (users lookup mock)
-- `mobile/src/__tests__/components/events/AddParticipantModal.test.tsx`
+- `mobile/src/__tests__/components/events/AddMembersSheet.test.tsx`
+- `mobile/src/__tests__/unit/events/groupBuilder.utils.test.ts`
 - `mobile/src/__tests__/components/events/EventDetailScreen.test.tsx` (extended)
-- `mobile/src/__tests__/unit/store/eventStore.test.ts` (extended)
 
-**Implementation notes (2026-06-07):**
-- `EventMemberRow` component — compact member list UI, organiser chip, × remove icon
-- Lock enabled only when `participants.length >= 2` (organiser + one other); specific API error messages surfaced
-- `reopenEvent` / `lockEvent` use atomic status checks (`locked`→`open`, `open`→`locked`)
-- Migration `20260610000000_backfill_creator_participants.sql` backfills organiser rows on existing events
-- `addManualParticipant`: `findRegisteredUserByPhoneHash()` — registered → `user_id` set (event appears in `GET /events?role=all` for that user); unregistered → `guest_pii` only
+**Implementation notes (2026-06-07 — refined 2026-06-09):**
+- `AddMembersSheet` replaces earlier `AddParticipantModal` two-choice picker and inline `GroupBuilderPanel`
+- **Contacts** | **By name** tabs; no clipboard paste on By name
+- Batch add on Done; partial success closes sheet + toast with failure count
+- `EventMemberRow` — compact member list UI, organiser chip, × remove icon
+- Lock enabled only when `participants.length >= 2` (organiser + one other)
+- User-facing copy uses **event** / **members**, not **group**
+- `addManualParticipant`: registered phone → `user_id`; unregistered → `guest_pii`
 
 **Acceptance Criteria:**
-1. Tap '+ Add manually' → choose 'From contacts' → pick a contact with a phone → participant appears in member list without OTP
-2. Tap '+ Add manually' → 'Enter manually' → existing name/phone/name-only flow still works
-3. Manual add with phone belonging to an existing LetsSplyt user → participant row has `user_id` set; that user sees the event under **Events you joined** on next login (no OTP, no new account created)
-4. Manual add with phone not registered → `guest_pii` created, `user_id=null`; SMS can still be sent later; user is not registered until they complete OTP elsewhere
-5. Contacts permission denied → user sees a clear message (not a crash); can still use 'Enter manually'
-6. On open event, payer can remove a pending participant → member disappears from list; DELETE API called
-7. Remove is hidden (or disabled with explanation) when event is locked
-8. Attempting to remove a participant who is not `payment_status='pending'` shows an error (API 400) — not a silent failure
-9. After locking, payer sees 'Reopen join window' → tap → event returns to open status, new QR/link visible, token expires in ~24 hours
-10. Non-payer cannot see remove or reopen controls (creator-only)
-11. Joined member (non-payer) opens Event Detail → participant view only: share hero with pending/calculated states, split breakdown when `split_mode` set, group roster — no QR, copy/share, add-member, lock, or payer settlement summary
+1. Tap **+ Add manually** → **Contacts** tab → select contact(s) → **Done** → member(s) appear without OTP
+2. Tap **+ Add manually** → **By name** tab → enter name (optional phone) → **Done** → member added
+3. **By name** shows one person row initially; **+ Add another person** adds more
+4. Manual add with registered phone → `user_id` set; user sees event under **Events you joined** on login
+5. Manual add with unregistered phone → `guest_pii` only
+6. Contacts permission denied → clear message; **By name** still works
+7. Payer can remove pending participant on open event
+8. Remove hidden/disabled when event locked
+9. After lock, payer sees **Reopen join window** → event returns to open, new QR/link (~24h)
+10. Non-payer sees participant view only — no QR, add-member, or lock controls
+11. Invalid phone with name filled → inline validation error before submit
+12. Duplicate names already on event → skipped with inline error if nothing to add
 
 **Tests required:**
 ```
-mobile/src/__tests__/components/events/AddParticipantModal.test.tsx
-  - shows From contacts / Enter manually choice
-  - Enter manually path renders existing form
-  - contact picker success calls addManualParticipant with E.164 phone
+mobile/src/__tests__/components/events/AddMembersSheet.test.tsx
+  - Contacts / By name tabs
+  - Done disabled until ready
+  - contact multi-select + deselect + search
+  - permission denied notice
+  - By name: single initial row, add another, name-only and with phone
+  - invalid phone validation
+  - duplicate name on event
+  - merged contacts + manual batch
+  - all-failed stays open; partial success closes
+  - state reset on reopen
+
+mobile/src/__tests__/unit/events/groupBuilder.utils.test.ts
+  - paste parse (legacy util), manual rows, dedupe, collectSubmitPayloads
+  - manualRowHasInvalidPhone, contactMatchesQuery, countReadyToSubmit
 
 mobile/src/__tests__/components/events/EventDetailScreen.test.tsx
-  - shows remove control on participant rows when event open
-  - remove calls deleteParticipant and updates list
-  - hides remove when event locked
-  - shows Reopen join window when event locked (payer)
-  - reopen calls reopenEvent and transitions to joining phase
-
-mobile/src/__tests__/unit/store/eventStore.test.ts
-  - removeParticipant removes from local participants list
-  - reopenEvent updates event status to open and refreshes join_url
-
-backend/src/__tests__/unit/events/participant.service.test.ts
-  - manual add with phone + registered user: links user_id, no guest_pii insert
-  - manual add with phone + unregistered: guest_pii insert, user_id=null
-  - duplicate registered user in same event: DUPLICATE_PHONE
-
-mobile/src/__tests__/components/events/EventDetailScreen.test.tsx
-  - non-payer sees participant view (Your share hero) without QR, add-member, or lock controls
-  - participant view shows calculated share and split mode when amount_owed is set
-
-mobile/src/__tests__/unit/utils/participantEventView.test.ts
-  - pending vs calculated share copy for participant Event Detail hero
+  - + Add manually opens sheet and batch-adds
+  - partial batch toast
+  - remove, reopen, lock event, participant view
 ```
 
 ---

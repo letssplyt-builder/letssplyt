@@ -18,7 +18,11 @@ import {
 import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
 import type { EventStatus } from '@letssplyt/shared/event.types';
-import { AddParticipantModal } from '../../components/events/AddParticipantModal';
+import {
+  AddMembersSheet,
+  type AddMembersBatchResult,
+} from '../../components/events/AddMembersSheet';
+import type { GroupBuilderSubmitPayload } from '../../components/events/groupBuilder.utils';
 import { EventDetailOverflowMenu } from '../../components/events/EventDetailOverflowMenu';
 import { EventMemberRow } from '../../components/events/EventMemberRow';
 import { AllPaidSheet } from '../../components/settlement/AllPaidSheet';
@@ -81,15 +85,15 @@ function isSettlementEventStatus(status: EventStatus): boolean {
   return SETTLEMENT_EVENT_STATUSES.includes(status);
 }
 
-function lockGroupErrorMessage(code: string | undefined): string {
+function lockEventErrorMessage(code: string | undefined): string {
   switch (code) {
     case 'MINIMUM_PARTICIPANTS_REQUIRED':
     case 'MIN_PARTICIPANTS':
-      return 'Add at least 2 members before locking the group.';
+      return 'Add at least 2 members before locking this event.';
     case 'ALREADY_LOCKED':
-      return 'Group is already locked. Pull down to refresh.';
+      return 'This event is already locked. Pull down to refresh.';
     default:
-      return 'Could not lock group. Try again.';
+      return 'Could not lock this event. Try again.';
   }
 }
 
@@ -98,7 +102,7 @@ function removeParticipantErrorMessage(code: string | undefined): string {
     case 'CANNOT_REMOVE_ACTIVE_PARTICIPANT':
       return 'Only pending members can be removed.';
     case 'GROUP_IS_LOCKED':
-      return 'Group is locked — reopen the join window to make changes.';
+      return 'This event is locked — reopen joining to make changes.';
     default:
       return 'Could not remove member. Try again.';
   }
@@ -119,7 +123,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
     deleteEvent: deleteEventFromStore,
   } = useEventStore();
 
-  const [addModalOpen, setAddModalOpen] = useState(false);
+  const [addMembersOpen, setAddMembersOpen] = useState(false);
   const [qrFullscreen, setQrFullscreen] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
@@ -372,7 +376,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const confirmReopenJoinWindow = () => {
     Alert.alert(
       'Reopen join window?',
-      'The group will be open again for 24 hours so a latecomer can scan the QR or use the link. Lock the group again after they join.',
+      'The event will be open again for 24 hours so a latecomer can scan the QR or use the link. Lock the event again after they join.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -479,23 +483,49 @@ export function EventDetailScreen({ navigation, route }: Props) {
     return currentEvent.summary;
   }, [currentEvent?.summary]);
 
-  const handleAddParticipant = async (input: {
-    display_name: string;
-    join_method: 'manual_phone' | 'manual_name_only';
-    phone_e164?: string;
-  }) => {
+  const handleAddParticipantsBatch = async (
+    entries: GroupBuilderSubmitPayload[],
+  ): Promise<AddMembersBatchResult> => {
     setIsAdding(true);
     setAddError(null);
+
+    const added: GroupBuilderSubmitPayload[] = [];
+    const failed: AddMembersBatchResult['failed'] = [];
+
     try {
-      await eventService.addManualParticipant(eventId, input);
-      setAddModalOpen(false);
-      setToast(`✓ ${input.display_name} added`);
-      await loadEventDetail(eventId);
-    } catch {
-      setAddError(`Failed to add ${input.display_name} — try again.`);
+      for (const entry of entries) {
+        try {
+          await eventService.addManualParticipant(eventId, entry);
+          added.push(entry);
+        } catch (err: unknown) {
+          const code = isApiRequestError(err) ? err.code : getApiErrorCode(err);
+          const message =
+            code === 'DUPLICATE_PHONE'
+              ? 'Already on this event'
+              : `Failed to add ${entry.display_name}`;
+          failed.push({ entry, message });
+        }
+      }
+
+      if (added.length > 0) {
+        const label =
+          failed.length > 0
+            ? `✓ Added ${added.length} members · ${failed.length} could not be added`
+            : added.length === 1
+              ? `✓ ${added[0]!.display_name} added`
+              : `✓ Added ${added.length} members`;
+        setToast(label);
+        await loadEventDetail(eventId);
+      }
+
+      if (failed.length > 0 && added.length === 0) {
+        setAddError(failed.map((item) => item.message).join(' · '));
+      }
     } finally {
       setIsAdding(false);
     }
+
+    return { added, failed };
   };
 
   const handleLock = async () => {
@@ -504,7 +534,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
       await lockEvent(eventId);
     } catch (err: unknown) {
       const code = isApiRequestError(err) ? err.code : getApiErrorCode(err);
-      setLockError(lockGroupErrorMessage(code));
+      setLockError(lockEventErrorMessage(code));
     }
   };
 
@@ -729,21 +759,21 @@ export function EventDetailScreen({ navigation, route }: Props) {
             <PrimaryButton
               label="+ Add manually"
               variant="inverse"
-              onPress={() => setAddModalOpen(true)}
+              onPress={() => setAddMembersOpen(true)}
               style={styles.addButton}
             />
 
             <PrimaryButton
-              label={`Lock group → · ${memberCount} ${memberCount === 1 ? 'member' : 'members'}`}
+              label={`Lock event → · ${memberCount} ${memberCount === 1 ? 'member' : 'members'}`}
               loading={isLocking}
               disabled={!lockEnabled || isLocking}
               onPress={() => void handleLock()}
-              accessibilityLabel={`Lock group, ${memberCount} members`}
+              accessibilityLabel={`Lock event, ${memberCount} members`}
               style={styles.lockButton}
             />
             {memberCount < 2 ? (
               <Text style={styles.lockHint}>
-                Add at least one more member besides you to lock the group.
+                Add at least one more member besides you to lock this event.
               </Text>
             ) : null}
             {lockError ? <Text style={glassStyles.errorText}>{lockError}</Text> : null}
@@ -847,15 +877,18 @@ export function EventDetailScreen({ navigation, route }: Props) {
         ) : null}
       </ScrollView>
 
-      <AddParticipantModal
-        visible={isPayer && addModalOpen}
+      <AddMembersSheet
+        visible={isPayer && addMembersOpen}
         isSubmitting={isAdding}
-        error={addError}
+        submitError={addError}
+        existingParticipants={participants.map((participant) => ({
+          display_name: participant.display_name,
+        }))}
         onClose={() => {
-          setAddModalOpen(false);
+          setAddMembersOpen(false);
           setAddError(null);
         }}
-        onSubmit={(input) => void handleAddParticipant(input)}
+        onSubmitBatch={handleAddParticipantsBatch}
       />
 
       {isPayer && event && joinUrl ? (

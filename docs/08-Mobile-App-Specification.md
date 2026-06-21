@@ -97,10 +97,10 @@ Root auth stack also includes:
 └── Modal screens (presented over any context):
     ├── AppJoinScreen           ← universal link opens here when app is installed
     │   └── AppJoinedScreen    ← success confirmation after joining
-    ├── AppLockedScreen         ← group was locked before they could join
+    ├── AppLockedScreen         ← event was locked before they could join
     ├── CreateEventModal        ← from HomeScreen or EventsScreen FAB
     ├── QRDisplayModal          ← fullscreen QR, shown after event create or from EventDetail
-    ├── AddParticipantModal     ← from EventDetail joining view
+    ├── AddMembersSheet             ← from EventDetail joining view (+ Add manually)
     ├── MessagePreviewModal     ← preview a single participant's message
     └── ConfirmPaymentModal     ← payer confirms a self-report
 ```
@@ -957,8 +957,8 @@ Each section lists only events matching the selected toggle. Event card: title, 
 - Live member list (Supabase Realtime subscription on `participants` table, filter by `event_id`)
 - Organiser (event creator) appears as the first member automatically — `is_organiser: true`, chip label **Organiser**, no remove control
 - Each member row (`EventMemberRow`): compact 48px row — 32px avatar | name | join-method chip (`alignSelf: flex-start`, not full-width) | optional × remove icon (payer only, non-organiser rows)
-- "+ Add manually" button → `AddParticipantModal` with two choices: **From contacts** (`expo-contacts`) or **Enter manually** (name / phone / name-only)
-- "Lock group →" CTA at bottom (disabled if < 2 participants — organiser + at least one other). Hint when count is 1: *"Add at least one more member besides you to lock the group."*
+- **+ Add manually** opens `AddMembersSheet` (Contacts | By name tabs; Done adds all at once)
+- "Lock event →" CTA at bottom (disabled if < 2 participants — organiser + at least one other). Hint when count is 1: *"Add at least one more member besides you to lock this event."*
 - "Reopen join window" button (shown when status is `locked` and user is payer — POST `/events/:id/reopen` reverts to `"open"`, new QR/link for 24h)
 
 **Settlement phase — payer only** (event status = `"locked"`, `"calculating"`, `"sent"`, `"settled"`):
@@ -1258,19 +1258,41 @@ Logout and delete live here — **not** on ProfileScreen.
 - "Close" (X) top right → dismiss
 - Shows "Expired" state with "Regenerate" button when token TTL elapsed
 
-#### AddParticipantModal (sheet)
+#### AddMembersSheet (bottom sheet)
 
-- Two-choice: "From contacts 📱" | "Enter manually ✏️"
-- Contacts picker: native contact picker (`expo-contacts`), pre-fills name + phone
-- Manual: name fields + phone input with country code picker
-- "Name only (no phone)" toggle — disables phone field
-- "Add to group" CTA
+Opened from **+ Add manually** on Event Detail while `status='open'`.
 
-Both phone paths call `POST /events/:id/participants/manual` with `join_method='manual_phone'`. Backend behaviour (E05-S04): if the phone matches an existing LetsSplyt user, that user is linked via `user_id` and will see the event under **Events you joined** on login — no OTP. If not registered, `guest_pii` stores the number for SMS only; no account is created until the person verifies via OTP elsewhere.
+**Layout**
+- `BottomSheetModal` with handle, heading **Add members**, subheading
+- `SegmentedControl`: **Contacts** | **By name**
+- Footer: **Done · add N members** (disabled until N ≥ 1)
 
-**On success:** Toast at bottom: "✓ [Name] added". Participant appears immediately in member list (optimistic UI).
+**Contacts tab**
+- Search field filters by name or phone substring
+- `FlatList` multi-select checklist (max 50 visible rows)
+- Permission denied → inline notice + **Open Settings** link; user can switch to **By name**
+- Contacts load error → empty-state message
+- Toggle contact on/off; selection persists when switching tabs
 
-**On failure:** Toast: "Failed to add [Name] — tap to retry."
+**By name tab**
+- One person block initially: **Person 1** — full name (required) + phone (optional, US national format)
+- **+ Add another person** appends more blocks
+- No clipboard paste (removed — keep entry explicit)
+
+**Done behaviour**
+- Merges selected contacts + filled manual rows into one batch
+- Dedupes by phone E.164 or normalised name (`groupBuilder.utils`)
+- Skips names already on the event (case-insensitive); shows inline error if nothing left to add
+- Invalid phone with a name filled → *"Enter a valid phone for [name] or leave phone blank."*
+- Sequential `POST /api/v1/events/:id/participants/manual` per entry via `handleAddParticipantsBatch`
+- **All failed:** sheet stays open, inline *"Could not add: …"*
+- **Any succeeded:** sheet closes, toast (single name or *"✓ Added N members"*; partial failure adds *"· M could not be added"*), member list refreshes
+
+**Phone paths:** `join_method='manual_phone'` — payer vouches, no OTP. Registered number → `user_id` linked; unregistered → `guest_pii` for SMS later. **Name-only:** `join_method='manual_name_only'` — no message ever sent.
+
+**Component:** `mobile/src/components/events/AddMembersSheet.tsx`  
+**Shared logic:** `mobile/src/components/events/groupBuilder.utils.ts`  
+**Tests:** `AddMembersSheet.test.tsx`, `groupBuilder.utils.test.ts`, `EventDetailScreen.test.tsx` (batch add)
 
 #### MessagePreviewModal (sheet, tall)
 
@@ -1477,7 +1499,7 @@ Use `@react-native-community/netinfo` to detect connectivity. On connectivity lo
 - Cached data is shown (React Query cache, `staleTime: 5 minutes`)
 - Show a non-blocking amber banner below the screen header (not the connectivity banner): "Last updated [X] minutes ago"
 - Realtime subscription will reconnect automatically when connectivity is restored
-- Actions (Lock group, Confirm, Dispute, Nudge) are disabled when offline — show tooltip: "Reconnect to take this action"
+- Actions (Lock event, Confirm, Dispute, Nudge) are disabled when offline — show tooltip: "Reconnect to take this action"
 
 **Settlement actions (ConfirmPaymentModal, dispute):**
 - Queue locally using `expo-sqlite` — store the action type, participant ID, event ID, and timestamp

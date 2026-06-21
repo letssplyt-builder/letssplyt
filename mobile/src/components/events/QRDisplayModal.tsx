@@ -53,7 +53,7 @@ export function QRDisplayModal({
         </Pressable>
 
         <Text style={styles.title}>{title}</Text>
-        <Text style={styles.subtitle}>Scan to join the group</Text>
+        <Text style={styles.subtitle}>Scan to join this event</Text>
 
         <View style={[styles.qrWrap, expired && styles.qrExpired]}>
           {expired ? (

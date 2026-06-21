@@ -174,7 +174,7 @@ describe('EventDetailScreen', () => {
     );
 
     await waitFor(() => {
-      const lockButton = screen.getByLabelText('Lock group, 0 members');
+      const lockButton = screen.getByLabelText('Lock event, 0 members');
       expect(lockButton.props.accessibilityState?.disabled).toBe(true);
     });
   });
@@ -204,10 +204,10 @@ describe('EventDetailScreen', () => {
       expect(screen.getByText('Sam')).toBeTruthy();
     });
 
-    const lockButton = screen.getByLabelText('Lock group, 1 members');
+    const lockButton = screen.getByLabelText('Lock event, 1 members');
     expect(lockButton.props.accessibilityState?.disabled).toBe(true);
     expect(
-      screen.getByText('Add at least one more member besides you to lock the group.'),
+      screen.getByText('Add at least one more member besides you to lock this event.'),
     ).toBeTruthy();
   });
 
@@ -243,8 +243,76 @@ describe('EventDetailScreen', () => {
       expect(screen.getByText('Sam')).toBeTruthy();
     });
 
-    const lockButton = screen.getByLabelText('Lock group, 2 members');
+    const lockButton = screen.getByLabelText('Lock event, 2 members');
     expect(lockButton.props.accessibilityState?.disabled).toBeFalsy();
+  });
+
+  it('opens AddMembersSheet from + Add manually and batch-adds members', async () => {
+    jest.mocked(eventService.addManualParticipant).mockResolvedValue({
+      id: 'p-new',
+      display_name: 'Chris',
+      join_method: 'manual_name_only',
+      payment_status: 'pending',
+      amount_owed: null,
+    } as never);
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('+ Add manually')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByText('+ Add manually'));
+    fireEvent.press(screen.getByText('By name'));
+    fireEvent.changeText(screen.getByLabelText('Person 1 name'), 'Chris');
+    fireEvent.press(screen.getByText('Done · add 1 member'));
+
+    await waitFor(() => {
+      expect(eventService.addManualParticipant).toHaveBeenCalledWith('event-1', {
+        display_name: 'Chris',
+        join_method: 'manual_name_only',
+      });
+    });
+  });
+
+  it('shows partial batch-add toast when some members fail', async () => {
+    jest
+      .mocked(eventService.addManualParticipant)
+      .mockResolvedValueOnce({
+        id: 'p-new',
+        display_name: 'Chris',
+        join_method: 'manual_name_only',
+        payment_status: 'pending',
+        amount_owed: null,
+      } as never)
+      .mockRejectedValueOnce(new ApiRequestError('Already on this event', 409, 'DUPLICATE_PHONE'));
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('+ Add manually')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByText('+ Add manually'));
+    fireEvent.press(screen.getByText('By name'));
+    fireEvent.changeText(screen.getByLabelText('Person 1 name'), 'Chris');
+    fireEvent.press(screen.getByText('+ Add another person'));
+    fireEvent.changeText(screen.getByLabelText('Person 2 name'), 'Sam');
+    fireEvent.press(screen.getByText('Done · add 2 members'));
+
+    await waitFor(() => {
+      expect(screen.getByText('✓ Added 1 members · 1 could not be added')).toBeTruthy();
+    });
   });
 
   it('subscribes to Realtime on mount', async () => {
@@ -781,7 +849,7 @@ describe('EventDetailScreen', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Your share')).toBeTruthy();
-      expect(screen.getByText(/Group is still open/)).toBeTruthy();
+      expect(screen.getByText(/This event is still open/)).toBeTruthy();
       expect(screen.getByText('You')).toBeTruthy();
       expect(screen.getByText('Alex')).toBeTruthy();
     });
@@ -789,7 +857,7 @@ describe('EventDetailScreen', () => {
     expect(screen.queryByLabelText(/QR code/)).toBeNull();
     expect(screen.queryByText('Copy link')).toBeNull();
     expect(screen.queryByText('+ Add manually')).toBeNull();
-    expect(screen.queryByText(/Lock group/)).toBeNull();
+    expect(screen.queryByText(/Lock event/)).toBeNull();
     expect(screen.queryByLabelText('Remove Alex')).toBeNull();
     unmount();
 

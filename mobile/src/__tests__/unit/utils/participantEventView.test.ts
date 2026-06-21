@@ -34,7 +34,7 @@ describe('participantEventView', () => {
     const hero = resolveParticipantShareHero(baseEvent, null, 'Alex');
     expect(hero.pending).toBe(true);
     expect(hero.amount).toBeNull();
-    expect(hero.statusLine).toContain('Group is still open');
+    expect(hero.statusLine).toContain('This event is still open');
     expect(hero.statusLine).toContain('Alex');
   });
 

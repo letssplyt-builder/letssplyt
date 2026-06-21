@@ -135,7 +135,7 @@ export function AppJoinScreen({ navigation, route }: Props) {
             Hosted by {creatorName ?? 'someone'}
           </Text>
           <Text style={styles.body}>
-            Tap join to appear in the group. The organiser will see you in real time.
+            Tap join to join this event. The organiser will see you in real time.
           </Text>
         </FadeSlideIn>
       )}

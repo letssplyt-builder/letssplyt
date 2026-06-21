@@ -26,7 +26,7 @@ export function AppLockedScreen({ navigation, route }: Props) {
       }
     >
       <FadeSlideIn>
-        <Text style={styles.title}>Group is locked</Text>
+        <Text style={styles.title}>This event is locked</Text>
         {eventName ? <Text style={styles.eventName}>{eventName}</Text> : null}
         <Text style={styles.body}>
           {creatorName

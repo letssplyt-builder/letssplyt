@@ -140,11 +140,39 @@ jest.mock('react-native-qrcode-svg', () => {
 
 jest.mock('expo-clipboard', () => ({
   setStringAsync: jest.fn(() => Promise.resolve()),
+  getStringAsync: jest.fn(() => Promise.resolve('')),
 }));
 
 jest.mock('expo-contacts', () => ({
   requestPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'granted' })),
   presentContactPickerAsync: jest.fn(() => Promise.resolve(null)),
+  getContactsAsync: jest.fn(() =>
+    Promise.resolve({
+      data: [
+        {
+          id: 'c1',
+          firstName: 'Jordan',
+          lastName: 'Lee',
+          phoneNumbers: [{ number: '+1 202 555 0100' }],
+        },
+        {
+          id: 'c2',
+          firstName: 'Sam',
+          lastName: 'T',
+          phoneNumbers: [{ number: '+1 202 555 0200' }],
+        },
+      ],
+    }),
+  ),
+  Fields: {
+    PhoneNumbers: 'phoneNumbers',
+    Name: 'name',
+    FirstName: 'firstName',
+    LastName: 'lastName',
+  },
+  SortTypes: {
+    FirstName: 'firstName',
+  },
 }));
 
 global.fetch = jest.fn() as unknown as typeof fetch;
