@@ -39,6 +39,7 @@
     "expo-secure-store": "~15.0.8",
     "expo-status-bar": "~3.0.9",
     "libphonenumber-js": "^1.12.9",
+    "promise": "^8.3.0",
     "react": "19.1.0",
     "react-native": "0.81.5",
     "react-native-document-scanner-plugin": "^2.0.4",

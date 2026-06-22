@@ -7,7 +7,7 @@ on:
     branches: [main, staging]
 
 jobs:
-  lint-typecheck:
+  backend-typecheck:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,21 +23,34 @@ jobs:
       - name: Lint backend
         run: cd backend && npm run lint
 
-      - name: Lint mobile
-        run: cd mobile && npm run lint
-
       - name: Typecheck shared
-        run: cd shared && npx tsc --noEmit
+        run: cd shared && npm run typecheck
 
       - name: Typecheck backend
         run: cd backend && npm run typecheck
 
+  mobile-typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint mobile
+        run: cd mobile && npm run lint
+
       - name: Typecheck mobile
         run: cd mobile && npm run typecheck
 
-  backend-tests:
+  backend-tests-with-db:
     runs-on: ubuntu-latest
-    needs: lint-typecheck
+    needs: backend-typecheck
     steps:
       - uses: actions/checkout@v4
 
@@ -46,17 +59,53 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start local Supabase
+        run: supabase start
+
+      - name: Export local Supabase credentials
+        run: |
+          echo "SUPABASE_URL=http://127.0.0.1:54321" >> "$GITHUB_ENV"
+          echo "SUPABASE_PUBLISHABLE_KEY=$(supabase status -o json | jq -r '.ANON_KEY')" >> "$GITHUB_ENV"
+          echo "SUPABASE_SECRET_KEY=$(supabase status -o json | jq -r '.SERVICE_ROLE_KEY')" >> "$GITHUB_ENV"
+
       - name: Install dependencies
         run: npm ci
 
-      - name: Run backend unit tests
-        run: cd backend && npm run test:unit
+      - name: Run backend tests with coverage
+        run: cd backend && npm run test:coverage
         env:
+          CI: 'true'
+          APP_ENV: test
           NODE_ENV: test
+          PHONE_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          PII_HMAC_SALT: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
+          HANDLE_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          ANALYTICS_SALT: abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd
+          TWILIO_ACCOUNT_SID: ACtest
+          TWILIO_AUTH_TOKEN: test-auth-token
+          TWILIO_PHONE_NUMBER: '+15005550006'
+          TELNYX_API_KEY: KEYtest_telnyx_api_key
+          TELNYX_FROM_NUMBER: '+14155550001'
+          GEMINI_API_KEY: test-gemini-key
+          UPSTASH_REDIS_REST_URL: https://test.upstash.io
+          UPSTASH_REDIS_REST_TOKEN: test-redis-token
+
+      - name: Upload backend coverage
+        if: always()
+        uses: codecov/codecov-action@v4
+        with:
+          directory: ./backend/coverage
+          flags: backend
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
 
   mobile-tests:
     runs-on: ubuntu-latest
-    needs: lint-typecheck
+    needs: mobile-typecheck
     steps:
       - uses: actions/checkout@v4
 
@@ -68,5 +117,14 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run mobile tests
-        run: cd mobile && npm test
+      - name: Run mobile tests with coverage
+        run: cd mobile && npm run test:coverage
+
+      - name: Upload mobile coverage
+        if: always()
+        uses: codecov/codecov-action@v4
+        with:
+          directory: ./mobile/coverage
+          flags: mobile
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false

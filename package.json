@@ -10,7 +10,9 @@
     "test": "npm run test --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "build:shared": "npm run build --workspace=@letssplyt/shared"
+    "build:shared": "npm run build --workspace=@letssplyt/shared",
+    "build:staging": "cd mobile && eas build --profile staging --platform android --non-interactive",
+    "build:production": "cd mobile && eas build --profile production --platform all --non-interactive"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.18.0",

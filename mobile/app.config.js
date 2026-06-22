@@ -1,6 +1,31 @@
+const APP_ENV = process.env.APP_ENV ?? process.env.EXPO_PUBLIC_APP_ENV ?? 'development';
+
+const envProfiles = {
+  development: {
+    name: 'LetsSplyt Dev',
+    bundleIdentifier: 'com.letssplyt.dev',
+    androidPackage: 'com.letssplyt.dev',
+    adaptiveIconBackground: '#4F46E5',
+  },
+  staging: {
+    name: 'LetsSplyt Staging',
+    bundleIdentifier: 'com.letssplyt.staging',
+    androidPackage: 'com.letssplyt.staging',
+    adaptiveIconBackground: '#059669',
+  },
+  production: {
+    name: 'LetsSplyt',
+    bundleIdentifier: 'com.letssplyt.app',
+    androidPackage: 'com.letssplyt.app',
+    adaptiveIconBackground: '#111827',
+  },
+};
+
+const profile = envProfiles[APP_ENV] ?? envProfiles.development;
+
 /** @type {import('expo/config').ExpoConfig} */
 module.exports = {
-  name: 'LetsSplyt',
+  name: profile.name,
   slug: 'letssplyt',
   version: '1.0.0',
   orientation: 'portrait',
@@ -18,7 +43,7 @@ module.exports = {
       'expo-contacts',
       {
         contactsPermission:
-          'LetsSplyt uses your contacts to add members to your group.',
+          'LetsSplyt uses your contacts to add members to your event.',
       },
     ],
     'expo-local-authentication',
@@ -27,7 +52,7 @@ module.exports = {
       'expo-notifications',
       {
         icon: './assets/notification-icon.png',
-        color: '#4F46E5',
+        color: profile.adaptiveIconBackground,
       },
     ],
     [
@@ -35,7 +60,6 @@ module.exports = {
       {
         ios: { useFrameworks: 'static' },
         android: {
-          // Respect system navigation bar insets on gesture + 3-button nav devices.
           enableEdgeToEdge: true,
           softwareKeyboardLayoutMode: 'resize',
         },
@@ -43,18 +67,22 @@ module.exports = {
     ],
   ],
   ios: {
-    bundleIdentifier: 'com.letssplyt.app',
+    bundleIdentifier: profile.bundleIdentifier,
+    buildNumber: '1',
     supportsTablet: false,
     associatedDomains: ['applinks:letssplyt.app', 'applinks:staging.letssplyt.app'],
     infoPlist: {
       NSContactsUsageDescription:
-        'LetsSplyt uses your contacts to add members to your group.',
+        'LetsSplyt uses your contacts to add members to your event.',
       NSFaceIDUsageDescription:
         'LetsSplyt uses Face ID to unlock your account and sign you in faster.',
     },
   },
   android: {
-    package: 'com.letssplyt.app',
+    package: profile.androidPackage,
+    adaptiveIcon: {
+      backgroundColor: profile.adaptiveIconBackground,
+    },
     permissions: ['READ_CONTACTS', 'CAMERA'],
     intentFilters: [
       {

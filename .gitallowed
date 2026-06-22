@@ -4,3 +4,4 @@ backend/src/__tests__/setup\.ts:.*TWILIO_AUTH_TOKEN.*test-auth-token
 docs/12-Build-Sequence\.md:.*SUPABASE_SECRET_KEY.*test-service-role-key
 docs/12-Build-Sequence\.md:.*TWILIO_AUTH_TOKEN.*test-auth-token
 docs/Telnyx Implementation/Telnyx-Setup-Guide\.md:.*TWILIO_AUTH_TOKEN
+\.github/workflows/ci\.yml:.*SUPABASE_SECRET_KEY.*SERVICE_ROLE_KEY

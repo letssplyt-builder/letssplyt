@@ -1,7 +1,7 @@
 # LetsSplyt — Build Progress
 **Project:** LetsSplyt mobile bill-splitting app
 **Last updated:** 2026-06-07
-**Current story:** E12-S03 — EAS Build Configuration + CI/CD Completion
+**Current story:** E12-S04 — End-to-End Test Suite (Maestro)
 
 > **AI:** Read this file at the start of every session to know where we left off.
 > Find the first `[ ]` story below and build it. After Pawan confirms it's done, change `[ ]` to `[x]` and add the date.
@@ -92,7 +92,7 @@
 ### Epic 12: Launch Readiness
 - [x] E12-S01 — Analytics Event Ingestion + Health Check (2026-06-07)
 - [x] E12-S02 — Sentry Error Monitoring + Structured Logging (2026-06-07)
-- [ ] E12-S03 — EAS Build Configuration + CI/CD Completion
+- [x] E12-S03 — EAS Build Configuration + CI/CD Completion (2026-06-09)
 - [ ] E12-S04 — End-to-End Test Suite (Maestro)
 
 ### Epic 13: AI Eval Framework (last epic — after E12)

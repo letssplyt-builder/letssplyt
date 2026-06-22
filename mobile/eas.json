@@ -6,14 +6,47 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": true
+      },
+      "env": {
+        "APP_ENV": "development",
+        "EXPO_PUBLIC_APP_ENV": "development"
+      }
     },
     "staging": {
       "distribution": "internal",
-      "channel": "staging"
+      "channel": "staging",
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:bundleRelease"
+      },
+      "ios": {
+        "distribution": "internal"
+      },
+      "env": {
+        "APP_ENV": "staging",
+        "EXPO_PUBLIC_APP_ENV": "staging"
+      }
     },
     "production": {
-      "channel": "production"
+      "distribution": "store",
+      "channel": "production",
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "ios": {
+        "autoIncrement": true
+      },
+      "credentialsSource": "remote",
+      "env": {
+        "APP_ENV": "production",
+        "EXPO_PUBLIC_APP_ENV": "production"
+      }
     }
   },
   "submit": {
