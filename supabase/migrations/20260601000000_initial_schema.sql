@@ -219,8 +219,7 @@ CREATE TABLE participants (
   -- user_id: populated for registered app users; NULL for guests
   user_id         UUID        REFERENCES users(id),
 
-  guest_pii_token UUID        REFERENCES guest_pii(id) ON DELETE SET NULL
-                  CONSTRAINT fk_guest_pii,
+  guest_pii_token UUID        CONSTRAINT fk_guest_pii REFERENCES guest_pii(id) ON DELETE SET NULL,
 
   -- display_name: non-sensitive name shown in the event member list and split table
   display_name    TEXT        NOT NULL,
