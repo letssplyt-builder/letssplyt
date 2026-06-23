@@ -1,6 +1,9 @@
 {
   "name": "letssplyt-monorepo",
   "private": true,
+  "engines": {
+    "node": ">=22"
+  },
   "workspaces": [
     "mobile",
     "backend",

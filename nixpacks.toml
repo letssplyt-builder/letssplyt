@@ -1,0 +1,19 @@
+# Railway/Nixpacks: backend-only deploy from monorepo (skip mobile workspace).
+# Default Nixpacks Node is 18; Expo/RN deps require 20+. Runtime uses Node 22.
+
+[variables]
+NIXPACKS_NODE_VERSION = "22"
+
+[phases.install]
+cmds = [
+  "npm ci --workspace=letssplyt-backend --workspace=@letssplyt/shared --include-workspace-root"
+]
+
+[phases.build]
+cmds = [
+  "npm run build --workspace=@letssplyt/shared",
+  "npm run build --workspace=letssplyt-backend"
+]
+
+[start]
+cmd = "node backend/dist/server.js"
