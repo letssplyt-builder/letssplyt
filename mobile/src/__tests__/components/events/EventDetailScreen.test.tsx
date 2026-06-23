@@ -160,9 +160,7 @@ describe('EventDetailScreen', () => {
       />,
     );
 
-    await waitFor(() => {
-      expect(screen.getByText('Sam')).toBeTruthy();
-    });
+    expect(await screen.findByText('Sam')).toBeTruthy();
   });
 
   it('shows Lock button disabled with 0 participants', async () => {

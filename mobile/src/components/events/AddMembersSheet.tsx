@@ -270,6 +270,8 @@ export function AddMembersSheet({
                   (item as Contacts.Contact & { id?: string }).id ?? `contact-${index}`
                 }
                 style={styles.contactList}
+                initialNumToRender={50}
+                maxToRenderPerBatch={50}
                 keyboardShouldPersistTaps="handled"
                 ListEmptyComponent={
                   <Text style={styles.emptyContacts}>

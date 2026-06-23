@@ -44,9 +44,7 @@ describe('AddMembersSheet', () => {
     expect(screen.getByText('Contacts')).toBeTruthy();
     expect(screen.getByText('By name')).toBeTruthy();
 
-    await waitFor(() => {
-      expect(screen.getByText('Jordan Lee')).toBeTruthy();
-    });
+    expect(await screen.findByText('Jordan Lee')).toBeTruthy();
   });
 
   it('keeps Done disabled until at least one member is ready', async () => {

@@ -1,6 +1,36 @@
 import { jest, beforeEach } from '@jest/globals';
+import { configure } from '@testing-library/react-native';
+import { Dimensions } from 'react-native';
+
+configure({ asyncUtilTimeout: 8000 });
+
+Dimensions.set({
+  window: { width: 390, height: 844, scale: 1, fontScale: 1 },
+  screen: { width: 390, height: 844, scale: 1, fontScale: 1 },
+});
 
 const mockSecureStoreMap = new Map<string, string>();
+
+const defaultContactsData = [
+  {
+    id: 'c1',
+    firstName: 'Jordan',
+    lastName: 'Lee',
+    phoneNumbers: [{ number: '+1 202 555 0100' }],
+  },
+  {
+    id: 'c2',
+    firstName: 'Sam',
+    lastName: 'T',
+    phoneNumbers: [{ number: '+1 202 555 0200' }],
+  },
+];
+
+function resetExpoContactsMock(): void {
+  const Contacts = jest.requireMock<typeof import('expo-contacts')>('expo-contacts');
+  Contacts.requestPermissionsAsync.mockResolvedValue({ status: 'granted' } as never);
+  Contacts.getContactsAsync.mockResolvedValue({ data: defaultContactsData } as never);
+}
 
 jest.mock('react-native-safe-area-context', () => {
   const React = require('react');
@@ -179,5 +209,7 @@ global.fetch = jest.fn() as unknown as typeof fetch;
 
 beforeEach(() => {
   mockSecureStoreMap.clear();
-  jest.clearAllMocks();
+  // Do not use jest.clearAllMocks() here — it wipes mock implementations from jest.mock()
+  // factories and causes flaky async failures when individual suites forget to re-stub.
+  resetExpoContactsMock();
 });

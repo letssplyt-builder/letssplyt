@@ -30,6 +30,8 @@ const config: Config = {
     },
   },
   testMatch: ['**/__tests__/**/*.test.{ts,tsx}', '**/*.test.{ts,tsx}'],
+  // Full-suite coverage on GitHub Actions can exceed the default 5s on async UI tests.
+  testTimeout: 15000,
 };
 
 export default config;

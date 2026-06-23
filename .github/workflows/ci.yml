@@ -126,6 +126,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build shared package
+        run: npm run build --workspace=@letssplyt/shared
+
       - name: Run mobile tests with coverage
         run: cd mobile && npm run test:coverage
 
