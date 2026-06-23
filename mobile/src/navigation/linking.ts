@@ -5,7 +5,7 @@ import { useJoinStore } from '../store/joinStore';
 import { navigationRef } from './navigationRef';
 import type { RootStackParamList } from './types';
 
-const APP_DOMAIN = process.env.EXPO_PUBLIC_APP_DOMAIN ?? 'letssplyt.app';
+const APP_DOMAIN = process.env.EXPO_PUBLIC_APP_DOMAIN ?? 'letssplyt.com';
 
 function extractJoinToken(url: string): string | null {
   try {

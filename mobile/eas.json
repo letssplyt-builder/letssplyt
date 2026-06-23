@@ -22,8 +22,7 @@
       "distribution": "internal",
       "channel": "staging",
       "android": {
-        "buildType": "apk",
-        "gradleCommand": ":app:bundleRelease"
+        "buildType": "apk"
       },
       "ios": {
         "distribution": "internal"

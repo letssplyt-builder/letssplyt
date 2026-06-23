@@ -17,6 +17,7 @@ describe('Deep link well-known files', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers['content-type']).toMatch(/application\/json/);
-    expect(response.body[0]?.target?.package_name).toBe('com.letssplyt.app');
+    expect(response.body[0]?.target?.package_name).toBe('com.letssplyt.staging');
+    expect(response.body[0]?.target?.sha256_cert_fingerprints?.[0]).toContain('37:D6:B3');
   });
 });

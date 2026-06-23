@@ -70,7 +70,7 @@ module.exports = {
     bundleIdentifier: profile.bundleIdentifier,
     buildNumber: '1',
     supportsTablet: false,
-    associatedDomains: ['applinks:letssplyt.app', 'applinks:staging.letssplyt.app'],
+    associatedDomains: ['applinks:letssplyt.com', 'applinks:staging.letssplyt.com'],
     infoPlist: {
       NSContactsUsageDescription:
         'LetsSplyt uses your contacts to add members to your event.',
@@ -89,8 +89,8 @@ module.exports = {
         action: 'VIEW',
         autoVerify: true,
         data: [
-          { scheme: 'https', host: 'letssplyt.app', pathPrefix: '/join/' },
-          { scheme: 'https', host: 'staging.letssplyt.app', pathPrefix: '/join/' },
+          { scheme: 'https', host: 'letssplyt.com', pathPrefix: '/join/' },
+          { scheme: 'https', host: 'staging.letssplyt.com', pathPrefix: '/join/' },
         ],
         category: ['BROWSABLE', 'DEFAULT'],
       },
