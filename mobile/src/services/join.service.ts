@@ -1,4 +1,4 @@
-import { apiGet, apiGetAuth, apiPostAuth } from './api';
+import { apiGet, apiPostAuth } from './api';
 
 export interface JoinPreviewResponse {
   eventName: string;

@@ -168,7 +168,7 @@ function buildSplitResponse(
   unassignedItemIds: string[],
   confidence: number,
   requiresReview: boolean,
-  total: number,
+  _total: number,
 ): SplitCalculateResponse {
   const nameToId = new Map(participants.map((p) => [p.display_name, p.id]));
 

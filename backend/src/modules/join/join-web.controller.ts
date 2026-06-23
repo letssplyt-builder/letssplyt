@@ -14,7 +14,6 @@ import {
   verifyJoinOtp,
   writeFunnelCheckpoint,
 } from './join-web.service';
-import { renderAppUserRedirectPage } from './templates/app-user-redirect.html';
 import { renderExpiredPage } from './templates/expired.html';
 import { renderJoinFormPage } from './templates/join-form.html';
 import { renderJoinSuccessPage } from './templates/join-success.html';

@@ -3,7 +3,7 @@ import {
   type NavigationProp,
   type ParamListBase,
 } from '@react-navigation/native';
-import type { EventsStackParamList, MainTabParamList } from './types';
+import type { MainTabParamList } from './types';
 
 /** Find the bottom-tab navigator (Dashboard / Events). */
 export function getTabNavigation(

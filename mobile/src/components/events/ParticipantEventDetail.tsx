@@ -57,12 +57,10 @@ function SplitBreakdownSection({
   splitMode,
   myItems,
   currency,
-  amountReady,
 }: {
   splitMode: EventDetailResponse['event']['split_mode'];
   myItems?: ParticipantAssignedItem[];
   currency: string;
-  amountReady: boolean;
 }) {
   if (!splitMode) {
     return null;
@@ -133,7 +131,6 @@ export function ParticipantEventDetail({ detail }: ParticipantEventDetailProps) 
         splitMode={event.split_mode}
         myItems={myItems}
         currency={event.currency}
-        amountReady={amountReady}
       />
 
       <Text style={glassStyles.sectionTitle}>Members · {participants.length}</Text>

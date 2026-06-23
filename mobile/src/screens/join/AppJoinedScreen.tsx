@@ -1,5 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { FadeSlideIn } from '../../components/auth/FadeSlideIn';
 import { PrimaryButton } from '../../components/PrimaryButton';

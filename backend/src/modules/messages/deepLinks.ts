@@ -21,8 +21,8 @@ export function buildPaymentLink(
   handleValue: string,
   amountMajorUnits: number,
   eventName: string,
-  currency: string,
-  locale: string,
+  _currency: string,
+  _locale: string,
 ): PaymentLinkResult | null {
   const encodedNote = encodeURIComponent(`${eventName} split`);
   const numericAmount = amountMajorUnits.toFixed(2);

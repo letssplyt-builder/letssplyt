@@ -5,7 +5,7 @@ import type {
   PaymentProvider,
   PublicUserProfile,
 } from '@letssplyt/shared/profile.types';
-import { apiDelete, apiGet, apiPatch, apiPost, apiPostAuth } from './api';
+import { apiDelete, apiGet, apiPatch, apiPostAuth } from './api';
 
 export async function fetchMyProfile(): Promise<PublicUserProfile> {
   return apiGet<PublicUserProfile>('/users/me');

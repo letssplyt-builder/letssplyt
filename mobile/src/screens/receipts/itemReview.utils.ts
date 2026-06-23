@@ -52,16 +52,16 @@ export function snapshotToEditable(snapshot: ReceiptReviewSnapshot): {
 }
 
 export function parseResultToSnapshot(
-  parseResult: ReceiptReviewSnapshot & { storage_path?: string },
+  parseResult: ReceiptParseResponse,
 ): ReceiptReviewSnapshot {
   return {
     items: parseResult.items,
     additional_charges: parseResult.additional_charges,
-    discounts: parseResult.discounts ?? [],
+    discounts: [],
     tax_amount: parseResult.tax_amount,
     tip_amount: parseResult.tip_amount,
     fees_amount: parseResult.fees_amount,
-    discount_amount: parseResult.discount_amount ?? 0,
+    discount_amount: 0,
     currency: parseResult.currency,
   };
 }

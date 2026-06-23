@@ -1,6 +1,5 @@
 import { twilioClient } from '../../twilio';
 import type {
-  MessageChannel,
   SendOutboundMessageParams,
   SendOutboundMessageResult,
   SMSProvider,

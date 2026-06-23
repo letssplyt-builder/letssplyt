@@ -1,5 +1,5 @@
 import type { PaymentProvider } from '@letssplyt/shared/profile.types';
-import { defaultLocaleForCurrency, formatCurrency } from '../../infrastructure/security';
+import { defaultLocaleForCurrency } from '../../infrastructure/security';
 import { buildA3Prompt, getRecipientPlaceholder } from './a3.prompt';
 import {
   assembleParticipantMessage,

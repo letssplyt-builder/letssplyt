@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { AppState, type AppStateStatus, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 import { APP_LOCK_IDLE_MS } from '../auth/appLockConfig';
 import { useAuthStore } from '../store/authStore';
 

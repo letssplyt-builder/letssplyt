@@ -27,7 +27,6 @@ import {
 } from '../splits/splitEntry.utils';
 import { useSplitStore } from '../../store/splitStore';
 import { authColors, colors } from '../../theme/colors';
-import { finishEventFlowToEventDetail } from '../../navigation/eventNavigation';
 import { completeEventWithoutSms } from '../../utils/messageFlow';
 
 type Props = NativeStackScreenProps<EventsStackParamList, 'MessagePreview'>;

@@ -16,12 +16,6 @@ interface ParticipantOwedRow {
   join_method: string;
 }
 
-interface EventMeta {
-  id: string;
-  title: string;
-  payer_id: string;
-}
-
 async function fetchCreatedEventIds(viewerId: string): Promise<string[]> {
   const { data, error } = await supabaseAdmin
     .from('events')

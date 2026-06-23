@@ -65,9 +65,6 @@ export function usePushNotifications(enabled: boolean): void {
   useEffect(() => {
     if (!enabled) return;
 
-    let receivedSubscription: Notifications.EventSubscription | undefined;
-    let responseSubscription: Notifications.EventSubscription | undefined;
-
     void registerTokenIfPermitted().catch(() => {
       // Permission denied or token unavailable — silent.
     });
@@ -79,14 +76,14 @@ export function usePushNotifications(enabled: boolean): void {
       if (eventId) navigateToEvent(eventId);
     });
 
-    receivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
+    const receivedSubscription = Notifications.addNotificationReceivedListener((notification) => {
       const title = notification.request.content.title ?? 'Notification';
       const body = notification.request.content.body ?? '';
       showPushToast({ title, body });
       void useNotificationStore.getState().loadUnreadCount();
     });
 
-    responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const eventId = extractEventId(
         response.notification.request.content.data as Record<string, unknown> | undefined,
       );
