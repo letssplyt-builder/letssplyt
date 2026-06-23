@@ -2,11 +2,11 @@
 -- Run in Supabase SQL Editor after: supabase db push
 -- Every check should pass before deploying backend + mobile to that environment.
 
--- ─── 1. Migration history (expect 17 rows on fully migrated projects) ─────
+-- ─── 1. Migration history (expect 31 rows on fully migrated projects) ─────
 SELECT
   'migration_count' AS check_name,
   COUNT(*)::text AS result,
-  CASE WHEN COUNT(*) >= 17 THEN 'ok' ELSE 'MISSING MIGRATIONS' END AS status
+  CASE WHEN COUNT(*) >= 31 THEN 'ok' ELSE 'MISSING MIGRATIONS' END AS status
 FROM supabase_migrations.schema_migrations;
 
 SELECT version, name
@@ -32,7 +32,21 @@ WITH expected AS (
     '20260612000000',
     '20260613000000',
     '20260614000000',
-    '20260615000000'
+    '20260615000000',
+    '20260616000000',
+    '20260617000000',
+    '20260617000001',
+    '20260618000000',
+    '20260619000000',
+    '20260620000000',
+    '20260621000000',
+    '20260622000000',
+    '20260623000000',
+    '20260624000000',
+    '20260624000001',
+    '20260624000002',
+    '20260625000000',
+    '20260626000000'
   ]) AS version
 ),
 applied AS (
@@ -46,10 +60,7 @@ WHERE a.version IS NULL
 ORDER BY e.version;
 
 -- ─── 3. Events columns (E05 + E07) ──────────────────────────────────────────
-SELECT
-  column_name,
-  CASE WHEN column_name IS NOT NULL THEN 'ok' ELSE 'missing' END AS status
-FROM (
+WITH expected AS (
   SELECT unnest(ARRAY[
     'ai_stage',
     'locale',
@@ -61,11 +72,16 @@ FROM (
     'total_amount',
     'split_mode'
   ]) AS column_name
-) expected
+)
+SELECT
+  e.column_name,
+  CASE WHEN c.column_name IS NOT NULL THEN 'ok' ELSE 'missing' END AS status
+FROM expected e
 LEFT JOIN information_schema.columns c
   ON c.table_schema = 'public'
  AND c.table_name = 'events'
- AND c.column_name = expected.column_name;
+ AND c.column_name = e.column_name
+ORDER BY e.column_name;
 
 -- ─── 4. ai_stage allows parsed_confirmed (migration #16) ────────────────────
 SELECT
