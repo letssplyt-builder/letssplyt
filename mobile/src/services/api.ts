@@ -63,6 +63,9 @@ function resolveErrorMessage(
       return apiMessage ?? 'No connection. Connect to the internet and try again.';
     case 'INVALID_RESPONSE':
       return isVerify ? verifyDefault : sendCodeDefault;
+    case 'UNKNOWN_ERROR':
+      if (isVerify) return verifyDefault;
+      return sendCodeDefault;
     case 'USER_CREATE_FAILED':
       if (apiMessage?.toLowerCase().includes('already registered')) {
         return 'This number already has an account. Enter your phone number to sign in.';
@@ -118,9 +121,7 @@ async function requestApi<TResponse>(
 
   if (!response.ok) {
     const apiError = payload as ApiError | null;
-    const code =
-      apiError?.error?.code ??
-      (response.status === 404 && path.includes('/auth/otp') ? 'ACCOUNT_NOT_FOUND' : 'UNKNOWN_ERROR');
+    const code = apiError?.error?.code ?? 'UNKNOWN_ERROR';
     const message = resolveErrorMessage(path, code, apiError?.error?.message) || fallbackMessage;
     throw new ApiRequestError(code, message, response.status);
   }

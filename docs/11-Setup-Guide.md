@@ -478,8 +478,8 @@ openssl rand -hex 32   # → PII_HMAC_SALT (hashes phones for lookups)
 |---|---|---|---|
 | `APP_URL` | `http://localhost:3000` | `https://letssplyt.up.railway.app` | `https://your-domain.com` |
 | `APP_DOMAIN` | `localhost:3000` | `letssplyt.up.railway.app` | `your-domain.com` |
-| `EXPO_PUBLIC_API_URL` | `http://localhost:3000/api/v1` | `https://letssplyt.up.railway.app/api/v1` | `https://your-domain.com/api/v1` |
-| `EXPO_PUBLIC_APP_DOMAIN` | `http://localhost:3000` | `https://letssplyt.up.railway.app` | `https://your-domain.com` |
+| `EXPO_PUBLIC_API_URL` | `http://localhost:3000` | `https://staging.letssplyt.com` | `https://your-domain.com` |
+| `EXPO_PUBLIC_APP_DOMAIN` | `letssplyt.com` | `letssplyt.com` | `letssplyt.com` |
 
 > ⚠️ Fill in staging/production values after you have a Railway URL (Part 3) and domain (Part 4). Leave as shown for development now.
 
@@ -713,8 +713,8 @@ All feature prompts, prototype references, and build instructions are in **`Lets
 4. Update Doppler staging secrets with your Railway URL:
    - `APP_URL` = `https://letssplyt.up.railway.app`
    - `APP_DOMAIN` = `letssplyt.up.railway.app`
-   - `EXPO_PUBLIC_API_URL` = `https://letssplyt.up.railway.app/api/v1`
-   - `EXPO_PUBLIC_APP_DOMAIN` = `https://letssplyt.up.railway.app`
+   - `EXPO_PUBLIC_API_URL` = `https://staging.letssplyt.com` (base URL only — no `/api/v1` suffix)
+   - `EXPO_PUBLIC_APP_DOMAIN` = `letssplyt.com`
 5. Confirm **Sentry** secrets exist in Doppler **staging** (same DSN as dev; `APP_ENV=staging`, `EXPO_PUBLIC_APP_ENV=staging`). Railway redeploys after Doppler sync.
 6. After deploy, smoke-test Sentry on staging:
    ```bash

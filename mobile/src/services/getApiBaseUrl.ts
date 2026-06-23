@@ -2,8 +2,17 @@ import Constants from 'expo-constants';
 
 const DEFAULT_PORT = 3000;
 
+/** Base URL only — callers append `/api/v1`. Strips a trailing `/api/v1` if misconfigured. */
+export function normalizeApiBaseUrl(raw: string): string {
+  const trimmed = raw.trim().replace(/\/$/, '');
+  if (trimmed.endsWith('/api/v1')) {
+    return trimmed.slice(0, -'/api/v1'.length);
+  }
+  return trimmed;
+}
+
 /**
- * Resolves the backend base URL (no trailing path).
+ * Resolves the backend base URL (no trailing path, no `/api/v1` suffix).
  *
  * Priority:
  * 1. EXPO_PUBLIC_API_URL — explicit override (staging/production or manual LAN IP)
@@ -13,7 +22,7 @@ const DEFAULT_PORT = 3000;
 export function getApiBaseUrl(): string {
   const configured = Constants.expoConfig?.extra?.apiUrl as string | undefined;
   if (configured && !configured.includes('localhost') && !configured.includes('127.0.0.1')) {
-    return configured.replace(/\/$/, '');
+    return normalizeApiBaseUrl(configured);
   }
 
   const debuggerHost =
@@ -27,5 +36,5 @@ export function getApiBaseUrl(): string {
     }
   }
 
-  return configured?.replace(/\/$/, '') ?? `http://localhost:${DEFAULT_PORT}`;
+  return configured ? normalizeApiBaseUrl(configured) : `http://localhost:${DEFAULT_PORT}`;
 }

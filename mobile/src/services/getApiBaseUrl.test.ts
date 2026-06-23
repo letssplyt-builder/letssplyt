@@ -16,4 +16,11 @@ describe('getApiBaseUrl', () => {
     mockExpoConstants.expoConfig = { extra: { apiUrl: 'https://api.example.com' } };
     expect(getApiBaseUrl()).toBe('https://api.example.com');
   });
+
+  it('strips a trailing /api/v1 from misconfigured EXPO_PUBLIC_API_URL', () => {
+    mockExpoConstants.expoConfig = {
+      extra: { apiUrl: 'https://staging.letssplyt.com/api/v1' },
+    };
+    expect(getApiBaseUrl()).toBe('https://staging.letssplyt.com');
+  });
 });

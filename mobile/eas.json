@@ -21,6 +21,7 @@
     "staging": {
       "distribution": "internal",
       "channel": "staging",
+      "environment": "preview",
       "android": {
         "buildType": "apk"
       },
@@ -29,7 +30,9 @@
       },
       "env": {
         "APP_ENV": "staging",
-        "EXPO_PUBLIC_APP_ENV": "staging"
+        "EXPO_PUBLIC_APP_ENV": "staging",
+        "EXPO_PUBLIC_API_URL": "https://staging.letssplyt.com",
+        "EXPO_PUBLIC_APP_DOMAIN": "letssplyt.com"
       }
     },
     "production": {
