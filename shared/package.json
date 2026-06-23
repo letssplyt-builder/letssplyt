@@ -1,21 +1,57 @@
 {
   "name": "@letssplyt/shared",
   "version": "1.0.0",
-  "main": "./types/index.ts",
-  "types": "./types/index.ts",
+  "main": "./dist/types/index.js",
+  "types": "./dist/types/index.d.ts",
   "exports": {
-    ".": "./types/index.ts",
-    "./api.types": "./types/api.types.ts",
-    "./auth.types": "./types/auth.types.ts",
-    "./event.types": "./types/event.types.ts",
-    "./participant.types": "./types/participant.types.ts",
-    "./profile.types": "./types/profile.types.ts",
-    "./receipt.types": "./types/receipt.types.ts",
-    "./settlement.types": "./types/settlement.types.ts",
-    "./counterparty.types": "./types/counterparty.types.ts",
-    "./paymentHandleValidation": "./utils/paymentHandleValidation.ts",
-    "./utils/splitCalculator": "./utils/splitCalculator.ts",
-    "./utils/receiptDiscounts": "./utils/receiptDiscounts.ts"
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "default": "./dist/types/index.js"
+    },
+    "./api.types": {
+      "types": "./dist/types/api.types.d.ts",
+      "default": "./dist/types/api.types.js"
+    },
+    "./auth.types": {
+      "types": "./dist/types/auth.types.d.ts",
+      "default": "./dist/types/auth.types.js"
+    },
+    "./event.types": {
+      "types": "./dist/types/event.types.d.ts",
+      "default": "./dist/types/event.types.js"
+    },
+    "./participant.types": {
+      "types": "./dist/types/participant.types.d.ts",
+      "default": "./dist/types/participant.types.js"
+    },
+    "./profile.types": {
+      "types": "./dist/types/profile.types.d.ts",
+      "default": "./dist/types/profile.types.js"
+    },
+    "./receipt.types": {
+      "types": "./dist/types/receipt.types.d.ts",
+      "default": "./dist/types/receipt.types.js"
+    },
+    "./settlement.types": {
+      "types": "./dist/types/settlement.types.d.ts",
+      "default": "./dist/types/settlement.types.js"
+    },
+    "./counterparty.types": {
+      "types": "./dist/types/counterparty.types.d.ts",
+      "default": "./dist/types/counterparty.types.js"
+    },
+    "./paymentHandleValidation": {
+      "types": "./dist/utils/paymentHandleValidation.d.ts",
+      "default": "./dist/utils/paymentHandleValidation.js"
+    },
+    "./utils/splitCalculator": {
+      "types": "./dist/utils/splitCalculator.d.ts",
+      "default": "./dist/utils/splitCalculator.js"
+    },
+    "./utils/receiptDiscounts": {
+      "types": "./dist/utils/receiptDiscounts.d.ts",
+      "default": "./dist/utils/receiptDiscounts.js"
+    }
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

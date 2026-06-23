@@ -11,6 +11,8 @@
     "lint": "npm run lint --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "build:shared": "npm run build --workspace=@letssplyt/shared",
+    "build:backend": "npm run build:shared && npm run build --workspace=letssplyt-backend",
+    "start:backend": "node backend/dist/server.js",
     "build:staging": "cd mobile && eas build --profile staging --platform android --non-interactive",
     "build:production": "cd mobile && eas build --profile production --platform all --non-interactive"
   },

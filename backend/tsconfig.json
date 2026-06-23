@@ -2,11 +2,12 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "dist",
+    "rootDir": "src",
     "baseUrl": ".",
     "paths": {
-      "@letssplyt/shared/*": ["../shared/types/*"],
-      "@letssplyt/shared/paymentHandleValidation": ["../shared/utils/paymentHandleValidation.ts"],
-      "@letssplyt/shared/utils/splitCalculator": ["../shared/utils/splitCalculator.ts"]
+      "@letssplyt/shared/*": ["../shared/dist/types/*"],
+      "@letssplyt/shared/paymentHandleValidation": ["../shared/dist/utils/paymentHandleValidation"],
+      "@letssplyt/shared/utils/splitCalculator": ["../shared/dist/utils/splitCalculator"]
     }
   },
   "include": ["src/**/*"]
