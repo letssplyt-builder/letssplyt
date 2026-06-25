@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="LetsSplyt — Split the bill in seconds. Guests pay from a link. No app download required."
+    />
+    <meta name="theme-color" content="#0B3D45" />
+    <title>LetsSplyt — Split bills without the friction</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header" id="top">
+    <div class="container header-inner">
+      <a class="logo" href="#top" aria-label="LetsSplyt home">
+        <span class="logo-mark" aria-hidden="true">
+          <svg viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="32" height="32" rx="9" fill="url(#logoGrad)" />
+            <path
+              d="M9 16.5c0-2.5 1.8-4.5 4.2-4.9V8.5h2.4v3.1c2.4.4 4.2 2.4 4.2 4.9s-1.8 4.5-4.2 4.9v3.1h-2.4v-3.1C10.8 21 9 19 9 16.5Z"
+              fill="white"
+              fill-opacity="0.95"
+            />
+            <defs>
+              <linearGradient id="logoGrad" x1="4" y1="4" x2="28" y2="28" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#0E5C66" />
+                <stop offset="1" stop-color="#1A8F9E" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </span>
+        <span class="logo-text">LetsSplyt</span>
+      </a>
+      <nav class="nav" aria-label="Primary">
+        <a href="#how">How it works</a>
+        <a href="#features">Features</a>
+        <a href="#everyone">For everyone</a>
+      </nav>
+      <a class="btn btn-ghost header-cta" href="#download">Coming soon</a>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- Hero -->
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-bg" aria-hidden="true">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+        <div class="grid-lines"></div>
+      </div>
+      <div class="container hero-grid">
+        <div class="hero-copy reveal">
+          <p class="eyebrow">
+            <span class="pulse-dot" aria-hidden="true"></span>
+            Bill splitting, reimagined
+          </p>
+          <h1 id="hero-title">One person pays.<br />Everyone else <em>just follows.</em></h1>
+          <p class="hero-sub">
+            Create a split in seconds. Guests join from a QR code, get their exact share by SMS, and pay
+            without downloading anything.
+          </p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="#download">Get the app</a>
+            <a class="btn btn-outline" href="#how">See how it works</a>
+          </div>
+          <ul class="hero-stats" aria-label="Key benefits">
+            <li><strong>No guest app</strong><span>Pay from a link</span></li>
+            <li><strong>AI receipt scan</strong><span>Items in seconds</span></li>
+            <li><strong>Real-time join</strong><span>See who&apos;s in</span></li>
+          </ul>
+        </div>
+
+        <div class="hero-visual reveal delay-1" aria-hidden="true">
+          <div class="phone-float">
+            <div class="phone">
+              <div class="phone-notch"></div>
+              <div class="phone-screen">
+                <div class="screen-header">
+                  <span class="screen-title">Friday Dinner</span>
+                  <span class="screen-badge">Live</span>
+                </div>
+                <div class="qr-block">
+                  <div class="qr-frame">
+                    <div class="qr-corners"></div>
+                    <div class="qr-pattern"></div>
+                  </div>
+                  <p class="qr-label">Scan to join</p>
+                </div>
+                <ul class="participant-list">
+                  <li class="participant join-anim" style="--i: 0">
+                    <span class="avatar" style="--hue: 174">A</span>
+                    <span class="p-name">Alex <small>Creator</small></span>
+                    <span class="p-status paid">Paid</span>
+                  </li>
+                  <li class="participant join-anim" style="--i: 1">
+                    <span class="avatar" style="--hue: 200">S</span>
+                    <span class="p-name">Sara</span>
+                    <span class="p-status">Joined</span>
+                  </li>
+                  <li class="participant join-anim" style="--i: 2">
+                    <span class="avatar" style="--hue: 160">M</span>
+                    <span class="p-name">Mike</span>
+                    <span class="p-status">Joined</span>
+                  </li>
+                  <li class="participant join-anim" style="--i: 3">
+                    <span class="avatar" style="--hue: 190">J</span>
+                    <span class="p-name">Jess</span>
+                    <span class="p-status pending">$24.50</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="sms-card float-card">
+              <div class="sms-icon" aria-hidden="true">💬</div>
+              <div>
+                <p class="sms-from">LetsSplyt</p>
+                <p class="sms-body">Your share for Friday Dinner is <strong>$24.50</strong>. Tap to pay.</p>
+              </div>
+            </div>
+
+            <div class="split-chip float-card delay-chip">
+              <span class="chip-amount">$124.00</span>
+              <span class="chip-arrow">→</span>
+              <span class="chip-split">4 shares</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="hero-wave" aria-hidden="true">
+        <svg viewBox="0 0 1440 80" preserveAspectRatio="none">
+          <path d="M0,40 C360,80 720,0 1080,40 C1260,60 1380,50 1440,40 L1440,80 L0,80 Z" fill="var(--surface)" />
+        </svg>
+      </div>
+    </section>
+
+    <!-- Problem strip -->
+    <section class="strip" aria-label="Why LetsSplyt">
+      <div class="container strip-inner">
+        <div class="strip-item reveal">
+          <span class="strip-icon" aria-hidden="true">✕</span>
+          <p>Other apps only work if <strong>everyone already has the app</strong></p>
+        </div>
+        <div class="strip-divider" aria-hidden="true"></div>
+        <div class="strip-item reveal delay-1">
+          <span class="strip-icon ok" aria-hidden="true">✓</span>
+          <p>LetsSplyt lets <strong>guests pay from their browser</strong> — one SMS, one tap</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section class="section" id="how" aria-labelledby="how-title">
+      <div class="container">
+        <header class="section-header reveal">
+          <p class="section-eyebrow">How it works</p>
+          <h2 id="how-title">From QR code to settled — in one evening</h2>
+          <p class="section-desc">An event-based flow designed for real dinners, not running ledgers.</p>
+        </header>
+
+        <ol class="timeline">
+          <li class="timeline-step reveal" style="--step: 0">
+            <div class="step-marker"><span>1</span></div>
+            <div class="step-body">
+              <h3>Create &amp; show QR</h3>
+              <p>The creator starts an event and displays a QR code. No spreadsheets, no awkward math at the table.</p>
+            </div>
+          </li>
+          <li class="timeline-step reveal" style="--step: 1">
+            <div class="step-marker"><span>2</span></div>
+            <div class="step-body">
+              <h3>Everyone joins live</h3>
+              <p>App members scan and join instantly. Guests open a browser, verify their phone, and appear in real time.</p>
+            </div>
+          </li>
+          <li class="timeline-step reveal" style="--step: 2">
+            <div class="step-marker"><span>3</span></div>
+            <div class="step-body">
+              <h3>Scan the receipt</h3>
+              <p>AI reads items, tax, and tip. Assign dishes by voice or tap. Math is exact — penny-perfect splits.</p>
+            </div>
+          </li>
+          <li class="timeline-step reveal" style="--step: 3">
+            <div class="step-marker"><span>4</span></div>
+            <div class="step-body">
+              <h3>Pay &amp; confirm</h3>
+              <p>Personalised messages with split images go out via SMS. People pay via Venmo, PayPal, or their favourite app.</p>
+            </div>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- Three users -->
+    <section class="section section-alt" id="everyone" aria-labelledby="everyone-title">
+      <div class="container">
+        <header class="section-header reveal">
+          <p class="section-eyebrow">Built for three kinds of people</p>
+          <h2 id="everyone-title">Everyone at the table, covered</h2>
+        </header>
+        <div class="cards-3">
+          <article class="persona-card reveal" style="--card: 0">
+            <div class="persona-icon creator" aria-hidden="true">
+              <svg viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="22" stroke="currentColor" stroke-width="2"/><path d="M24 14v20M14 24h20" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/></svg>
+            </div>
+            <h3>Creator</h3>
+            <p class="persona-tag">Paid the bill</p>
+            <p>Create the event, lock the group, scan the receipt, send requests, and confirm when everyone&apos;s paid.</p>
+          </article>
+          <article class="persona-card reveal" style="--card: 1">
+            <div class="persona-icon member" aria-hidden="true">
+              <svg viewBox="0 0 48 48" fill="none"><rect x="10" y="8" width="28" height="32" rx="6" stroke="currentColor" stroke-width="2"/><circle cx="24" cy="34" r="2" fill="currentColor"/></svg>
+            </div>
+            <h3>App member</h3>
+            <p class="persona-tag">Has LetsSplyt</p>
+            <p>Scan the QR, get an in-app notification with your share and payment links, pay, and self-report in seconds.</p>
+          </article>
+          <article class="persona-card reveal" style="--card: 2">
+            <div class="persona-icon guest" aria-hidden="true">
+              <svg viewBox="0 0 48 48" fill="none"><path d="M8 14h32M8 24h20M8 34h26" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"/><circle cx="38" cy="34" r="6" stroke="currentColor" stroke-width="2"/></svg>
+            </div>
+            <h3>Guest</h3>
+            <p class="persona-tag">No app needed</p>
+            <p>Open the link, enter your name, verify OTP, receive SMS with your exact amount. Pay without installing anything.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="section" id="features" aria-labelledby="features-title">
+      <div class="container">
+        <header class="section-header reveal">
+          <p class="section-eyebrow">Under the hood</p>
+          <h2 id="features-title">Smart splitting, serious trust</h2>
+        </header>
+        <div class="feature-grid">
+          <article class="feature reveal" style="--f: 0">
+            <div class="feature-glyph" aria-hidden="true">◎</div>
+            <h3>AI receipt reading</h3>
+            <p>Items, tax, tip, and currency detected automatically. You review before anything is sent.</p>
+          </article>
+          <article class="feature reveal" style="--f: 1">
+            <div class="feature-glyph" aria-hidden="true">◈</div>
+            <h3>Penny-perfect math</h3>
+            <p>Largest-remainder rounding in pure TypeScript — not AI guesswork. Totals always add up.</p>
+          </article>
+          <article class="feature reveal" style="--f: 2">
+            <div class="feature-glyph" aria-hidden="true">⚡</div>
+            <h3>Real-time presence</h3>
+            <p>See participants join as they scan. Lock the group when your table is complete.</p>
+          </article>
+          <article class="feature reveal" style="--f: 3">
+            <div class="feature-glyph" aria-hidden="true">▣</div>
+            <h3>Split images</h3>
+            <p>Every message includes a personalised breakdown image — their row highlighted.</p>
+          </article>
+          <article class="feature reveal" style="--f: 4">
+            <div class="feature-glyph" aria-hidden="true">◇</div>
+            <h3>Privacy first</h3>
+            <p>Phone numbers encrypted at rest. Guests verify once; no account spam.</p>
+          </article>
+          <article class="feature reveal" style="--f: 5">
+            <div class="feature-glyph" aria-hidden="true">↗</div>
+            <h3>Pay your way</h3>
+            <p>Deep links to Venmo, PayPal, Cash App, and more — participants choose what they use.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="cta-section" id="download" aria-labelledby="cta-title">
+      <div class="container cta-inner reveal">
+        <div class="cta-glow" aria-hidden="true"></div>
+        <h2 id="cta-title">Ready to never chase payments again?</h2>
+        <p>LetsSplyt is launching soon on iOS and Android. The guest experience works in any browser today.</p>
+        <div class="store-badges">
+          <span class="store-badge soon" aria-label="App Store — coming soon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.44 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
+            App Store
+            <small>Soon</small>
+          </span>
+          <span class="store-badge soon" aria-label="Google Play — coming soon">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M3 20.5v-17c0-.83.67-1.5 1.5-1.5.28 0 .53.08.76.21l13.37 7.67c.66.38.89 1.22.51 1.88-.1.17-.24.31-.41.41L5.25 20.29c-.23.13-.48.21-.76.21-.83 0-1.5-.67-1.5-1.5z"/></svg>
+            Google Play
+            <small>Soon</small>
+          </span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="logo-text">LetsSplyt</span>
+        <p>Split bills without the friction.</p>
+      </div>
+      <nav class="footer-nav" aria-label="Footer">
+        <a href="/privacy.html">Privacy</a>
+        <a href="/terms.html">Terms</a>
+        <a href="mailto:hello@letssplyt.com">Contact</a>
+      </nav>
+      <p class="footer-copy">&copy; <span id="year"></span> LetsSplyt. All rights reserved.</p>
+    </div>
+  </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

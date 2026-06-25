@@ -6,12 +6,13 @@ NIXPACKS_NODE_VERSION = "22"
 
 [phases.install]
 cmds = [
-  "npm ci --workspace=letssplyt-backend --workspace=@letssplyt/shared --include-workspace-root"
+  "npm ci --workspace=letssplyt-backend --workspace=@letssplyt/shared --workspace=@letssplyt/web --include-workspace-root"
 ]
 
 [phases.build]
 cmds = [
   "npm run build --workspace=@letssplyt/shared",
+  "npm run build --workspace=@letssplyt/web",
   "npm run build --workspace=letssplyt-backend"
 ]
 
