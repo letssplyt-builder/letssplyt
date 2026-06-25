@@ -14,8 +14,10 @@ describe('renderJoinFormPage', () => {
     expect(html).toContain('never shared with the organiser');
     expect(html).toContain('href="https://letssplyt.app/terms.html"');
     expect(html).toContain('href="https://letssplyt.app/privacy.html"');
-    expect(html).toContain('By joining you agree to our');
-    expect(html.indexOf('Join →')).toBeLessThan(html.indexOf('By joining you agree'));
+    expect(html).toContain('Msg &amp; data rates may apply');
+    expect(html).toContain('Reply STOP to opt out');
+    expect(html).toContain('HELP for help');
+    expect(html.indexOf('Join →')).toBeLessThan(html.indexOf('Msg &amp; data rates may apply'));
     expect(html).not.toContain('By entering your phone number, you agree to receive');
   });
 });

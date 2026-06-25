@@ -60,6 +60,8 @@ describe('PhoneEntryScreen', () => {
 
     expect(screen.getByText('Enter your\nphone number')).toBeTruthy();
     expect(screen.getByText("We'll text you a\none-time code.")).toBeTruthy();
+    expect(screen.getByText(/Msg & data rates may apply/)).toBeTruthy();
+    expect(screen.getByText(/Reply STOP to opt out/)).toBeTruthy();
     expect(screen.queryByText('Welcome back')).toBeNull();
     expect(screen.queryByText('New account')).toBeNull();
   });

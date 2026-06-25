@@ -1,4 +1,5 @@
 import { JOIN_COUNTRY_OPTIONS } from '../join-countries';
+import { WEB_JOIN_SMS_OPT_IN_DISCLOSURE } from '../sms-consent';
 import { JOIN_PAGE_STYLES, escapeHtml } from './shared-styles';
 
 export function renderJoinFormPage(input: {
@@ -67,15 +68,12 @@ export function renderJoinFormPage(input: {
           request — it is never shared with the organiser or other guests.
         </p>
         <button class="btn" type="submit">Join →</button>
+        <p class="sms-consent">${escapeHtml(WEB_JOIN_SMS_OPT_IN_DISCLOSURE)}</p>
         <p class="legal">
-          By joining you agree to our
+          See our
           <a href="${escapeHtml(termsUrl)}" target="_blank" rel="noopener noreferrer">Terms</a>
           &amp;
           <a href="${escapeHtml(privacyUrl)}" target="_blank" rel="noopener noreferrer">Privacy Policy</a>.
-        </p>
-        <p class="sms-consent">
-          You may receive a one-time verification code and payment request SMS from LetsSplyt.
-          Reply STOP to opt out.
         </p>
       </form>
     </div>

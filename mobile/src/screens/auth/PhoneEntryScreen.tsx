@@ -11,6 +11,7 @@ import { apiPost, isApiRequestError } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { useJoinStore } from '../../store/joinStore';
 import { authColors } from '../../theme/colors';
+import { SMS_OPT_IN_DISCLOSURE } from '../../content/smsConsent';
 import {
   DEFAULT_AUTH_REGION,
   formatUsNationalDisplay,
@@ -97,6 +98,7 @@ export function PhoneEntryScreen({ navigation, route }: Props) {
               loading={isLoading}
               onPress={() => void handleSendCode()}
             />
+            <Text style={styles.smsConsent}>{SMS_OPT_IN_DISCLOSURE}</Text>
             <Text style={styles.legal}>
               By continuing you agree to our{' '}
               <Text
@@ -219,6 +221,12 @@ const styles = StyleSheet.create({
   },
   footer: {
     gap: 12,
+  },
+  smsConsent: {
+    textAlign: 'center',
+    fontSize: 11,
+    color: authColors.textOnDarkFaint,
+    lineHeight: 16,
   },
   legal: {
     textAlign: 'center',
