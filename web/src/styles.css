@@ -1061,7 +1061,7 @@ a {
 .footer-inner {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
 }
@@ -1089,9 +1089,37 @@ a {
   color: var(--teal-900);
 }
 
+.footer-meta {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.footer-contact {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.footer-contact strong {
+  color: var(--teal-900);
+  font-weight: 600;
+}
+
 .footer-copy {
   font-size: 13px;
   color: var(--text-faint);
+}
+
+@media (max-width: 720px) {
+  .footer-inner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .footer-meta {
+    text-align: left;
+    margin-top: 8px;
+  }
 }
 
 /* Scroll reveal */

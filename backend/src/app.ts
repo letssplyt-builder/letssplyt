@@ -27,6 +27,11 @@ const app = express();
 
 const publicDir = path.resolve(__dirname, '..', 'public');
 
+app.get('/privacy', (_req, res) => res.redirect(301, '/privacy.html'));
+app.get('/terms', (_req, res) => res.redirect(301, '/terms.html'));
+app.get('/legal/privacy', (_req, res) => res.redirect(301, '/privacy.html'));
+app.get('/legal/terms', (_req, res) => res.redirect(301, '/terms.html'));
+
 app.use(
   express.static(publicDir, {
     setHeaders: (res, filePath) => {
