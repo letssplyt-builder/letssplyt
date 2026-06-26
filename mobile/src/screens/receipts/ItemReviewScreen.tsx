@@ -177,20 +177,17 @@ export function ItemReviewScreen({ navigation, route }: Props) {
     const tax = parseAmountInput(taxInput);
     const tip = parseAmountInput(tipInput);
     const itemsSubtotal = computeItemsSubtotal(validItems);
-    const payloadDiscounts = discounts
-      .filter((discount) => discount.name.trim().length > 0 && discount.value > 0)
-      .map((discount) => ({
-        name: discount.name.trim(),
-        type: discount.type,
-        value: discount.value,
-      }));
-    const discountTotal = computeDiscountTotal(
-      payloadDiscounts.map((discount, index) => ({
-        ...discount,
-        localId: `confirm-${index}`,
-      })),
-      itemsSubtotal,
+    const filteredDiscounts = discounts.filter(
+      (discount) => discount.name.trim().length > 0 && discount.value > 0,
     );
+    const payloadDiscounts = filteredDiscounts.map((discount) => ({
+      name: discount.name.trim(),
+      type: discount.type,
+      value: discount.value,
+      scope: discount.scope ?? 'bill',
+      item_id: discount.scope === 'item' ? discount.item_id : undefined,
+    }));
+    const discountTotal = computeDiscountTotal(filteredDiscounts, validItems);
 
     setConfirming(true);
     setConfirmError(null);

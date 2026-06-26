@@ -156,6 +156,7 @@ export async function assignItems(
           fees: 0,
           tip: 0,
           discounts: 0,
+          bill_discounts: 0,
         };
         const partialAssignments = assignments.filter(
           (row) => !validated.unassigned_item_ids.includes(row.item_id),

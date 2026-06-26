@@ -16,6 +16,7 @@ import {
   computeDiscountTotal,
   computeItemsSubtotal,
   formatAmountInput,
+  itemLabelForDiscount,
   parseAmountInput,
   type EditableReviewDiscount,
   type EditableReviewItem,
@@ -290,6 +291,7 @@ function DiscountLineRow({
   discount,
   currency,
   resolvedAmount,
+  itemLabel,
   isExpanded,
   onToggle,
   onCollapse,
@@ -299,6 +301,7 @@ function DiscountLineRow({
   discount: EditableReviewDiscount;
   currency: string;
   resolvedAmount: number;
+  itemLabel: string | null;
   isExpanded: boolean;
   onToggle: () => void;
   onCollapse: () => void;
@@ -361,6 +364,8 @@ function DiscountLineRow({
     discount.type === 'percent'
       ? `${discount.name || 'Discount'} (${formatAmountInput(discount.value)}%)`
       : discount.name || 'Discount';
+  const scopedLabel =
+    discount.scope === 'item' && itemLabel ? `${label} · ${itemLabel}` : label;
 
   return (
     <Pressable
@@ -372,7 +377,7 @@ function DiscountLineRow({
     >
       <View style={styles.compactRow}>
         <Text style={[styles.lineLabel, styles.discountLabel]} numberOfLines={2}>
-          {label}
+          {scopedLabel}
         </Text>
         <Text style={[styles.lineAmount, styles.discountAmount]}>
           −{formatMoney(resolvedAmount, currency)}
@@ -487,7 +492,7 @@ export function ReceiptReviewSlip({
 }: ReceiptReviewSlipProps) {
   const subtotal = computeItemsSubtotal(items);
   const feesTotal = charges.reduce((sum, c) => sum + c.amount, 0);
-  const discountTotal = computeDiscountTotal(discounts, subtotal);
+  const discountTotal = computeDiscountTotal(discounts, items);
 
   const toggle = (key: string) => {
     onExpandedKeyChange(expandedKey === key ? null : key);
@@ -565,9 +570,10 @@ export function ReceiptReviewSlip({
           key={discount.localId}
           discount={discount}
           currency={currency}
+          itemLabel={itemLabelForDiscount(discount, items)}
           resolvedAmount={computeDiscountLineAmount(
             discount,
-            subtotal,
+            items,
             discounts.slice(0, index),
           )}
           isExpanded={expandedKey === `discount-${discount.localId}`}

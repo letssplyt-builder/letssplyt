@@ -128,6 +128,7 @@ describe('calculateSplits', () => {
       fees: 0,
       tip: 10,
       discounts: 0,
+      bill_discounts: 0,
       total: 65,
     };
 
@@ -152,6 +153,7 @@ describe('calculateSplits', () => {
       fees: 0,
       tip: 0,
       discounts: 0,
+      bill_discounts: 0,
       total: 10,
     };
 
@@ -174,6 +176,7 @@ describe('calculateSplits', () => {
       fees: 0,
       tip: 0,
       discounts: 0,
+      bill_discounts: 0,
       total: 1200,
     };
 
@@ -189,6 +192,7 @@ describe('calculateSplits', () => {
       fees: 0,
       tip: 0,
       discounts: 0,
+      bill_discounts: 0,
       total: 10,
     };
     expect(() =>
@@ -207,6 +211,7 @@ describe('calculateSplits', () => {
       fees: 0,
       tip: 0,
       discounts: 0,
+      bill_discounts: 0,
       total: 10,
     };
     expect(() =>
@@ -225,6 +230,7 @@ describe('calculateSplits', () => {
       fees: 0,
       tip: 0,
       discounts: 0,
+      bill_discounts: 0,
       total: 50,
     };
     expect(() =>
@@ -238,7 +244,8 @@ describe('calculateSplits', () => {
 
   it('throws when no participants provided', () => {
     expect(() =>
-      calculateSplits([], [], { subtotal: 0, tax: 0, fees: 0, tip: 0, discounts: 0, total: 0 }, [], 'USD'),
+      calculateSplits([], [], { subtotal: 0, tax: 0, fees: 0, tip: 0, discounts: 0,
+      bill_discounts: 0, total: 0 }, [], 'USD'),
     ).toThrow(/At least one participant/);
   });
 
@@ -249,6 +256,7 @@ describe('calculateSplits', () => {
       fees: 0,
       tip: 0,
       discounts: 0,
+      bill_discounts: 0,
       total: 12,
     };
     expect(() =>
@@ -264,7 +272,8 @@ describe('calculateSplits', () => {
     const splits = calculateSplits(
       [{ id: 'a', name: 'Item', unit_price: 10, quantity: 1 }],
       [{ item_id: 'a', assigned_to: ['Alex'] }],
-      { subtotal: 10, tax: 0, fees: 0, tip: 0, discounts: 0, total: 10 },
+      { subtotal: 10, tax: 0, fees: 0, tip: 0, discounts: 0,
+      bill_discounts: 0, total: 10 },
       ['Alex'],
     );
     expect(splits[0].amountOwed).toBe(10);
@@ -274,7 +283,8 @@ describe('calculateSplits', () => {
     const splits = calculateSplits(
       [],
       [],
-      { subtotal: 0, tax: 0, fees: 0, tip: 0, discounts: 0, total: 0 },
+      { subtotal: 0, tax: 0, fees: 0, tip: 0, discounts: 0,
+      bill_discounts: 0, total: 0 },
       ['Alex', 'Jordan'],
       'USD',
     );
@@ -299,6 +309,7 @@ describe('calculateSplits', () => {
       fees: 0,
       tip: 0,
       discounts: 10,
+      bill_discounts: 10,
       total: 45,
     };
 
@@ -323,6 +334,7 @@ describe('calculateSplits', () => {
       fees: 0,
       tip: 0,
       discounts: 15,
+      bill_discounts: 15,
       total: 37,
     };
 
@@ -343,12 +355,38 @@ describe('calculateSplits', () => {
       fees: 0,
       tip: 0,
       discounts: 120,
+      bill_discounts: 120,
       total: 1080,
     };
 
     const splits = calculateSplits(items, assignments, totals, ['Alex', 'Jordan'], 'JPY');
     expect(splits.reduce((sum, row) => sum + row.amountOwed, 0)).toBe(1080);
     expect(splits.map((row) => row.amountOwed).sort((a, b) => b - a)).toEqual([540, 540]);
+  });
+
+  it('applies item line_discount before assignment and prorates bill discounts only', () => {
+    const items: ConfirmedReceiptItem[] = [
+      { id: 'a', name: 'CERAVE', unit_price: 25.99, quantity: 1, line_discount: 2 },
+      { id: 'b', name: 'Smoothie', unit_price: 13.49, quantity: 1 },
+    ];
+    const assignments: Assignment[] = [
+      { item_id: 'a', assigned_to: ['Alex'] },
+      { item_id: 'b', assigned_to: ['Jordan'] },
+    ];
+    const totals: ReceiptTotals = {
+      subtotal: 39.48,
+      tax: 0,
+      fees: 0,
+      tip: 0,
+      discounts: 7,
+      bill_discounts: 5,
+      total: 32.48,
+    };
+
+    const splits = runItemised(items, assignments, totals);
+    expect(splits.find((r) => r.participantName === 'Alex')!.amountOwed).toBe(20.79);
+    expect(splits.find((r) => r.participantName === 'Jordan')!.amountOwed).toBe(11.69);
+    expect(splits.reduce((sum, row) => sum + row.amountOwed, 0)).toBe(32.48);
   });
 
   it('throws when item has no assignees', () => {
@@ -358,6 +396,7 @@ describe('calculateSplits', () => {
       fees: 0,
       tip: 0,
       discounts: 0,
+      bill_discounts: 0,
       total: 10,
     };
     expect(() =>

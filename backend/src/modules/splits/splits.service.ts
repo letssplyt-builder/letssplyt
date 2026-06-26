@@ -7,6 +7,10 @@ import {
   type ParticipantSplit,
   type ReceiptTotals,
 } from '@letssplyt/shared/utils/splitCalculator';
+import {
+  resolveItemLineDiscounts,
+  type ReceiptDiscountInput,
+} from '@letssplyt/shared/utils/receiptDiscounts';
 import { AppError } from '../../infrastructure/errors';
 import { supabaseAdmin } from '../../infrastructure/supabase';
 import {
@@ -88,14 +92,37 @@ async function loadFoodItems(eventId: string): Promise<ConfirmedReceiptItem[]> {
     throw new AppError('RECEIPT_ITEMS_FETCH_FAILED', 'Could not load receipt items', 500);
   }
 
-  return (data ?? [])
-    .filter((row) => !row.is_fee)
-    .map((row) => ({
-      id: row.id as string,
-      name: row.name as string,
-      unit_price: Number(row.unit_price),
-      quantity: Number(row.quantity),
-    }));
+  const foodRows = (data ?? []).filter((row) => !row.is_fee);
+  const baseItems = foodRows.map((row) => ({
+    id: row.id as string,
+    name: row.name as string,
+    unit_price: Number(row.unit_price),
+    quantity: Number(row.quantity),
+  }));
+
+  const { data: discountRows, error: discountError } = await supabaseAdmin
+    .from('receipt_discounts')
+    .select('name, discount_type, value, receipt_item_id')
+    .eq('event_id', eventId);
+
+  if (discountError) {
+    throw new AppError('RECEIPT_DISCOUNTS_FETCH_FAILED', 'Could not load receipt discounts', 500);
+  }
+
+  const discountInputs: ReceiptDiscountInput[] = (discountRows ?? []).map((row) => ({
+    name: row.name as string,
+    type: row.discount_type as 'percent' | 'amount',
+    value: Number(row.value),
+    scope: row.receipt_item_id ? 'item' : 'bill',
+    item_id: (row.receipt_item_id as string | null) ?? undefined,
+  }));
+
+  const lineDiscounts = resolveItemLineDiscounts(baseItems, discountInputs);
+
+  return baseItems.map((item) => ({
+    ...item,
+    line_discount: lineDiscounts.get(item.id) ?? 0,
+  }));
 }
 
 function buildReceiptTotals(
@@ -110,12 +137,16 @@ function buildReceiptTotals(
   const fees = Number(eventRow.fees_amount ?? 0);
   const tip = Number(eventRow.tip_amount ?? 0);
   const discounts = Number(eventRow.discount_amount ?? 0);
+  const itemDiscountSum = Number(
+    foodItems.reduce((sum, item) => sum + (item.line_discount ?? 0), 0).toFixed(2),
+  );
+  const bill_discounts = Number(Math.max(0, discounts - itemDiscountSum).toFixed(2));
   const total =
     manualTotal !== undefined
       ? Number(manualTotal.toFixed(2))
       : Number(eventRow.total_amount ?? subtotal + tax + fees + tip - discounts);
 
-  return { subtotal, tax, fees, tip, discounts, total };
+  return { subtotal, tax, fees, tip, discounts, bill_discounts, total };
 }
 
 function mapParticipantIdsToNames(

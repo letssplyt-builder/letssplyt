@@ -36,6 +36,7 @@ export function buildA1DevStubResult(currency = 'USD'): ReceiptParseResult {
         confidence_score: 0.9,
       },
     ],
+    discounts: [],
     subtotal: 17,
     tax: 1.5,
     tip: 3,

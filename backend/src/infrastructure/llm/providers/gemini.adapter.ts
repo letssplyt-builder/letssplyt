@@ -40,14 +40,17 @@ export class GeminiAdapter implements LLMProvider {
     messages: LLMMessage[],
     options: LLMCompletionOptions = {},
   ): Promise<LLMResponse> {
-    const { maxTokens = 1024, timeout = 20_000 } = options;
+    const { maxTokens = 1024, timeout = 20_000, responseJson = false } = options;
     let lastError: Error | null = null;
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
         const genModel = this.client.getGenerativeModel({
           model: this.model,
-          generationConfig: { maxOutputTokens: maxTokens },
+          generationConfig: {
+            maxOutputTokens: maxTokens,
+            ...(responseJson ? { responseMimeType: 'application/json' as const } : {}),
+          },
         });
 
         const parts = messages.flatMap((m) =>

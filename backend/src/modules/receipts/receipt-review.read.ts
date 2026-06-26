@@ -24,7 +24,7 @@ export async function fetchReceiptReviewSnapshot(
 
   const { data: discountRows, error: discountError } = await supabaseAdmin
     .from('receipt_discounts')
-    .select('name, discount_type, value, resolved_amount')
+    .select('name, discount_type, value, resolved_amount, receipt_item_id')
     .eq('event_id', eventId)
     .order('created_at');
 
@@ -53,6 +53,8 @@ export async function fetchReceiptReviewSnapshot(
       name: row.name as string,
       type: row.discount_type as 'percent' | 'amount',
       value: Number(row.value),
+      scope: row.receipt_item_id ? 'item' : 'bill',
+      item_id: (row.receipt_item_id as string | null) ?? undefined,
     })),
     tax_amount: Number(financials.tax_amount ?? 0),
     tip_amount: Number(financials.tip_amount ?? 0),

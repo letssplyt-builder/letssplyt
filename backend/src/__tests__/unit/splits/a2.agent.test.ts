@@ -24,6 +24,7 @@ const TOTALS = {
   fees: 0,
   tip: 3,
   discounts: 0,
+  bill_discounts: 0,
   total: 35.4,
 };
 

@@ -23,10 +23,24 @@ export interface ReceiptAdditionalCharge {
 
 export type ReceiptDiscountType = 'percent' | 'amount';
 
+export type ReceiptDiscountScope = 'bill' | 'item';
+
 export interface ReceiptDiscountLine {
   name: string;
   type: ReceiptDiscountType;
   value: number;
+  scope?: ReceiptDiscountScope;
+  /** Food line id when scope is `item`. */
+  item_id?: string;
+}
+
+/** Discount row for confirm API and resolution helpers. */
+export interface ReceiptDiscountInput {
+  name: string;
+  type: ReceiptDiscountType;
+  value: number;
+  scope?: ReceiptDiscountScope;
+  item_id?: string;
 }
 
 /** Editable receipt snapshot for Item Review (from parse or GET event). */
@@ -57,6 +71,8 @@ export interface ReceiptConfirmDiscountInput {
   name: string;
   type: ReceiptDiscountType;
   value: number;
+  scope?: ReceiptDiscountScope;
+  item_id?: string;
 }
 
 export interface ReceiptConfirmRequest {
@@ -78,6 +94,7 @@ export interface ReceiptConfirmResponse {
 export interface ReceiptParseResponse {
   items: ReceiptParseResultItem[];
   additional_charges: ReceiptAdditionalCharge[];
+  discounts: ReceiptDiscountLine[];
   tax_amount: number;
   tip_amount: number;
   fees_amount: number;

@@ -10,6 +10,8 @@ export interface AuditLogParams {
   modelUsed: string;
   success: boolean;
   errorCode?: string;
+  /** First ~500 chars of raw model output on failure (A1 JSON salvage debugging). */
+  outputPreview?: string;
   provider?: string;
   inputHash?: string;
   outputHash?: string;
@@ -37,6 +39,7 @@ export function writeAuditLog(params: AuditLogParams): void {
         attempts: params.attempts ?? 1,
         success: params.success,
         error_code: params.errorCode ?? null,
+        output_preview: params.outputPreview ?? null,
       });
     } catch (err) {
       logger.error({ err, agent: params.agent }, 'Failed to write AI audit log');

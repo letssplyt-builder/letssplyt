@@ -30,6 +30,16 @@ const confirmDiscountSchema = z.object({
   name: z.string().min(1).max(60),
   type: z.enum(['percent', 'amount']),
   value: z.number().positive(),
+  scope: z.enum(['bill', 'item']).optional(),
+  item_id: z.string().uuid().optional(),
+}).superRefine((discount, ctx) => {
+  if (discount.scope === 'item' && !discount.item_id) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: 'item_id is required when scope is item',
+      path: ['item_id'],
+    });
+  }
 });
 
 export const confirmReceiptBodySchema = z.object({
@@ -196,7 +206,18 @@ export async function confirmReceipt(
 
   const itemsSubtotal = sumItems(body.items);
   const chargesTotal = sumCharges(body.additional_charges);
-  const computedDiscountTotal = resolveDiscountsTotal(body.discounts, itemsSubtotal);
+  const discountItemLines = body.items
+    .filter((item) => isValidItemId(item.id))
+    .map((item) => ({
+      id: item.id!,
+      unit_price: item.price,
+      quantity: item.quantity,
+    }));
+  const computedDiscountTotal = resolveDiscountsTotal(
+    body.discounts,
+    itemsSubtotal,
+    discountItemLines,
+  );
 
   if (Math.abs(chargesTotal - body.fees) > 0.02) {
     throw Errors.validation('fees must equal the sum of additional_charges');
@@ -248,7 +269,11 @@ export async function confirmReceipt(
   await syncReceiptItemsOnConfirm(body.event_id, body.items, body.additional_charges);
 
   if (body.discounts.length > 0) {
-    const resolvedDiscounts = resolveReceiptDiscounts(body.discounts, itemsSubtotal);
+    const resolvedDiscounts = resolveReceiptDiscounts(
+      body.discounts,
+      itemsSubtotal,
+      discountItemLines,
+    );
     const discountRows = resolvedDiscounts.map((discount) => ({
       id: randomUUID(),
       event_id: body.event_id,
@@ -256,6 +281,7 @@ export async function confirmReceipt(
       discount_type: discount.type,
       value: discount.value,
       resolved_amount: discount.resolved_amount,
+      receipt_item_id: discount.scope === 'item' ? discount.item_id ?? null : null,
     }));
 
     const { error: discountInsertError } = await supabaseAdmin

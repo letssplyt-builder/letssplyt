@@ -22,6 +22,7 @@ function baseResult(
       },
     ],
     additional_charges: [],
+    discounts: [],
     subtotal: 10,
     tax: 1,
     tip: 0,

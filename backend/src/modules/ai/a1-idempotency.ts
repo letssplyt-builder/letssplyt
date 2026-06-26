@@ -107,6 +107,7 @@ export async function getCachedReceiptResult(eventId: string): Promise<ReceiptPa
   return {
     items: mappedItems,
     additional_charges: additionalCharges,
+    discounts: [],
     subtotal: Number(subtotal.toFixed(2)),
     tax: Number(event.tax_amount ?? 0),
     tip: Number(event.tip_amount ?? 0),

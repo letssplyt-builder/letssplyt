@@ -28,6 +28,7 @@ const parseResult = {
     { name: 'Salad', unit_price: 8, quantity: 1, confidence: 'low' as const },
   ],
   additional_charges: [{ name: 'SVC Fee', amount: 2, confidence: 'high' as const }],
+  discounts: [],
   tax_amount: 1,
   tip_amount: 2,
   fees_amount: 2,
@@ -132,7 +133,7 @@ describe('ItemReviewScreen', () => {
       expect(receiptsService.confirmReceipt).toHaveBeenCalledWith(
         expect.objectContaining({
           event_id: 'event-1',
-          discounts: [{ name: 'Happy hour', type: 'percent', value: 10 }],
+          discounts: [{ name: 'Happy hour', type: 'percent', value: 10, scope: 'bill' }],
           discount_total: 1.8,
         }),
       );
@@ -158,8 +159,8 @@ describe('ItemReviewScreen', () => {
       expect(receiptsService.confirmReceipt).toHaveBeenCalledWith(
         expect.objectContaining({
           discounts: [
-            { name: 'Happy hour', type: 'percent', value: 10 },
-            { name: 'Comp', type: 'amount', value: 3 },
+            { name: 'Happy hour', type: 'percent', value: 10, scope: 'bill' },
+            { name: 'Comp', type: 'amount', value: 3, scope: 'bill' },
           ],
           discount_total: 4.8,
         }),
@@ -197,7 +198,7 @@ describe('ItemReviewScreen', () => {
       receipt_review: {
         items: [{ id: 'item-1', name: 'Burger', unit_price: 10, quantity: 1, confidence: 'high' }],
         additional_charges: [],
-        discounts: [{ name: 'Comp', type: 'amount', value: 2 }],
+        discounts: [{ name: 'Comp', type: 'amount', value: 2, scope: 'bill' }],
         tax_amount: 0,
         tip_amount: 0,
         fees_amount: 0,

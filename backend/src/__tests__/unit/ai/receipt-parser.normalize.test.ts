@@ -53,6 +53,30 @@ describe('preprocessReceiptParseOutput', () => {
     const raw = { error: 'unreadable', reason: 'too blurry' };
     expect(preprocessReceiptParseOutput(raw)).toEqual(raw);
   });
+
+  it('converts negative item lines into item-scoped discounts', () => {
+    const result = preprocessReceiptParseOutput({
+      items: [
+        { name: 'CERAVE CREAM', unit_price: 25.99, quantity: 1, confidence_score: 0.95 },
+        { name: 'INST SAV', unit_price: -2.5, quantity: 1, confidence_score: 0.9 },
+      ],
+      additional_charges: [],
+      subtotal: 23.49,
+      tax: 0,
+      tip: 0,
+      total: 23.49,
+      currency: 'USD',
+      parse_confidence: 0.9,
+    }) as {
+      items: unknown[];
+      discounts: Array<{ scope: string; item_index?: number; value: number }>;
+    };
+
+    expect(result.items).toHaveLength(1);
+    expect(result.discounts).toEqual([
+      expect.objectContaining({ scope: 'item', item_index: 0, value: 2.5 }),
+    ]);
+  });
 });
 
 describe('ReceiptParseOutputSchema with preprocess', () => {
@@ -96,5 +120,31 @@ describe('ReceiptParseOutputSchema with preprocess', () => {
     expect(validated.items).toHaveLength(2);
     expect(validated.items[1].name).toBe(UNREADABLE_RECEIPT_ITEM_LABEL);
     expect(validated.items[1].confidence_score).toBeLessThan(0.75);
+  });
+
+  it('accepts model output with zero-amount additional_charges stripped', () => {
+    const validated = ReceiptParseOutputSchema.parse({
+      items: [
+        {
+          name: 'CERAVE CREAM',
+          unit_price: 25.99,
+          quantity: 1,
+          confidence_score: 0.95,
+        },
+      ],
+      additional_charges: [{ name: 'Zero fee', amount: 0, confidence_score: 0.9 }],
+      subtotal: 25.99,
+      tax: 0,
+      tip: 0,
+      total: 25.99,
+      currency: 'USD',
+      parse_confidence: 0.9,
+    });
+
+    if ('error' in validated) {
+      throw new Error('expected success payload');
+    }
+
+    expect(validated.additional_charges).toHaveLength(0);
   });
 });

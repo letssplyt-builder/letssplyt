@@ -8,6 +8,8 @@ export interface ConfirmedReceiptItem {
   name: string;
   unit_price: number;
   quantity: number;
+  /** Resolved item-scoped discount reducing this line before split assignment. */
+  line_discount?: number;
 }
 
 export interface Assignment {
@@ -20,8 +22,10 @@ export interface ReceiptTotals {
   tax: number;
   fees: number;
   tip: number;
-  /** Total discount off the bill (positive number). Prorated like tax/fees in itemised splits. */
+  /** Total discount (item + bill) for grand-total invariant. */
   discounts: number;
+  /** Bill-scoped discount only — prorated like tax/fees in itemised splits. */
+  bill_discounts: number;
   total: number;
 }
 
@@ -129,8 +133,10 @@ export function calculateSplits(
     }
 
     const totalItemMinor = toMinorUnits(item.unit_price * item.quantity, currencyCode);
-    const sharePerPersonMinor = Math.floor(totalItemMinor / assignment.assigned_to.length);
-    const remainderMinor = totalItemMinor % assignment.assigned_to.length;
+    const lineDiscountMinor = toMinorUnits(item.line_discount ?? 0, currencyCode);
+    const netItemMinor = Math.max(0, totalItemMinor - lineDiscountMinor);
+    const sharePerPersonMinor = Math.floor(netItemMinor / assignment.assigned_to.length);
+    const remainderMinor = netItemMinor % assignment.assigned_to.length;
 
     for (let i = 0; i < assignment.assigned_to.length; i++) {
       const participant = assignment.assigned_to[i];
@@ -146,17 +152,22 @@ export function calculateSplits(
   }
 
   const subtotalMinor = toMinorUnits(totals.subtotal, currencyCode);
+  const itemDiscountMinor = items.reduce(
+    (sum, item) => sum + toMinorUnits(item.line_discount ?? 0, currencyCode),
+    0,
+  );
+  const netSubtotalMinor = subtotalMinor - itemDiscountMinor;
   const assignedSubtotalMinor = Array.from(rawAmountsMinor.values()).reduce((a, b) => a + b, 0);
 
-  if (Math.abs(assignedSubtotalMinor - subtotalMinor) > 2) {
+  if (Math.abs(assignedSubtotalMinor - netSubtotalMinor) > 2) {
     throw new Error(
       `Subtotal mismatch: assignments sum to ${fromMinorUnits(assignedSubtotalMinor, currencyCode)}, ` +
-        `receipt subtotal is ${totals.subtotal}`,
+        `expected net items subtotal ${fromMinorUnits(netSubtotalMinor, currencyCode)}`,
     );
   }
 
-  const taxFeesTipAndDiscountMinor = toMinorUnits(
-    totals.tax + totals.fees + totals.tip - totals.discounts,
+  const taxFeesTipAndBillDiscountMinor = toMinorUnits(
+    totals.tax + totals.fees + totals.tip - totals.bill_discounts,
     currencyCode,
   );
 
@@ -168,7 +179,7 @@ export function calculateSplits(
         ? itemMinor / assignedSubtotalMinor
         : 1 / participantNames.length;
     const totalMajor = fromMinorUnits(
-      itemMinor + taxFeesTipAndDiscountMinor * proportion,
+      itemMinor + taxFeesTipAndBillDiscountMinor * proportion,
       currencyCode,
     );
     finalAmounts.set(name, totalMajor);

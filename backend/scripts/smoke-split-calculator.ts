@@ -92,6 +92,7 @@ function run(): void {
     fees: 2,
     tip: 6.4,
     discounts: 0,
+    bill_discounts: 0,
     total: 64.56,
   };
 

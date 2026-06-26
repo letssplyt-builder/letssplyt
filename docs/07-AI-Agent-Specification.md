@@ -572,6 +572,12 @@ export function dedupeFeeLineItems(result: ReceiptParseResult): ReceiptParseResu
 
 Gemini occasionally returns JSON that is **almost** valid but fails strict Zod checks (e.g. invented non-UUID `id` strings, `$0.00` promo lines, garbled names like `***` on blurry thermal lines). A hard validation failure used to surface as `PARSE_FAILED` 500 for the entire receipt.
 
+**Structured output:** A1 calls Gemini with `responseMimeType: application/json` (`responseJson: true` on `LLMCompletionOptions`).
+
+**JSON salvage:** `parseReceiptModelJson()` strips markdown fences, extracts the outer `{…}` payload, and repairs trailing commas / smart quotes before `JSON.parse`.
+
+**Failed parse debugging:** On each failed attempt, structured logs and `ai_audit_log.output_preview` (first 500 chars of raw model text) are written alongside `error_code`.
+
 `preprocessReceiptParseOutput()` in `receipt-parser.normalize.ts` runs inside `ReceiptParseOutputSchema` **before** Zod validation:
 
 | Model output issue | Normalization |

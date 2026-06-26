@@ -20,6 +20,7 @@ const discounts: EditableReviewDiscount[] = [
     name: 'Happy hour',
     type: 'percent',
     value: 10,
+    scope: 'bill',
   },
 ];
 

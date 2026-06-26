@@ -237,8 +237,8 @@ describe('GET /api/v1/events/:id receipt_review with discounts', () => {
       ],
       additional_charges: [],
       discounts: [
-        { name: 'Happy hour', type: 'percent', value: 10 },
-        { name: 'Comp', type: 'amount', value: 2 },
+        { name: 'Happy hour', type: 'percent', value: 10, scope: 'bill' },
+        { name: 'Comp', type: 'amount', value: 2, scope: 'bill' },
       ],
       tax_amount: 1,
       tip_amount: 2,

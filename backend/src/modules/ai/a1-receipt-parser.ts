@@ -1,9 +1,11 @@
 import { createHash, randomUUID } from 'crypto';
+import { ZodError } from 'zod';
 import type { ReceiptParseResponse } from '@letssplyt/shared/receipt.types';
 import { AppError } from '../../infrastructure/errors';
 import { createLLMProvider } from '../../infrastructure/llm/factory';
 import { writeAuditLog } from '../../infrastructure/llm/ai-audit';
 import type { LLMMessage } from '../../infrastructure/llm/llm.provider';
+import logger from '../../infrastructure/logger';
 import { sanitizePromptInput } from '../../infrastructure/security/sanitize';
 import { supabaseAdmin } from '../../infrastructure/supabase';
 import { buildA1DevStubResult, isA1DevStubEnabled } from './a1-dev-stub';
@@ -15,8 +17,13 @@ import {
   setAiStage,
 } from './a1-idempotency';
 import { dedupeFeeLineItems } from './receipt-parser/receipt-parser.dedupe';
+import { mapParsedDiscountsToApiLines } from './receipt-parser/receipt-parser.discounts';
 import { preprocessReceiptImage } from './receipt-parser/receipt-parser.preprocess';
 import { buildReceiptParserPrompt } from './receipt-parser/receipt-parser.prompt';
+import {
+  parseReceiptModelJson,
+  previewModelOutput,
+} from './receipt-parser/receipt-parser.parse-json';
 import {
   ReceiptParseOutputSchema,
   sumAdditionalCharges,
@@ -26,6 +33,7 @@ import {
 
 const RECEIPTS_BUCKET = 'receipts';
 const MAX_RETRIES = parseInt(process.env.RECEIPT_PARSE_MAX_RETRIES ?? '3', 10);
+const A1_MAX_OUTPUT_TOKENS = parseInt(process.env.A1_MAX_OUTPUT_TOKENS ?? '8192', 10);
 const LOW_CONFIDENCE_THRESHOLD = parseFloat(process.env.A1_ITEM_CONFIDENCE_THRESHOLD ?? '0.75');
 
 function sha256(value: string): string {
@@ -52,18 +60,26 @@ function mapChargeConfidence(charge: AdditionalCharge): 'high' | 'low' {
 
 function toApiResponse(result: ReceiptParseResult, storagePath: string): ReceiptParseResponse {
   const feesAmount = sumAdditionalCharges(result.additional_charges);
+  const items = result.items.map((item) => ({
+    id: item.id,
+    name: item.name,
+    unit_price: item.unit_price,
+    quantity: item.quantity,
+    confidence: (item.is_low_confidence ? 'low' : 'high') as 'high' | 'low',
+  }));
+  const discounts = mapParsedDiscountsToApiLines(
+    result.discounts,
+    items.filter((item) => item.id).map((item) => ({ id: item.id! })),
+  );
+
   return {
-    items: result.items.map((item) => ({
-      name: item.name,
-      unit_price: item.unit_price,
-      quantity: item.quantity,
-      confidence: item.is_low_confidence ? 'low' : 'high',
-    })),
+    items,
     additional_charges: result.additional_charges.map((charge) => ({
       name: charge.name,
       amount: charge.amount,
       confidence: mapChargeConfidence(charge),
     })),
+    discounts,
     tax_amount: result.tax,
     tip_amount: result.tip,
     fees_amount: feesAmount,
@@ -71,6 +87,15 @@ function toApiResponse(result: ReceiptParseResult, storagePath: string): Receipt
     currency: result.currency,
     storage_path: storagePath,
   };
+}
+
+function formatA1ParseError(err: Error): string {
+  if (err instanceof ZodError) {
+    return err.issues
+      .map((issue) => `${issue.path.join('.') || 'root'}: ${issue.message}`)
+      .join('; ');
+  }
+  return err.message;
 }
 
 async function fetchReceiptImageBase64(storagePath: string): Promise<{
@@ -239,15 +264,18 @@ async function callA1Model(
           ],
         },
       ];
-      const response = await provider.complete(messages, { maxTokens: 2048, timeout: 60_000 });
+      const response = await provider.complete(messages, {
+        maxTokens: A1_MAX_OUTPUT_TOKENS,
+        timeout: 60_000,
+        responseJson: true,
+      });
       rawText = response.text.trim();
 
       if (!rawText) {
         throw new Error('Empty response from model');
       }
 
-      const jsonText = rawText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
-      const parsed = JSON.parse(jsonText);
+      const parsed = parseReceiptModelJson(rawText);
       const validated = ReceiptParseOutputSchema.parse(parsed);
 
       if ('error' in validated) {
@@ -288,6 +316,7 @@ async function callA1Model(
       return result;
     } catch (err) {
       lastError = err instanceof Error ? err : new Error(String(err));
+      const errorMessage = formatA1ParseError(lastError);
 
       if (err instanceof AppError && err.code === 'RECEIPT_UNREADABLE') {
         throw err;
@@ -297,6 +326,17 @@ async function callA1Model(
         throw toA1AppError(err);
       }
 
+      const outputPreview = rawText ? previewModelOutput(rawText) : undefined;
+      logger.warn(
+        {
+          eventId,
+          attempt,
+          error: errorMessage,
+          outputPreview,
+        },
+        'A1 receipt parse attempt failed',
+      );
+
       writeAuditLog({
         agent: 'A1',
         eventId,
@@ -304,7 +344,8 @@ async function callA1Model(
         outputTokens: 0,
         modelUsed: process.env.AI_MODEL_A1 ?? 'unknown',
         success: false,
-        errorCode: lastError.message,
+        errorCode: errorMessage,
+        outputPreview,
         inputHash: sha256(prompt),
         outputHash: sha256(rawText ?? ''),
         latencyMs: Date.now() - start,

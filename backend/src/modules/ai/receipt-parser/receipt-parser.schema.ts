@@ -16,9 +16,18 @@ export const AdditionalChargeSchema = z.object({
   confidence_score: z.number().min(0).max(1).optional(),
 });
 
+export const ParsedDiscountSchema = z.object({
+  name: z.string().min(1).max(60),
+  type: z.enum(['percent', 'amount']).default('amount'),
+  value: z.number().positive(),
+  scope: z.enum(['bill', 'item']).default('bill'),
+  item_index: z.number().int().nonnegative().optional(),
+});
+
 export const ReceiptParseResultSchema = z.object({
   items: z.array(ReceiptItemSchema).min(1),
   additional_charges: z.array(AdditionalChargeSchema).default([]),
+  discounts: z.array(ParsedDiscountSchema).default([]),
   subtotal: z.number().nonnegative(),
   tax: z.number().nonnegative(),
   tip: z.number().nonnegative(),
@@ -39,6 +48,7 @@ export const ReceiptParseOutputSchema = z.preprocess(
 );
 
 export type AdditionalCharge = z.infer<typeof AdditionalChargeSchema>;
+export type ParsedReceiptDiscount = z.infer<typeof ParsedDiscountSchema>;
 export type ReceiptParseResult = z.infer<typeof ReceiptParseResultSchema>;
 export type ReceiptParseOutput = z.infer<typeof ReceiptParseOutputSchema>;
 

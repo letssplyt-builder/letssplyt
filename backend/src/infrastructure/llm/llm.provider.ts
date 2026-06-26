@@ -30,6 +30,8 @@ export interface LLMResponse {
 export interface LLMCompletionOptions {
   maxTokens?: number;
   timeout?: number;
+  /** When true, Gemini uses responseMimeType application/json (A1 receipt parse). */
+  responseJson?: boolean;
 }
 
 export interface LLMProvider {

@@ -255,6 +255,60 @@ describe('a1-receipt-parser', () => {
     expect(mockLLMProvider.complete).not.toHaveBeenCalled();
   });
 
+  it('requests structured JSON from the LLM provider', async () => {
+    mockSupabase.from.mockImplementation((table: string) => {
+      if (table === 'events') {
+        return {
+          ...mockGetAiStage('none'),
+          ...mockClaimUpdate(true),
+        } as never;
+      }
+      if (table === 'receipt_items') {
+        return {
+          ...mockClaimUpdate(true),
+          insert: jest.fn(() => Promise.resolve({ error: null })),
+        } as never;
+      }
+      return mockClaimUpdate(true) as never;
+    });
+
+    const { runA1ReceiptParse } = await import('../../../modules/ai/a1-receipt-parser');
+    await runA1ReceiptParse(EVENT_ID, STORAGE_PATH);
+
+    expect(mockLLMProvider.complete).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({ responseJson: true }),
+    );
+  });
+
+  it('salvages JSON with markdown fences and trailing commas', async () => {
+    mockLLMProvider.complete.mockResolvedValue({
+      text: '```json\n{"items":[{"name":"Burger","unit_price":10,"quantity":1,"confidence_score":0.95},],"additional_charges":[],"subtotal":10,"tax":1,"tip":2,"total":13,"currency":"USD","parse_confidence":0.95,}\n```',
+      usage: { inputTokens: 10, outputTokens: 20 },
+      modelUsed: 'mock-model',
+    });
+
+    mockSupabase.from.mockImplementation((table: string) => {
+      if (table === 'events') {
+        return {
+          ...mockGetAiStage('none'),
+          ...mockClaimUpdate(true),
+        } as never;
+      }
+      if (table === 'receipt_items') {
+        return {
+          ...mockClaimUpdate(true),
+          insert: jest.fn(() => Promise.resolve({ error: null })),
+        } as never;
+      }
+      return mockClaimUpdate(true) as never;
+    });
+
+    const { runA1ReceiptParse } = await import('../../../modules/ai/a1-receipt-parser');
+    const result = await runA1ReceiptParse(EVENT_ID, STORAGE_PATH);
+    expect(result.items[0].name).toBe('Burger');
+  });
+
   it('rejects malformed AI response with PARSE_FAILED', async () => {
     mockLLMProvider.complete.mockResolvedValue({
       text: 'not-json',

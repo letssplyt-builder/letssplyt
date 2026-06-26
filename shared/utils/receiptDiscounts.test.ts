@@ -26,8 +26,8 @@ describe('receiptDiscounts', () => {
     ];
     expect(resolveDiscountsTotal(discounts, 100)).toBe(15);
     expect(resolveReceiptDiscounts(discounts, 100)).toEqual([
-      { name: '10% off', type: 'percent', value: 10, resolved_amount: 10 },
-      { name: '$5 off', type: 'amount', value: 5, resolved_amount: 5 },
+      { name: '10% off', type: 'percent', value: 10, scope: 'bill', resolved_amount: 10 },
+      { name: '$5 off', type: 'amount', value: 5, scope: 'bill', resolved_amount: 5 },
     ]);
   });
 
@@ -53,8 +53,44 @@ describe('receiptDiscounts', () => {
     ];
     expect(resolveDiscountsTotal(discounts, 40)).toBe(40);
     expect(resolveReceiptDiscounts(discounts, 40)).toEqual([
-      { name: '50%', type: 'percent', value: 50, resolved_amount: 20 },
-      { name: 'Big comp', type: 'amount', value: 100, resolved_amount: 20 },
+      { name: '50%', type: 'percent', value: 50, scope: 'bill', resolved_amount: 20 },
+      { name: 'Big comp', type: 'amount', value: 100, scope: 'bill', resolved_amount: 20 },
+    ]);
+  });
+
+  it('applies item-scoped discounts to a single line before bill discounts', () => {
+    const items = [
+      { id: 'a', unit_price: 25.99, quantity: 1 },
+      { id: 'b', unit_price: 13.49, quantity: 1 },
+    ];
+    const discounts = [
+      {
+        name: 'Item savings',
+        type: 'amount' as const,
+        value: 2,
+        scope: 'item' as const,
+        item_id: 'a',
+      },
+      { name: 'Bill coupon', type: 'amount' as const, value: 5, scope: 'bill' as const },
+    ];
+
+    expect(resolveDiscountsTotal(discounts, 39.48, items)).toBe(7);
+    expect(resolveReceiptDiscounts(discounts, 39.48, items)).toEqual([
+      {
+        name: 'Item savings',
+        type: 'amount',
+        value: 2,
+        scope: 'item',
+        item_id: 'a',
+        resolved_amount: 2,
+      },
+      {
+        name: 'Bill coupon',
+        type: 'amount',
+        value: 5,
+        scope: 'bill',
+        resolved_amount: 5,
+      },
     ]);
   });
 

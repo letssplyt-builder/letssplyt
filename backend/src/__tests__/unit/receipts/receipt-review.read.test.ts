@@ -58,7 +58,7 @@ describe('fetchReceiptReviewSnapshot', () => {
       { name: 'SVC Fee', amount: 2, confidence: 'high' },
     ]);
     expect(snapshot.discounts).toEqual([
-      { name: 'Happy hour', type: 'percent', value: 10 },
+      { name: 'Happy hour', type: 'percent', value: 10, scope: 'bill' },
     ]);
     expect(snapshot.discount_amount).toBe(1);
   });
