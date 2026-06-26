@@ -35,7 +35,7 @@ Create Event → QR displayed → participants scan (app or browser) → members
 
 **AI:** Gemini 2.5 Flash (dev/staging), Claude Haiku 4.5 (production). ALWAYS use LLM factory (`src/infrastructure/llm/factory.ts`, exported function `createLLMProvider`). NEVER hardcode providers.
 
-**Secrets:** Doppler → process.env. No Doppler SDK. No config loaders. Use `APP_ENV` (not `NODE_ENV`) — Railway sets NODE_ENV=production on all deployments. Two URL environment variables exist: `APP_URL` (full URL, e.g. `https://letssplyt.app`, used for Twilio webhooks) and `APP_DOMAIN` (domain only, e.g. `letssplyt.app`, used for CORS and deep link config). Both are set by Doppler.
+**Secrets:** Doppler → process.env. No Doppler SDK. No config loaders. Use `APP_ENV` (not `NODE_ENV`) — Railway sets NODE_ENV=production on all deployments. Self-generated encryption/HMAC secrets: see `docs/09-Security-And-Privacy.md` §3 (**PHONE/HANDLE keys = 64 hex chars** from `openssl rand -hex 32`; **JWT_SECRET = 128 hex** from `rand -hex 64`; **ANALYTICS_SALT = 32 hex** from `rand -hex 16`). Two URL environment variables exist: `APP_URL` (full URL, e.g. `https://letssplyt.app`, used for Twilio webhooks) and `APP_DOMAIN` (domain only, e.g. `letssplyt.app`, used for CORS and deep link config). Both are set by Doppler.
 
 **Package manager:** npm. Monorepo workspaces: `mobile/`, `backend/`, `shared/`.
 
@@ -97,7 +97,7 @@ letssplyt/
 
 2. **Token Storage:** Supabase JWT tokens → `expo-secure-store` ONLY. Never AsyncStorage.
 
-3. **Payment handles:** AES-256-GCM encrypted with `HANDLE_ENCRYPTION_KEY` before storing.
+3. **Payment handles:** AES-256-GCM encrypted with `HANDLE_ENCRYPTION_KEY` before storing (`openssl rand -hex 32` → **64 hex chars** in Doppler).
 
 4. **AI Prompt Safety:** Call `sanitizePromptInput()` on ALL user-controlled strings before inserting into AI prompts.
 

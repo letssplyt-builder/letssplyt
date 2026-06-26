@@ -534,10 +534,10 @@ export const ReceiptParseErrorSchema = z.object({
   reason: z.string(),
 });
 
-export const ReceiptParseOutputSchema = z.union([
-  ReceiptParseResultSchema,
-  ReceiptParseErrorSchema,
-]);
+export const ReceiptParseOutputSchema = z.preprocess(
+  preprocessReceiptParseOutput,
+  z.union([ReceiptParseResultSchema, ReceiptParseErrorSchema]),
+);
 
 export type ReceiptItem = z.infer<typeof ReceiptItemSchema>;
 export type ReceiptParseResult = z.infer<typeof ReceiptParseResultSchema>;
@@ -567,6 +567,23 @@ A1 sometimes returns the same surcharge in both `items` and `additional_charges`
 // backend/src/modules/ai/receipt-parser/receipt-parser.dedupe.ts
 export function dedupeFeeLineItems(result: ReceiptParseResult): ReceiptParseResult;
 ```
+
+### Model output normalization (pre-Zod)
+
+Gemini occasionally returns JSON that is **almost** valid but fails strict Zod checks (e.g. invented non-UUID `id` strings, `$0.00` promo lines, garbled names like `***` on blurry thermal lines). A hard validation failure used to surface as `PARSE_FAILED` 500 for the entire receipt.
+
+`preprocessReceiptParseOutput()` in `receipt-parser.normalize.ts` runs inside `ReceiptParseOutputSchema` **before** Zod validation:
+
+| Model output issue | Normalization |
+|---|---|
+| `items[n].id` not a valid UUID v4 | Strip `id` (backend assigns UUID on persist) |
+| `unit_price ≤ 0` | **Omit** the line (comps / model mistakes) |
+| Empty, `***`, or single-character garbage `name` | Replace with **`Unreadable line`**, cap `confidence_score` below `A1_ITEM_CONFIDENCE_THRESHOLD` (0.75) so Item Review shows amber **Check** styling |
+| Whole receipt unreadable | Model should still return `{"error":"unreadable","reason":"…"}` → `RECEIPT_UNREADABLE` 400 |
+
+After normalization, the payer fixes unreadable lines on **Item Review** instead of the scan failing outright.
+
+**Tests:** `backend/src/__tests__/unit/ai/receipt-parser.normalize.test.ts`
 
 ### A1 persistence
 

@@ -86,11 +86,13 @@ Instead, `participants` holds only a `guest_pii_token UUID` — a foreign key re
 
 ### Environment Variables for Encryption
 
-| Variable | Purpose | Never Store In |
-|----------|---------|----------------|
-| `PHONE_ENCRYPTION_KEY` | AES-256-GCM key for phone_encrypted and name_encrypted columns | Code, git, logs |
-| `PII_HMAC_SALT` | HMAC-SHA256 salt for phone_hash computation | Code, git, logs |
-| `HANDLE_ENCRYPTION_KEY` | AES-256-GCM key for payment handle encryption | Code, git, logs |
+| Variable | Purpose | Hex length in Doppler | Generate with | Never Store In |
+|----------|---------|----------------------|---------------|----------------|
+| `PHONE_ENCRYPTION_KEY` | AES-256-GCM for `phone_encrypted` / `name_encrypted` | **64** | `openssl rand -hex 32` | Code, git, logs |
+| `PII_HMAC_SALT` | HMAC-SHA256 salt for `phone_hash` | **64** (recommended) | `openssl rand -hex 32` | Code, git, logs |
+| `HANDLE_ENCRYPTION_KEY` | AES-256-GCM for payment handles | **64** | `openssl rand -hex 32` | Code, git, logs |
+
+Full table (including `JWT_SECRET`, `ANALYTICS_SALT`): `docs/09-Security-And-Privacy.md` §3 **Secret generation quick reference**.
 
 `PII_HMAC_SALT` is used consistently everywhere a phone hash is computed — in the `users` table, in `guest_pii`, and in `sms_opt_outs`. Using the same salt ensures that an opt-out hash computed at message time matches the stored hash in `sms_opt_outs`.
 
@@ -634,6 +636,8 @@ CREATE TABLE item_assignments (
   UNIQUE (item_id, participant_id)
 );
 ```
+
+**Re-confirm preservation:** `POST /receipts/confirm` upserts food `receipt_items` by stable client `id` instead of deleting all rows. Because `item_id` references `receipt_items(id) ON DELETE CASCADE`, a bulk delete on confirm used to wipe assignments. Fee lines (`is_fee = true`) are still replaced on each confirm. Removed food lines cascade-delete their assignments.
 
 ---
 

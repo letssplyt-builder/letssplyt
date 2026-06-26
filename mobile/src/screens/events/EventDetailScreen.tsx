@@ -62,6 +62,7 @@ import {
   canSendEventMessages,
   resolveEventSplitActionMode,
   resolveSplitEntryMode,
+  shouldOpenReceiptReviewBeforeSplitEdit,
 } from '../../utils/eventSplitFooter';
 
 type Props = CompositeScreenProps<
@@ -323,7 +324,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
     });
   }, [participants]);
 
-  const openItemReview = () => {
+  const openItemReview = (flow: 'initial' | 'edit' = 'initial') => {
     const review = currentEvent?.receipt_review;
     if (!review) {
       setToast('Receipt data is not ready yet. Pull to refresh.');
@@ -333,6 +334,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
       eventId,
       storagePath: '',
       parseResult: receiptReviewToParseResult(review),
+      flow,
     });
   };
 
@@ -356,6 +358,11 @@ export function EventDetailScreen({ navigation, route }: Props) {
     const event = detail?.event;
     if (!event) {
       setToast('Could not load event. Try again.');
+      return;
+    }
+
+    if (shouldOpenReceiptReviewBeforeSplitEdit(Boolean(detail?.receipt_review))) {
+      openItemReview('edit');
       return;
     }
 

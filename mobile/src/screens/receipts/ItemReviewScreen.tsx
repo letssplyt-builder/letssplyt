@@ -36,7 +36,8 @@ import {
 type Props = NativeStackScreenProps<EventsStackParamList, 'ItemReview'>;
 
 export function ItemReviewScreen({ navigation, route }: Props) {
-  const { eventId, parseResult } = route.params;
+  const { eventId, parseResult, flow = 'initial' } = route.params;
+  const isEditFlow = flow === 'edit';
   const { rawBottom } = useAppInsets();
 
   const initialSnapshot = useMemo(() => parseResultToSnapshot(parseResult), [parseResult]);
@@ -217,11 +218,11 @@ export function ItemReviewScreen({ navigation, route }: Props) {
       contentStyle={styles.layout}
       footer={
         <PrimaryButton
-          label="Looks good → assign shares"
+          label={isEditFlow ? 'Continue to split →' : 'Looks good → assign shares'}
           loading={confirming}
           disabled={confirming}
           onPress={() => void handleConfirm()}
-          accessibilityLabel="Confirm items"
+          accessibilityLabel={isEditFlow ? 'Continue to split' : 'Confirm items'}
           style={styles.confirmButton}
         />
       }

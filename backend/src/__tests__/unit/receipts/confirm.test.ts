@@ -162,4 +162,37 @@ describe('confirmReceipt', () => {
     expect(result.confirmed).toBe(true);
     expect(result.total_amount).toBe(15);
   });
+
+  it('allows re-confirm when ai_stage is calculated and updates items in place', async () => {
+    const ITEM_ID = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    mockSupabase.__pushMockResultForTable('events', {
+      data: { ...PARSED_EVENT_ROW, ai_stage: 'calculated' },
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('events', {
+      data: [{ id: EVENT_ID }],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('receipt_items', {
+      data: [{ id: ITEM_ID, is_fee: false }],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('receipt_discounts', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('receipt_items', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('events', { data: null, error: null });
+
+    const result = await confirmReceipt(USER_ID, {
+      event_id: EVENT_ID,
+      items: [{ id: ITEM_ID, name: 'Pasta (updated)', price: 16, quantity: 1 }],
+      additional_charges: [],
+      discounts: [],
+      tax: 0,
+      fees: 0,
+      tip: 0,
+      discount_total: 0,
+    });
+
+    expect(result.confirmed).toBe(true);
+    expect(result.total_amount).toBe(16);
+  });
 });

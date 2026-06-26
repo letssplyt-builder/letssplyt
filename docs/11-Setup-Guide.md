@@ -455,15 +455,35 @@ Open doppler.com → letssplyt → **development** environment first. Add each s
 
 > **EAS builds:** `EXPO_PUBLIC_*` values are baked in at build time. After adding Sentry secrets to Doppler staging/production, run a **new** `eas build` for those environments — restarting Expo Go alone is not enough for staging/production binaries.
 
-**Security keys — generate DIFFERENT values for each environment:**
+**Security keys — generate DIFFERENT values for each environment.**
+
+Full reference: `docs/09-Security-And-Privacy.md` §3 **Secret generation quick reference**.
+
+| Doppler secret | Command | Hex chars in Doppler |
+|---|---|---|
+| `PHONE_ENCRYPTION_KEY` | `openssl rand -hex 32` | **64** |
+| `HANDLE_ENCRYPTION_KEY` | `openssl rand -hex 32` | **64** |
+| `PII_HMAC_SALT` | `openssl rand -hex 32` | **64** |
+| `JWT_SECRET` | `openssl rand -hex 64` | **128** |
+| `ANALYTICS_SALT` | `openssl rand -hex 16` | **32** |
+
+`openssl rand -hex N` outputs **2×N hex characters** (N random bytes). Do **not** use `rand -hex 64` for encryption keys — that length is for `JWT_SECRET` only. Wrong-length `PHONE_ENCRYPTION_KEY` breaks OTP verify after a correct code (`EncryptionError` in Sentry).
 
 ```bash
-# Run each command in Terminal, paste the output as the value in Doppler
-openssl rand -hex 32   # → HANDLE_ENCRYPTION_KEY (encrypts payment handles)
-openssl rand -hex 64   # → JWT_SECRET (signs session tokens)
-openssl rand -hex 16   # → ANALYTICS_SALT (anonymises analytics)
-openssl rand -hex 32   # → PHONE_ENCRYPTION_KEY (encrypts phone numbers)
-openssl rand -hex 32   # → PII_HMAC_SALT (hashes phones for lookups)
+# Generate each value separately; paste into Doppler (development, then repeat for staging/production)
+openssl rand -hex 32   # PHONE_ENCRYPTION_KEY
+openssl rand -hex 32   # HANDLE_ENCRYPTION_KEY
+openssl rand -hex 32   # PII_HMAC_SALT
+openssl rand -hex 64   # JWT_SECRET
+openssl rand -hex 16   # ANALYTICS_SALT
+
+# Optional: set staging in one go
+doppler secrets set PHONE_ENCRYPTION_KEY="$(openssl rand -hex 32)" \
+  HANDLE_ENCRYPTION_KEY="$(openssl rand -hex 32)" \
+  PII_HMAC_SALT="$(openssl rand -hex 32)" \
+  JWT_SECRET="$(openssl rand -hex 64)" \
+  ANALYTICS_SALT="$(openssl rand -hex 16)" \
+  --project letssplyt --config staging
 ```
 
 ⚠️ Generate different values for dev, staging, and production. Never copy keys across environments.

@@ -562,7 +562,7 @@ describe('EventDetailScreen', () => {
     });
   });
 
-  it('navigates to SplitEntry from Edit share CTA', async () => {
+  it('navigates to ItemReview from Edit share when receipt was scanned', async () => {
     jest.mocked(eventService.fetchEventById).mockResolvedValue({
       ...mockDetailLocked,
       event: { ...mockDetailLocked.event, ai_stage: 'parsed_confirmed' },
@@ -591,10 +591,13 @@ describe('EventDetailScreen', () => {
 
     fireEvent.press(screen.getByLabelText('Edit split'));
 
-    expect(navigation.navigate).toHaveBeenCalledWith('SplitEntry', {
-      eventId: 'event-1',
-      mode: 'itemised',
-    });
+    expect(navigation.navigate).toHaveBeenCalledWith(
+      'ItemReview',
+      expect.objectContaining({
+        eventId: 'event-1',
+        flow: 'edit',
+      }),
+    );
   });
 
   it('resets expenses and returns to scan or enter total', async () => {

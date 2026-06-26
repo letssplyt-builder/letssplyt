@@ -38,3 +38,6 @@ npm-debug.log*
 # ─── OS / editor ──────────────────────────────────────────────
 .DS_Store
 Thumbs.db
+
+# Local landing prototype (reference only — not shipped)
+letssplyt-landing.html

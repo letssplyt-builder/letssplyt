@@ -12,6 +12,7 @@ import {
   hasEventExpensesEntered,
   resolveEventSplitActionMode,
   resolveSplitEntryMode,
+  shouldOpenReceiptReviewBeforeSplitEdit,
 } from '../../../utils/eventSplitFooter';
 
 describe('getEventSplitActionMode', () => {
@@ -69,6 +70,16 @@ describe('resolveSplitEntryMode', () => {
 
   it('uses manual when calculated even if split_mode is still null', () => {
     expect(resolveSplitEntryMode(null, 'calculated', false)).toBe('manual');
+  });
+});
+
+describe('shouldOpenReceiptReviewBeforeSplitEdit', () => {
+  it('is true when receipt review data exists', () => {
+    expect(shouldOpenReceiptReviewBeforeSplitEdit(true)).toBe(true);
+  });
+
+  it('is false for manual-total events without receipt review', () => {
+    expect(shouldOpenReceiptReviewBeforeSplitEdit(false)).toBe(false);
   });
 });
 

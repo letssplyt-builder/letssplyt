@@ -123,6 +123,65 @@ In this system, PII is any datum that can identify a natural person directly, in
 
 All keys are stored in Doppler and injected as `process.env` variables at process startup. No key value appears in code or git at any time.
 
+### Secret generation quick reference
+
+`openssl rand -hex N` generates **N random bytes**, printed as **2×N lowercase hex characters**. Paste **only the hex string** into Doppler — no `0x` prefix, no quotes, no spaces.
+
+| Doppler secret | `openssl` command | Raw bytes | **Hex chars in Doppler** | Enforced in code? |
+|---|---|---|---|---|
+| `PHONE_ENCRYPTION_KEY` | `openssl rand -hex 32` | 32 | **64** | Yes — `crypto.ts` throws if not exactly 64 hex chars |
+| `HANDLE_ENCRYPTION_KEY` | `openssl rand -hex 32` | 32 | **64** | Yes — same |
+| `PII_HMAC_SALT` | `openssl rand -hex 32` | 32 | **64** (recommended) | No strict length check; use 64 hex per spec |
+| `JWT_SECRET` | `openssl rand -hex 64` | 64 | **128** | Supabase Auth signing |
+| `ANALYTICS_SALT` | `openssl rand -hex 16` | 16 | **32** | No strict length check; use 32 hex per spec |
+
+**Common mistake:** Using `openssl rand -hex 64` for `PHONE_ENCRYPTION_KEY` or `HANDLE_ENCRYPTION_KEY` produces **128 hex chars** (64 bytes). The backend expects **64 hex chars** (32 bytes) and will throw `EncryptionError: Encryption key must be exactly 32 bytes (64 hex chars)` on OTP verify / handle encrypt.
+
+**Do not confuse:**
+
+- `openssl rand -hex 32` → value length **64** characters (32-byte AES keys)
+- `openssl rand -hex 64` → value length **128** characters (`JWT_SECRET` only among app-generated secrets)
+
+Generate **different values** for development, staging, and production. Never copy keys across environments.
+
+**One-shot generation (run each command separately; paste each output into Doppler):**
+
+```bash
+openssl rand -hex 32   # PHONE_ENCRYPTION_KEY
+openssl rand -hex 32   # HANDLE_ENCRYPTION_KEY
+openssl rand -hex 32   # PII_HMAC_SALT
+openssl rand -hex 64   # JWT_SECRET
+openssl rand -hex 16   # ANALYTICS_SALT
+```
+
+**Set in Doppler (example — staging):**
+
+```bash
+doppler secrets set PHONE_ENCRYPTION_KEY="$(openssl rand -hex 32)" \
+  --project letssplyt --config staging
+doppler secrets set HANDLE_ENCRYPTION_KEY="$(openssl rand -hex 32)" \
+  --project letssplyt --config staging
+doppler secrets set PII_HMAC_SALT="$(openssl rand -hex 32)" \
+  --project letssplyt --config staging
+doppler secrets set JWT_SECRET="$(openssl rand -hex 64)" \
+  --project letssplyt --config staging
+doppler secrets set ANALYTICS_SALT="$(openssl rand -hex 16)" \
+  --project letssplyt --config staging
+```
+
+**Verify lengths after setting (expected: 64, 64, 64, 128, 32):**
+
+```bash
+for name in PHONE_ENCRYPTION_KEY HANDLE_ENCRYPTION_KEY PII_HMAC_SALT JWT_SECRET ANALYTICS_SALT; do
+  len=$(doppler secrets get "$name" --plain 2>/dev/null | wc -c | tr -d ' ')
+  echo "$name: $len chars"
+done
+```
+
+(`wc -c` may show one extra if the value has a trailing newline from the shell; expect 64/128/32 or 65/129/33 — trim in Doppler if needed.)
+
+See also: `docs/11-Setup-Guide.md` (Doppler onboarding) and `backend/.env.example` (local dev placeholders).
+
 ### Keys
 
 ---
@@ -133,6 +192,7 @@ All keys are stored in Doppler and injected as `process.env` variables at proces
 |---|---|
 | **Algorithm** | AES-256-GCM |
 | **Key size** | 32 bytes (256 bits), stored as 64-character lowercase hex string |
+| **Generate** | `openssl rand -hex 32` |
 | **What it encrypts** | `user_payment_handles.handle_encrypted` — Venmo/PayPal/CashApp/Zelle/Wise/UPI handles |
 | **Development** | Unique value — generated with `openssl rand -hex 32`. Never shared with staging or production |
 | **Staging** | Unique value — separate generation. Never shared with development or production |
@@ -148,6 +208,7 @@ All keys are stored in Doppler and injected as `process.env` variables at proces
 |---|---|
 | **Algorithm** | AES-256-GCM |
 | **Key size** | 32 bytes (256 bits), stored as 64-character lowercase hex string |
+| **Generate** | `openssl rand -hex 32` |
 | **What it encrypts** | `users.phone_encrypted`, `users.name_encrypted`, `guest_pii.phone_encrypted`, `guest_pii.name_encrypted` |
 | **Development** | Unique value — generated with `openssl rand -hex 32` |
 | **Staging** | Unique value — separate generation |
@@ -163,6 +224,7 @@ All keys are stored in Doppler and injected as `process.env` variables at proces
 |---|---|
 | **Algorithm** | HMAC-SHA256 |
 | **Key size** | 32 bytes (256 bits), stored as 64-character lowercase hex string |
+| **Generate** | `openssl rand -hex 32` |
 | **What it protects** | Used to compute `phone_hash` values in `users`, `guest_pii`, and `sms_opt_outs`. The salt makes phone hashes non-reversible and prevents cross-system correlation if two systems with different salts are compared |
 | **Development** | Unique value |
 | **Staging** | Unique value — must differ from development so staging hashes do not match development data |
@@ -178,6 +240,7 @@ All keys are stored in Doppler and injected as `process.env` variables at proces
 |---|---|
 | **Algorithm** | HMAC-SHA256 (used by Supabase Auth JWT signing) |
 | **Key size** | 64 bytes (512 bits), stored as 128-character lowercase hex string |
+| **Generate** | `openssl rand -hex 64` |
 | **What it protects** | Signs and verifies all Supabase access tokens and refresh tokens. A compromised JWT_SECRET allows an attacker to forge valid sessions for any user |
 | **Development** | Unique value — generated with `openssl rand -hex 64` |
 | **Staging** | Unique value |
@@ -191,9 +254,10 @@ All keys are stored in Doppler and injected as `process.env` variables at proces
 
 | Property | Value |
 |---|---|
-| **Algorithm** | SHA-256 (non-keyed, used for one-way hashing only) |
+| **Algorithm** | HMAC-SHA256 (keyed hash for analytics user IDs) |
 | **Key size** | 16 bytes (128 bits), stored as 32-character lowercase hex string |
-| **What it protects** | Used to produce anonymised phone identifiers in analytics events: `SHA-256(phone_e164 + ANALYTICS_SALT)`. Prevents raw phone hashes from appearing in analytics data |
+| **Generate** | `openssl rand -hex 16` |
+| **What it protects** | Used to produce anonymised user identifiers in analytics events via `HMAC-SHA256(userId, ANALYTICS_SALT)`. Prevents raw user UUIDs from appearing in analytics data |
 | **Development** | Unique value |
 | **Staging** | Unique value |
 | **Production** | Unique value |
@@ -1066,10 +1130,13 @@ Development secrets in `.env.development` (local only, listed in `.gitignore`) a
 
 ### Secret Rotation Procedure
 
+See **Secret generation quick reference** (above) for `openssl` commands and expected hex lengths.
+
 ```
-1. Generate new key value:
-   openssl rand -hex 32    (for 32-byte keys)
-   openssl rand -hex 64    (for 64-byte keys)
+1. Generate new key value using the correct openssl command for that secret
+   (PHONE/HANDLE encryption: rand -hex 32 → 64 hex chars;
+    JWT_SECRET: rand -hex 64 → 128 hex chars;
+    ANALYTICS_SALT: rand -hex 16 → 32 hex chars)
 
 2. Update the key in Doppler for the target environment
 

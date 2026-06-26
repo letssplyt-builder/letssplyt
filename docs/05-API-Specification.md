@@ -1137,7 +1137,9 @@ Runs A1 with atomic idempotency (`ai_stage`). Returns major-unit amounts (not mi
 
 **Persistence:** Food lines → `receipt_items` (`is_fee = false`). Each `additional_charges` entry → `receipt_items` (`is_fee = true`) plus aggregate on `events.fees_amount`. Tax/tip → `events.tax_amount` / `events.tip_amount` only.
 
-**Error codes:** `ALREADY_PROCESSING` 409, `PARSE_FAILED` 500, `RECEIPT_UNREADABLE` 400, `AI_QUOTA_EXCEEDED` 429
+**Error codes:** `ALREADY_PROCESSING` 409, `PARSE_FAILED` 500 (whole receipt still fails — e.g. empty JSON, no items after normalization, whole-receipt unreadable), `RECEIPT_UNREADABLE` 400, `AI_QUOTA_EXCEEDED` 503
+
+**Parse resilience:** Per-line Zod issues (invalid `id`, zero price, garbled names) are normalized before validation — see `receipt-parser.normalize.ts` in `docs/07-AI-Agent-Specification.md` §3. Failed attempts log `error_code` in `ai_audit_log` (often a Zod JSON array when normalization did not apply).
 
 **Dev:** `A1_DEV_STUB=true` (non-production) skips the LLM and returns fixture data.
 
@@ -1168,16 +1170,25 @@ Payer confirms (and optionally edits) parsed receipt lines before split assignme
 - Multiple discounts apply **sequentially** (each reduces the remaining subtotal for the next)
 - Empty-name or zero-value discounts are omitted by the mobile client before submit
 
-**Atomic guard:** `UPDATE events SET ai_stage = 'parsed_confirmed' WHERE id = event_id AND ai_stage IN ('parsed', 'parsed_confirmed')` — allows first confirm and re-itemization edits.
+**Atomic guard:** `UPDATE events SET ai_stage = … WHERE id = event_id AND ai_stage IN ('parsed', 'parsed_confirmed', 'calculated', 'calculating')`.
 
-**Side effects:** Deletes existing `receipt_items` and `receipt_discounts` for the event; inserts food rows (`is_fee = false`), fee rows (`is_fee = true`), and discount rows; updates `events.total_amount`, `tax_amount`, `tip_amount`, `fees_amount`, `discount_amount`, `receipt_scan_attempted`, `ai_parse_success`.
+- First confirm (`ai_stage = 'parsed'`) → sets `parsed_confirmed`.
+- Re-edit after split calculate (`calculated` / `calculating`) → **keeps** current `ai_stage` so Fair play can reload existing assignments.
+
+**Item sync (preserves `item_assignments`):** Does **not** delete all `receipt_items` on every confirm.
+
+- **Food lines:** `UPDATE` rows when the client sends the same `id`; `INSERT` new rows; `DELETE` only food rows removed from the payload. Stable ids keep `item_assignments` rows (FK `ON DELETE CASCADE` would otherwise wipe assignments).
+- **Fee lines:** delete all existing `is_fee = true` rows for the event, then insert fresh surcharge rows from `additional_charges`.
+- **Discounts:** delete all `receipt_discounts` for the event, then insert from payload.
+
+Also updates `events.total_amount`, `tax_amount`, `tip_amount`, `fees_amount`, `discount_amount`, `receipt_scan_attempted`, `ai_parse_success`.
 
 **Response `200`:**
 ```typescript
 { confirmed: true; total_amount: number; }
 ```
 
-**Error codes:** `INVALID_AI_STAGE` 400 (not `parsed` / `parsed_confirmed`), `EVENT_NOT_LOCKED` 400, `VALIDATION_ERROR` 400 (e.g. fees or `discount_total` mismatch), `FORBIDDEN` 403
+**Error codes:** `INVALID_AI_STAGE` 400 (not in `parsed` / `parsed_confirmed` / `calculated` / `calculating`), `EVENT_NOT_LOCKED` 400, `VALIDATION_ERROR` 400 (e.g. fees or `discount_total` mismatch), `FORBIDDEN` 403
 
 ---
 

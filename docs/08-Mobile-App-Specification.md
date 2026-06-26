@@ -981,7 +981,16 @@ Each section lists only events matching the selected toggle. Event card: title, 
 
 **Review items** navigates to `ItemReviewScreen` with `receipt_review` from `GET /events/:id` (no re-scan). If `receipt_review` is missing, show toast and pull to refresh.
 
-**Edit share** navigates to `SplitEntryScreen` via `resolveSplitEntryMode()`:
+**Edit share** navigation (`shouldOpenReceiptReviewBeforeSplitEdit()` in `eventSplitFooter.ts`):
+
+| Event expenses source | **Edit share** opens |
+|---|---|
+| Receipt scanned (`receipt_review` present) | `ItemReviewScreen` with `flow: 'edit'` → **Continue to split →** → `SplitEntryScreen` |
+| Manual total only (no `receipt_review`) | `SplitEntryScreen` directly via `resolveSplitEntryMode()` (`manual` or `itemised`) |
+
+Re-confirm on Item Review (`POST /receipts/confirm`) **preserves `item_assignments`** when food line `id`s are stable. `SplitEntryScreen` reloads assignments from `GET /events/:id/split/assignments` on load. Payer should tap **Review split →** after receipt edits if totals changed.
+
+`resolveSplitEntryMode()` (manual path only when no receipt review):
 - `itemised` when `receipt_review` exists or `split_mode = 'itemised'`
 - `manual` for **Enter total** flows (`split_mode = equal|portion` or `ai_stage = calculated|messaging|complete` without receipt data)
 
@@ -1091,11 +1100,15 @@ Receipt-slip layout on `AuthGradientLayout`: warm paper card on teal gradient. C
 | Confirm payload | Only discounts with non-empty name and `value > 0`; `discount_total` must match server resolution |
 | Split math | `discount_amount` prorated across participants like tax/fees/tip (`shared/utils/splitCalculator.ts`) |
 | A1 | Does **not** auto-extract discounts from receipt images (manual only on this screen) |
-- Low-confidence items: amber row + **Check** chip (`confidence: 'low'`)
+- Low-confidence items: amber row + **Check** chip (`confidence: 'low'`) — includes A1 **`Unreadable line`** placeholders after normalize
 - Pull-to-refresh → `GET /events/:id` → applies `receipt_review` (does **not** re-run A1)
-- CTA: **Looks good → assign shares** → `POST /api/v1/receipts/confirm` → `SplitEntryScreen` (`mode: 'itemised'`)
+- CTA (first scan / **Review items**): **Looks good → assign shares** → `POST /api/v1/receipts/confirm` → `SplitEntryScreen` (`mode: 'itemised'`)
+- CTA (`flow: 'edit'` from **Edit share**): **Continue to split →** → same confirm path → `SplitEntryScreen`
 
-Entry: after `POST /receipts/parse` (`ReceiptPreviewScreen`) or from Event Detail **Review items** / **Edit share** (uses `receipt_review` snapshot).
+Entry:
+- After `POST /receipts/parse` (`ReceiptPreviewScreen`, `flow: 'initial'`)
+- Event Detail **Review items** (`flow: 'initial'`)
+- Event Detail **Edit share** when `receipt_review` exists (`flow: 'edit'`)
 
 **Error state:** If confirm fails: "Couldn't save items. Check your connection and try again." Local edits preserved.
 

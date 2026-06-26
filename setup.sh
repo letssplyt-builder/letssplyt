@@ -323,6 +323,7 @@ cmd_dev() {
     echo ""
     prompt "Open doppler.com → letssplyt project → development environment and add the missing secrets."
     prompt "See docs/11-Setup-Guide.md Section 3 for where to find each value."
+    prompt "Security key lengths: docs/09-Security-And-Privacy.md §3 (PHONE/HANDLE = 64 hex, JWT = 128 hex, ANALYTICS = 32 hex)."
     if confirm "Open Doppler dashboard now?"; then
       open "https://dashboard.doppler.com"
     fi

@@ -63,6 +63,11 @@ export function resolveSplitEntryMode(
   return 'itemised';
 }
 
+/** Receipt-based events should open Item Review before Fair play when editing the split. */
+export function shouldOpenReceiptReviewBeforeSplitEdit(hasReceiptReview: boolean): boolean {
+  return hasReceiptReview;
+}
+
 /** Whether expense data has been entered (receipt confirmed or split calculated). */
 export function hasEventExpensesEntered(aiStage: AiStage): boolean {
   switch (aiStage) {
