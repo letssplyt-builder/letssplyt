@@ -19,6 +19,8 @@ export type EventsStackParamList = {
     eventId: string;
     storagePath: string;
     parseResult: ReceiptParseResponse;
+    /** `edit` = opened from Edit share; `initial` = first scan flow */
+    flow?: 'initial' | 'edit';
   };
   SplitEntry: { eventId: string; mode?: 'itemised' | 'manual' };
   SplitReview: { eventId: string };

@@ -502,6 +502,16 @@ Place this file at the root of the `/mobile` directory.
 - All code that branches on environment **must use `APP_ENV`**, never `NODE_ENV`.
 - The LLM factory resolves provider from `APP_ENV`: `development|staging → Gemini`, `production → Anthropic`
 
+**Self-generated Doppler secrets** (different values per environment; never copy across dev/staging/production):
+
+| Secret | `openssl` command | Hex chars in Doppler |
+|---|---|---|
+| `PHONE_ENCRYPTION_KEY`, `HANDLE_ENCRYPTION_KEY`, `PII_HMAC_SALT` | `openssl rand -hex 32` | **64** |
+| `JWT_SECRET` | `openssl rand -hex 64` | **128** |
+| `ANALYTICS_SALT` | `openssl rand -hex 16` | **32** |
+
+Authoritative table and Doppler examples: `docs/09-Security-And-Privacy.md` §3 **Secret generation quick reference**.
+
 ### Local Development Startup
 
 ```bash

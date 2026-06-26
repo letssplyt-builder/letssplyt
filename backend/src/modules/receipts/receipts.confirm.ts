@@ -53,6 +53,132 @@ function sumCharges(charges: z.infer<typeof confirmChargeSchema>[]): number {
   return Number(total.toFixed(2));
 }
 
+const RECEIPT_RECONFIRM_STAGES = ['parsed', 'parsed_confirmed', 'calculated', 'calculating'] as const;
+
+function isValidItemId(id: string | undefined): boolean {
+  return Boolean(id && /^[0-9a-f-]{36}$/i.test(id));
+}
+
+function buildFoodItemRow(
+  eventId: string,
+  item: z.infer<typeof confirmItemSchema>,
+  id: string,
+) {
+  return {
+    id,
+    event_id: eventId,
+    name: item.name.trim(),
+    unit_price: Number(item.price.toFixed(2)),
+    quantity: item.quantity,
+    confidence_score: 1,
+    is_low_confidence: false,
+    is_tax: false,
+    is_tip: false,
+    is_fee: false,
+    is_shared: false,
+    ai_extracted: false,
+  };
+}
+
+function buildFeeItemRow(
+  eventId: string,
+  charge: z.infer<typeof confirmChargeSchema>,
+  id: string,
+) {
+  return {
+    id,
+    event_id: eventId,
+    name: charge.name.trim(),
+    unit_price: Number(charge.amount.toFixed(2)),
+    quantity: 1,
+    confidence_score: 1,
+    is_low_confidence: false,
+    is_tax: false,
+    is_tip: false,
+    is_fee: true,
+    is_shared: false,
+    ai_extracted: false,
+  };
+}
+
+async function syncReceiptItemsOnConfirm(
+  eventId: string,
+  items: z.infer<typeof confirmItemSchema>[],
+  charges: z.infer<typeof confirmChargeSchema>[],
+): Promise<void> {
+  const { data: existingRows, error: existingError } = await supabaseAdmin
+    .from('receipt_items')
+    .select('id, is_fee')
+    .eq('event_id', eventId);
+
+  if (existingError) {
+    throw new AppError('DB_WRITE_FAILED', existingError.message, 500);
+  }
+
+  const existing = existingRows ?? [];
+  const existingFoodIds = new Set(
+    existing.filter((row) => !row.is_fee).map((row) => row.id as string),
+  );
+  const payloadFoodIds = new Set(
+    items.map((item) => item.id).filter((id): id is string => isValidItemId(id)),
+  );
+
+  const idsToDelete = existing
+    .filter((row) => row.is_fee || !payloadFoodIds.has(row.id as string))
+    .map((row) => row.id as string);
+
+  if (idsToDelete.length > 0) {
+    const { error: deleteError } = await supabaseAdmin
+      .from('receipt_items')
+      .delete()
+      .in('id', idsToDelete);
+
+    if (deleteError) {
+      throw new AppError('DB_WRITE_FAILED', deleteError.message, 500);
+    }
+  }
+
+  for (const item of items) {
+    const id = isValidItemId(item.id) ? item.id! : randomUUID();
+    const row = buildFoodItemRow(eventId, item, id);
+
+    if (existingFoodIds.has(id)) {
+      const { error: updateError } = await supabaseAdmin
+        .from('receipt_items')
+        .update({
+          name: row.name,
+          unit_price: row.unit_price,
+          quantity: row.quantity,
+          confidence_score: row.confidence_score,
+          is_low_confidence: row.is_low_confidence,
+          is_tax: row.is_tax,
+          is_tip: row.is_tip,
+          is_fee: row.is_fee,
+          is_shared: row.is_shared,
+          ai_extracted: row.ai_extracted,
+        })
+        .eq('id', id);
+
+      if (updateError) {
+        throw new AppError('DB_WRITE_FAILED', updateError.message, 500);
+      }
+    } else {
+      const { error: insertError } = await supabaseAdmin.from('receipt_items').insert(row);
+      if (insertError) {
+        throw new AppError('DB_WRITE_FAILED', insertError.message, 500);
+      }
+    }
+  }
+
+  for (const charge of charges) {
+    const row = buildFeeItemRow(eventId, charge, randomUUID());
+    const { error: insertError } = await supabaseAdmin.from('receipt_items').insert(row);
+    if (insertError) {
+      throw new AppError('DB_WRITE_FAILED', insertError.message, 500);
+    }
+  }
+}
+
 export async function confirmReceipt(
   userId: string,
   body: z.infer<typeof confirmReceiptBodySchema>,
@@ -88,11 +214,14 @@ export async function confirmReceipt(
     body.discount_total,
   );
 
+  const nextAiStage =
+    eventRow.ai_stage === 'parsed' ? 'parsed_confirmed' : eventRow.ai_stage;
+
   const { data: claimed, error: claimError } = await supabaseAdmin
     .from('events')
-    .update({ ai_stage: 'parsed_confirmed' })
+    .update({ ai_stage: nextAiStage })
     .eq('id', body.event_id)
-    .in('ai_stage', ['parsed', 'parsed_confirmed'])
+    .in('ai_stage', [...RECEIPT_RECONFIRM_STAGES])
     .select('id');
 
   if (claimError) {
@@ -102,18 +231,9 @@ export async function confirmReceipt(
   if (!claimed?.length) {
     throw new AppError(
       'INVALID_AI_STAGE',
-      'Receipt can only be confirmed when ai_stage is parsed or parsed_confirmed',
+      'Receipt can only be confirmed when ai_stage is parsed, parsed_confirmed, calculated, or calculating',
       400,
     );
-  }
-
-  const { error: deleteItemsError } = await supabaseAdmin
-    .from('receipt_items')
-    .delete()
-    .eq('event_id', body.event_id);
-
-  if (deleteItemsError) {
-    throw new AppError('DB_WRITE_FAILED', deleteItemsError.message, 500);
   }
 
   const { error: deleteDiscountsError } = await supabaseAdmin
@@ -125,43 +245,7 @@ export async function confirmReceipt(
     throw new AppError('DB_WRITE_FAILED', deleteDiscountsError.message, 500);
   }
 
-  const itemRows = body.items.map((item) => ({
-    id: item.id && /^[0-9a-f-]{36}$/i.test(item.id) ? item.id : randomUUID(),
-    event_id: body.event_id,
-    name: item.name.trim(),
-    unit_price: Number(item.price.toFixed(2)),
-    quantity: item.quantity,
-    confidence_score: 1,
-    is_low_confidence: false,
-    is_tax: false,
-    is_tip: false,
-    is_fee: false,
-    is_shared: false,
-    ai_extracted: false,
-  }));
-
-  const feeRows = body.additional_charges.map((charge) => ({
-    id: randomUUID(),
-    event_id: body.event_id,
-    name: charge.name.trim(),
-    unit_price: Number(charge.amount.toFixed(2)),
-    quantity: 1,
-    confidence_score: 1,
-    is_low_confidence: false,
-    is_tax: false,
-    is_tip: false,
-    is_fee: true,
-    is_shared: false,
-    ai_extracted: false,
-  }));
-
-  const rows = [...itemRows, ...feeRows];
-  if (rows.length > 0) {
-    const { error: insertError } = await supabaseAdmin.from('receipt_items').insert(rows);
-    if (insertError) {
-      throw new AppError('DB_WRITE_FAILED', insertError.message, 500);
-    }
-  }
+  await syncReceiptItemsOnConfirm(body.event_id, body.items, body.additional_charges);
 
   if (body.discounts.length > 0) {
     const resolvedDiscounts = resolveReceiptDiscounts(body.discounts, itemsSubtotal);

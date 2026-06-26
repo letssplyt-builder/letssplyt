@@ -2185,9 +2185,13 @@ QSTASH_NEXT_SIGNING_KEY=sig_yyy...
 NODE_ENV=development                   # 'development' | 'staging' | 'production'
 APP_URL=https://letssplyt.app          # Full base URL (used for webhook signature verification)
 APP_DOMAIN=letssplyt.app               # Domain only (used for CORS, AASA, deep link config)
-HANDLE_ENCRYPTION_KEY=64-char-hex     # openssl rand -hex 32
-ANALYTICS_SALT=64-char-hex            # openssl rand -hex 32
-JWT_SECRET=128-char-hex               # openssl rand -hex 64
+
+# Self-generated secrets — see docs/09-Security-And-Privacy.md §3 (Secret generation quick reference)
+PHONE_ENCRYPTION_KEY=64-hex-chars      # openssl rand -hex 32  (32 bytes → 64 hex chars)
+HANDLE_ENCRYPTION_KEY=64-hex-chars     # openssl rand -hex 32
+PII_HMAC_SALT=64-hex-chars             # openssl rand -hex 32
+JWT_SECRET=128-hex-chars               # openssl rand -hex 64  (64 bytes → 128 hex chars)
+ANALYTICS_SALT=32-hex-chars            # openssl rand -hex 16  (16 bytes → 32 hex chars)
 ```
 
 ---

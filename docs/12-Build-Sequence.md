@@ -1880,10 +1880,12 @@ backend/src/__tests__/unit/receipts/receipts.service.test.ts
 - `backend/src/modules/ai/receipt-parser/receipt-parser.schema.ts`
 - `backend/src/modules/ai/receipt-parser/receipt-parser.prompt.ts`
 - `backend/src/modules/ai/receipt-parser/receipt-parser.dedupe.ts`
+- `backend/src/modules/ai/receipt-parser/receipt-parser.normalize.ts`
 - `backend/src/__tests__/unit/ai/a1-receipt-parser.test.ts`
 - `backend/src/__tests__/unit/ai/a1-idempotency.test.ts`
 - `backend/src/__tests__/unit/ai/receipt-parser.schema.test.ts`
-- `backend/src/__tests__/unit/ai/receipt-parser.dedupe.test.ts`
+- `backend/src/modules/ai/receipt-parser/receipt-parser.normalize.ts`
+- `backend/src/__tests__/unit/ai/receipt-parser.normalize.test.ts`
 - `supabase/migrations/20260612000000_event_fees_and_receipt_item_is_fee.sql`
 
 **Acceptance Criteria:**
@@ -1891,7 +1893,7 @@ backend/src/__tests__/unit/receipts/receipts.service.test.ts
 2. SELECT ai_stage FROM events WHERE id=... shows 'parsed' after a successful parse
 3. POST with the same event_id a second time → returns cached result from the database, AI provider is NOT called again (verify via mock call count)
 4. Two concurrent POST requests for the same event_id → exactly one AI call is made (atomic idempotency works)
-5. If AI returns malformed JSON that fails Zod validation → endpoint returns 500 PARSE_FAILED and ai_stage is set to 'failed'
+5. If AI returns malformed JSON that cannot be recovered → endpoint returns 500 `PARSE_FAILED` and `ai_stage` is set to `failed`. Per-line issues (invalid `id`, zero price, garbled names) are **normalized** before Zod — see `receipt-parser.normalize.ts` and `docs/07-AI-Agent-Specification.md` §3.
 
 **Tests required:**
 ```
@@ -1916,6 +1918,10 @@ backend/src/__tests__/unit/ai/receipt-parser.schema.test.ts
   - sumAdditionalCharges totals fee amounts
 
 backend/src/__tests__/unit/ai/receipt-parser.dedupe.test.ts
+  - dedupeFeeLineItems removes duplicate fee lines
+
+backend/src/__tests__/unit/ai/receipt-parser.normalize.test.ts
+  - drops zero unit_price lines; strips invalid ids; marks garbage names Unreadable line
   - feeNamesLikelyMatch (SVC Fee / SVC Fees)
   - dedupeFeeLineItems removes duplicates; no-op when amounts differ
 ```
@@ -1948,11 +1954,11 @@ backend/src/__tests__/unit/ai/receipt-parser.dedupe.test.ts
 **Acceptance Criteria:**
 1. ItemReviewScreen displays all items from the AI parse result (receipt-slip compact rows)
 2. Tap a line → expands inline edit; name/qty/price update; total recalculates live
-3. Low-confidence items show amber highlight + **Check** chip
+3. Low-confidence items show amber highlight + **Check** chip (includes A1 **Unreadable line** placeholders)
 4. Swipe left on compact food row → delete → total updates
 5. **+ Add line** adds a new editable row
-6. **Looks good → assign shares** → `POST /api/v1/receipts/confirm` → `SplitEntryScreen` (`itemised`)
-7. Event Detail (locked payer): after scan without confirm, footer shows **Review items** (not Scan/Enter total); after confirm or manual split entry, **Edit share** + **Reset expenses** (+ **Send messages** when expenses entered); refetch on screen focus (skip one refresh after reset alert)
+6. **Looks good → assign shares** (first scan) or **Continue to split →** (`flow: 'edit'`) → `POST /api/v1/receipts/confirm` → `SplitEntryScreen` (`itemised`)
+7. Event Detail (locked payer): after scan without confirm, footer shows **Review items**; after confirm or manual split entry, **Edit share** routes to **Item Review** when `receipt_review` exists (else Fair play directly) + **Reset expenses** (+ **Send messages** when expenses entered); refetch on screen focus (skip one refresh after reset alert)
 8. **Reset expenses** → `POST /events/:id/expenses/reset` → footer returns to **Scan receipt** + **Enter total** (blocked after `messages_sent_at`)
 9. **EventSplitActionBar layout:** paired CTAs (**Scan receipt** + **Enter total**, **Edit share** + **Send messages**) must use a **row** with `flex: 1` per button; stacked CTAs use `alignSelf: 'stretch'` only (never `flex: 1` in a column) — prevents invisible zero-height footer buttons in `AuthGradientLayout`
 
@@ -2095,7 +2101,7 @@ cd backend && npm test src/modules/splits/splits.router.test.ts
 3. NLP field: type "Mark had the salmon", tap submit → loading indicator → Mark's row shows the salmon item highlighted in the assignment grid
 4. SplitReviewScreen: all participant amounts are shown in a table and the sum at the bottom matches the receipt total with a checkmark
 5. "Send to all" button is disabled if any participant has no amount assigned or the sum constraint fails
-6. Event Detail: **Edit share** opens `SplitEntry` (`itemised` or `manual` per `resolveSplitEntryMode`); **Reset expenses** clears DB state and restores **Scan receipt** + **Enter total** footer
+6. Event Detail: **Edit share** opens `ItemReview` (`flow: 'edit'`) when `receipt_review` exists, else `SplitEntry` (`itemised` or `manual` per `resolveSplitEntryMode`); **Reset expenses** clears DB state and restores **Scan receipt** + **Enter total** footer
 
 **Files (workflow additions):**
 - `backend/src/modules/events/expenses.reset.ts`
@@ -2387,10 +2393,14 @@ Read CLAUDE.md, BUILD-PROGRESS.md, and this story. Read `docs/06-Integration-Con
 **What:** After payment messages are sent, the Creator may correct a mistake using the **same Edit share flow** as pre-send (no separate modal or overflow action). Only participants whose amounts changed receive a revision SMS.
 
 **Mobile flow (Creator):**
-1. Event Detail footer **Edit share** (still visible after send when edits are allowed) → `SplitEntryScreen` → **Review split**.
+1. Event Detail footer **Edit share** (still visible after send when edits are allowed).
+   - **Receipt events** (`receipt_review` present): `ItemReviewScreen` (`flow: 'edit'`) → **Continue to split →** → `SplitEntryScreen` → **Review split**.
+   - **Manual-total events:** `SplitEntryScreen` directly.
 2. Pre-send: Review split CTA **Preview messages →** → `MessagePreviewScreen` → Send to all.
 3. Post-send: Review split CTA **Save and notify →** → `POST /split/confirm` → `POST /splits/resend` → `DeliveryTrackingScreen` (affected participants only).
 4. **Edit lock:** `canEditEventShare()` hides **Edit share** when any participant has `payment_status` in `self_reported`, `confirmed`, or `settled`. Disputing a self-report (status back to `pending`) re-opens edit if no other blockers remain. Toast if tapped while locked.
+
+**Receipt re-confirm:** `POST /receipts/confirm` upserts food `receipt_items` by stable `id` so existing `item_assignments` rows survive when the payer edits the bill without removing lines.
 
 **Acceptance Criteria:**
 - `POST /api/v1/events/:eventId/split/confirm` accepts post-send revisions when `events.status = sent` and `messages_sent_at` is set. Sum invariant enforced (±1 minor unit). Affected non-confirmed participants: `payment_status = pending`, `revision_count` incremented, `original_amount_owed` preserved on first change. `ai_stage` stays `complete`.

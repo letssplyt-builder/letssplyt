@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { preprocessReceiptParseOutput } from './receipt-parser.normalize';
 
 export const ReceiptItemSchema = z.object({
   id: z.string().uuid().optional(),
@@ -32,10 +33,10 @@ export const ReceiptParseErrorSchema = z.object({
   reason: z.string(),
 });
 
-export const ReceiptParseOutputSchema = z.union([
-  ReceiptParseResultSchema,
-  ReceiptParseErrorSchema,
-]);
+export const ReceiptParseOutputSchema = z.preprocess(
+  preprocessReceiptParseOutput,
+  z.union([ReceiptParseResultSchema, ReceiptParseErrorSchema]),
+);
 
 export type AdditionalCharge = z.infer<typeof AdditionalChargeSchema>;
 export type ReceiptParseResult = z.infer<typeof ReceiptParseResultSchema>;
