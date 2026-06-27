@@ -9,6 +9,7 @@ import {
   findParticipantIdByUserInEvent,
   linkParticipantToUser,
 } from '../participants/participant-link.service';
+import { normalizeOtpCodeInput } from '../../infrastructure/otp/otp.service';
 import { sendOtp, verifyOtpCodeForJoin } from './join-otp';
 import { JOIN_COUNTRY_OPTIONS } from './join-countries';
 
@@ -387,6 +388,62 @@ export interface JoinOtpVerificationResult {
   payerName: string;
 }
 
+async function completeJoinForExistingMember(input: {
+  context: JoinEventContext;
+  eventRow: EventRow;
+  phoneHash: string;
+  displayName: string;
+  sessionId: string;
+  userId?: string | null;
+}): Promise<JoinOtpVerificationResult | null> {
+  const registeredUser = input.userId
+    ? { id: input.userId }
+    : await findRegisteredUserByPhoneHash(input.phoneHash);
+  if (!registeredUser) {
+    return null;
+  }
+
+  const existingParticipantId = await findParticipantInEvent(
+    input.context.eventId,
+    input.phoneHash,
+    registeredUser.id,
+  );
+  if (!existingParticipantId) {
+    return null;
+  }
+
+  await linkParticipantToUser(existingParticipantId, registeredUser.id);
+  const { error: participantNameError } = await supabaseAdmin
+    .from('participants')
+    .update({ display_name: input.displayName })
+    .eq('id', existingParticipantId);
+  if (participantNameError) {
+    logger.warn({
+      msg: 'Failed to update participant display_name after web join',
+      participantId: existingParticipantId,
+      supabaseCode: participantNameError.code,
+      supabaseMessage: participantNameError.message,
+    });
+  }
+  await writeFunnelCheckpoint({
+    sessionId: input.sessionId,
+    eventId: input.context.eventId,
+    checkpoint: 'otp_verified',
+    metadata: { participant_id: existingParticipantId },
+  });
+  await writeFunnelCheckpoint({
+    sessionId: input.sessionId,
+    eventId: input.context.eventId,
+    checkpoint: 'join_confirmed',
+    metadata: { participant_id: existingParticipantId },
+  });
+  return {
+    participantId: existingParticipantId,
+    eventTitle: input.eventRow.title,
+    payerName: input.context.payerName,
+  };
+}
+
 export async function verifyJoinOtp(
   input: JoinOtpVerificationInput,
 ): Promise<JoinOtpVerificationResult> {
@@ -404,9 +461,35 @@ export async function verifyJoinOtp(
 
   const phoneE164 = input.phoneE164.trim();
   const phoneHash = hashPhone(phoneE164);
+  const code = normalizeOtpCodeInput(input.code.trim());
+  if (!/^[0-9]{6}$/.test(code)) {
+    throw new JoinServiceError('INVALID_OTP', 'Incorrect code. Try again.', 400);
+  }
 
-  const approved = await verifyOtpCodeForJoin(phoneE164, input.code);
+  const alreadyJoined = await completeJoinForExistingMember({
+    context,
+    eventRow,
+    phoneHash,
+    displayName,
+    sessionId: input.sessionId,
+  });
+  if (alreadyJoined) {
+    return alreadyJoined;
+  }
+
+  const approved = await verifyOtpCodeForJoin(phoneE164, code);
   if (!approved) {
+    // Double-submit race: first request consumed OTP and created the participant.
+    const recovered = await completeJoinForExistingMember({
+      context,
+      eventRow,
+      phoneHash,
+      displayName,
+      sessionId: input.sessionId,
+    });
+    if (recovered) {
+      return recovered;
+    }
     throw new JoinServiceError('INVALID_OTP', 'Incorrect code. Try again.', 400);
   }
 
@@ -419,42 +502,16 @@ export async function verifyJoinOtp(
     'register',
   );
 
-  const existingParticipantId = await findParticipantInEvent(
-    context.eventId,
+  const existingAfterOtp = await completeJoinForExistingMember({
+    context,
+    eventRow,
     phoneHash,
-    resolvedUser.userId,
-  );
-  if (existingParticipantId) {
-    await linkParticipantToUser(existingParticipantId, resolvedUser.userId);
-    const { error: participantNameError } = await supabaseAdmin
-      .from('participants')
-      .update({ display_name: displayName })
-      .eq('id', existingParticipantId);
-    if (participantNameError) {
-      logger.warn({
-        msg: 'Failed to update participant display_name after web join',
-        participantId: existingParticipantId,
-        supabaseCode: participantNameError.code,
-        supabaseMessage: participantNameError.message,
-      });
-    }
-    await writeFunnelCheckpoint({
-      sessionId: input.sessionId,
-      eventId: context.eventId,
-      checkpoint: 'otp_verified',
-      metadata: { participant_id: existingParticipantId },
-    });
-    await writeFunnelCheckpoint({
-      sessionId: input.sessionId,
-      eventId: context.eventId,
-      checkpoint: 'join_confirmed',
-      metadata: { participant_id: existingParticipantId },
-    });
-    return {
-      participantId: existingParticipantId,
-      eventTitle: eventRow.title,
-      payerName: context.payerName,
-    };
+    displayName,
+    sessionId: input.sessionId,
+    userId: resolvedUser.userId,
+  });
+  if (existingAfterOtp) {
+    return existingAfterOtp;
   }
 
   const messageChannel = resolveMessageChannel(phoneE164);

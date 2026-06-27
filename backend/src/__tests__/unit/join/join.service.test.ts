@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { mockSupabase } from '../../mocks/supabase.mock';
 import { mockTwilio } from '../../mocks/twilio.mock';
+import * as joinOtp from '../../../modules/join/join-otp';
 import {
   encryptPhoneForJoin,
   hashPhoneForJoin,
@@ -189,5 +190,33 @@ describe('join-web.service', () => {
         expect.objectContaining({ display_name: 'Robert' }),
       ]),
     );
+  });
+
+  it('verifyJoinOtp recovers when OTP row is gone but participant already joined (double submit)', async () => {
+    mockJoinContext();
+    mockSupabase.__setMockResultForTable('funnel_checkpoints', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('users', { data: { display_name: 'Alex' }, error: null });
+    mockSupabase.__pushMockResultForTable('users', {
+      data: { id: 'user-already-joined' },
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: { id: 'participant-already' },
+      error: null,
+    });
+
+    jest.spyOn(joinOtp, 'verifyOtpCodeForJoin').mockResolvedValue(false);
+
+    const result = await verifyJoinOtp({
+      token: TOKEN,
+      displayName: 'Sam',
+      phoneE164: PHONE_E164,
+      code: '123456',
+      sessionId: 'session-race',
+    });
+
+    expect(result.participantId).toBe('participant-already');
+    expect(result.eventTitle).toBe('Friday Dinner');
+    expect(mockSupabase.auth.admin.createUser).not.toHaveBeenCalled();
   });
 });

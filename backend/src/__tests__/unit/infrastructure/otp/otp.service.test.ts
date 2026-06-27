@@ -132,6 +132,27 @@ describe('otp.service', () => {
     expect(mockSupabase.from).not.toHaveBeenCalledWith('otp_verifications');
   });
 
+  it('verifyOTP normalizes pasted codes with spaces', async () => {
+    const code = '472918';
+    const crypto = await import('crypto');
+    const salt = process.env.PII_HMAC_SALT!;
+    const expectedHash = crypto.createHmac('sha256', salt).update(code).digest('hex');
+
+    mockSupabase.__pushMockResultForTable('otp_verifications', {
+      data: {
+        id: 'otp-row-1',
+        code_hash: expectedHash,
+        expires_at: new Date(Date.now() + 600000).toISOString(),
+        attempt_count: 0,
+        verified_at: null,
+      },
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('otp_verifications', { data: null, error: null });
+
+    await verifyOTP(PHONE_HASH, '472 918');
+  });
+
   it('purgeExpiredOTPs deletes expired rows', async () => {
     mockSupabase.__setMockResultForTable('otp_verifications', { data: null, error: null, count: 3 });
 
