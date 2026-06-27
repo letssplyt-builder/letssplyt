@@ -23,7 +23,6 @@ import { authColors } from '../../theme/colors';
 import { glassStyles } from '../../theme/glassStyles';
 import {
   computeDiscountTotal,
-  computeItemsSubtotal,
   computeReviewTotal,
   createLocalId,
   parseAmountInput,
@@ -176,7 +175,6 @@ export function ItemReviewScreen({ navigation, route }: Props) {
     const fees = payloadCharges.reduce((sum, charge) => sum + charge.amount, 0);
     const tax = parseAmountInput(taxInput);
     const tip = parseAmountInput(tipInput);
-    const itemsSubtotal = computeItemsSubtotal(validItems);
     const filteredDiscounts = discounts.filter(
       (discount) => discount.name.trim().length > 0 && discount.value > 0,
     );

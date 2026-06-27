@@ -122,11 +122,6 @@ export function computeItemsSubtotal(items: EditableReviewItem[]): number {
   return Number(total.toFixed(2));
 }
 
-function computeItemsSubtotalFromLines(items: ReceiptLineForDiscount[]): number {
-  const total = items.reduce((sum, item) => sum + item.unit_price * item.quantity, 0);
-  return Number(total.toFixed(2));
-}
-
 export function computeChargesTotal(
   charges: ReceiptParseResponse['additional_charges'],
 ): number {

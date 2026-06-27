@@ -55,7 +55,7 @@ export function renderOtpEntryPage(input: {
           var codeInput = document.getElementById('code');
           if (!form || !btn || !codeInput) return;
           form.addEventListener('submit', function (event) {
-            codeInput.value = (codeInput.value || '').replace(/\D/g, '').slice(0, 6);
+            codeInput.value = (codeInput.value || '').replace(/[^0-9]/g, '').slice(0, 6);
             if (codeInput.value.length !== 6) {
               event.preventDefault();
               return;
