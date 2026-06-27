@@ -15,6 +15,11 @@ interface OtpVerificationRow {
   verified_at: string | null;
 }
 
+/** Strip non-digits; SMS keyboards and paste often add spaces or dashes. */
+export function normalizeOtpCodeInput(code: string): string {
+  return code.replace(/\D/g, '');
+}
+
 function hashOtpCode(code: string): string {
   const salt = process.env.PII_HMAC_SALT;
   if (!salt) {
@@ -62,14 +67,16 @@ export async function sendOTP(phoneHash: string, phoneE164: string): Promise<voi
 
 /** Verify OTP; throws AppError with mobile-compatible codes on failure. */
 export async function verifyOTP(phoneHash: string, code: string): Promise<void> {
+  const normalizedCode = normalizeOtpCodeInput(code);
+  if (!/^[0-9]{6}$/.test(normalizedCode)) {
+    throw new AppError('INVALID_CODE', 'Invalid OTP code', 400);
+  }
+
   if (isOtpDevBypassEnabled()) {
-    if (!/^[0-9]{6}$/.test(code)) {
-      throw new AppError('INVALID_CODE', 'Invalid OTP code', 400);
-    }
     return;
   }
 
-  const codeHash = hashOtpCode(code);
+  const codeHash = hashOtpCode(normalizedCode);
   const now = new Date().toISOString();
 
   const { data: otpRow, error } = await supabaseAdmin
