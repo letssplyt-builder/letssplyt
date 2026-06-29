@@ -67,14 +67,13 @@ export function parseResultToSnapshot(
   discount_amount: number;
   currency: string;
 } {
-  const itemLines = discountItemLines(parseResult.items);
-  const itemsSubtotal = computeItemsSubtotal(
-    parseResult.items.map((item, index) => ({
-      ...item,
-      localId: item.id ? `food-${item.id}` : `food-${index}`,
-      is_fee: false,
-    })),
-  );
+  const editableItems: EditableReviewItem[] = parseResult.items.map((item, index) => ({
+    ...item,
+    localId: item.id ? `food-${item.id}` : `food-${index}`,
+    is_fee: false,
+  }));
+  const itemLines = discountItemLines(editableItems);
+  const itemsSubtotal = computeItemsSubtotal(editableItems);
   const discountTotal = resolveDiscountsTotal(
     parseResult.discounts ?? [],
     itemsSubtotal,

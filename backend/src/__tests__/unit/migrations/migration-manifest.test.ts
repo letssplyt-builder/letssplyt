@@ -38,6 +38,8 @@ const EXPECTED_MIGRATIONS = [
   '20260624000002_participants_payment_status_opted_out.sql',
   '20260625000000_repair_create_analytics_partition.sql',
   '20260626000000_receipt_discounts.sql',
+  '20260627000000_ai_audit_log_output_preview.sql',
+  '20260627000001_receipt_discounts_item_scope.sql',
 ] as const;
 
 const REPO_ROOT = path.resolve(__dirname, '../../../../..');

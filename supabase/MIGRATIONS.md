@@ -68,6 +68,8 @@ If CLI reports *"Found local migration files to be inserted before the last migr
 | 29 | `20260624000002_participants_payment_status_opted_out.sql` | E11-S06 | `payment_status` CHECK includes `opted_out` | `DROP CONSTRAINT IF EXISTS` |
 | 30 | `20260625000000_repair_create_analytics_partition.sql` | E10/E12 repair | `create_analytics_partition` RPC if missing from remote | `CREATE OR REPLACE FUNCTION` |
 | 31 | `20260626000000_receipt_discounts.sql` | E07+ | `events.discount_amount`, `receipt_discounts` table, reset RPC clears discounts | `IF NOT EXISTS` |
+| 32 | `20260627000000_ai_audit_log_output_preview.sql` | E07+ | `ai_audit_log.output_preview` for failed parse debugging | `ADD COLUMN IF NOT EXISTS` |
+| 33 | `20260627000001_receipt_discounts_item_scope.sql` | E07+ | `receipt_discounts.receipt_item_id` for item-scoped discounts | `ADD COLUMN IF NOT EXISTS` |
 
 ---
 
