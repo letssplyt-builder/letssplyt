@@ -1153,7 +1153,7 @@ describe('EventDetailScreen', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Sam')).toBeTruthy();
-      expect(screen.queryByLabelText('Paid')).toBeNull();
+      expect(screen.queryByLabelText('Mark paid')).toBeNull();
       expect(screen.queryByLabelText('Dispute')).toBeNull();
     });
   });
@@ -1215,7 +1215,7 @@ describe('EventDetailScreen', () => {
       expect(screen.getByText('Sam')).toBeTruthy();
       expect(screen.getByText('Mia')).toBeTruthy();
       expect(screen.getByText('Pending')).toBeTruthy();
-      expect(screen.getByLabelText('Paid')).toBeTruthy();
+      expect(screen.getByLabelText('Mark paid')).toBeTruthy();
       expect(screen.queryByLabelText('Nudge')).toBeNull();
       expect(screen.queryByLabelText('Mark cash')).toBeNull();
     });
