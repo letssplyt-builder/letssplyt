@@ -1,5 +1,6 @@
 import { CommonActions } from '@react-navigation/native';
 import {
+  closePostCreateQrAndOpenEventDetail,
   navigateFromNotification,
   navigateToHomeTab,
   openEventDetail,
@@ -108,5 +109,27 @@ describe('eventNavigation', () => {
     navigateToHomeTab(navigation as never);
 
     expect(tabNavigate).toHaveBeenCalledWith('HomeTab', { screen: 'Home' });
+  });
+
+  it('closePostCreateQrAndOpenEventDetail dismisses QR then opens event detail', () => {
+    const tabNavigate = jest.fn();
+    const tabNavigation = {
+      navigate: tabNavigate,
+      getState: jest.fn(() => ({
+        routeNames: ['HomeTab', 'EventsTab', 'SettingsTab'],
+        index: 0,
+      })),
+      getParent: jest.fn(),
+    };
+    const { navigation } = createMockNavigation(['Home'], 0, tabNavigation);
+    const dismissQr = jest.fn();
+
+    closePostCreateQrAndOpenEventDetail(navigation as never, 'event-new', dismissQr);
+
+    expect(dismissQr).toHaveBeenCalledTimes(1);
+    expect(tabNavigate).toHaveBeenCalledWith('EventsTab', {
+      screen: 'EventDetail',
+      params: { eventId: 'event-new' },
+    });
   });
 });

@@ -45,6 +45,16 @@ export function openEventDetail(
   console.warn('openEventDetail: could not resolve Events stack navigator');
 }
 
+/** After first-time QR from event create, land on event detail instead of the list/dashboard. */
+export function closePostCreateQrAndOpenEventDetail(
+  navigation: NavigationProp<ParamListBase>,
+  eventId: string,
+  dismissQr: () => void,
+): void {
+  dismissQr();
+  openEventDetail(navigation, eventId);
+}
+
 /**
  * Leave the inbox without leaving a deep stack, then open the event on EventsTab.
  */

@@ -20,6 +20,7 @@ import { NotificationBellButton } from '../../components/notifications/Notificat
 import { QRDisplayModal } from '../../components/events/QRDisplayModal';
 import { SegmentedControl } from '../../components/events/SegmentedControl';
 import { useAppInsets } from '../../hooks/useAppInsets';
+import { closePostCreateQrAndOpenEventDetail } from '../../navigation/eventNavigation';
 import type { EventsStackParamList, MainTabParamList } from '../../navigation/types';
 import { fetchEvents, regenerateJoinToken } from '../../services/event.service';
 import type { EventListItem } from '@letssplyt/shared/event.types';
@@ -116,6 +117,15 @@ export function EventsScreen({ navigation }: Props) {
     }
   };
 
+  const handleClosePostCreateQr = useCallback(() => {
+    if (!qrPresentation) return;
+    closePostCreateQrAndOpenEventDetail(
+      navigation,
+      qrPresentation.eventId,
+      dismissQrPresentation,
+    );
+  }, [navigation, qrPresentation, dismissQrPresentation]);
+
   const handleRegenerate = async () => {
     if (!qrPresentation) return;
     setIsRegenerating(true);
@@ -209,7 +219,7 @@ export function EventsScreen({ navigation }: Props) {
           joinUrl={qrPresentation.joinUrl}
           tokenExpiresAt={qrPresentation.tokenExpiresAt}
           isRegenerating={isRegenerating}
-          onClose={dismissQrPresentation}
+          onClose={handleClosePostCreateQr}
           onRegenerate={() => void handleRegenerate()}
         />
       ) : null}

@@ -20,7 +20,7 @@ import { SegmentedControl } from '../../components/events/SegmentedControl';
 import { NotificationBellButton } from '../../components/notifications/NotificationBellButton';
 import { CounterpartyRow } from '../../components/settlement/CounterpartyRow';
 import { useAppInsets } from '../../hooks/useAppInsets';
-import { openEventDetail } from '../../navigation/eventNavigation';
+import { closePostCreateQrAndOpenEventDetail, openEventDetail } from '../../navigation/eventNavigation';
 import type {
   HomeStackParamList,
   MainTabParamList,
@@ -126,6 +126,15 @@ export function HomeScreen({ navigation }: Props) {
       setIsRegenerating(false);
     }
   };
+
+  const handleClosePostCreateQr = useCallback(() => {
+    if (!qrPresentation) return;
+    closePostCreateQrAndOpenEventDetail(
+      navigation,
+      qrPresentation.eventId,
+      dismissQrPresentation,
+    );
+  }, [navigation, qrPresentation, dismissQrPresentation]);
 
   const handleOpenEvent = (eventId: string) => {
     openEventDetail(navigation, eventId);
@@ -292,7 +301,7 @@ export function HomeScreen({ navigation }: Props) {
           joinUrl={qrPresentation.joinUrl}
           tokenExpiresAt={qrPresentation.tokenExpiresAt}
           isRegenerating={isRegenerating}
-          onClose={dismissQrPresentation}
+          onClose={handleClosePostCreateQr}
           onRegenerate={() => void handleRegenerate()}
         />
       ) : null}
