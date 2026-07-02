@@ -1,12 +1,17 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals';
-import { render, screen, waitFor } from '@testing-library/react-native';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { HomeScreen } from './HomeScreen';
 import * as eventService from '../../services/event.service';
+import { closePostCreateQrAndOpenEventDetail } from '../../navigation/eventNavigation';
 import { useAuthStore } from '../../store/authStore';
 import { useEventStore } from '../../store/eventStore';
 import { useSettlementStore } from '../../store/settlementStore';
 
 jest.mock('../../services/event.service');
+jest.mock('../../navigation/eventNavigation', () => ({
+  openEventDetail: jest.fn(),
+  closePostCreateQrAndOpenEventDetail: jest.fn(),
+}));
 
 jest.mock('@react-navigation/native', () => {
   const React = require('react');
@@ -124,5 +129,33 @@ describe('HomeScreen', () => {
       expect(screen.getByText('$40.00')).toBeTruthy();
       expect(screen.getByText('$15.00')).toBeTruthy();
     });
+  });
+
+  it('opens event detail when post-create QR is closed', async () => {
+    const dismissQrPresentation = jest.fn();
+    useEventStore.setState({
+      qrPresentation: {
+        eventId: 'event-new',
+        title: 'Friday Dinner',
+        joinUrl: 'https://letssplyt.app/join/abc',
+        tokenExpiresAt: '2099-01-01T00:00:00.000Z',
+      },
+      dismissQrPresentation,
+    });
+
+    render(
+      <HomeScreen
+        navigation={navigation}
+        route={{ key: 'Home', name: 'Home' } as never}
+      />,
+    );
+
+    fireEvent.press(screen.getByLabelText('Close'));
+
+    expect(closePostCreateQrAndOpenEventDetail).toHaveBeenCalledWith(
+      navigation,
+      'event-new',
+      dismissQrPresentation,
+    );
   });
 });
