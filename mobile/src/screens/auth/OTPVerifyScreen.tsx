@@ -118,7 +118,34 @@ export function OTPVerifyScreen({ navigation, route }: Props) {
   );
 
   const handleDigitChange = (index: number, value: string) => {
-    const digit = value.replace(/\D/g, '').slice(-1);
+    const cleaned = value.replace(/\D/g, '');
+
+    if (!cleaned) {
+      const next = [...digits];
+      next[index] = '';
+      setDigits(next);
+      setError(null);
+      return;
+    }
+
+    if (cleaned.length > 1) {
+      const next = [...digits];
+      for (let i = 0; i < cleaned.length && index + i < OTP_LENGTH; i++) {
+        next[index + i] = cleaned[i]!;
+      }
+      setDigits(next);
+      setError(null);
+
+      const lastFilledIndex = Math.min(index + cleaned.length - 1, OTP_LENGTH - 1);
+      inputRefs.current[lastFilledIndex]?.focus();
+
+      if (next.every((d) => d.length === 1)) {
+        void handleVerify(next.join(''));
+      }
+      return;
+    }
+
+    const digit = cleaned;
     const next = [...digits];
     next[index] = digit;
     setDigits(next);
@@ -261,7 +288,9 @@ export function OTPVerifyScreen({ navigation, route }: Props) {
               filled={digit.length === 1}
               accessibilityLabel={`Digit ${index + 1}`}
               keyboardType="number-pad"
-              maxLength={1}
+              maxLength={OTP_LENGTH}
+              textContentType="oneTimeCode"
+              autoComplete={Platform.OS === 'android' ? 'sms-otp' : 'one-time-code'}
               value={digit}
               onChangeText={(value) => handleDigitChange(index, value)}
               onKeyPress={(event) => handleKeyPress(index, event)}

@@ -134,6 +134,79 @@ describe('OTPVerifyScreen', () => {
     });
   });
 
+  it('fills all digit fields when a full code is pasted', async () => {
+    mockApiPost.mockResolvedValue({
+      access_token: 'access-1',
+      refresh_token: 'refresh-1',
+      expires_in: 3600,
+      user: {
+        id: 'user-1',
+        display_name: 'Alex',
+        avatar_colour: '#4F46E5',
+        is_new_user: false,
+      },
+    });
+
+    render(
+      <OTPVerifyScreen
+        navigation={navigation as never}
+        route={{
+          key: 'OTPVerify',
+          name: 'OTPVerify',
+          params: { phoneE164: '+15551234567', accountExists: true },
+        }}
+      />,
+    );
+
+    fireEvent.changeText(screen.getByLabelText('Digit 1'), '123456');
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Digit 1').props.value).toBe('1');
+      expect(screen.getByLabelText('Digit 6').props.value).toBe('6');
+    });
+
+    await waitFor(() => {
+      expect(mockApiPost).toHaveBeenCalledWith(
+        '/auth/otp/verify',
+        expect.objectContaining({ code: '123456' }),
+      );
+    });
+  });
+
+  it('strips spaces when pasting a formatted SMS code', async () => {
+    mockApiPost.mockResolvedValue({
+      access_token: 'access-1',
+      refresh_token: 'refresh-1',
+      expires_in: 3600,
+      user: {
+        id: 'user-1',
+        display_name: 'Alex',
+        avatar_colour: '#4F46E5',
+        is_new_user: false,
+      },
+    });
+
+    render(
+      <OTPVerifyScreen
+        navigation={navigation as never}
+        route={{
+          key: 'OTPVerify',
+          name: 'OTPVerify',
+          params: { phoneE164: '+15551234567', accountExists: true },
+        }}
+      />,
+    );
+
+    fireEvent.changeText(screen.getByLabelText('Digit 1'), '123 456');
+
+    await waitFor(() => {
+      expect(mockApiPost).toHaveBeenCalledWith(
+        '/auth/otp/verify',
+        expect.objectContaining({ code: '123456' }),
+      );
+    });
+  });
+
   it('shows error and clears digits on wrong OTP', async () => {
     const { ApiRequestError: MockApiRequestError } = jest.requireMock('../../services/api') as {
       ApiRequestError: typeof ApiRequestError;
