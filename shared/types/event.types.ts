@@ -124,7 +124,7 @@ export interface EventDetailResponse {
   summary: EventSettlementSummary | null;
   /** Itemised split — current viewer's assigned line items (participant view only). */
   my_items?: ParticipantAssignedItem[];
-  /** Payer only — parsed receipt lines for Item Review refresh (no AI re-run). */
+  /** Parsed receipt lines for Item Review (payer, pre-send) and read-only quick view (all members after send). */
   receipt_review?: ReceiptReviewSnapshot;
 }
 

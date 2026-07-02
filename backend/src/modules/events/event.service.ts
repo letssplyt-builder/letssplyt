@@ -529,11 +529,11 @@ export async function getEventById(userId: string, eventId: string): Promise<Eve
   }
 
   let receipt_review: EventDetailResponse['receipt_review'];
-  if (
-    isPayer &&
-    RECEIPT_REVIEW_STAGES.has(eventRow.ai_stage) &&
-    eventRow.receipt_scan_attempted
-  ) {
+  const shouldIncludeReceiptReview =
+    eventRow.receipt_scan_attempted &&
+    (Boolean(eventRow.messages_sent_at) ||
+      (isPayer && RECEIPT_REVIEW_STAGES.has(eventRow.ai_stage)));
+  if (shouldIncludeReceiptReview) {
     receipt_review = await fetchReceiptReviewSnapshot(eventId, {
       tax_amount: eventRow.tax_amount,
       tip_amount: eventRow.tip_amount,
