@@ -832,6 +832,11 @@ export function EventDetailScreen({ navigation, route }: Props) {
             <Text style={glassStyles.sectionTitle}>
               Members · {settlementRosterParticipants.length}
             </Text>
+            {showOrganiserCollectionActions ? (
+              <Text style={styles.rosterSwipeHint}>
+                Swipe a member card left to dispute, right to mark paid.
+              </Text>
+            ) : null}
             <View style={styles.memberList}>
               {settlementRosterParticipants.map((participant) => {
                 const isOrganiserRow = Boolean(participant.is_organiser);
@@ -1027,6 +1032,13 @@ const styles = StyleSheet.create({
   },
   memberList: {
     marginBottom: 4,
+  },
+  rosterSwipeHint: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: authColors.textOnDarkFaint,
+    marginTop: -8,
+    marginBottom: 12,
   },
   addButton: {
     marginTop: 8,
