@@ -1,7 +1,17 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Animated,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Swipeable } from 'react-native-gesture-handler';
 import { authColors } from '../../theme/colors';
 import { formatMoney, isRegisteredEventParticipant } from '../../utils/events';
 import { rosterPaymentStatusDisplay } from '../../utils/settlementDisplay';
@@ -20,12 +30,45 @@ interface SettlementRosterRowProps {
   onMarkCash?: () => void;
 }
 
-const STATUS_TONE_COLORS = {
-  paid: '#34D399',
-  pending: '#FBBF24',
-  disputed: '#FBBF24',
-  muted: authColors.textOnDarkMuted,
+const ACTION_WIDTH = 96;
+const CARD_RADIUS = 16;
+
+const STATUS_TONE = {
+  paid: {
+    text: '#6EE7B7',
+    pillBg: 'rgba(16, 185, 129, 0.18)',
+    pillBorder: 'rgba(52, 211, 153, 0.35)',
+    avatarRing: 'rgba(52, 211, 153, 0.55)',
+  },
+  pending: {
+    text: '#FCD34D',
+    pillBg: 'rgba(245, 158, 11, 0.16)',
+    pillBorder: 'rgba(251, 191, 36, 0.35)',
+    avatarRing: 'rgba(251, 191, 36, 0.5)',
+  },
+  disputed: {
+    text: '#FCA5A5',
+    pillBg: 'rgba(239, 68, 68, 0.16)',
+    pillBorder: 'rgba(248, 113, 113, 0.35)',
+    avatarRing: 'rgba(248, 113, 113, 0.5)',
+  },
+  muted: {
+    text: authColors.textOnDarkMuted,
+    pillBg: authColors.pillOnDark,
+    pillBorder: authColors.glassBorder,
+    avatarRing: authColors.glassBorder,
+  },
 } as const;
+
+const openSettlementSwipeables = new Set<Swipeable>();
+
+function closeOtherSwipeables(current: Swipeable | null): void {
+  for (const swipeable of openSettlementSwipeables) {
+    if (swipeable !== current) {
+      swipeable.close();
+    }
+  }
+}
 
 export function SettlementRosterRow({
   displayName,
@@ -66,6 +109,7 @@ export function SettlementRosterRow({
   const statusDisplay = isOrganiser
     ? { label: 'Organiser', tone: 'muted' as const }
     : rosterPaymentStatusDisplay(paymentStatus, selfReportedMethod);
+  const toneStyle = STATUS_TONE[statusDisplay.tone];
 
   const isRegisteredMember = isRegisteredEventParticipant(userId);
 
@@ -81,33 +125,59 @@ export function SettlementRosterRow({
       paymentStatus === 'payer_marked' ||
       paymentStatus === 'settled') &&
     onDispute;
+  const hasSwipeActions = hasPaidAction || hasDisputeAction;
 
-  const rowBody = (
-    <View style={[styles.row, isSelf && styles.selfRow]}>
-      <View style={styles.avatar}>
-        <Text style={styles.avatarText}>{initial}</Text>
+  const cardBody = (
+    <View style={[styles.card, isSelf && styles.selfCard]}>
+      {hasDisputeAction ? <View style={styles.edgeAccentLeft} /> : null}
+      {hasPaidAction ? <View style={styles.edgeAccentRight} /> : null}
+
+      <View style={[styles.avatarRing, { borderColor: toneStyle.avatarRing }]}>
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{initial}</Text>
+        </View>
       </View>
-      <View style={styles.info}>
-        <Text style={styles.name} numberOfLines={1}>{displayName}</Text>
-        <Text
-          style={[
-            styles.statusMeta,
-            { color: STATUS_TONE_COLORS[statusDisplay.tone] },
-          ]}
-        >
-          {statusDisplay.label}
-        </Text>
+
+      <View style={styles.main}>
+        <View style={styles.titleRow}>
+          <Text style={styles.name} numberOfLines={1}>
+            {displayName}
+          </Text>
+          <Text style={styles.amount}>{formatMoney(amountOwed, currency)}</Text>
+        </View>
+
+        <View style={styles.metaRow}>
+          <View
+            style={[
+              styles.statusPill,
+              {
+                backgroundColor: toneStyle.pillBg,
+                borderColor: toneStyle.pillBorder,
+              },
+            ]}
+          >
+            <Text style={[styles.statusPillText, { color: toneStyle.text }]}>
+              {statusDisplay.label}
+            </Text>
+          </View>
+
+          {hasSwipeActions ? (
+            <View style={styles.swipeHintRow}>
+              {hasDisputeAction ? (
+                <Text style={styles.swipeHintLeft}>Dispute</Text>
+              ) : (
+                <View />
+              )}
+              {hasPaidAction ? <Text style={styles.swipeHintRight}>Mark paid</Text> : null}
+            </View>
+          ) : null}
+        </View>
       </View>
-      <Text style={styles.amount}>{formatMoney(amountOwed, currency)}</Text>
     </View>
   );
 
-  if (!hasPaidAction && !hasDisputeAction) {
-    return (
-      <View style={styles.shell}>
-        {rowBody}
-      </View>
-    );
+  if (!hasSwipeActions) {
+    return <View style={styles.shell}>{cardBody}</View>;
   }
 
   const runPaidAction = () => {
@@ -120,181 +190,325 @@ export function SettlementRosterRow({
     onDispute?.();
   };
 
+  const handleSwipeableOpen = () => {
+    closeOtherSwipeables(swipeableRef.current);
+    if (swipeableRef.current) {
+      openSettlementSwipeables.add(swipeableRef.current);
+    }
+  };
+
+  const handleSwipeableClose = () => {
+    if (swipeableRef.current) {
+      openSettlementSwipeables.delete(swipeableRef.current);
+    }
+  };
+
   return (
     <View style={styles.shell}>
-      <GestureHandlerRootView style={styles.gestureRoot}>
-        <Swipeable
-          ref={swipeableRef}
-          overshootLeft={false}
-          overshootRight={false}
-          friction={2}
-          leftThreshold={48}
-          rightThreshold={48}
-          containerStyle={styles.swipeableContainer}
-          childrenContainerStyle={styles.swipeableChild}
-          renderLeftActions={
-            hasDisputeAction
-              ? () => (
-                  <View style={styles.leftActions}>
-                    <SwipeActionButton
-                      label="Dispute"
-                      loading={loadingAction === 'dispute'}
-                      backgroundColor="#B91C1C"
-                      onPress={runDisputeAction}
-                    />
-                  </View>
-                )
-              : undefined
-          }
-          renderRightActions={
-            hasPaidAction
-              ? () => (
-                  <View style={styles.rightActions}>
-                    <SwipeActionButton
-                      label="Paid"
-                      loading={loadingAction === 'mark-cash'}
-                      backgroundColor="#059669"
-                      onPress={runPaidAction}
-                    />
-                  </View>
-                )
-              : undefined
-          }
-        >
-          {rowBody}
-        </Swipeable>
-      </GestureHandlerRootView>
+      <Swipeable
+        ref={swipeableRef}
+        overshootLeft={false}
+        overshootRight={false}
+        friction={2.2}
+        leftThreshold={ACTION_WIDTH * 0.45}
+        rightThreshold={ACTION_WIDTH * 0.45}
+        containerStyle={styles.swipeableContainer}
+        childrenContainerStyle={styles.swipeableChild}
+        onSwipeableOpen={handleSwipeableOpen}
+        onSwipeableClose={handleSwipeableClose}
+        renderLeftActions={
+          hasDisputeAction
+            ? (progress) => (
+                <SwipeActionLane
+                  side="left"
+                  progress={progress}
+                  label="Dispute"
+                  icon="!"
+                  loading={loadingAction === 'dispute'}
+                  colors={['#991B1B', '#DC2626']}
+                  onPress={runDisputeAction}
+                />
+              )
+            : undefined
+        }
+        renderRightActions={
+          hasPaidAction
+            ? (progress) => (
+                <SwipeActionLane
+                  side="right"
+                  progress={progress}
+                  label="Mark paid"
+                  icon="✓"
+                  loading={loadingAction === 'mark-cash'}
+                  colors={['#047857', '#10B981']}
+                  onPress={runPaidAction}
+                />
+              )
+            : undefined
+        }
+      >
+        {cardBody}
+      </Swipeable>
     </View>
   );
 }
 
-function SwipeActionButton({
+function SwipeActionLane({
+  side,
+  progress,
   label,
-  onPress,
+  icon,
   loading,
-  backgroundColor,
+  colors,
+  onPress,
 }: {
+  side: 'left' | 'right';
+  progress?: Animated.AnimatedInterpolation<number>;
   label: string;
-  onPress: () => void;
+  icon: string;
   loading?: boolean;
-  backgroundColor: string;
+  colors: [string, string];
+  onPress: () => void;
 }) {
+  const animatedStyle =
+    progress != null
+      ? {
+          opacity: progress.interpolate({
+            inputRange: [0, 0.35, 1],
+            outputRange: [0, 0.75, 1],
+            extrapolate: 'clamp',
+          }),
+          transform: [
+            {
+              scale: progress.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.86, 1],
+                extrapolate: 'clamp',
+              }),
+            },
+          ],
+        }
+      : undefined;
+
+  const radiusStyle: StyleProp<ViewStyle> =
+    side === 'left'
+      ? {
+          borderTopRightRadius: CARD_RADIUS,
+          borderBottomRightRadius: CARD_RADIUS,
+        }
+      : {
+          borderTopLeftRadius: CARD_RADIUS,
+          borderBottomLeftRadius: CARD_RADIUS,
+        };
+
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      disabled={loading}
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.swipeButton,
-        { backgroundColor },
-        pressed && !loading && styles.swipeButtonPressed,
-        loading && styles.swipeButtonDisabled,
+    <Animated.View
+      style={[
+        styles.actionLane,
+        side === 'left' ? styles.actionLaneLeft : styles.actionLaneRight,
+        animatedStyle,
       ]}
     >
-      {loading ? (
-        <ActivityIndicator size="small" color="#FFFFFF" />
-      ) : (
-        <Text style={styles.swipeButtonText}>{label}</Text>
-      )}
-    </Pressable>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={label}
+        disabled={loading}
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.actionPressable,
+          pressed && !loading && styles.actionPressablePressed,
+        ]}
+      >
+        <LinearGradient colors={colors} style={[styles.actionGradient, radiusStyle]}>
+          {loading ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <>
+              <View style={styles.actionIconCircle}>
+                <Text style={styles.actionIcon}>{icon}</Text>
+              </View>
+              <Text style={styles.actionLabel}>{label}</Text>
+            </>
+          )}
+        </LinearGradient>
+      </Pressable>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   shell: {
-    marginBottom: 8,
-  },
-  gestureRoot: {
-    flexGrow: 0,
-    flexShrink: 0,
+    marginBottom: 10,
   },
   swipeableContainer: {
     overflow: 'hidden',
-    borderRadius: 12,
+    borderRadius: CARD_RADIUS,
   },
   swipeableChild: {
     backgroundColor: 'transparent',
   },
-  row: {
+  card: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    backgroundColor: authColors.glass,
-    borderRadius: 12,
+    alignItems: 'center',
+    minHeight: 76,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    backgroundColor: authColors.glassStrong,
+    borderRadius: CARD_RADIUS,
     borderWidth: 1,
     borderColor: authColors.glassBorder,
-    gap: 10,
+    gap: 12,
+    shadowColor: '#020617',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 3,
   },
-  selfRow: {
+  selfCard: {
     borderColor: 'rgba(129, 140, 248, 0.45)',
     backgroundColor: 'rgba(99, 102, 241, 0.14)',
   },
+  edgeAccentLeft: {
+    position: 'absolute',
+    left: 0,
+    top: 14,
+    bottom: 14,
+    width: 3,
+    borderRadius: 999,
+    backgroundColor: '#F87171',
+  },
+  edgeAccentRight: {
+    position: 'absolute',
+    right: 0,
+    top: 14,
+    bottom: 14,
+    width: 3,
+    borderRadius: 999,
+    backgroundColor: '#34D399',
+  },
+  avatarRing: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     backgroundColor: authColors.pillOnDark,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
     color: authColors.textOnDark,
   },
-  info: {
+  main: {
     flex: 1,
     minWidth: 0,
+    gap: 8,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: 10,
   },
   name: {
-    fontSize: 14,
-    fontWeight: '600',
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '700',
     color: authColors.textOnDark,
-  },
-  statusMeta: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 2,
   },
   amount: {
-    fontSize: 13,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
     color: authColors.textOnDark,
-    marginTop: 2,
   },
-  leftActions: {
+  metaRow: {
     flexDirection: 'row',
-    alignItems: 'stretch',
-    paddingRight: 8,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  statusPill: {
+    flexShrink: 1,
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  statusPillText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  swipeHintRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 0,
+  },
+  swipeHintLeft: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+    color: '#FCA5A5',
+    textTransform: 'uppercase',
+  },
+  swipeHintRight: {
+    fontSize: 10,
+    fontWeight: '700',
+    letterSpacing: 0.2,
+    color: '#6EE7B7',
+    textTransform: 'uppercase',
+  },
+  actionLane: {
+    width: ACTION_WIDTH,
     justifyContent: 'center',
   },
-  rightActions: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    paddingLeft: 8,
-    justifyContent: 'center',
+  actionLaneLeft: {
+    marginRight: 0,
   },
-  swipeButton: {
-    width: 84,
+  actionLaneRight: {
+    marginLeft: 0,
+  },
+  actionPressable: {
+    flex: 1,
     alignSelf: 'stretch',
-    borderRadius: 12,
+  },
+  actionPressablePressed: {
+    opacity: 0.92,
+  },
+  actionGradient: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    minHeight: 52,
+    gap: 6,
+    paddingHorizontal: 8,
+    minHeight: 76,
   },
-  swipeButtonPressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.98 }],
+  actionIconCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  swipeButtonDisabled: {
-    opacity: 0.7,
-  },
-  swipeButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
+  actionIcon: {
+    fontSize: 15,
+    fontWeight: '900',
     color: '#FFFFFF',
+  },
+  actionLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    letterSpacing: 0.2,
   },
 });
