@@ -407,7 +407,7 @@ describe('event.service', () => {
       expect(detail.receipt_review).toBeUndefined();
     });
 
-    it('omits receipt_review for non-payer participants', async () => {
+    it('omits receipt_review for non-payer participants before shares are sent', async () => {
       mockSupabase.__pushMockResultForTable('events', { data: lockedParsedEvent, error: null });
       mockSupabase.__pushMockResultForTable('participants', {
         data: { id: 'p2' },
@@ -438,6 +438,62 @@ describe('event.service', () => {
       const detail = await getEventById(OTHER_USER_ID, EVENT_ID);
 
       expect(detail.receipt_review).toBeUndefined();
+    });
+
+    it('includes receipt_review for non-payer participants after messages are sent', async () => {
+      mockSupabase.__pushMockResultForTable('events', {
+        data: {
+          ...lockedParsedEvent,
+          status: 'sent',
+          ai_stage: 'complete',
+          messages_sent_at: '2026-01-02T00:00:00.000Z',
+        },
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('participants', {
+        data: { id: 'p2' },
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('users', {
+        data: { id: OTHER_USER_ID, display_name: 'Guest', avatar_colour: '#4F46E5' },
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('participants', {
+        data: [
+          {
+            id: 'p2',
+            user_id: OTHER_USER_ID,
+            display_name: 'Guest',
+            join_method: 'qr_app',
+            payment_status: 'pending',
+            amount_owed: 12,
+          },
+        ],
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('users', {
+        data: [{ id: OTHER_USER_ID, display_name: 'Guest' }],
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('receipt_items', {
+        data: [
+          {
+            id: '11111111-1111-1111-1111-111111111111',
+            name: 'Burger',
+            unit_price: 10,
+            quantity: 1,
+            confidence_score: 0.95,
+            is_low_confidence: false,
+            is_fee: false,
+          },
+        ],
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('receipt_discounts', { data: [], error: null });
+
+      const detail = await getEventById(OTHER_USER_ID, EVENT_ID);
+
+      expect(detail.receipt_review?.items[0]?.name).toBe('Burger');
     });
   });
 

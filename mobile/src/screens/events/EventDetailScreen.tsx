@@ -33,6 +33,8 @@ import { SettlementRosterRow } from '../../components/settlement/SettlementRoste
 import { EventSplitActionBar } from '../../components/events/EventSplitActionBar';
 import { ParticipantEventDetail } from '../../components/events/ParticipantEventDetail';
 import { QRDisplayModal } from '../../components/events/QRDisplayModal';
+import { ReceiptQuickViewSheet } from '../../components/receipts/ReceiptQuickViewSheet';
+import { ReceiptViewChip } from '../../components/receipts/ReceiptViewChip';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { BottomToast } from '../../components/BottomToast';
 import { PrimaryButton } from '../../components/PrimaryButton';
@@ -53,6 +55,7 @@ import { authColors } from '../../theme/colors';
 import { receiptReviewToParseResult } from '../receipts/itemReview.utils';
 import { formatMoney, isPayerParticipant, statusChipLabel } from '../../utils/events';
 import { openMessagePreviewOrComplete } from '../../utils/messageFlow';
+import { canViewSharedReceipt } from '../../utils/receiptQuickView';
 import {
   canEditEventShare,
   canOrganiserNudgeOrMarkCash,
@@ -143,6 +146,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const [selfReportLoading, setSelfReportLoading] = useState(false);
   const [paySheetOpen, setPaySheetOpen] = useState(false);
   const [allPaidSheetOpen, setAllPaidSheetOpen] = useState(false);
+  const [receiptQuickViewOpen, setReceiptQuickViewOpen] = useState(false);
   const loadEventLedger = useSettlementStore((state) => state.loadEventLedger);
   const getIOweForEvent = useSettlementStore((state) => state.getIOweForEvent);
   const skipFocusRefreshRef = useRef(false);
@@ -278,6 +282,8 @@ export function EventDetailScreen({ navigation, route }: Props) {
   );
   const selfParticipant = participants.find((row) => row.is_self);
   const showOrganiserCollectionActions = canOrganiserNudgeOrMarkCash(event?.messages_sent_at);
+  const sharedReceiptReview = currentEvent?.receipt_review;
+  const showReceiptQuickView = canViewSharedReceipt(event?.messages_sent_at, sharedReceiptReview);
   const showParticipantPayActions = Boolean(
     !isPayer &&
       event &&
@@ -694,6 +700,10 @@ export function EventDetailScreen({ navigation, route }: Props) {
           <Text style={styles.bannerError}>Couldn&apos;t load member list. Pull to retry.</Text>
         ) : null}
 
+        {showReceiptQuickView && sharedReceiptReview ? (
+          <ReceiptViewChip onPress={() => setReceiptQuickViewOpen(true)} />
+        ) : null}
+
         {!isPayer && currentEvent ? (
           <>
             <ParticipantEventDetail detail={currentEvent} />
@@ -940,6 +950,14 @@ export function EventDetailScreen({ navigation, route }: Props) {
           onConfirm={(method) =>
             void submitSelfReport(participantPayContext.participantId, method)
           }
+        />
+      ) : null}
+
+      {showReceiptQuickView && sharedReceiptReview ? (
+        <ReceiptQuickViewSheet
+          visible={receiptQuickViewOpen}
+          review={sharedReceiptReview}
+          onClose={() => setReceiptQuickViewOpen(false)}
         />
       ) : null}
 
