@@ -62,6 +62,53 @@ describe('counterparties.service', () => {
     expect(result.you_owe).toEqual([]);
   });
 
+  it('nets reciprocal member balances into you_owe when viewer owes more', async () => {
+    mockSupabase.__pushMockResultForTable('events', {
+      data: [{ id: EVENT_CREATED }],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: [
+        {
+          user_id: MEMBER_ID,
+          amount_owed: 57.33,
+          payment_status: 'pending',
+        },
+      ],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: [{ amount_owed: 60, event_id: EVENT_JOINED, payment_status: 'pending' }],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('events', {
+      data: [{ id: EVENT_JOINED, payer_id: MEMBER_ID }],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('users', {
+      data: [
+        {
+          id: MEMBER_ID,
+          display_name: 'Alex',
+          avatar_colour: '#4F46E5',
+        },
+      ],
+      error: null,
+    });
+
+    const result = await getMemberCounterparties(VIEWER_ID);
+
+    expect(result.owe_you).toEqual([]);
+    expect(result.you_owe).toEqual([
+      {
+        user_id: MEMBER_ID,
+        display_name: 'Alex',
+        avatar_colour: '#4F46E5',
+        net_amount: 2.67,
+      },
+    ]);
+  });
+
   it('aggregates phone guests by phone_hash', async () => {
     mockSupabase.__pushMockResultForTable('events', {
       data: [{ id: EVENT_CREATED }],

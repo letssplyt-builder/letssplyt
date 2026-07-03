@@ -5,7 +5,9 @@ import { glassStyles } from '../../theme/glassStyles';
 import { authColors } from '../../theme/colors';
 
 interface EventRoleSectionProps {
-  title: string;
+  title?: string;
+  subtitle?: string;
+  titleAccentColor?: string;
   events: EventListItem[];
   emptyMessage: string;
   onEventPress: (eventId: string) => void;
@@ -13,13 +15,23 @@ interface EventRoleSectionProps {
 
 export function EventRoleSection({
   title,
+  subtitle,
+  titleAccentColor,
   events,
   emptyMessage,
   onEventPress,
 }: EventRoleSectionProps) {
   return (
     <View style={styles.section}>
-      <Text style={glassStyles.sectionTitle}>{title}</Text>
+      {title ? (
+        <View style={styles.titleRow}>
+          {titleAccentColor ? (
+            <View style={[styles.titleAccent, { backgroundColor: titleAccentColor }]} />
+          ) : null}
+          <Text style={glassStyles.sectionTitle}>{title}</Text>
+        </View>
+      ) : null}
+      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
       {events.length === 0 ? <Text style={styles.empty}>{emptyMessage}</Text> : null}
       {events.map((event) => (
         <EventCard
@@ -36,6 +48,24 @@ export function EventRoleSection({
 const styles = StyleSheet.create({
   section: {
     marginBottom: 20,
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  titleAccent: {
+    width: 3,
+    height: 16,
+    borderRadius: 2,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: authColors.textOnDarkFaint,
+    lineHeight: 16,
+    marginTop: -4,
+    marginBottom: 8,
   },
   empty: {
     fontSize: 13,

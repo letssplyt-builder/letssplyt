@@ -1,7 +1,11 @@
 import { AppError } from '../../infrastructure/errors';
 import { supabaseAdmin } from '../../infrastructure/supabase';
-
-const OUTSTANDING_STATUSES = ['pending', 'disputed'] as const;
+import {
+  fetchCreatedEventIds,
+  fetchMemberNetMaps,
+  sumNettedMemberBalances,
+} from '../settlement/member-net-balances';
+import { isOutstandingPaymentStatus } from '../settlement/outstanding';
 
 export interface UserBalanceSummary {
   net_balance: number;
@@ -10,8 +14,35 @@ export interface UserBalanceSummary {
   you_owe: number;
 }
 
-function sumOutstanding(amounts: Array<number | null>): number {
-  return amounts.reduce<number>((sum, amount) => sum + (amount ?? 0), 0);
+function roundMoney(total: number): number {
+  return Number(total.toFixed(2));
+}
+
+async function sumGuestOutstanding(viewerId: string): Promise<number> {
+  const createdEventIds = await fetchCreatedEventIds(viewerId);
+  if (createdEventIds.length === 0) {
+    return 0;
+  }
+
+  const { data: guestRows, error } = await supabaseAdmin
+    .from('participants')
+    .select('amount_owed, payment_status')
+    .in('event_id', createdEventIds)
+    .is('user_id', null);
+
+  if (error) {
+    throw new AppError('BALANCE_FETCH_FAILED', 'Could not load balance', 500);
+  }
+
+  let total = 0;
+  for (const row of guestRows ?? []) {
+    if (!isOutstandingPaymentStatus(row.payment_status as string)) continue;
+    const amount = row.amount_owed as number | null;
+    if (amount === null || amount <= 0) continue;
+    total = roundMoney(total + amount);
+  }
+
+  return total;
 }
 
 export async function getUserBalance(userId: string): Promise<UserBalanceSummary> {
@@ -25,62 +56,12 @@ export async function getUserBalance(userId: string): Promise<UserBalanceSummary
     throw new AppError('BALANCE_FETCH_FAILED', 'Could not load balance', 500);
   }
 
-  const createdEventIds = (createdEvents ?? []).map((row) => row.id as string);
-  let owedToYou = 0;
+  const memberMaps = await fetchMemberNetMaps(userId);
+  const memberTotals = sumNettedMemberBalances(memberMaps);
+  const guestOwed = await sumGuestOutstanding(userId);
 
-  if (createdEventIds.length > 0) {
-    // Include registered members (user_id != payer) and pure guests (user_id IS NULL).
-    // SQL `user_id != payer` alone excludes NULL rows, which drops all guest obligations.
-    const { data: owedRows, error: owedError } = await supabaseAdmin
-      .from('participants')
-      .select('amount_owed')
-      .in('event_id', createdEventIds)
-      .or(`user_id.is.null,user_id.neq.${userId}`)
-      .in('payment_status', [...OUTSTANDING_STATUSES])
-      .not('amount_owed', 'is', null);
-
-    if (owedError) {
-      throw new AppError('BALANCE_FETCH_FAILED', 'Could not load balance', 500);
-    }
-
-    owedToYou = sumOutstanding((owedRows ?? []).map((row) => row.amount_owed as number | null));
-  }
-
-  const { data: oweRows, error: oweError } = await supabaseAdmin
-    .from('participants')
-    .select('amount_owed, event_id')
-    .eq('user_id', userId)
-    .in('payment_status', [...OUTSTANDING_STATUSES])
-    .not('amount_owed', 'is', null);
-
-  if (oweError) {
-    throw new AppError('BALANCE_FETCH_FAILED', 'Could not load balance', 500);
-  }
-
-  const oweEventIds = [...new Set((oweRows ?? []).map((row) => row.event_id as string))];
-  const payerByEventId = new Map<string, string>();
-
-  if (oweEventIds.length > 0) {
-    const { data: oweEvents, error: oweEventsError } = await supabaseAdmin
-      .from('events')
-      .select('id, payer_id')
-      .in('id', oweEventIds);
-
-    if (oweEventsError) {
-      throw new AppError('BALANCE_FETCH_FAILED', 'Could not load balance', 500);
-    }
-
-    for (const event of oweEvents ?? []) {
-      payerByEventId.set(event.id as string, event.payer_id as string);
-    }
-  }
-
-  const youOwe = sumOutstanding(
-    (oweRows ?? [])
-      .filter((row) => payerByEventId.get(row.event_id as string) !== userId)
-      .map((row) => row.amount_owed as number | null),
-  );
-
+  const owedToYou = roundMoney(memberTotals.owed_to_you + guestOwed);
+  const youOwe = memberTotals.you_owe;
   const currency =
     (createdEvents?.[0]?.currency as string | undefined) ??
     'USD';
@@ -88,7 +69,7 @@ export async function getUserBalance(userId: string): Promise<UserBalanceSummary
   return {
     owed_to_you: owedToYou,
     you_owe: youOwe,
-    net_balance: owedToYou - youOwe,
+    net_balance: roundMoney(owedToYou - youOwe),
     currency,
   };
 }

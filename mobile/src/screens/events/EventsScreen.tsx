@@ -27,14 +27,70 @@ import type { EventListItem } from '@letssplyt/shared/event.types';
 import { useEventStore } from '../../store/eventStore';
 import { glassStyles } from '../../theme/glassStyles';
 import { authColors } from '../../theme/colors';
-import { filterEventsBySegment } from '../../utils/events';
+import {
+  filterEventsBySegment,
+  groupEventsByStatus,
+  eventStatusVisual,
+  sortEventsByDateDesc,
+} from '../../utils/events';
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<EventsStackParamList, 'Events'>,
   BottomTabScreenProps<MainTabParamList>
 >;
 
-type Segment = 'active' | 'settled';
+type EventsTab = 'created' | 'participated' | 'settled';
+
+const EVENTS_TABS = ['created', 'participated', 'settled'] as const;
+
+const EVENTS_TAB_LABELS: Record<EventsTab, string> = {
+  created: 'You created',
+  participated: 'You participated',
+  settled: 'Settled',
+};
+
+const EMPTY_MESSAGES: Record<Exclude<EventsTab, 'settled'>, string> = {
+  created: "You haven't created any active events yet. Tap + to split your first bill.",
+  participated: "You haven't joined any active events yet.",
+};
+
+const SETTLED_EMPTY_MESSAGE = 'No settled events yet.';
+
+const SETTLED_CREATED_SECTION = {
+  title: 'Events you created',
+  subtitle: 'All settled — everyone has paid their share',
+  emptyMessage: "No settled events you've created yet.",
+} as const;
+
+const SETTLED_JOINED_SECTION = {
+  title: 'Events you joined',
+  subtitle: 'Settled — your share is paid',
+  emptyMessage: "No settled events you've joined yet.",
+} as const;
+
+function renderActiveEventsByStatus(
+  events: EventListItem[],
+  emptyMessage: string,
+  onEventPress: (eventId: string) => void,
+) {
+  if (events.length === 0) {
+    return <Text style={styles.emptyTab}>{emptyMessage}</Text>;
+  }
+
+  return groupEventsByStatus(events).map((group) => (
+    <EventRoleSection
+      key={group.visualKey}
+      title={group.label}
+      titleAccentColor={eventStatusVisual(group.events[0]!.status, {
+        role: group.events[0]!.role,
+        viewerPaymentStatus: group.events[0]!.viewer_payment_status,
+      }).cardAccent}
+      events={group.events}
+      emptyMessage=""
+      onEventPress={onEventPress}
+    />
+  ));
+}
 
 export function EventsScreen({ navigation }: Props) {
   const { screenScrollBottomPadding } = useAppInsets();
@@ -49,7 +105,7 @@ export function EventsScreen({ navigation }: Props) {
     updateJoinUrl,
   } = useEventStore();
 
-  const [segment, setSegment] = useState<Segment>('active');
+  const [tab, setTab] = useState<EventsTab>('created');
   const [createdEvents, setCreatedEvents] = useState<EventListItem[]>([]);
   const [joinedEvents, setJoinedEvents] = useState<EventListItem[]>([]);
   const [titleDraft, setTitleDraft] = useState('');
@@ -59,23 +115,31 @@ export function EventsScreen({ navigation }: Props) {
   const [isLoading, setIsLoading] = useState(true);
   const [isRegenerating, setIsRegenerating] = useState(false);
 
-  const createdForSegment = useMemo(
-    () => filterEventsBySegment(createdEvents, segment),
-    [createdEvents, segment],
+  const activeCreatedEvents = useMemo(
+    () => filterEventsBySegment(createdEvents, 'active'),
+    [createdEvents],
   );
-  const joinedForSegment = useMemo(
-    () => filterEventsBySegment(joinedEvents, segment),
-    [joinedEvents, segment],
+  const activeJoinedEvents = useMemo(
+    () => filterEventsBySegment(joinedEvents, 'active'),
+    [joinedEvents],
   );
+  const settledCreatedEvents = useMemo(
+    () => sortEventsByDateDesc(filterEventsBySegment(createdEvents, 'settled')),
+    [createdEvents],
+  );
+  const settledJoinedEvents = useMemo(
+    () => sortEventsByDateDesc(filterEventsBySegment(joinedEvents, 'settled')),
+    [joinedEvents],
+  );
+  const settledTabIsEmpty =
+    settledCreatedEvents.length === 0 && settledJoinedEvents.length === 0;
 
-  const createdEmptyMessage =
-    segment === 'active'
-      ? "You haven't created any active events yet. Tap + to split your first bill."
-      : "No settled events you've created yet.";
-  const joinedEmptyMessage =
-    segment === 'active'
-      ? "You haven't joined any active events yet."
-      : "No settled events you've joined yet.";
+  const handleEventPress = useCallback(
+    (eventId: string) => {
+      navigation.navigate('EventDetail', { eventId });
+    },
+    [navigation],
+  );
 
   const refreshList = useCallback(async () => {
     setListError(false);
@@ -101,7 +165,8 @@ export function EventsScreen({ navigation }: Props) {
   useFocusEffect(
     useCallback(() => {
       useEventStore.getState().resetCurrentEvent();
-    }, []),
+      void refreshList();
+    }, [refreshList]),
   );
 
   const handleCreate = async () => {
@@ -163,10 +228,11 @@ export function EventsScreen({ navigation }: Props) {
             <NotificationBellButton onPress={() => navigation.navigate('Notifications')} />
           </View>
           <SegmentedControl
-            segments={['active', 'settled'] as const}
-            labels={{ active: 'Active', settled: 'Settled' }}
-            value={segment}
-            onChange={setSegment}
+            compact
+            segments={EVENTS_TABS}
+            labels={EVENTS_TAB_LABELS}
+            value={tab}
+            onChange={setTab}
           />
           {listError ? (
             <Text style={glassStyles.errorText}>Something went wrong. Pull to retry.</Text>
@@ -175,26 +241,40 @@ export function EventsScreen({ navigation }: Props) {
 
         {isLoading ? (
           <ActivityIndicator color={authColors.textOnDark} style={styles.loader} />
-        ) : (
-          <>
-            <EventRoleSection
-              title="Events you created"
-              events={createdForSegment}
-              emptyMessage={createdEmptyMessage}
-              onEventPress={(eventId) =>
-                navigation.navigate('EventDetail', { eventId })
-              }
-            />
-            <EventRoleSection
-              title="Events you joined"
-              events={joinedForSegment}
-              emptyMessage={joinedEmptyMessage}
-              onEventPress={(eventId) =>
-                navigation.navigate('EventDetail', { eventId })
-              }
-            />
-          </>
-        )}
+        ) : tab === 'settled' ? (
+          settledTabIsEmpty ? (
+            <Text style={styles.emptyTab}>{SETTLED_EMPTY_MESSAGE}</Text>
+          ) : (
+            <>
+              <EventRoleSection
+                title={SETTLED_CREATED_SECTION.title}
+                subtitle={SETTLED_CREATED_SECTION.subtitle}
+                events={settledCreatedEvents}
+                emptyMessage={SETTLED_CREATED_SECTION.emptyMessage}
+                onEventPress={handleEventPress}
+              />
+              <EventRoleSection
+                title={SETTLED_JOINED_SECTION.title}
+                subtitle={SETTLED_JOINED_SECTION.subtitle}
+                events={settledJoinedEvents}
+                emptyMessage={SETTLED_JOINED_SECTION.emptyMessage}
+                onEventPress={handleEventPress}
+              />
+            </>
+          )
+        ) : tab === 'created' ? (
+          renderActiveEventsByStatus(
+            activeCreatedEvents,
+            EMPTY_MESSAGES.created,
+            handleEventPress,
+          )
+        ) : tab === 'participated' ? (
+          renderActiveEventsByStatus(
+            activeJoinedEvents,
+            EMPTY_MESSAGES.participated,
+            handleEventPress,
+          )
+        ) : null}
       </ScrollView>
 
       <EventFab onPress={openCreateModal} />
@@ -246,5 +326,10 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginVertical: 16,
+  },
+  emptyTab: {
+    fontSize: 13,
+    color: authColors.textOnDarkMuted,
+    lineHeight: 18,
   },
 });

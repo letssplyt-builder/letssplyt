@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type {
   EventDetailResponse,
   EventParticipantSummary,
@@ -19,6 +19,7 @@ import {
 
 interface ParticipantEventDetailProps {
   detail: EventDetailResponse;
+  onViewReceipt?: () => void;
 }
 
 function AssignedItemsSection({
@@ -79,7 +80,7 @@ function SplitBreakdownSection({
   );
 }
 
-export function ParticipantEventDetail({ detail }: ParticipantEventDetailProps) {
+export function ParticipantEventDetail({ detail, onViewReceipt }: ParticipantEventDetailProps) {
   const { event, participants, my_items: myItems } = detail;
   const selfParticipant = participants.find((participant) => participant.is_self);
   const hero = resolveParticipantShareHero(
@@ -110,8 +111,24 @@ export function ParticipantEventDetail({ detail }: ParticipantEventDetailProps) 
           Hosted by {event.payer.display_name}
           {eventDate ? ` · ${eventDate}` : ''}
         </Text>
-        <View style={styles.statusChip}>
-          <Text style={styles.statusChipText}>{statusLabel}</Text>
+        <View style={styles.headerActions}>
+          {onViewReceipt ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="View receipt"
+              accessibilityHint="Opens a read-only summary of scanned receipt lines"
+              onPress={onViewReceipt}
+              style={({ pressed }) => [
+                styles.receiptHeaderIcon,
+                pressed && styles.receiptHeaderIconPressed,
+              ]}
+            >
+              <Text style={styles.receiptHeaderIconGlyph}>🧾</Text>
+            </Pressable>
+          ) : null}
+          <View style={styles.statusChip}>
+            <Text style={styles.statusChipText}>{statusLabel}</Text>
+          </View>
         </View>
       </View>
 
@@ -168,6 +185,29 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: authColors.textOnDarkMuted,
     lineHeight: 18,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 0,
+  },
+  receiptHeaderIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: authColors.pillOnDark,
+    borderWidth: 1,
+    borderColor: authColors.glassBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  receiptHeaderIconPressed: {
+    opacity: 0.88,
+    transform: [{ scale: 0.97 }],
+  },
+  receiptHeaderIconGlyph: {
+    fontSize: 16,
   },
   statusChip: {
     backgroundColor: authColors.pillOnDark,
