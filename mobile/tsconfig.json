@@ -7,6 +7,7 @@
     "paths": {
       "@letssplyt/shared/*": ["../shared/types/*"],
       "@letssplyt/shared/paymentHandleValidation": ["../shared/utils/paymentHandleValidation.ts"],
+      "@letssplyt/shared/paymentLinks": ["../shared/utils/paymentLinks.ts"],
       "@letssplyt/shared/utils/splitCalculator": ["../shared/utils/splitCalculator.ts"],
       "@letssplyt/shared/utils/receiptDiscounts": ["../shared/utils/receiptDiscounts.ts"],
       "@/*": ["./src/*"]

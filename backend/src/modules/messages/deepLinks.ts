@@ -1,4 +1,8 @@
 import type { PaymentProvider } from '@letssplyt/shared/profile.types';
+import {
+  buildPaymentLinkUrl,
+  buildZelleInstruction,
+} from '@letssplyt/shared/paymentLinks';
 import { formatCurrency } from '../../infrastructure/security';
 
 export interface PaymentLinkResult {
@@ -12,6 +16,17 @@ export interface PayerHandleInput {
   handle_value: string;
 }
 
+const PROVIDER_LABELS: Record<PaymentProvider, string> = {
+  venmo: 'Venmo',
+  paypal: 'PayPal',
+  cashapp: 'Cash App',
+  zelle: 'Zelle',
+  wise: 'Wise',
+  upi: 'UPI',
+  bank_transfer: 'Bank transfer',
+  other: 'Other',
+};
+
 /**
  * Build a single payment deep link for a payer handle.
  * amountMajorUnits is in major currency units (e.g. 12.34 for USD).
@@ -24,70 +39,38 @@ export function buildPaymentLink(
   _currency: string,
   _locale: string,
 ): PaymentLinkResult | null {
-  const encodedNote = encodeURIComponent(`${eventName} split`);
-  const numericAmount = amountMajorUnits.toFixed(2);
-
-  switch (provider) {
-    case 'venmo':
-      return {
-        provider: 'venmo',
-        label: 'Venmo',
-        url: `venmo://paycharge?txn=pay&recipients=${encodeURIComponent(handleValue)}&amount=${numericAmount}&note=${encodedNote}`,
-      };
-
-    case 'paypal':
-      return {
-        provider: 'paypal',
-        label: 'PayPal',
-        url: `https://paypal.me/${encodeURIComponent(handleValue)}/${numericAmount}`,
-      };
-
-    case 'cashapp':
-      return {
-        provider: 'cashapp',
-        label: 'Cash App',
-        url: `https://cash.app/${encodeURIComponent(handleValue)}/${numericAmount}`,
-      };
-
-    case 'zelle':
-      return {
-        provider: 'zelle',
-        label: 'Zelle',
-        url: buildZelleInstruction(handleValue),
-      };
-
-    case 'wise':
-      return {
-        provider: 'wise',
-        label: 'Wise',
-        url: `https://wise.com/pay/me/${encodeURIComponent(handleValue)}`,
-      };
-
-    case 'upi':
-      return {
-        provider: 'upi',
-        label: 'UPI',
-        url: `upi://pay?pa=${encodeURIComponent(handleValue)}&am=${numericAmount}&cu=INR&tn=${encodedNote}`,
-      };
-
-    case 'bank_transfer':
-      return {
-        provider: 'bank_transfer',
-        label: 'Bank transfer',
-        url: buildBankTransferText(handleValue),
-      };
-
-    case 'other':
-      return null;
-
-    default:
-      return null;
+  if (provider === 'bank_transfer') {
+    return {
+      provider,
+      label: PROVIDER_LABELS.bank_transfer,
+      url: buildBankTransferText(handleValue),
+    };
   }
+
+  if (provider === 'other') {
+    return null;
+  }
+
+  const url = buildPaymentLinkUrl({
+    provider,
+    handleValue,
+    amountMajorUnits,
+    eventName,
+    channel: 'sms',
+  });
+
+  if (!url) {
+    return null;
+  }
+
+  return {
+    provider,
+    label: PROVIDER_LABELS[provider],
+    url,
+  };
 }
 
-export function buildZelleInstruction(handle: string): string {
-  return `Pay via Zelle — send to: ${handle}`;
-}
+export { buildZelleInstruction };
 
 export function buildBankTransferText(accountDetails: string): string {
   return `Bank transfer details:\n${accountDetails}`;

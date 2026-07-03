@@ -30,7 +30,7 @@ const MEMBER_USER_ID = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 const PARTICIPANT_ORGANISER = 'part-o-0000-0000-0000-000000000000';
 const PARTICIPANT_A = 'part-a-1111-1111-1111-111111111111';
 const PARTICIPANT_B = 'part-b-2222-2222-2222-222222222222';
-const BREAKDOWN_URL = 'https://letssplyt.app/split/testtoken123';
+const BREAKDOWN_URL = 'https://letssplyt.app/s/testtoken123';
 
 describe('sendEventMessages', () => {
   beforeEach(() => {
@@ -43,7 +43,7 @@ describe('sendEventMessages', () => {
         participant_id: PARTICIPANT_A,
         display_name: 'Alex',
         amount_owed: 20,
-        message_text: `Hi Alex — your share is $20.00.\n\nSee full split: ${BREAKDOWN_URL}`,
+        message_text: `Hi Alex! Your share for Dinner paid by Alex Host is: $20.00\nPay: ${BREAKDOWN_URL}`,
         channel: 'sms',
         payment_links: [],
         breakdown_url: BREAKDOWN_URL,
@@ -145,7 +145,7 @@ describe('sendEventMessages', () => {
         participant_id: PARTICIPANT_A,
         display_name: 'Alex',
         amount_owed: 20,
-        message_text: `Hi Alex — your share is $20.00.\n\nSee full split: ${BREAKDOWN_URL}`,
+        message_text: `Hi Alex! Your share for Dinner paid by Alex Host is: $20.00\nPay: ${BREAKDOWN_URL}`,
         channel: 'sms',
         payment_links: [],
         breakdown_url: BREAKDOWN_URL,
@@ -193,7 +193,7 @@ describe('sendEventMessages', () => {
     expect(sendOutboundMessage).toHaveBeenCalledWith(
       '+15005550001',
       'sms',
-      expect.stringContaining('See full split'),
+      expect.stringMatching(/Pay:.*testtoken123/),
     );
     expect(jest.mocked(sendOutboundMessage).mock.calls[0]?.length).toBe(3);
   });

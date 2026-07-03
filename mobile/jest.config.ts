@@ -8,6 +8,7 @@ const config: Config = {
   ],
   moduleNameMapper: {
     '@letssplyt/shared/paymentHandleValidation': '<rootDir>/../shared/utils/paymentHandleValidation.ts',
+    '@letssplyt/shared/paymentLinks': '<rootDir>/../shared/utils/paymentLinks.ts',
     '@letssplyt/shared/utils/splitCalculator': '<rootDir>/../shared/utils/splitCalculator.ts',
     '@letssplyt/shared/utils/receiptDiscounts': '<rootDir>/../shared/utils/receiptDiscounts.ts',
     '@letssplyt/shared/(.*)': '<rootDir>/../shared/types/$1',
