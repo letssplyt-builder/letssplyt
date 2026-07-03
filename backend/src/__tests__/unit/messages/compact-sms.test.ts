@@ -18,8 +18,10 @@ describe('buildCompactSmsMessage', () => {
     });
 
     expect(message.length).toBeLessThanOrEqual(SMS_SINGLE_SEGMENT_LIMIT);
+    expect(message).toContain('Hi Jordan!');
+    expect(message).toContain('Your share for Team Dinner paid by Alex');
     expect(message).toContain('$42.50');
-    expect(message).toContain(payUrl);
+    expect(message).toContain(`Pay: ${payUrl}`);
     expect(message).not.toContain('Venmo:');
     expect(message).not.toContain('PayPal:');
     expect(smsSegmentCount(message)).toBe(1);

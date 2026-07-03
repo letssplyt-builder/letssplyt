@@ -31,37 +31,51 @@ function trimEventTitle(eventName: string, maxLen: number): string {
   return safe.slice(0, maxLen - 1) + '…';
 }
 
+function buildShareLine(
+  name: string,
+  event: string,
+  payer: string,
+  amount: string,
+): string {
+  return `Hi ${name}! Your share for ${event} paid by ${payer} is: ${amount}`;
+}
+
 /**
  * Build a single-segment SMS when possible.
- * Payment links live on the hosted pay page (short URL) — not inlined in the text.
+ * Payment links live on the hosted pay page — not inlined in the text.
+ *
+ * Format:
+ *   Hi {name}! Your share for {event} paid by {payer} is: {amount}
+ *   Pay: {url}
  */
 export function buildCompactSmsMessage(params: CompactSmsParams): string {
   const name = firstWord(params.displayName, 20);
   const payer = firstWord(params.payerDisplayName, 20);
   const amount = params.formattedAmount;
   const url = params.payUrl;
-  const prefix = params.revisionLeadIn ? `${params.revisionLeadIn.trim()} ` : '';
+  const revisionBlock = params.revisionLeadIn ? `${params.revisionLeadIn.trim()}\n` : '';
 
-  const templates: Array<(event: string) => string> = [
-    (event) => `${prefix}Hi ${name}! ${payer} — ${event}. Owe ${amount}. Pay: ${url}`,
-    (event) => `${prefix}Hi ${name}! ${payer}. Owe ${amount} (${event}). Pay: ${url}`,
-    () => `${prefix}Hi ${name}! Owe ${amount} to ${payer}. Pay: ${url}`,
-    () => `${prefix}Owe ${amount} to ${payer}. Pay: ${url}`,
-  ];
+  const eventFull = trimEventTitle(params.eventName, 50);
+  const payLine = `Pay: ${url}`;
 
-  const eventFull = trimEventTitle(params.eventName, 40);
-
-  for (const build of templates) {
-    for (let len = eventFull.length; len >= 0; len -= 1) {
-      const event = len === eventFull.length ? eventFull : trimEventTitle(params.eventName, len);
-      const message = build(event);
-      if (message.length <= SMS_SINGLE_SEGMENT_LIMIT) {
-        return message;
-      }
+  for (let len = eventFull.length; len >= 0; len -= 1) {
+    const event =
+      len === eventFull.length ? eventFull : trimEventTitle(params.eventName, len);
+    const shareLine = buildShareLine(name, event, payer, amount);
+    const message = `${revisionBlock}${shareLine}\n${payLine}`;
+    if (message.length <= SMS_SINGLE_SEGMENT_LIMIT) {
+      return message;
     }
   }
 
-  return `${prefix}Pay ${amount}: ${url}`.slice(0, SMS_SINGLE_SEGMENT_LIMIT);
+  // Last resort: drop event name but keep the agreed structure.
+  const fallbackShare = `Hi ${name}! Your share paid by ${payer} is: ${amount}`;
+  const fallback = `${revisionBlock}${fallbackShare}\n${payLine}`;
+  if (fallback.length <= SMS_SINGLE_SEGMENT_LIMIT) {
+    return fallback;
+  }
+
+  return `${revisionBlock}${payLine}`.slice(0, SMS_SINGLE_SEGMENT_LIMIT);
 }
 
 export function smsSegmentCount(message: string): number {

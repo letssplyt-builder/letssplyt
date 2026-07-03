@@ -39,8 +39,8 @@ describe('assembleParticipantMessage', () => {
 
     expect(result.messageText.length).toBeLessThanOrEqual(SMS_SINGLE_SEGMENT_LIMIT);
     expect(result.messageText).toContain('$24.50');
-    expect(result.messageText).toContain('https://letssplyt.app/s/abc123token');
-    expect(result.messageText).not.toContain('See full split:');
+    expect(result.messageText).toContain('Your share for Dinner paid by Alex');
+    expect(result.messageText).toContain('Pay: https://letssplyt.app/s/abc123token');
     expect(result.messageText).not.toContain('Pay here:');
     expect(result.messageText).not.toContain('Venmo:');
     expect(result.paymentLinks).toHaveLength(2);
