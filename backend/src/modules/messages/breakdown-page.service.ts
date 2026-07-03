@@ -1,9 +1,14 @@
 import { formatCurrency } from '../../infrastructure/security';
 import { supabaseAdmin } from '../../infrastructure/supabase';
+import { getPaymentConfigForPhone } from '../../config/payment-methods.config';
+import { getHandles } from '../profile/profile.service';
+import { buildPaymentLinksForMethods } from './deepLinks';
 import { loadParticipantItemNames } from './messages.service';
+import { resolveParticipantPhoneContext } from './participant-phone';
 import {
   renderBreakdownNotFoundPage,
   renderBreakdownPage,
+  type BreakdownPaymentLink,
   type BreakdownRow,
 } from './templates/breakdown.html';
 
@@ -11,12 +16,19 @@ interface ViewerParticipant {
   id: string;
   event_id: string;
   display_name: string;
+  amount_owed: number | null;
+  user_id: string | null;
+  guest_pii_token: string | null;
+  country_code: string | null;
+  join_method: string;
 }
 
 async function fetchViewerByToken(token: string): Promise<ViewerParticipant | null> {
   const { data, error } = await supabaseAdmin
     .from('participants')
-    .select('id, event_id, display_name')
+    .select(
+      'id, event_id, display_name, amount_owed, user_id, guest_pii_token, country_code, join_method',
+    )
     .eq('breakdown_token', token)
     .maybeSingle();
 
@@ -94,12 +106,49 @@ export async function renderSplitBreakdownHtml(token: string): Promise<{ html: s
   const totalAmount =
     eventRow.total_amount !== null ? Number(eventRow.total_amount) : summedShares;
 
+  const viewerAmount =
+    viewer.amount_owed !== null ? Number(viewer.amount_owed) : null;
+
+  let paymentLinks: BreakdownPaymentLink[] = [];
+  if (viewerAmount !== null && viewerAmount > 0) {
+    const phoneContext = await resolveParticipantPhoneContext({
+      user_id: viewer.user_id,
+      guest_pii_token: viewer.guest_pii_token,
+      country_code: viewer.country_code,
+      join_method: viewer.join_method,
+    });
+    const paymentConfig = getPaymentConfigForPhone(
+      phoneContext.phoneE164 ?? '+1',
+      phoneContext.resolvedCountry,
+    );
+    const payerHandles = await getHandles(eventRow.payer_id as string);
+    const links = buildPaymentLinksForMethods(
+      payerHandles.map((handle) => ({
+        provider: handle.provider,
+        handle_value: handle.handle_value,
+      })),
+      paymentConfig.supportedMethods,
+      viewerAmount,
+      eventRow.title as string,
+      currency,
+      locale,
+    );
+    paymentLinks = links.map((link) => ({
+      label: link.label,
+      url: link.url,
+      isInstruction: !link.url.startsWith('http') && !link.url.includes('://'),
+    }));
+  }
+
   const html = renderBreakdownPage({
     eventTitle: eventRow.title as string,
     payerName: payer.display_name as string,
     currency,
     rows,
     totalLabel: formatCurrency(totalAmount, currency, locale),
+    viewerShareLabel:
+      viewerAmount !== null ? formatCurrency(viewerAmount, currency, locale) : null,
+    paymentLinks,
   });
 
   return { html, status: 200 };

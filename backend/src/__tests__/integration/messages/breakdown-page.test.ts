@@ -17,6 +17,11 @@ describe('Split breakdown page', () => {
         id: VIEWER_ID,
         event_id: EVENT_ID,
         display_name: 'Jordan',
+        amount_owed: 42,
+        user_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        guest_pii_token: null,
+        country_code: 'US',
+        join_method: 'qr_app',
       },
       error: null,
     });
@@ -58,6 +63,15 @@ describe('Split breakdown page', () => {
     });
 
     mockSupabase.__pushMockResultForTable('item_assignments', { data: [], error: null });
+    mockSupabase.__pushMockResultForTable('user_payment_handles', { data: [], error: null });
+  });
+
+  it('GET /s/:token serves the same breakdown page as /split/:token', async () => {
+    const response = await request(app).get(`/s/${TOKEN}`);
+
+    expect(response.status).toBe(200);
+    expect(response.text).toContain('Team Dinner');
+    expect(response.text).toContain('Jordan (you)');
   });
 
   it('GET /split/:token returns HTML breakdown with viewer highlighted', async () => {

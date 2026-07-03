@@ -281,7 +281,11 @@ async function main(): Promise<void> {
       previews?.length === memberCount &&
       previews.every((p) => p.message_text.length > 20) &&
       previewsWithBreakdown.length >= 1 &&
-      previews.every((p) => p.message_text.includes('See full split:'))
+      previews.every((p) =>
+        p.channel === 'sms'
+          ? p.message_text.includes('Pay:')
+          : p.message_text.includes('See full split:'),
+      )
     ) {
       pass(
         'GET messages/preview',
@@ -292,9 +296,10 @@ async function main(): Promise<void> {
       return;
     }
 
-    const hasDisplayName = previews?.every(
-      (p) => p.message_text.includes(p.display_name) && !p.message_text.includes('Recipient'),
-    );
+    const hasDisplayName = previews?.every((p) => {
+      const firstName = p.display_name.trim().split(/\s+/)[0] ?? p.display_name;
+      return p.message_text.includes(firstName) && !p.message_text.includes('Recipient');
+    });
     if (hasDisplayName) {
       pass('preview message_text', 'uses display_name not Recipient');
     } else {

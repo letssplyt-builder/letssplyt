@@ -8,6 +8,12 @@ export interface BreakdownRow {
   isOrganiser: boolean;
 }
 
+export interface BreakdownPaymentLink {
+  label: string;
+  url: string;
+  isInstruction: boolean;
+}
+
 function formatParticipantLabel(row: BreakdownRow): string {
   const tags: string[] = [];
   if (row.isViewer) tags.push('you');
@@ -22,6 +28,30 @@ export interface BreakdownPageParams {
   currency: string;
   rows: BreakdownRow[];
   totalLabel: string;
+  viewerShareLabel: string | null;
+  paymentLinks: BreakdownPaymentLink[];
+}
+
+function renderPaymentSection(params: BreakdownPageParams): string {
+  if (!params.viewerShareLabel || params.paymentLinks.length === 0) {
+    return '';
+  }
+
+  const buttons = params.paymentLinks
+    .map((link) => {
+      if (link.isInstruction) {
+        return `<p class="pay-instruction">${escapeHtml(link.url)}</p>`;
+      }
+      return `<a class="pay-btn" href="${escapeHtml(link.url)}" rel="noopener noreferrer">${escapeHtml(link.label)}</a>`;
+    })
+    .join('');
+
+  return `<div class="pay-section">
+      <h2 class="pay-title">Pay your share</h2>
+      <p class="pay-amount">You owe <strong>${escapeHtml(params.viewerShareLabel)}</strong> to ${escapeHtml(params.payerName)}</p>
+      <div class="pay-actions">${buttons}</div>
+      <p class="pay-note">Tap a button to open your payment app with the amount pre-filled.</p>
+    </div>`;
 }
 
 export function renderBreakdownPage(params: BreakdownPageParams): string {
@@ -70,6 +100,22 @@ export function renderBreakdownPage(params: BreakdownPageParams): string {
       border-top: 1.5px solid #E5E7EB;
     }
     .footnote { font-size: 11px; color: #9CA3AF; margin-top: 20px; line-height: 1.5; text-align: center; }
+    .pay-section {
+      margin-top: 28px; padding-top: 24px; border-top: 1.5px solid #E5E7EB;
+    }
+    .pay-title { font-size: 18px; font-weight: 800; margin-bottom: 6px; color: #111827; }
+    .pay-amount { font-size: 14px; color: #4B5563; margin-bottom: 16px; line-height: 1.5; }
+    .pay-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+    .pay-btn {
+      display: inline-block; padding: 12px 18px; border-radius: 12px;
+      background: #0E5C66; color: #fff; font-weight: 700; font-size: 14px;
+      text-decoration: none; text-align: center;
+    }
+    .pay-instruction {
+      width: 100%; font-size: 14px; color: #374151; background: #F9FAFB;
+      border: 1px solid #E5E7EB; border-radius: 12px; padding: 12px 14px; margin: 0;
+    }
+    .pay-note { font-size: 12px; color: #9CA3AF; line-height: 1.4; }
   </style>
 </head>
 <body>
@@ -100,6 +146,7 @@ export function renderBreakdownPage(params: BreakdownPageParams): string {
           </tr>
         </tbody>
       </table>
+      ${renderPaymentSection(params)}
       <p class="footnote">This link is personal — only share if you are comfortable showing the full split.</p>
     </div>
   </div>
