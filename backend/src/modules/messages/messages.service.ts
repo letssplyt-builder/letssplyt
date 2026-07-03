@@ -314,6 +314,7 @@ export async function buildRevisionMessagesForParticipants(
       revisionLeadIn: 'Your share has been updated.',
       aiGreeting: buildStandardOpeningLine(displayName, eventName, payerDisplayName),
       displayName,
+      payerDisplayName,
       amountOwed,
       currency,
       locale,

@@ -88,6 +88,7 @@ app.use('/webhooks/telnyx', telnyxWebhookRouter);
 
 app.use('/join', joinWebRoutes);
 app.use('/split', breakdownRoutes);
+app.use('/s', breakdownRoutes);
 
 app.use('/api/v1/join', joinAppRoutes);
 

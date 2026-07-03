@@ -9,6 +9,8 @@ import {
   type PaymentLinkResult,
   type PayerHandleInput,
 } from './deepLinks';
+import { buildCompactSmsMessage } from './compact-sms';
+import { buildShortBreakdownUrl } from './breakdown-url';
 
 export interface AssembledParticipantMessage {
   messageText: string;
@@ -31,6 +33,7 @@ export function buildStandardOpeningLine(
 export interface AssembleMessageParams {
   aiGreeting: string;
   displayName: string;
+  payerDisplayName: string;
   amountOwed: number;
   currency: string;
   locale: string;
@@ -40,7 +43,54 @@ export interface AssembleMessageParams {
   channel: 'whatsapp' | 'sms';
   isRegistered: boolean;
   breakdownUrl?: string;
+  breakdownToken?: string;
   revisionLeadIn?: string;
+}
+
+function assembleWhatsAppMessage(
+  params: AssembleMessageParams,
+  formattedAmount: string,
+  paymentLinks: PaymentLinkResult[],
+): string {
+  const paymentLines = paymentLinks.map((link) => `${link.label}: ${link.url}`);
+  const paymentBlock =
+    paymentLines.length > 0
+      ? `Pay here:\n${paymentLines.join('\n')}`
+      : 'Please reply to confirm when you have paid.';
+
+  const nudge = params.isRegistered
+    ? ''
+    : '\n\nTrack your payments with LetsSplyt: https://letssplyt.app/download';
+
+  const breakdownLine = params.breakdownUrl
+    ? `See full split: ${params.breakdownUrl}`
+    : '';
+
+  return [
+    params.revisionLeadIn,
+    params.aiGreeting,
+    `Your share is ${formattedAmount}.`,
+    breakdownLine,
+    paymentBlock,
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join('\n\n')
+    .concat(nudge);
+}
+
+function assembleSmsMessage(
+  params: AssembleMessageParams,
+  formattedAmount: string,
+  payUrl: string,
+): string {
+  return buildCompactSmsMessage({
+    displayName: params.displayName,
+    payerDisplayName: params.payerDisplayName,
+    eventName: params.eventName,
+    formattedAmount,
+    payUrl,
+    revisionLeadIn: params.revisionLeadIn,
+  });
 }
 
 export function assembleParticipantMessage(params: AssembleMessageParams): AssembledParticipantMessage {
@@ -56,33 +106,24 @@ export function assembleParticipantMessage(params: AssembleMessageParams): Assem
     locale,
   );
 
-  const paymentLines = paymentLinks.map((link) => `${link.label}: ${link.url}`);
-  const paymentBlock =
-    paymentLines.length > 0
-      ? `Pay here:\n${paymentLines.join('\n')}`
-      : 'Please reply to confirm when you have paid.';
+  if (params.channel === 'sms') {
+    const payUrl =
+      params.breakdownUrl ??
+      (params.breakdownToken ? buildShortBreakdownUrl(params.breakdownToken) : '');
 
-  const nudge = params.isRegistered
-    ? ''
-    : '\n\nTrack your payments with LetsSplyt: https://letssplyt.app/download';
+    const messageText = payUrl
+      ? assembleSmsMessage(params, formattedAmount, payUrl)
+      : assembleWhatsAppMessage(params, formattedAmount, paymentLinks);
 
-  const breakdownLine = params.breakdownUrl
-    ? `See full split: ${params.breakdownUrl}`
-    : '';
-
-  const messageText = [
-    params.revisionLeadIn,
-    params.aiGreeting,
-    `Your share is ${formattedAmount}.`,
-    breakdownLine,
-    paymentBlock,
-  ]
-    .filter((line): line is string => Boolean(line))
-    .join('\n\n')
-    .concat(nudge);
+    return {
+      messageText,
+      paymentLinks,
+      channel: params.channel,
+    };
+  }
 
   return {
-    messageText,
+    messageText: assembleWhatsAppMessage(params, formattedAmount, paymentLinks),
     paymentLinks,
     channel: params.channel,
   };

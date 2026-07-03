@@ -30,8 +30,12 @@ export function normalizePaymentHandle(provider: PaymentProvider, raw: string): 
 
   switch (provider) {
     case 'venmo': {
-      const withoutAt = trimmed.replace(/^@+/, '');
-      return `@${withoutAt}`;
+      let slug = trimmed
+        .replace(/^https?:\/\/(account\.)?(www\.)?venmo\.com\//i, '')
+        .replace(/^venmo\.com\//i, '')
+        .replace(/^@+/, '');
+      slug = (slug.split(/[/?#]/)[0] ?? slug).trim();
+      return `@${slug}`;
     }
     case 'paypal': {
       const slug = trimmed
@@ -97,7 +101,7 @@ export function validatePaymentHandle(
 export function paymentHandleHint(provider: PaymentProvider): string {
   switch (provider) {
     case 'venmo':
-      return '5–30 characters. Example: @alex-chen';
+      return 'Your @username from Venmo → Me → Profile. Example: @alex-chen';
     case 'paypal':
       return 'Username or link. Example: paypal.me/alexchen';
     case 'cashapp':

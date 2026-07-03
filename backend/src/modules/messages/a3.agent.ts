@@ -39,6 +39,7 @@ export async function composeParticipantMessage(
   const composed = assembleParticipantMessage({
     aiGreeting: openingLine,
     displayName: params.displayName,
+    payerDisplayName: params.payerDisplayName,
     amountOwed: params.amountOwed,
     currency: params.currency,
     locale,

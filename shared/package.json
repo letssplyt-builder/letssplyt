@@ -44,6 +44,10 @@
       "types": "./dist/utils/paymentHandleValidation.d.ts",
       "default": "./dist/utils/paymentHandleValidation.js"
     },
+    "./paymentLinks": {
+      "types": "./dist/utils/paymentLinks.d.ts",
+      "default": "./dist/utils/paymentLinks.js"
+    },
     "./utils/splitCalculator": {
       "types": "./dist/utils/splitCalculator.d.ts",
       "default": "./dist/utils/splitCalculator.js"

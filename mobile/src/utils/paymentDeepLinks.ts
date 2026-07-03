@@ -1,4 +1,5 @@
 import type { PaymentProvider } from '@letssplyt/shared/profile.types';
+import { buildPaymentLinkUrl } from '@letssplyt/shared/paymentLinks';
 
 export interface PaymentDeepLink {
   provider: PaymentProvider;
@@ -6,49 +7,42 @@ export interface PaymentDeepLink {
   url: string;
 }
 
+const PROVIDER_LABELS: Partial<Record<PaymentProvider, string>> = {
+  venmo: 'Venmo',
+  paypal: 'PayPal',
+  cashapp: 'Cash App',
+  zelle: 'Zelle',
+  wise: 'Wise',
+};
+
 export function buildPaymentDeepLink(
   provider: PaymentProvider,
   handleValue: string,
   amountMajorUnits: number,
   eventName: string,
 ): PaymentDeepLink | null {
-  const encodedNote = encodeURIComponent(`${eventName} split`);
-  const numericAmount = amountMajorUnits.toFixed(2);
+  const url = buildPaymentLinkUrl({
+    provider,
+    handleValue,
+    amountMajorUnits,
+    eventName,
+    channel: 'app',
+  });
 
-  switch (provider) {
-    case 'venmo':
-      return {
-        provider: 'venmo',
-        label: 'Venmo',
-        url: `venmo://paycharge?txn=pay&recipients=${encodeURIComponent(handleValue)}&amount=${numericAmount}&note=${encodedNote}`,
-      };
-    case 'paypal':
-      return {
-        provider: 'paypal',
-        label: 'PayPal',
-        url: `https://paypal.me/${encodeURIComponent(handleValue)}/${numericAmount}`,
-      };
-    case 'cashapp':
-      return {
-        provider: 'cashapp',
-        label: 'Cash App',
-        url: `https://cash.app/${encodeURIComponent(handleValue)}/${numericAmount}`,
-      };
-    case 'zelle':
-      return {
-        provider: 'zelle',
-        label: 'Zelle',
-        url: `zelle://pay?email=${encodeURIComponent(handleValue)}&amount=${numericAmount}`,
-      };
-    case 'wise':
-      return {
-        provider: 'wise',
-        label: 'Wise',
-        url: `https://wise.com/pay/me/${encodeURIComponent(handleValue)}`,
-      };
+  if (!url) {
+    return null;
   }
 
-  return null;
+  const label = PROVIDER_LABELS[provider];
+  if (!label) {
+    return null;
+  }
+
+  return {
+    provider,
+    label,
+    url,
+  };
 }
 
 export function isHttpOrAppUrl(url: string): boolean {

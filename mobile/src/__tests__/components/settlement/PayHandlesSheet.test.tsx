@@ -17,12 +17,14 @@ describe('PayHandlesSheet', () => {
         currency="USD"
         payerDisplayName="Alex"
         eventTitleForLink="Dinner"
-        handles={[{ provider: 'venmo', handle_display: '@alex' }]}
+        handles={[{ provider: 'venmo', handle_display: '@alex-chen' }]}
       />,
     );
 
-    fireEvent.press(screen.getByLabelText('Pay via Venmo — @alex'));
+    fireEvent.press(screen.getByLabelText('Pay via Venmo — @alex-chen'));
 
-    expect(openUrl).toHaveBeenCalledWith(expect.stringContaining('venmo://'));
+    expect(openUrl).toHaveBeenCalledWith(
+      expect.stringMatching(/^https:\/\/account\.venmo\.com\/pay\?/),
+    );
   });
 });
