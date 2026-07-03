@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { EventListItem } from '@letssplyt/shared/event.types';
 import { authColors } from '../../theme/colors';
-import { formatEventDate, formatMoney, statusChipLabel } from '../../utils/events';
+import { formatEventDate, formatMoney, eventStatusVisual, statusChipLabel } from '../../utils/events';
 
 interface EventCardProps {
   event: EventListItem;
@@ -13,6 +13,10 @@ export function EventCard({ event, onPress, variant = 'default' }: EventCardProp
   const compact = variant === 'compact';
   const dateLabel = formatEventDate(event.created_at);
   const statusLabel = statusChipLabel(event.status, {
+    role: event.role,
+    viewerPaymentStatus: event.viewer_payment_status,
+  });
+  const statusVisual = eventStatusVisual(event.status, {
     role: event.role,
     viewerPaymentStatus: event.viewer_payment_status,
   });
@@ -36,6 +40,8 @@ export function EventCard({ event, onPress, variant = 'default' }: EventCardProp
       onPress={onPress}
       style={({ pressed }) => [
         compact ? styles.compactCard : styles.card,
+        { borderLeftColor: statusVisual.cardAccent },
+        styles.cardAccent,
         pressed && styles.cardPressed,
       ]}
     >
@@ -49,8 +55,16 @@ export function EventCard({ event, onPress, variant = 'default' }: EventCardProp
           </Text>
         </View>
         <View style={styles.trailing}>
-          <View style={[styles.statusChip, compact && styles.statusChipCompact]}>
-            <Text style={styles.statusChipText}>{statusLabel}</Text>
+          <View
+            style={[
+              styles.statusChip,
+              compact && styles.statusChipCompact,
+              { backgroundColor: statusVisual.chipBackground },
+            ]}
+          >
+            <Text style={[styles.statusChipText, { color: statusVisual.chipText }]}>
+              {statusLabel}
+            </Text>
           </View>
           {!compact && event.total_amount !== null ? (
             <Text style={styles.amount}>{amountLabel}</Text>
@@ -69,6 +83,9 @@ const styles = StyleSheet.create({
     borderColor: authColors.glassBorder,
     padding: 16,
     marginBottom: 10,
+  },
+  cardAccent: {
+    borderLeftWidth: 3,
   },
   compactCard: {
     backgroundColor: authColors.glass,
@@ -112,7 +129,6 @@ const styles = StyleSheet.create({
   },
   statusChip: {
     alignSelf: 'flex-end',
-    backgroundColor: authColors.pillOnDark,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 100,
@@ -124,7 +140,6 @@ const styles = StyleSheet.create({
   statusChipText: {
     fontSize: 10,
     fontWeight: '700',
-    color: authColors.textOnDarkMuted,
   },
   amount: {
     fontSize: 14,
