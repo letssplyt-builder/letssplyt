@@ -24,7 +24,7 @@ describe('PayHandlesSheet', () => {
     fireEvent.press(screen.getByLabelText('Pay via Venmo — @alex-chen'));
 
     expect(openUrl).toHaveBeenCalledWith(
-      expect.stringContaining('venmo://paycharge?txn=pay&recipients=alex-chen'),
+      expect.stringMatching(/^https:\/\/account\.venmo\.com\/pay\?/),
     );
   });
 });

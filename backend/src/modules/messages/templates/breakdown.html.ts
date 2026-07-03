@@ -32,6 +32,10 @@ export interface BreakdownPageParams {
   paymentLinks: BreakdownPaymentLink[];
 }
 
+function escapeHref(url: string): string {
+  return url.replace(/"/g, '&quot;');
+}
+
 function renderPaymentSection(params: BreakdownPageParams): string {
   if (!params.viewerShareLabel || params.paymentLinks.length === 0) {
     return '';
@@ -42,7 +46,7 @@ function renderPaymentSection(params: BreakdownPageParams): string {
       if (link.isInstruction) {
         return `<p class="pay-instruction">${escapeHtml(link.url)}</p>`;
       }
-      return `<a class="pay-btn" href="${escapeHtml(link.url)}" rel="noopener noreferrer">${escapeHtml(link.label)}</a>`;
+      return `<a class="pay-btn" href="${escapeHref(link.url)}" rel="noopener noreferrer" target="_blank">${escapeHtml(link.label)}</a>`;
     })
     .join('');
 

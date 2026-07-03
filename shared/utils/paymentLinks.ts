@@ -61,6 +61,17 @@ export function buildZelleInstruction(handle: string): string {
   return `Pay via Zelle — send to: ${zelleHandleForLink(handle)}`;
 }
 
+/** Venmo web/universal pay URL — works in Safari and opens the app when installed. */
+export function buildVenmoPayUrl(
+  username: string,
+  amountMajorUnits: number,
+  eventName: string,
+): string {
+  const encodedNote = encodeURIComponent(`${eventName} split`);
+  const numericAmount = amountMajorUnits.toFixed(2);
+  return `https://account.venmo.com/pay?txn=pay&recipients=${encodeURIComponent(username)}&amount=${numericAmount}&note=${encodedNote}`;
+}
+
 /**
  * Build a payment URL or Zelle instruction from a stored profile handle.
  * SMS channel uses HTTPS universal links where possible; app channel prefers native schemes.
@@ -83,10 +94,8 @@ export function buildPaymentLinkUrl(params: {
       if (!username) {
         return null;
       }
-      if (channel === 'app') {
-        return `venmo://paycharge?txn=pay&recipients=${encodeURIComponent(username)}&amount=${numericAmount}&note=${encodedNote}`;
-      }
-      return `https://venmo.com/${encodeURIComponent(username)}?txn=pay&amount=${numericAmount}&note=${encodedNote}`;
+      // Always HTTPS — venmo:// fails in Safari (breakdown page) and on simulators without Venmo.
+      return buildVenmoPayUrl(username, amountMajorUnits, eventName);
     }
 
     case 'paypal': {

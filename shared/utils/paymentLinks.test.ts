@@ -35,7 +35,7 @@ describe('paymentLinks', () => {
   });
 
   describe('buildPaymentLinkUrl', () => {
-    it('builds Venmo SMS link without @ in username', () => {
+    it('builds Venmo HTTPS pay link without @ in recipients', () => {
       expect(
         buildPaymentLinkUrl({
           provider: 'venmo',
@@ -45,22 +45,20 @@ describe('paymentLinks', () => {
           channel: 'sms',
         }),
       ).toBe(
-        'https://venmo.com/marcus-pay?txn=pay&amount=42.50&note=Dinner%20split',
+        'https://account.venmo.com/pay?txn=pay&recipients=marcus-pay&amount=42.50&note=Dinner%20split',
       );
     });
 
-    it('builds Venmo app deep link without @ in recipients', () => {
-      expect(
-        buildPaymentLinkUrl({
-          provider: 'venmo',
-          handleValue: '@marcus-pay',
-          amountMajorUnits: 42.5,
-          eventName: 'Dinner',
-          channel: 'app',
-        }),
-      ).toBe(
-        'venmo://paycharge?txn=pay&recipients=marcus-pay&amount=42.50&note=Dinner%20split',
-      );
+    it('uses HTTPS Venmo link for in-app channel too', () => {
+      const url = buildPaymentLinkUrl({
+        provider: 'venmo',
+        handleValue: '@marcus-pay',
+        amountMajorUnits: 42.5,
+        eventName: 'Dinner',
+        channel: 'app',
+      });
+      expect(url).toMatch(/^https:\/\/account\.venmo\.com\/pay\?/);
+      expect(url).not.toContain('venmo://');
     });
 
     it('builds PayPal link from stored paypal.me handle', () => {

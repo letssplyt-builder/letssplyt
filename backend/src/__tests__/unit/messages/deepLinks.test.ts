@@ -11,7 +11,7 @@ describe('deepLinks', () => {
   it('builds Venmo SMS link from stored @username handle', () => {
     const link = buildPaymentLink('venmo', '@marcus-pay', 42.5, 'Dinner', 'USD', 'en-US');
     expect(link?.url).toBe(
-      'https://venmo.com/marcus-pay?txn=pay&amount=42.50&note=Dinner%20split',
+      'https://account.venmo.com/pay?txn=pay&recipients=marcus-pay&amount=42.50&note=Dinner%20split',
     );
   });
 
