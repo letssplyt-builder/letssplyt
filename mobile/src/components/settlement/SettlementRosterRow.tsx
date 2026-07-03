@@ -255,8 +255,10 @@ export function SettlementRosterRow({
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gesture) => {
         const config = swipeGestureRef.current;
+        if (!config.hasSwipeActions) {
+          return false;
+        }
         return (
-          config.hasSwipeActions &&
           Math.abs(gesture.dx) > Math.abs(gesture.dy) &&
           Math.abs(gesture.dx) > 8
         );
