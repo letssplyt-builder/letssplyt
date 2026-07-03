@@ -8,6 +8,13 @@ describe('paymentHandleValidation', () => {
     expect(validatePaymentHandle('venmo', 'alex-chen').normalized).toBe('@alex-chen');
   });
 
+  it('accepts pasted Venmo profile URLs', () => {
+    expect(validatePaymentHandle('venmo', 'https://venmo.com/alex-chen').valid).toBe(true);
+    expect(validatePaymentHandle('venmo', 'https://venmo.com/alex-chen').normalized).toBe(
+      '@alex-chen',
+    );
+  });
+
   it('rejects short Venmo usernames', () => {
     expect(validatePaymentHandle('venmo', '@test').valid).toBe(false);
   });

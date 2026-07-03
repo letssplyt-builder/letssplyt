@@ -8,21 +8,21 @@ import {
 } from '../../../modules/messages/deepLinks';
 
 describe('deepLinks', () => {
-  it('builds Venmo deep link format', () => {
-    const link = buildPaymentLink('venmo', 'marcus-pay', 42.5, 'Dinner', 'USD', 'en-US');
+  it('builds Venmo SMS link from stored @username handle', () => {
+    const link = buildPaymentLink('venmo', '@marcus-pay', 42.5, 'Dinner', 'USD', 'en-US');
     expect(link?.url).toBe(
-      'venmo://paycharge?txn=pay&recipients=marcus-pay&amount=42.50&note=Dinner%20split',
+      'https://venmo.com/marcus-pay?txn=pay&amount=42.50&note=Dinner%20split',
     );
   });
 
-  it('builds PayPal link format', () => {
-    const link = buildPaymentLink('paypal', 'marcus', 12.34, 'Dinner', 'USD', 'en-US');
+  it('builds PayPal link from stored paypal.me handle', () => {
+    const link = buildPaymentLink('paypal', 'paypal.me/marcus', 12.34, 'Dinner', 'USD', 'en-US');
     expect(link?.url).toBe('https://paypal.me/marcus/12.34');
   });
 
-  it('builds Cash App link format', () => {
+  it('builds Cash App link from stored $cashtag handle', () => {
     const link = buildPaymentLink('cashapp', '$marcus', 9.99, 'Dinner', 'USD', 'en-US');
-    expect(link?.url).toBe('https://cash.app/%24marcus/9.99');
+    expect(link?.url).toBe('https://cash.app/$marcus/9.99');
   });
 
   it('returns Zelle instruction text without app deep link', () => {
@@ -49,8 +49,8 @@ describe('deepLinks', () => {
   it('filters payment links by supported methods', () => {
     const links = buildPaymentLinksForMethods(
       [
-        { provider: 'venmo', handle_value: 'venmo-user' },
-        { provider: 'paypal', handle_value: 'paypal-user' },
+        { provider: 'venmo', handle_value: '@venmo-user' },
+        { provider: 'paypal', handle_value: 'paypal.me/paypal-user' },
         { provider: 'cashapp', handle_value: '$cash' },
       ],
       ['paypal', 'wise'],
