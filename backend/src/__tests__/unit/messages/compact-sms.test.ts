@@ -6,7 +6,7 @@ import {
 } from '../../../modules/messages/compact-sms';
 
 describe('buildCompactSmsMessage', () => {
-  const payUrl = 'https://letssplyt.app/s/abcdefghijklmnopqrstuvwx';
+  const payUrl = 'https://letssplyt.app/s/abc123token12';
 
   it('fits a typical US split message in one SMS segment', () => {
     const message = buildCompactSmsMessage({
