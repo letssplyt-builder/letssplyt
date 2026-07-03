@@ -78,6 +78,60 @@ describe('settlementStore', () => {
     expect(state.guests[1].kind).toBe('name_only');
   });
 
+  it('loadDashboardCounterparties populates members and guests together', async () => {
+    jest.mocked(settlementService.fetchMemberCounterparties).mockResolvedValue({
+      owe_you: [
+        {
+          user_id: 'u1',
+          display_name: 'Jordan',
+          avatar_colour: '#4F46E5',
+          net_amount: 25,
+        },
+      ],
+      you_owe: [],
+    });
+    jest.mocked(settlementService.fetchGuestCounterparties).mockResolvedValue({
+      guests: [
+        {
+          guest_key: 'hash-1',
+          kind: 'phone',
+          display_name: 'Guest Sam',
+          amount: 30,
+        },
+      ],
+    });
+
+    await useSettlementStore.getState().loadDashboardCounterparties();
+
+    const state = useSettlementStore.getState();
+    expect(state.membersOweYou).toHaveLength(1);
+    expect(state.guests).toHaveLength(1);
+    expect(state.counterpartyError).toBe(false);
+  });
+
+  it('loadDashboardCounterparties keeps member data when guest fetch fails', async () => {
+    jest.mocked(settlementService.fetchMemberCounterparties).mockResolvedValue({
+      owe_you: [
+        {
+          user_id: 'u1',
+          display_name: 'Jordan',
+          avatar_colour: '#4F46E5',
+          net_amount: 25,
+        },
+      ],
+      you_owe: [],
+    });
+    jest.mocked(settlementService.fetchGuestCounterparties).mockRejectedValue(new Error('guests down'));
+
+    await useSettlementStore.getState().loadDashboardCounterparties();
+
+    const state = useSettlementStore.getState();
+    expect(state.membersOweYou).toHaveLength(1);
+    expect(state.guests).toEqual([]);
+    expect(state.counterpartyError).toBe(true);
+    expect(state.isLoadingCounterparties).toBe(false);
+  });
+
   it('loadMemberDetail populates outstanding and history', async () => {
     jest.mocked(settlementService.fetchMemberDetail).mockResolvedValue({
       counterparty: {

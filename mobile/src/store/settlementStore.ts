@@ -21,6 +21,7 @@ interface SettlementState {
   isLoadingLedger: boolean;
   counterpartyError: boolean;
   loadCounterparties: (kind: 'members' | 'guests') => Promise<void>;
+  loadDashboardCounterparties: () => Promise<void>;
   loadMemberDetail: (userId: string) => Promise<void>;
   loadGuestDetail: (phoneHash: string) => Promise<void>;
   loadEventLedger: () => Promise<void>;
@@ -70,6 +71,31 @@ export const useSettlementStore = create<SettlementState>((set, get) => ({
     } catch {
       set({ counterpartyError: true, isLoadingCounterparties: false });
     }
+  },
+
+  loadDashboardCounterparties: async () => {
+    set({ isLoadingCounterparties: true, counterpartyError: false });
+    const [membersResult, guestsResult] = await Promise.allSettled([
+      settlementService.fetchMemberCounterparties(),
+      settlementService.fetchGuestCounterparties(),
+    ]);
+
+    const members =
+      membersResult.status === 'fulfilled'
+        ? membersResult.value
+        : { owe_you: [], you_owe: [] };
+    const guestData =
+      guestsResult.status === 'fulfilled' ? guestsResult.value : { guests: [] };
+    const hadFailure =
+      membersResult.status === 'rejected' || guestsResult.status === 'rejected';
+
+    set({
+      membersOweYou: members.owe_you,
+      membersYouOwe: members.you_owe,
+      guests: guestData.guests,
+      isLoadingCounterparties: false,
+      counterpartyError: hadFailure,
+    });
   },
 
   loadMemberDetail: async (userId) => {

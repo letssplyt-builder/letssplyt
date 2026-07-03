@@ -6,6 +6,7 @@ interface SegmentedControlProps<T extends string> {
   labels: Record<T, string>;
   value: T;
   onChange: (value: T) => void;
+  compact?: boolean;
 }
 
 export function SegmentedControl<T extends string>({
@@ -13,6 +14,7 @@ export function SegmentedControl<T extends string>({
   labels,
   value,
   onChange,
+  compact = false,
 }: SegmentedControlProps<T>) {
   return (
     <View style={styles.wrap}>
@@ -22,11 +24,23 @@ export function SegmentedControl<T extends string>({
           <Pressable
             key={segment}
             accessibilityRole="button"
+            accessibilityLabel={`${labels[segment]} tab`}
             accessibilityState={{ selected: active }}
             onPress={() => onChange(segment)}
             style={[styles.segment, active && styles.segmentActive]}
           >
-            <Text style={[styles.label, active && styles.labelActive]}>{labels[segment]}</Text>
+            <Text
+              style={[
+                styles.label,
+                compact && styles.labelCompact,
+                active && styles.labelActive,
+              ]}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.85}
+            >
+              {labels[segment]}
+            </Text>
           </Pressable>
         );
       })}
@@ -60,5 +74,8 @@ const styles = StyleSheet.create({
   labelActive: {
     color: authColors.segmentActiveText,
     fontWeight: '700',
+  },
+  labelCompact: {
+    fontSize: 11,
   },
 });

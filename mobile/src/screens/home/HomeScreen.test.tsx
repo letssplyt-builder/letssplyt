@@ -70,6 +70,7 @@ describe('HomeScreen', () => {
       isLoadingDetail: false,
       counterpartyError: false,
       loadCounterparties: jest.fn(async () => {}),
+      loadDashboardCounterparties: jest.fn(async () => {}),
       loadMemberDetail: jest.fn(async () => {}),
       loadGuestDetail: jest.fn(async () => {}),
       clearDetail: jest.fn(),
@@ -99,7 +100,7 @@ describe('HomeScreen', () => {
     });
   });
 
-  it('shows members toggle and people who owe you list', async () => {
+  it('opens on Collect From when members owe the viewer', async () => {
     render(
       <HomeScreen
         navigation={navigation}
@@ -108,10 +109,55 @@ describe('HomeScreen', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Members')).toBeTruthy();
-      expect(screen.getByText('People who owe you')).toBeTruthy();
       expect(screen.getByText('Jordan')).toBeTruthy();
-      expect(screen.getByText('$25.00')).toBeTruthy();
+    });
+  });
+
+  it('shows pay, collect, and guests tabs', async () => {
+    render(
+      <HomeScreen
+        navigation={navigation}
+        route={{ key: 'Home', name: 'Home' } as never}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Pay to tab')).toBeTruthy();
+      expect(screen.getByLabelText('Collect From tab')).toBeTruthy();
+      expect(screen.getByLabelText('Guest Collect tab')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByLabelText('Pay to tab'));
+
+    await waitFor(() => {
+      expect(screen.getByText("You don't owe any members right now.")).toBeTruthy();
+    });
+    expect(screen.queryByText('People who owe you')).toBeNull();
+  });
+
+  it('switches to pay tab', async () => {
+    useSettlementStore.setState({
+      membersOweYou: [],
+      membersYouOwe: [
+        {
+          user_id: 'member-2',
+          display_name: 'Sam',
+          avatar_colour: '#059669',
+          net_amount: 12,
+        },
+      ],
+    });
+
+    render(
+      <HomeScreen
+        navigation={navigation}
+        route={{ key: 'Home', name: 'Home' } as never}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Sam')).toBeTruthy();
+      expect(screen.getByText('$12.00')).toBeTruthy();
     });
   });
 
@@ -124,8 +170,9 @@ describe('HomeScreen', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Owed to you')).toBeTruthy();
-      expect(screen.getByText('You owe')).toBeTruthy();
+      expect(
+        screen.getByLabelText('Owed to you $40.00. You owe $15.00.'),
+      ).toBeTruthy();
       expect(screen.getByText('$40.00')).toBeTruthy();
       expect(screen.getByText('$15.00')).toBeTruthy();
     });
