@@ -559,7 +559,7 @@ const SPLIT_EDIT_BLOCK_STATUSES = ['self_reported', 'confirmed', 'settled'] as c
 
 const LOCKED_PARTICIPANT_AMOUNT_STATUSES = new Set<string>(SPLIT_EDIT_BLOCK_STATUSES);
 
-async function assertSplitEditAllowed(eventId: string): Promise<void> {
+export async function assertSplitEditAllowed(eventId: string): Promise<void> {
   const { data, error } = await supabaseAdmin
     .from('participants')
     .select('id')
@@ -580,7 +580,7 @@ async function assertSplitEditAllowed(eventId: string): Promise<void> {
 }
 
 /** Split can be confirmed while joining is closed — including post-send revisions (E08-S07). */
-function assertEventAllowsSplitConfirm(status: string): void {
+export function assertEventAllowsSplitConfirm(status: string): void {
   if (status === 'locked' || status === 'sent') {
     return;
   }

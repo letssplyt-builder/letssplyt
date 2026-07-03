@@ -168,7 +168,7 @@ describe('Settlement API integration', () => {
         id: EVENT_ID,
         payer_id: PAYER_ID,
         title: 'Dinner',
-        status: 'sent',
+        status: 'settled',
         currency: 'USD',
         locale: 'en-US',
         deleted_at: null,
@@ -197,6 +197,7 @@ describe('Settlement API integration', () => {
       error: null,
     });
     mockSupabase.__pushMockResultForTable('settlement_log', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('events', { data: null, error: null });
 
     const dispute = await request(app)
       .post(`/api/v1/events/${EVENT_ID}/settlement/${PARTICIPANT_ID}/dispute`)

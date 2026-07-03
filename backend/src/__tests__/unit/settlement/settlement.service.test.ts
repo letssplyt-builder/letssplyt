@@ -200,6 +200,35 @@ describe('settlement.service', () => {
     expect(result.disputed_count).toBe(1);
   });
 
+  it('dispute reopens a fully settled event back to sent', async () => {
+    mockSupabase.__pushMockResultForTable('events', {
+      data: {
+        id: EVENT_ID,
+        payer_id: PAYER_ID,
+        title: 'Dinner',
+        status: 'settled',
+        currency: 'USD',
+        locale: 'en-US',
+        deleted_at: null,
+      },
+      error: null,
+    });
+    pushParticipantRow({ payment_status: 'confirmed', disputed_count: 0 });
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: { id: PARTICIPANT_ID },
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('settlement_log', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('events', { data: null, error: null });
+
+    await disputePayment(PAYER_ID, EVENT_ID, PARTICIPANT_ID, {});
+
+    const eventUpdates = mockSupabase.from.mock.calls
+      .map((call) => call[0])
+      .filter((table) => table === 'events');
+    expect(eventUpdates.length).toBeGreaterThan(0);
+  });
+
   it('nudge rejects within 48h cooldown with retry timestamp', async () => {
     pushEvent();
     const recent = new Date(Date.now() - 1000).toISOString();

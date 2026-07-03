@@ -13,6 +13,10 @@ import {
   fetchEventRow,
   type EventRowWithReceiptFields,
 } from '../events/event.service';
+import {
+  assertEventAllowsSplitConfirm,
+  assertSplitEditAllowed,
+} from '../splits/splits.service';
 
 const confirmItemSchema = z.object({
   id: z.string().uuid().optional(),
@@ -63,7 +67,8 @@ function sumCharges(charges: z.infer<typeof confirmChargeSchema>[]): number {
   return Number(total.toFixed(2));
 }
 
-const RECEIPT_RECONFIRM_STAGES = ['parsed', 'parsed_confirmed', 'calculated', 'calculating'] as const;
+const PRE_SEND_RECONFIRM_STAGES = ['parsed', 'parsed_confirmed', 'calculated', 'calculating'] as const;
+const POST_SEND_RECONFIRM_STAGES = ['messaging', 'complete'] as const;
 
 function isValidItemId(id: string | undefined): boolean {
   return Boolean(id && /^[0-9a-f-]{36}$/i.test(id));
@@ -196,12 +201,11 @@ export async function confirmReceipt(
   const eventRow = await fetchEventRow(body.event_id) as EventRowWithReceiptFields;
   await assertEventOwner(eventRow, userId);
 
-  if (eventRow.status !== 'locked') {
-    throw new AppError(
-      'EVENT_NOT_LOCKED',
-      'Event must be locked before confirming receipt items',
-      400,
-    );
+  assertEventAllowsSplitConfirm(eventRow.status);
+
+  const isPostSend = eventRow.status === 'sent' && Boolean(eventRow.messages_sent_at);
+  if (isPostSend) {
+    await assertSplitEditAllowed(body.event_id);
   }
 
   const itemsSubtotal = sumItems(body.items);
@@ -238,11 +242,15 @@ export async function confirmReceipt(
   const nextAiStage =
     eventRow.ai_stage === 'parsed' ? 'parsed_confirmed' : eventRow.ai_stage;
 
+  const allowedStages = isPostSend
+    ? [...POST_SEND_RECONFIRM_STAGES]
+    : [...PRE_SEND_RECONFIRM_STAGES];
+
   const { data: claimed, error: claimError } = await supabaseAdmin
     .from('events')
     .update({ ai_stage: nextAiStage })
     .eq('id', body.event_id)
-    .in('ai_stage', [...RECEIPT_RECONFIRM_STAGES])
+    .in('ai_stage', allowedStages)
     .select('id');
 
   if (claimError) {
@@ -252,7 +260,7 @@ export async function confirmReceipt(
   if (!claimed?.length) {
     throw new AppError(
       'INVALID_AI_STAGE',
-      'Receipt can only be confirmed when ai_stage is parsed, parsed_confirmed, calculated, or calculating',
+      'Receipt can only be confirmed when ai_stage is parsed, parsed_confirmed, calculated, calculating, messaging, or complete',
       400,
     );
   }
