@@ -185,6 +185,22 @@ async function checkAndMarkEventSettled(eventId: string): Promise<boolean> {
   return true;
 }
 
+/** When a payment is disputed after full settlement, the event is no longer fully settled. */
+async function revertEventFullySettledIfNeeded(eventId: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('events')
+    .update({
+      status: 'sent',
+      fully_settled_at: null,
+    })
+    .eq('id', eventId)
+    .eq('status', 'settled');
+
+  if (error) {
+    throw new AppError('DB_WRITE_FAILED', error.message, 500);
+  }
+}
+
 export interface SelfReportInput {
   payment_method: string;
   note?: string;
@@ -432,6 +448,8 @@ export async function disputePayment(
     amount: participant.amount_owed,
     note: input.note ?? null,
   });
+
+  await revertEventFullySettledIfNeeded(eventId);
 
   return {
     participant_id: participantId,
