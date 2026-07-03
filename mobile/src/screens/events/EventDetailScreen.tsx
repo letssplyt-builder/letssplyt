@@ -29,12 +29,11 @@ import { AllPaidSheet } from '../../components/settlement/AllPaidSheet';
 import { PayHandlesSheet } from '../../components/settlement/PayHandlesSheet';
 import { ParticipantPayActions } from '../../components/settlement/ParticipantPayActions';
 import { SettlementProgressBar } from '../../components/settlement/SettlementProgressBar';
-import { SettlementRosterRow } from '../../components/settlement/SettlementRosterRow';
+import { SettlementRosterRow, hasSettlementSwipeActions } from '../../components/settlement/SettlementRosterRow';
 import { EventSplitActionBar } from '../../components/events/EventSplitActionBar';
 import { ParticipantEventDetail } from '../../components/events/ParticipantEventDetail';
 import { QRDisplayModal } from '../../components/events/QRDisplayModal';
 import { ReceiptQuickViewSheet } from '../../components/receipts/ReceiptQuickViewSheet';
-import { ReceiptViewChip } from '../../components/receipts/ReceiptViewChip';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { BottomToast } from '../../components/BottomToast';
 import { PrimaryButton } from '../../components/PrimaryButton';
@@ -150,6 +149,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const loadEventLedger = useSettlementStore((state) => state.loadEventLedger);
   const getIOweForEvent = useSettlementStore((state) => state.getIOweForEvent);
   const skipFocusRefreshRef = useRef(false);
+  const settlementSwipeHintPlayedRef = useRef(false);
   const isFocused = useIsFocused();
 
   const refreshDetail = useCallback(async () => {
@@ -329,6 +329,21 @@ export function EventDetailScreen({ navigation, route }: Props) {
       return 0;
     });
   }, [participants]);
+
+  const firstSettlementSwipeHintParticipantId = useMemo(() => {
+    if (!showOrganiserCollectionActions) {
+      return null;
+    }
+    const match = settlementRosterParticipants.find((participant) =>
+      hasSettlementSwipeActions(
+        participant.payment_status,
+        participant.user_id,
+        Boolean(participant.is_organiser),
+        true,
+      ),
+    );
+    return match?.id ?? null;
+  }, [settlementRosterParticipants, showOrganiserCollectionActions]);
 
   const openItemReview = (flow: 'initial' | 'edit' = 'initial') => {
     const review = currentEvent?.receipt_review;
@@ -700,13 +715,14 @@ export function EventDetailScreen({ navigation, route }: Props) {
           <Text style={styles.bannerError}>Couldn&apos;t load member list. Pull to retry.</Text>
         ) : null}
 
-        {showReceiptQuickView && sharedReceiptReview ? (
-          <ReceiptViewChip onPress={() => setReceiptQuickViewOpen(true)} />
-        ) : null}
-
         {!isPayer && currentEvent ? (
           <>
-            <ParticipantEventDetail detail={currentEvent} />
+            <ParticipantEventDetail
+              detail={currentEvent}
+              onViewReceipt={
+                showReceiptQuickView ? () => setReceiptQuickViewOpen(true) : undefined
+              }
+            />
             {participantPayContext ? (
               <ParticipantPayActions
                 onPayNow={() => setPaySheetOpen(true)}
@@ -798,7 +814,23 @@ export function EventDetailScreen({ navigation, route }: Props) {
         ) : isPayer ? (
           <View style={styles.settlementPhase}>
             <View style={styles.settlementHeader}>
-              <Text style={glassStyles.heading}>Settlement phase</Text>
+              <View style={styles.settlementTitleRow}>
+                <Text style={glassStyles.heading}>Settlement phase</Text>
+                {showReceiptQuickView ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="View receipt"
+                    accessibilityHint="Opens a read-only summary of scanned receipt lines"
+                    onPress={() => setReceiptQuickViewOpen(true)}
+                    style={({ pressed }) => [
+                      styles.receiptHeaderIcon,
+                      pressed && styles.receiptHeaderIconPressed,
+                    ]}
+                  >
+                    <Text style={styles.receiptHeaderIconGlyph}>🧾</Text>
+                  </Pressable>
+                ) : null}
+              </View>
               {event ? (
                 <View style={styles.organiserStatusChip}>
                   <Text style={styles.organiserStatusChipText}>
@@ -842,17 +874,20 @@ export function EventDetailScreen({ navigation, route }: Props) {
             <Text style={glassStyles.sectionTitle}>
               Members · {settlementRosterParticipants.length}
             </Text>
-            {showOrganiserCollectionActions ? (
-              <Text style={styles.rosterSwipeHint}>
-                Swipe a member card left to dispute, right to mark paid.
-              </Text>
-            ) : null}
             <View style={styles.memberList}>
               {settlementRosterParticipants.map((participant) => {
                 const isOrganiserRow = Boolean(participant.is_organiser);
                 return (
                   <SettlementRosterRow
                     key={participant.id}
+                    playMountHint={
+                      showOrganiserCollectionActions &&
+                      !settlementSwipeHintPlayedRef.current &&
+                      participant.id === firstSettlementSwipeHintParticipantId
+                    }
+                    onSwipeHintPlayed={() => {
+                      settlementSwipeHintPlayedRef.current = true;
+                    }}
                     displayName={
                       participant.is_self ? 'You' : participant.display_name
                     }
@@ -1051,13 +1086,6 @@ const styles = StyleSheet.create({
   memberList: {
     marginBottom: 4,
   },
-  rosterSwipeHint: {
-    fontSize: 12,
-    lineHeight: 17,
-    color: authColors.textOnDarkFaint,
-    marginTop: -8,
-    marginBottom: 12,
-  },
   addButton: {
     marginTop: 8,
     marginBottom: 12,
@@ -1080,6 +1108,29 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 12,
     marginBottom: 16,
+  },
+  settlementTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 1,
+  },
+  receiptHeaderIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: authColors.pillOnDark,
+    borderWidth: 1,
+    borderColor: authColors.glassBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  receiptHeaderIconPressed: {
+    opacity: 0.88,
+    transform: [{ scale: 0.97 }],
+  },
+  receiptHeaderIconGlyph: {
+    fontSize: 16,
   },
   organiserStatusChip: {
     backgroundColor: authColors.pillOnDark,

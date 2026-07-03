@@ -1,16 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { fireEvent, render, screen } from '@testing-library/react-native';
-import { SettlementRosterRow } from '../../../components/settlement/SettlementRosterRow';
-
-jest.mock('expo-linear-gradient', () => {
-  const React = require('react');
-  const { View } = require('react-native');
-  return {
-    LinearGradient: ({ children, ...props }: { children?: React.ReactNode }) => (
-      <View {...props}>{children}</View>
-    ),
-  };
-});
+import { SettlementRosterRow, hasSettlementSwipeActions } from '../../../components/settlement/SettlementRosterRow';
 
 jest.mock('@react-navigation/native', () => {
   const React = require('react');
@@ -26,7 +16,7 @@ describe('SettlementRosterRow', () => {
     jest.clearAllMocks();
   });
 
-  it('renders a static card without swipe affordances when no actions apply', () => {
+  it('renders a static row without swipe actions when no actions apply', () => {
     render(
       <SettlementRosterRow
         displayName="Jordan"
@@ -39,11 +29,11 @@ describe('SettlementRosterRow', () => {
     expect(screen.getByText('Jordan')).toBeTruthy();
     expect(screen.getByText('$24.00')).toBeTruthy();
     expect(screen.getByText('Pending')).toBeTruthy();
-    expect(screen.queryByText('Mark paid')).toBeNull();
-    expect(screen.queryByText('Dispute')).toBeNull();
+    expect(screen.queryByLabelText('Mark paid')).toBeNull();
+    expect(screen.queryByLabelText('Dispute')).toBeNull();
   });
 
-  it('shows swipe hints and paid action lane for pending members', () => {
+  it('shows mark paid action for pending members', () => {
     render(
       <SettlementRosterRow
         displayName="Jordan"
@@ -54,11 +44,10 @@ describe('SettlementRosterRow', () => {
       />,
     );
 
-    expect(screen.getAllByText('Mark paid').length).toBeGreaterThan(0);
     expect(screen.getByLabelText('Mark paid')).toBeTruthy();
   });
 
-  it('shows dispute action lane for paid registered members', () => {
+  it('shows dispute action for paid registered members', () => {
     render(
       <SettlementRosterRow
         displayName="Jordan"
@@ -89,5 +78,17 @@ describe('SettlementRosterRow', () => {
 
     fireEvent.press(screen.getByLabelText('Mark paid'));
     expect(onMarkCash).toHaveBeenCalledTimes(1);
+  });
+
+  it('detects swipeable roster rows for hint targeting', () => {
+    expect(
+      hasSettlementSwipeActions('pending', 'user-2', false, true),
+    ).toBe(true);
+    expect(
+      hasSettlementSwipeActions('self_reported', 'user-2', false, true),
+    ).toBe(true);
+    expect(
+      hasSettlementSwipeActions('pending', 'user-2', true, true),
+    ).toBe(false);
   });
 });

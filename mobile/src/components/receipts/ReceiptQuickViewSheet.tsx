@@ -1,8 +1,11 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { ReceiptReviewSnapshot } from '@letssplyt/shared/receipt.types';
-import { BottomSheetModal } from '../layout/BottomSheetModal';
+import {
+  CenteredCardModal,
+  centeredCardModalStyles,
+} from '../layout/CenteredCardModal';
 import { ReceiptReviewSlipReadOnly } from './ReceiptReviewSlipReadOnly';
-import { authColors } from '../../theme/colors';
+import { colors } from '../../theme/colors';
 
 interface ReceiptQuickViewSheetProps {
   visible: boolean;
@@ -12,25 +15,20 @@ interface ReceiptQuickViewSheetProps {
 
 export function ReceiptQuickViewSheet({ visible, review, onClose }: ReceiptQuickViewSheetProps) {
   return (
-    <BottomSheetModal
-      visible={visible}
-      onClose={onClose}
-      dismissLabel="Close receipt view"
-      sheetStyle={styles.sheet}
-    >
-      <View style={styles.handle} />
+    <CenteredCardModal visible={visible} onClose={onClose} dismissLabel="Close receipt view">
       <View style={styles.header}>
         <View style={styles.headerText}>
           <Text style={styles.title}>Receipt</Text>
-          <Text style={styles.subtitle}>What everyone split</Text>
+          <Text style={styles.hint}>What everyone split</Text>
         </View>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Close receipt"
           onPress={onClose}
-          style={styles.closeButton}
+          hitSlop={12}
+          style={styles.closeBtn}
         >
-          <Text style={styles.closeText}>✕</Text>
+          <Text style={styles.closeIcon}>✕</Text>
         </Pressable>
       </View>
 
@@ -41,62 +39,40 @@ export function ReceiptQuickViewSheet({ visible, review, onClose }: ReceiptQuick
       >
         <ReceiptReviewSlipReadOnly review={review} />
       </ScrollView>
-    </BottomSheetModal>
+    </CenteredCardModal>
   );
 }
 
 const styles = StyleSheet.create({
-  sheet: {
-    backgroundColor: authColors.gradientMid,
-    maxHeight: '88%',
-    paddingTop: 8,
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: authColors.glassBorder,
-    alignSelf: 'center',
-    marginBottom: 12,
-  },
   header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    marginBottom: 12,
-    gap: 12,
+    ...centeredCardModalStyles.header,
   },
   headerText: {
-    flex: 1,
+    ...centeredCardModalStyles.headerText,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: authColors.textOnDark,
+    ...centeredCardModalStyles.title,
+    marginBottom: 0,
+  },
+  hint: {
+    ...centeredCardModalStyles.hint,
+    marginBottom: 0,
+    marginTop: 4,
+  },
+  closeBtn: {
+    ...centeredCardModalStyles.closeBtn,
+  },
+  closeIcon: {
+    ...centeredCardModalStyles.closeIcon,
+  },
+  scroll: {
+    maxHeight: 420,
+  },
+  scrollContent: {
+    paddingBottom: 4,
   },
   subtitle: {
     fontSize: 13,
-    color: authColors.textOnDarkMuted,
-    marginTop: 2,
-  },
-  closeButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: authColors.glass,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeText: {
-    fontSize: 16,
-    color: authColors.textOnDarkMuted,
-  },
-  scroll: {
-    flexGrow: 0,
-  },
-  scrollContent: {
-    paddingBottom: 8,
+    color: colors.textMuted,
   },
 });
