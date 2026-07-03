@@ -39,14 +39,25 @@ describe('Profile API integration', () => {
       data: [{ id: 'event-balance-1', currency: 'USD' }],
       error: null,
     });
+    mockSupabase.__pushMockResultForTable('events', {
+      data: [{ id: 'event-balance-1' }],
+      error: null,
+    });
     mockSupabase.__pushMockResultForTable('participants', {
       data: [
-        { amount_owed: 20, user_id: 'member-other' },
-        { amount_owed: 12, user_id: null },
+        { amount_owed: 20, user_id: 'member-other', payment_status: 'pending' },
       ],
       error: null,
     });
     mockSupabase.__pushMockResultForTable('participants', { data: [], error: null });
+    mockSupabase.__pushMockResultForTable('events', {
+      data: [{ id: 'event-balance-1' }],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: [{ amount_owed: 12, user_id: null, payment_status: 'pending' }],
+      error: null,
+    });
 
     const response = await request(app).get('/api/v1/users/me/balance').set(AUTH_HEADER);
 
@@ -153,14 +164,16 @@ describe('Profile API integration', () => {
   it('POST /users/me/delete returns 409 when you_owe is greater than zero', async () => {
     mockAuth();
     mockSupabase.__pushMockResultForTable('events', { data: [], error: null });
+    mockSupabase.__pushMockResultForTable('events', { data: [], error: null });
     mockSupabase.__pushMockResultForTable('participants', {
-      data: [{ amount_owed: 1500, event_id: 'owe-event-1' }],
+      data: [{ amount_owed: 1500, event_id: 'owe-event-1', payment_status: 'pending' }],
       error: null,
     });
     mockSupabase.__pushMockResultForTable('events', {
       data: [{ id: 'owe-event-1', payer_id: 'other-payer-id' }],
       error: null,
     });
+    mockSupabase.__pushMockResultForTable('events', { data: [], error: null });
 
     const response = await request(app)
       .post('/api/v1/users/me/delete')
