@@ -48,6 +48,22 @@ const activeJoined = {
   creator_name: 'Jordan',
 };
 
+const settledJoined = {
+  ...activeJoined,
+  id: 'e-joined-settled',
+  title: 'Past Dinner',
+  status: 'settled' as const,
+  viewer_payment_status: 'confirmed',
+};
+
+const sentCreated = {
+  ...activeCreated,
+  id: 'e-created-sent',
+  title: 'Birthday Party',
+  status: 'sent' as const,
+  created_at: '2026-06-09T00:00:00.000Z',
+};
+
 describe('EventsScreen', () => {
   beforeEach(() => {
     useEventStore.setState({
@@ -58,13 +74,13 @@ describe('EventsScreen', () => {
     jest.mocked(eventService.fetchEvents).mockImplementation(async (_cursor, options) => {
       if (options?.role === 'creator') {
         return {
-          events: [activeCreated, settledCreated],
+          events: [activeCreated, sentCreated, settledCreated],
           next_cursor: null,
           has_more: false,
         };
       }
       return {
-        events: [activeJoined],
+        events: [activeJoined, settledJoined],
         next_cursor: null,
         has_more: false,
       };
@@ -72,7 +88,7 @@ describe('EventsScreen', () => {
     jest.clearAllMocks();
   });
 
-  it('renders Active | Settled toggle and created/joined sections', async () => {
+  it('renders You created | You participated | Settled tabs', async () => {
     render(
       <EventsScreen
         navigation={navigation}
@@ -81,14 +97,13 @@ describe('EventsScreen', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText('Active')).toBeTruthy();
+      expect(screen.getByText('You created')).toBeTruthy();
+      expect(screen.getByText('You participated')).toBeTruthy();
       expect(screen.getByText('Settled')).toBeTruthy();
-      expect(screen.getByText('Events you created')).toBeTruthy();
-      expect(screen.getByText('Events you joined')).toBeTruthy();
     });
   });
 
-  it('shows only active events when Active segment is selected', async () => {
+  it('shows only created active events on You created tab', async () => {
     render(
       <EventsScreen
         navigation={navigation}
@@ -98,12 +113,49 @@ describe('EventsScreen', () => {
 
     await waitFor(() => {
       expect(screen.getByText('Friday Dinner')).toBeTruthy();
-      expect(screen.getByText('Team Lunch')).toBeTruthy();
+      expect(screen.queryByText('Team Lunch')).toBeNull();
       expect(screen.queryByText('Old Brunch')).toBeNull();
     });
   });
 
-  it('shows settled created events when Settled segment is selected', async () => {
+  it('groups active created events by status', async () => {
+    render(
+      <EventsScreen
+        navigation={navigation}
+        route={{ key: 'Events', name: 'Events' } as never}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText('Expenses Share').length).toBeGreaterThan(0);
+      expect(screen.getAllByText('Open').length).toBeGreaterThan(0);
+      expect(screen.getByText('Birthday Party')).toBeTruthy();
+      expect(screen.getByText('Friday Dinner')).toBeTruthy();
+    });
+  });
+
+  it('shows only joined active events on Participated tab', async () => {
+    render(
+      <EventsScreen
+        navigation={navigation}
+        route={{ key: 'Events', name: 'Events' } as never}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Friday Dinner')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByText('You participated'));
+
+    await waitFor(() => {
+      expect(screen.getByText('Team Lunch')).toBeTruthy();
+      expect(screen.queryByText('Friday Dinner')).toBeNull();
+      expect(screen.queryByText('Old Brunch')).toBeNull();
+    });
+  });
+
+  it('groups settled events into created and joined sections', async () => {
     render(
       <EventsScreen
         navigation={navigation}
@@ -118,7 +170,12 @@ describe('EventsScreen', () => {
     fireEvent.press(screen.getByText('Settled'));
 
     await waitFor(() => {
+      expect(screen.getByText('Events you created')).toBeTruthy();
+      expect(screen.getByText('Events you joined')).toBeTruthy();
+      expect(screen.getByText('All settled — everyone has paid their share')).toBeTruthy();
+      expect(screen.getByText('Settled — your share is paid')).toBeTruthy();
       expect(screen.getByText('Old Brunch')).toBeTruthy();
+      expect(screen.getByText('Past Dinner')).toBeTruthy();
       expect(screen.queryByText('Friday Dinner')).toBeNull();
       expect(screen.queryByText('Team Lunch')).toBeNull();
     });
