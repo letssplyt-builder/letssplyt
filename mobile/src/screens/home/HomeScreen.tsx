@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -33,6 +33,7 @@ import { useSettlementStore } from '../../store/settlementStore';
 import { glassStyles } from '../../theme/glassStyles';
 import { authColors } from '../../theme/colors';
 import { appRefreshControl } from '../../utils/refreshControl';
+import { pickDefaultHomeSegment, type HomeSegment } from '../../utils/dashboardSegments';
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<HomeStackParamList, 'Home'>,
@@ -42,7 +43,13 @@ type Props = CompositeScreenProps<
   >
 >;
 
-type HomeSegment = 'members' | 'guests';
+const HOME_SEGMENTS = ['pay', 'collect', 'guests'] as const;
+
+const HOME_SEGMENT_LABELS: Record<HomeSegment, string> = {
+  pay: 'Pay to',
+  collect: 'Collect From',
+  guests: 'Guest Collect',
+};
 
 export function HomeScreen({ navigation }: Props) {
   const { screenScrollBottomPadding } = useAppInsets();
@@ -63,9 +70,12 @@ export function HomeScreen({ navigation }: Props) {
   const guests = useSettlementStore((state) => state.guests);
   const isLoadingCounterparties = useSettlementStore((state) => state.isLoadingCounterparties);
   const counterpartyError = useSettlementStore((state) => state.counterpartyError);
-  const loadCounterparties = useSettlementStore((state) => state.loadCounterparties);
+  const loadDashboardCounterparties = useSettlementStore(
+    (state) => state.loadDashboardCounterparties,
+  );
 
-  const [segment, setSegment] = useState<HomeSegment>('members');
+  const [segment, setSegment] = useState<HomeSegment>('pay');
+  const [segmentPinned, setSegmentPinned] = useState(false);
   const [titleDraft, setTitleDraft] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
   const [balance, setBalance] = useState<BalanceSummary | null>(null);
@@ -95,14 +105,28 @@ export function HomeScreen({ navigation }: Props) {
   }, []);
 
   const refreshData = useCallback(async () => {
-    await Promise.all([loadBalance(), loadCounterparties(segment)]);
-  }, [loadBalance, loadCounterparties, segment]);
+    await Promise.all([loadBalance(), loadDashboardCounterparties()]);
+  }, [loadBalance, loadDashboardCounterparties]);
 
   useFocusEffect(
     useCallback(() => {
+      setSegmentPinned(false);
       void refreshData();
     }, [refreshData]),
   );
+
+  useEffect(() => {
+    if (segmentPinned || isLoadingCounterparties) {
+      return;
+    }
+    setSegment(pickDefaultHomeSegment(membersYouOwe, membersOweYou, guests));
+  }, [
+    segmentPinned,
+    isLoadingCounterparties,
+    membersYouOwe,
+    membersOweYou,
+    guests,
+  ]);
 
   const handleCreate = async () => {
     const trimmed = titleDraft.trim();
@@ -140,7 +164,7 @@ export function HomeScreen({ navigation }: Props) {
     openEventDetail(navigation, eventId);
   };
 
-  const renderMembersLists = () => {
+  const renderCounterpartyLoadingOrError = () => {
     if (counterpartyError) {
       return (
         <Text style={glassStyles.errorText}>Couldn&apos;t load balances. Pull to retry.</Text>
@@ -151,65 +175,59 @@ export function HomeScreen({ navigation }: Props) {
       return <ActivityIndicator color={authColors.textOnDark} style={styles.loader} />;
     }
 
-    const oweYouEmpty = membersOweYou.length === 0;
-    const youOweEmpty = membersYouOwe.length === 0;
+    return null;
+  };
 
-    if (oweYouEmpty && youOweEmpty) {
-      return <Text style={styles.emptySection}>No outstanding balances with members.</Text>;
+  const renderOweYouList = () => {
+    const loadingOrError = renderCounterpartyLoadingOrError();
+    if (loadingOrError) {
+      return loadingOrError;
     }
 
-    return (
-      <>
-        {!oweYouEmpty ? (
-          <View style={styles.section}>
-            <Text style={glassStyles.sectionTitle}>People who owe you</Text>
-            {membersOweYou.map((row) => (
-              <CounterpartyRow
-                key={row.user_id}
-                displayName={row.display_name}
-                amount={row.net_amount}
-                avatarColour={row.avatar_colour}
-                directionLabel="owe you"
-                amountTone="positive"
-                onPress={() =>
-                  navigation.navigate('MemberDetail', { userId: row.user_id })
-                }
-              />
-            ))}
-          </View>
-        ) : null}
+    if (membersOweYou.length === 0) {
+      return <Text style={styles.emptySection}>No members owe you right now.</Text>;
+    }
 
-        {!youOweEmpty ? (
-          <View style={styles.section}>
-            <Text style={glassStyles.sectionTitle}>People you owe</Text>
-            {membersYouOwe.map((row) => (
-              <CounterpartyRow
-                key={row.user_id}
-                displayName={row.display_name}
-                amount={row.net_amount}
-                avatarColour={row.avatar_colour}
-                directionLabel="you owe"
-                amountTone="negative"
-                onPress={() =>
-                  navigation.navigate('MemberDetail', { userId: row.user_id })
-                }
-              />
-            ))}
-          </View>
-        ) : null}
-      </>
-    );
+    return membersOweYou.map((row) => (
+      <CounterpartyRow
+        key={row.user_id}
+        displayName={row.display_name}
+        amount={row.net_amount}
+        avatarColour={row.avatar_colour}
+        directionLabel="owe you"
+        amountTone="positive"
+        onPress={() => navigation.navigate('MemberDetail', { userId: row.user_id })}
+      />
+    ));
+  };
+
+  const renderYouOweList = () => {
+    const loadingOrError = renderCounterpartyLoadingOrError();
+    if (loadingOrError) {
+      return loadingOrError;
+    }
+
+    if (membersYouOwe.length === 0) {
+      return <Text style={styles.emptySection}>You don&apos;t owe any members right now.</Text>;
+    }
+
+    return membersYouOwe.map((row) => (
+      <CounterpartyRow
+        key={row.user_id}
+        displayName={row.display_name}
+        amount={row.net_amount}
+        avatarColour={row.avatar_colour}
+        directionLabel="you owe"
+        amountTone="negative"
+        onPress={() => navigation.navigate('MemberDetail', { userId: row.user_id })}
+      />
+    ));
   };
 
   const renderGuestsList = () => {
-    if (counterpartyError) {
-      return (
-        <Text style={glassStyles.errorText}>Couldn&apos;t load balances. Pull to retry.</Text>
-      );
-    }
-
-    if (isLoadingCounterparties) {
-      return <ActivityIndicator color={authColors.textOnDark} style={styles.loader} />;
+    const loadingOrError = renderCounterpartyLoadingOrError();
+    if (loadingOrError) {
+      return loadingOrError;
     }
 
     if (guests.length === 0) {
@@ -221,6 +239,8 @@ export function HomeScreen({ navigation }: Props) {
         key={guest.guest_key}
         displayName={guest.display_name}
         amount={guest.amount}
+        directionLabel="to collect from"
+        amountTone="positive"
         onPress={() => {
           if (guest.kind === 'name_only' && guest.event_id) {
             handleOpenEvent(guest.event_id);
@@ -230,6 +250,19 @@ export function HomeScreen({ navigation }: Props) {
         }}
       />
     ));
+  };
+
+  const renderSegmentList = () => {
+    switch (segment) {
+      case 'pay':
+        return renderYouOweList();
+      case 'collect':
+        return renderOweYouList();
+      case 'guests':
+        return renderGuestsList();
+      default:
+        return null;
+    }
   };
 
   return (
@@ -267,15 +300,17 @@ export function HomeScreen({ navigation }: Props) {
         />
 
         <SegmentedControl
-          segments={['members', 'guests'] as const}
-          labels={{ members: 'Members', guests: 'Guests' }}
+          segments={HOME_SEGMENTS}
+          labels={HOME_SEGMENT_LABELS}
           value={segment}
-          onChange={setSegment}
+          onChange={(value) => {
+            setSegmentPinned(true);
+            setSegment(value);
+          }}
+          compact
         />
 
-        <View style={styles.listArea}>
-          {segment === 'members' ? renderMembersLists() : renderGuestsList()}
-        </View>
+        <View style={styles.listArea}>{renderSegmentList()}</View>
 
       </ScrollView>
 
@@ -329,9 +364,6 @@ const styles = StyleSheet.create({
   },
   listArea: {
     marginTop: 16,
-  },
-  section: {
-    marginBottom: 18,
   },
   emptySection: {
     fontSize: 13,
