@@ -134,7 +134,7 @@ describe('POST /api/v1/receipts/confirm', () => {
     expect(response.body.error.code).toBe('FORBIDDEN');
   });
 
-  it('returns 400 when event is not locked', async () => {
+  it('returns 409 when event is not locked or sent', async () => {
     mockAuth(USER_A);
     mockSupabase.__pushMockResultForTable('events', {
       data: { ...LOCKED_PARSED_EVENT, status: 'open' },
@@ -155,7 +155,7 @@ describe('POST /api/v1/receipts/confirm', () => {
         discount_total: 0,
       });
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(409);
     expect(response.body.error.code).toBe('EVENT_NOT_LOCKED');
   });
 });
