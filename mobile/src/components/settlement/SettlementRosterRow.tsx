@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Animated,
+  PanResponder,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { Swipeable } from 'react-native-gesture-handler';
 import { authColors } from '../../theme/colors';
 import { formatMoney, isRegisteredEventParticipant } from '../../utils/events';
 import { rosterPaymentStatusDisplay } from '../../utils/settlementDisplay';
@@ -25,6 +32,16 @@ interface SettlementRosterRowProps {
 
 const SWIPE_HINT_OPEN_MS = 720;
 const SWIPE_HINT_HOLD_MS = 520;
+const ACTION_BUTTON_WIDTH = 84;
+const ACTION_SLOT_GAP = 8;
+const ACTION_SLOT_WIDTH = ACTION_BUTTON_WIDTH + ACTION_SLOT_GAP;
+const SWIPE_OPEN_THRESHOLD = 48;
+
+type SettlementSwipeHandle = {
+  close: () => void;
+  openLeft: () => void;
+  openRight: () => void;
+};
 
 export function hasSettlementSwipeActions(
   paymentStatus: string,
@@ -52,14 +69,18 @@ const STATUS_TONE_COLORS = {
   muted: authColors.textOnDarkMuted,
 } as const;
 
-const openSettlementSwipeables = new Set<Swipeable>();
+const openSettlementSwipeables = new Set<SettlementSwipeHandle>();
 
-function closeOtherSwipeables(current: Swipeable | null): void {
+function closeOtherSwipeables(current: SettlementSwipeHandle | null): void {
   for (const swipeable of openSettlementSwipeables) {
     if (swipeable !== current) {
       swipeable.close();
     }
   }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 export function SettlementRosterRow({
@@ -77,28 +98,11 @@ export function SettlementRosterRow({
   onDispute,
   onMarkCash,
 }: SettlementRosterRowProps) {
-  const swipeableRef = useRef<Swipeable>(null);
+  const panX = useRef(new Animated.Value(0)).current;
+  const dragStartX = useRef(0);
+  const swipeHandleRef = useRef<SettlementSwipeHandle | null>(null);
   const previousPaymentStatusRef = useRef(paymentStatus);
   const mountHintPlayedRef = useRef(false);
-
-  const closeSwipe = useCallback(() => {
-    swipeableRef.current?.close();
-  }, []);
-
-  useFocusEffect(
-    useCallback(() => {
-      return () => {
-        closeSwipe();
-      };
-    }, [closeSwipe]),
-  );
-
-  useEffect(() => {
-    if (previousPaymentStatusRef.current !== paymentStatus) {
-      previousPaymentStatusRef.current = paymentStatus;
-      closeSwipe();
-    }
-  }, [paymentStatus, closeSwipe]);
 
   const initial = displayName.charAt(0).toUpperCase();
   const statusDisplay = isOrganiser
@@ -121,6 +125,81 @@ export function SettlementRosterRow({
     onDispute;
   const hasSwipeActions = hasPaidAction || hasDisputeAction;
 
+  const minPanX = hasPaidAction ? -ACTION_SLOT_WIDTH : 0;
+  const maxPanX = hasDisputeAction ? ACTION_SLOT_WIDTH : 0;
+
+  const animateTo = useCallback(
+    (target: number, onComplete?: () => void) => {
+      Animated.spring(panX, {
+        toValue: target,
+        useNativeDriver: false,
+        friction: 8,
+        tension: 140,
+      }).start(({ finished }) => {
+        if (finished) {
+          onComplete?.();
+        }
+      });
+    },
+    [panX],
+  );
+
+  const closeSwipe = useCallback(() => {
+    dragStartX.current = 0;
+    animateTo(0, () => {
+      if (swipeHandleRef.current) {
+        openSettlementSwipeables.delete(swipeHandleRef.current);
+      }
+    });
+  }, [animateTo]);
+
+  const openLeft = useCallback(() => {
+    if (!hasDisputeAction) {
+      return;
+    }
+    closeOtherSwipeables(swipeHandleRef.current);
+    dragStartX.current = ACTION_SLOT_WIDTH;
+    animateTo(ACTION_SLOT_WIDTH, () => {
+      if (swipeHandleRef.current) {
+        openSettlementSwipeables.add(swipeHandleRef.current);
+      }
+    });
+  }, [animateTo, hasDisputeAction]);
+
+  const openRight = useCallback(() => {
+    if (!hasPaidAction) {
+      return;
+    }
+    closeOtherSwipeables(swipeHandleRef.current);
+    dragStartX.current = -ACTION_SLOT_WIDTH;
+    animateTo(-ACTION_SLOT_WIDTH, () => {
+      if (swipeHandleRef.current) {
+        openSettlementSwipeables.add(swipeHandleRef.current);
+      }
+    });
+  }, [animateTo, hasPaidAction]);
+
+  swipeHandleRef.current = {
+    close: closeSwipe,
+    openLeft,
+    openRight,
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        closeSwipe();
+      };
+    }, [closeSwipe]),
+  );
+
+  useEffect(() => {
+    if (previousPaymentStatusRef.current !== paymentStatus) {
+      previousPaymentStatusRef.current = paymentStatus;
+      closeSwipe();
+    }
+  }, [paymentStatus, closeSwipe]);
+
   useEffect(() => {
     if (!playMountHint || !hasSwipeActions || mountHintPlayedRef.current) {
       return undefined;
@@ -130,29 +209,128 @@ export function SettlementRosterRow({
 
     const openTimer = setTimeout(() => {
       if (hasPaidAction) {
-        swipeableRef.current?.openRight();
+        openRight();
       } else if (hasDisputeAction) {
-        swipeableRef.current?.openLeft();
+        openLeft();
       }
     }, SWIPE_HINT_OPEN_MS);
 
     const closeTimer = setTimeout(() => {
-      swipeableRef.current?.close();
+      closeSwipe();
     }, SWIPE_HINT_OPEN_MS + SWIPE_HINT_HOLD_MS);
 
     return () => {
       clearTimeout(openTimer);
       clearTimeout(closeTimer);
     };
-  }, [playMountHint, hasSwipeActions, hasPaidAction, hasDisputeAction, onSwipeHintPlayed]);
+  }, [
+    playMountHint,
+    hasSwipeActions,
+    hasPaidAction,
+    hasDisputeAction,
+    onSwipeHintPlayed,
+    openLeft,
+    openRight,
+    closeSwipe,
+  ]);
+
+  const swipeGestureRef = useRef({
+    hasSwipeActions,
+    minPanX,
+    maxPanX,
+    hasDisputeAction,
+    hasPaidAction,
+    animateTo,
+  });
+  swipeGestureRef.current = {
+    hasSwipeActions,
+    minPanX,
+    maxPanX,
+    hasDisputeAction,
+    hasPaidAction,
+    animateTo,
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) => {
+        const config = swipeGestureRef.current;
+        return (
+          config.hasSwipeActions &&
+          Math.abs(gesture.dx) > Math.abs(gesture.dy) &&
+          Math.abs(gesture.dx) > 8
+        );
+      },
+      onPanResponderGrant: () => {
+        panX.stopAnimation((value) => {
+          dragStartX.current = value ?? 0;
+        });
+      },
+      onPanResponderMove: (_, gesture) => {
+        const { minPanX: minX, maxPanX: maxX } = swipeGestureRef.current;
+        const next = clamp(dragStartX.current + gesture.dx, minX, maxX);
+        panX.setValue(next);
+      },
+      onPanResponderRelease: (_, gesture) => {
+        const config = swipeGestureRef.current;
+        const current = clamp(
+          dragStartX.current + gesture.dx,
+          config.minPanX,
+          config.maxPanX,
+        );
+        let target = 0;
+
+        if (
+          config.hasDisputeAction &&
+          (current >= SWIPE_OPEN_THRESHOLD || gesture.vx > 0.75)
+        ) {
+          target = ACTION_SLOT_WIDTH;
+        } else if (
+          config.hasPaidAction &&
+          (current <= -SWIPE_OPEN_THRESHOLD || gesture.vx < -0.75)
+        ) {
+          target = -ACTION_SLOT_WIDTH;
+        }
+
+        dragStartX.current = target;
+        config.animateTo(target, () => {
+          if (!swipeHandleRef.current) {
+            return;
+          }
+          if (target === 0) {
+            openSettlementSwipeables.delete(swipeHandleRef.current);
+          } else {
+            closeOtherSwipeables(swipeHandleRef.current);
+            openSettlementSwipeables.add(swipeHandleRef.current);
+          }
+        });
+      },
+      onPanResponderTerminationRequest: () => true,
+      onPanResponderTerminate: () => {
+        swipeGestureRef.current.animateTo(dragStartX.current);
+      },
+    }),
+  ).current;
+
+  const leftSlotWidth = panX.interpolate({
+    inputRange: [0, ACTION_SLOT_WIDTH],
+    outputRange: [0, ACTION_SLOT_WIDTH],
+    extrapolate: 'clamp',
+  });
+
+  const rightSlotWidth = panX.interpolate({
+    inputRange: [-ACTION_SLOT_WIDTH, 0],
+    outputRange: [ACTION_SLOT_WIDTH, 0],
+    extrapolate: 'clamp',
+  });
 
   const rowBody = (
     <View
       style={[
-        styles.row,
+        styles.card,
         isSelf && styles.selfRow,
-        hasDisputeAction && styles.rowRailLeft,
-        hasPaidAction && styles.rowRailRight,
+        hasDisputeAction && styles.cardRailLeft,
+        hasPaidAction && styles.cardRailRight,
       ]}
     >
       {hasDisputeAction ? <View style={styles.railLeft} /> : null}
@@ -161,7 +339,7 @@ export function SettlementRosterRow({
         <Text style={styles.avatarText}>{initial}</Text>
       </View>
       <View style={styles.info}>
-        <Text style={styles.name} numberOfLines={1}>
+        <Text style={styles.name} numberOfLines={1} ellipsizeMode="tail">
           {displayName}
         </Text>
         <Text
@@ -169,11 +347,14 @@ export function SettlementRosterRow({
             styles.statusMeta,
             { color: STATUS_TONE_COLORS[statusDisplay.tone] },
           ]}
+          numberOfLines={1}
         >
           {statusDisplay.label}
         </Text>
       </View>
-      <Text style={styles.amount}>{formatMoney(amountOwed, currency)}</Text>
+      <Text style={styles.amount} numberOfLines={1}>
+        {formatMoney(amountOwed, currency)}
+      </Text>
     </View>
   );
 
@@ -191,63 +372,39 @@ export function SettlementRosterRow({
     onDispute?.();
   };
 
-  const handleSwipeableOpen = () => {
-    closeOtherSwipeables(swipeableRef.current);
-    if (swipeableRef.current) {
-      openSettlementSwipeables.add(swipeableRef.current);
-    }
-  };
-
-  const handleSwipeableClose = () => {
-    if (swipeableRef.current) {
-      openSettlementSwipeables.delete(swipeableRef.current);
-    }
-  };
-
   return (
     <View style={styles.shell}>
-      <Swipeable
-        ref={swipeableRef}
-        overshootLeft={false}
-        overshootRight={false}
-        friction={2}
-        leftThreshold={48}
-        rightThreshold={48}
-        containerStyle={styles.swipeableContainer}
-        childrenContainerStyle={styles.swipeableChild}
-        onSwipeableOpen={handleSwipeableOpen}
-        onSwipeableClose={handleSwipeableClose}
-        renderLeftActions={
-          hasDisputeAction
-            ? () => (
-                <View style={styles.leftActions}>
-                  <SwipeActionButton
-                    label="Dispute"
-                    loading={loadingAction === 'dispute'}
-                    backgroundColor="#B91C1C"
-                    onPress={runDisputeAction}
-                  />
-                </View>
-              )
-            : undefined
-        }
-        renderRightActions={
-          hasPaidAction
-            ? () => (
-                <View style={styles.rightActions}>
-                  <SwipeActionButton
-                    label="Mark paid"
-                    loading={loadingAction === 'mark-cash'}
-                    backgroundColor="#059669"
-                    onPress={runPaidAction}
-                  />
-                </View>
-              )
-            : undefined
-        }
-      >
+      <View style={styles.shrinkRow} {...panResponder.panHandlers}>
+        {hasDisputeAction ? (
+          <Animated.View style={[styles.actionSlot, { width: leftSlotWidth }]}>
+            <View style={styles.actionSlotInnerLeft}>
+              <SwipeActionButton
+                label="Dispute"
+                loading={loadingAction === 'dispute'}
+                backgroundColor="#B91C1C"
+                onPress={runDisputeAction}
+              />
+              <View style={styles.actionSlotGap} />
+            </View>
+          </Animated.View>
+        ) : null}
+
         {rowBody}
-      </Swipeable>
+
+        {hasPaidAction ? (
+          <Animated.View style={[styles.actionSlot, { width: rightSlotWidth }]}>
+            <View style={styles.actionSlotInnerRight}>
+              <View style={styles.actionSlotGap} />
+              <SwipeActionButton
+                label="Mark paid"
+                loading={loadingAction === 'mark-cash'}
+                backgroundColor="#059669"
+                onPress={runPaidAction}
+              />
+            </View>
+          </Animated.View>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -289,16 +446,32 @@ const styles = StyleSheet.create({
   shell: {
     marginBottom: 8,
   },
-  swipeableContainer: {
-    overflow: 'hidden',
-    borderRadius: 12,
-  },
-  swipeableChild: {
-    backgroundColor: 'transparent',
-  },
-  row: {
+  shrinkRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'stretch',
+  },
+  actionSlot: {
+    overflow: 'hidden',
+  },
+  actionSlotInnerLeft: {
+    width: ACTION_SLOT_WIDTH,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  actionSlotInnerRight: {
+    width: ACTION_SLOT_WIDTH,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+  },
+  actionSlotGap: {
+    width: ACTION_SLOT_GAP,
+    flexShrink: 0,
+  },
+  card: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 10,
     paddingHorizontal: 10,
     backgroundColor: authColors.glass,
@@ -308,10 +481,10 @@ const styles = StyleSheet.create({
     gap: 10,
     overflow: 'hidden',
   },
-  rowRailLeft: {
+  cardRailLeft: {
     paddingLeft: 14,
   },
-  rowRailRight: {
+  cardRailRight: {
     paddingRight: 14,
   },
   railLeft: {
@@ -341,6 +514,7 @@ const styles = StyleSheet.create({
     backgroundColor: authColors.pillOnDark,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
   avatarText: {
     fontSize: 13,
@@ -365,28 +539,18 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: authColors.textOnDark,
-    marginTop: 2,
-  },
-  leftActions: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    paddingRight: 8,
-    justifyContent: 'center',
-  },
-  rightActions: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    paddingLeft: 8,
-    justifyContent: 'center',
+    flexShrink: 0,
+    maxWidth: '36%',
   },
   swipeButton: {
-    width: 84,
-    alignSelf: 'stretch',
+    width: ACTION_BUTTON_WIDTH,
+    flexShrink: 0,
+    minHeight: 52,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 12,
-    minHeight: 52,
+    paddingHorizontal: 6,
   },
   swipeButtonPressed: {
     opacity: 0.9,
@@ -399,5 +563,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: '#FFFFFF',
+    textAlign: 'center',
   },
 });
