@@ -11,6 +11,8 @@ export interface BreakdownRow {
 export interface BreakdownPaymentLink {
   label: string;
   url: string;
+  appUrl?: string;
+  androidIntentUrl?: string;
   isInstruction: boolean;
 }
 
@@ -36,6 +38,42 @@ function escapeHref(url: string): string {
   return url.replace(/"/g, '&quot;');
 }
 
+const BREAKDOWN_PAY_OPENER_SCRIPT = `
+function letsSplytOpenPay(anchor, event) {
+  var web = anchor.getAttribute('href');
+  var app = anchor.getAttribute('data-app-url');
+  var intent = anchor.getAttribute('data-android-intent');
+  var mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (!mobile || (!app && !intent)) {
+    return true;
+  }
+  event.preventDefault();
+  if (/Android/i.test(navigator.userAgent) && intent) {
+    window.location.href = intent;
+    return false;
+  }
+  if (!app) {
+    window.location.href = web;
+    return false;
+  }
+  var opened = false;
+  var onVis = function() {
+    if (document.hidden) { opened = true; }
+  };
+  document.addEventListener('visibilitychange', onVis);
+  var iframe = document.createElement('iframe');
+  iframe.style.display = 'none';
+  iframe.src = app;
+  document.body.appendChild(iframe);
+  setTimeout(function() {
+    document.removeEventListener('visibilitychange', onVis);
+    if (iframe.parentNode) { iframe.parentNode.removeChild(iframe); }
+    if (!opened && !document.hidden) { window.location.href = web; }
+  }, 1200);
+  return false;
+}
+`.trim();
+
 function renderPaymentSection(params: BreakdownPageParams): string {
   if (!params.viewerShareLabel || params.paymentLinks.length === 0) {
     return '';
@@ -46,7 +84,11 @@ function renderPaymentSection(params: BreakdownPageParams): string {
       if (link.isInstruction) {
         return `<p class="pay-instruction">${escapeHtml(link.url)}</p>`;
       }
-      return `<a class="pay-btn" href="${escapeHref(link.url)}" rel="noopener noreferrer" target="_blank">${escapeHtml(link.label)}</a>`;
+      const appAttr = link.appUrl ? ` data-app-url="${escapeHref(link.appUrl)}"` : '';
+      const intentAttr = link.androidIntentUrl
+        ? ` data-android-intent="${escapeHref(link.androidIntentUrl)}"`
+        : '';
+      return `<a class="pay-btn" href="${escapeHref(link.url)}"${appAttr}${intentAttr} onclick="return letsSplytOpenPay(this, event)">${escapeHtml(link.label)}</a>`;
     })
     .join('');
 
@@ -154,6 +196,7 @@ export function renderBreakdownPage(params: BreakdownPageParams): string {
       <p class="footnote">This link is personal — only share if you are comfortable showing the full split.</p>
     </div>
   </div>
+  <script>${BREAKDOWN_PAY_OPENER_SCRIPT}</script>
 </body>
 </html>`;
 }

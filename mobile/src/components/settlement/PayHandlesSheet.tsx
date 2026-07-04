@@ -72,7 +72,9 @@ export function PayHandlesSheet({
                 key={option.provider}
                 accessibilityRole="button"
                 accessibilityLabel={`Pay via ${option.label} — ${option.handleDisplay}`}
-                onPress={() => void openPaymentDeepLink(option.url, option.label)}
+                onPress={() =>
+                  void openPaymentDeepLink(option.url, option.label, option.webFallbackUrl)
+                }
                 style={styles.payCard}
               >
                 <View style={[styles.badge, { backgroundColor: visual.color }]}>

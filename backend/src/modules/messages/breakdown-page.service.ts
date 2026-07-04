@@ -2,7 +2,8 @@ import { formatCurrency } from '../../infrastructure/security';
 import { supabaseAdmin } from '../../infrastructure/supabase';
 import { getPaymentConfigForPhone } from '../../config/payment-methods.config';
 import { getHandles } from '../profile/profile.service';
-import { buildPaymentLinksForMethods } from './deepLinks';
+import { buildPaymentLinkTargets } from '@letssplyt/shared/paymentLinks';
+import type { PaymentProvider } from '@letssplyt/shared/profile.types';
 import { loadParticipantItemNames } from './messages.service';
 import { resolveParticipantPhoneContext } from './participant-phone';
 import {
@@ -109,7 +110,7 @@ export async function renderSplitBreakdownHtml(token: string): Promise<{ html: s
   const viewerAmount =
     viewer.amount_owed !== null ? Number(viewer.amount_owed) : null;
 
-  let paymentLinks: BreakdownPaymentLink[] = [];
+  const paymentLinks: BreakdownPaymentLink[] = [];
   if (viewerAmount !== null && viewerAmount > 0) {
     const phoneContext = await resolveParticipantPhoneContext({
       user_id: viewer.user_id,
@@ -122,22 +123,37 @@ export async function renderSplitBreakdownHtml(token: string): Promise<{ html: s
       phoneContext.resolvedCountry,
     );
     const payerHandles = await getHandles(eventRow.payer_id as string);
-    const links = buildPaymentLinksForMethods(
-      payerHandles.map((handle) => ({
+    const providerLabels: Record<PaymentProvider, string> = {
+      venmo: 'Venmo',
+      paypal: 'PayPal',
+      cashapp: 'Cash App',
+      zelle: 'Zelle',
+      wise: 'Wise',
+      upi: 'UPI',
+      bank_transfer: 'Bank transfer',
+      other: 'Other',
+    };
+    for (const handle of payerHandles) {
+      if (!paymentConfig.supportedMethods.includes(handle.provider)) {
+        continue;
+      }
+      const targets = buildPaymentLinkTargets({
         provider: handle.provider,
-        handle_value: handle.handle_value,
-      })),
-      paymentConfig.supportedMethods,
-      viewerAmount,
-      eventRow.title as string,
-      currency,
-      locale,
-    );
-    paymentLinks = links.map((link) => ({
-      label: link.label,
-      url: link.url,
-      isInstruction: !link.url.startsWith('http') && !link.url.includes('://'),
-    }));
+        handleValue: handle.handle_value,
+        amountMajorUnits: viewerAmount,
+        eventName: eventRow.title as string,
+      });
+      if (!targets) {
+        continue;
+      }
+      paymentLinks.push({
+        label: providerLabels[handle.provider],
+        url: targets.webUrl,
+        appUrl: targets.appUrl,
+        androidIntentUrl: targets.androidIntentUrl,
+        isInstruction: Boolean(targets.isInstruction),
+      });
+    }
   }
 
   const html = renderBreakdownPage({

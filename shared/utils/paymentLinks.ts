@@ -2,6 +2,22 @@ import type { PaymentProvider } from '../types/profile.types';
 
 export type PaymentLinkChannel = 'sms' | 'app';
 
+export interface PaymentLinkTargets {
+  /** HTTPS pay URL — opens app via universal link when possible, otherwise web checkout. */
+  webUrl: string;
+  /** Native scheme for mobile web “try app first” (LetsSplyt breakdown page). */
+  appUrl?: string;
+  /** Android intent URL with browser fallback (breakdown page on Android). */
+  androidIntentUrl?: string;
+  isInstruction?: boolean;
+}
+
+const ANDROID_APP_PACKAGES: Partial<Record<PaymentProvider, string>> = {
+  venmo: 'com.venmo',
+  cashapp: 'com.squareup.cash',
+  paypal: 'com.paypal.android.p2pmobile',
+};
+
 /** Bare Venmo username for URLs (stored value is usually @username). */
 export function venmoUsernameForLink(stored: string): string {
   let value = stored.trim();
@@ -61,15 +77,91 @@ export function buildZelleInstruction(handle: string): string {
   return `Pay via Zelle — send to: ${zelleHandleForLink(handle)}`;
 }
 
-/** Venmo web/universal pay URL — works in Safari and opens the app when installed. */
+function paymentNote(eventName: string): string {
+  return encodeURIComponent(`${eventName} split`);
+}
+
+function paymentAmount(amountMajorUnits: number): string {
+  return amountMajorUnits.toFixed(2);
+}
+
+/** Venmo web/universal pay URL — works in Safari and SMS (breakdown page). */
 export function buildVenmoPayUrl(
   username: string,
   amountMajorUnits: number,
   eventName: string,
 ): string {
-  const encodedNote = encodeURIComponent(`${eventName} split`);
-  const numericAmount = amountMajorUnits.toFixed(2);
-  return `https://account.venmo.com/pay?txn=pay&recipients=${encodeURIComponent(username)}&amount=${numericAmount}&note=${encodedNote}`;
+  const numericAmount = paymentAmount(amountMajorUnits);
+  return `https://account.venmo.com/pay?txn=pay&recipients=${encodeURIComponent(username)}&amount=${numericAmount}&note=${paymentNote(eventName)}`;
+}
+
+/** Venmo native scheme — opens the Venmo app from LetsSplyt mobile. */
+export function buildVenmoNativePayUrl(
+  username: string,
+  amountMajorUnits: number,
+  eventName: string,
+): string {
+  const numericAmount = paymentAmount(amountMajorUnits);
+  return `venmo://paycharge?txn=pay&recipients=${encodeURIComponent(username)}&amount=${numericAmount}&note=${paymentNote(eventName)}`;
+}
+
+/** Cash App HTTPS universal link — SMS and web breakdown page. */
+export function buildCashAppWebPayUrl(bareTag: string, amountMajorUnits: number): string {
+  return `https://cash.app/$${bareTag}/${paymentAmount(amountMajorUnits)}`;
+}
+
+/** Cash App native scheme — opens Cash App from LetsSplyt mobile. */
+export function buildCashAppNativePayUrl(bareTag: string, amountMajorUnits: number): string {
+  const cashtag = `$${bareTag}`;
+  return `cashme://pay?cashtag=${encodeURIComponent(cashtag)}&amount=${paymentAmount(amountMajorUnits)}`;
+}
+
+/** Android intent URL — opens native app or falls back to HTTPS in Chrome. */
+export function buildAndroidIntentUrl(
+  appUrl: string,
+  packageName: string,
+  webFallbackUrl: string,
+): string {
+  const match = appUrl.match(/^([a-z][a-z0-9+.-]*):\/\/(.*)$/i);
+  if (!match) {
+    return webFallbackUrl;
+  }
+  const scheme = match[1]!;
+  const pathAndQuery = match[2]!;
+  return `intent://${pathAndQuery}#Intent;scheme=${scheme};package=${packageName};S.browser_fallback_url=${encodeURIComponent(webFallbackUrl)};end`;
+}
+
+/**
+ * Web + native targets for a payment handle (breakdown page, optional SMS metadata).
+ * SMS/breakdown web href uses HTTPS; breakdown JS tries native first on mobile.
+ */
+export function buildPaymentLinkTargets(params: {
+  provider: PaymentProvider;
+  handleValue: string;
+  amountMajorUnits: number;
+  eventName: string;
+}): PaymentLinkTargets | null {
+  const webUrl = buildPaymentLinkUrl({ ...params, channel: 'sms' });
+  if (!webUrl) {
+    return null;
+  }
+
+  if (params.provider === 'zelle') {
+    return { webUrl, isInstruction: true };
+  }
+
+  const appUrl = buildPaymentLinkUrl({ ...params, channel: 'app' });
+  const targets: PaymentLinkTargets = { webUrl };
+
+  if (appUrl && appUrl !== webUrl) {
+    targets.appUrl = appUrl;
+    const androidPackage = ANDROID_APP_PACKAGES[params.provider];
+    if (androidPackage) {
+      targets.androidIntentUrl = buildAndroidIntentUrl(appUrl, androidPackage, webUrl);
+    }
+  }
+
+  return targets;
 }
 
 /**
@@ -85,8 +177,8 @@ export function buildPaymentLinkUrl(params: {
 }): string | null {
   const { provider, handleValue, amountMajorUnits, eventName } = params;
   const channel = params.channel ?? 'sms';
-  const encodedNote = encodeURIComponent(`${eventName} split`);
-  const numericAmount = amountMajorUnits.toFixed(2);
+  const encodedNote = paymentNote(eventName);
+  const numericAmount = paymentAmount(amountMajorUnits);
 
   switch (provider) {
     case 'venmo': {
@@ -94,7 +186,9 @@ export function buildPaymentLinkUrl(params: {
       if (!username) {
         return null;
       }
-      // Always HTTPS — venmo:// fails in Safari (breakdown page) and on simulators without Venmo.
+      if (channel === 'app') {
+        return buildVenmoNativePayUrl(username, amountMajorUnits, eventName);
+      }
       return buildVenmoPayUrl(username, amountMajorUnits, eventName);
     }
 
@@ -103,6 +197,7 @@ export function buildPaymentLinkUrl(params: {
       if (!slug) {
         return null;
       }
+      // PayPal has no public native pay URL with amount; paypal.me is best-effort universal link.
       return `https://paypal.me/${encodeURIComponent(slug)}/${numericAmount}`;
     }
 
@@ -111,7 +206,10 @@ export function buildPaymentLinkUrl(params: {
       if (!bareTag) {
         return null;
       }
-      return `https://cash.app/$${bareTag}/${numericAmount}`;
+      if (channel === 'app') {
+        return buildCashAppNativePayUrl(bareTag, amountMajorUnits);
+      }
+      return buildCashAppWebPayUrl(bareTag, amountMajorUnits);
     }
 
     case 'zelle':
