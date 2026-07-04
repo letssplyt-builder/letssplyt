@@ -43,12 +43,15 @@ function letsSplytOpenPay(anchor, event) {
   var web = anchor.getAttribute('href');
   var app = anchor.getAttribute('data-app-url');
   var intent = anchor.getAttribute('data-android-intent');
-  var mobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  var ua = navigator.userAgent || '';
+  var isAndroid = /Android/i.test(ua);
+  var isIOS = /iPhone|iPad|iPod/i.test(ua);
+  var mobile = isAndroid || isIOS;
   if (!mobile || (!app && !intent)) {
     return true;
   }
   event.preventDefault();
-  if (/Android/i.test(navigator.userAgent) && intent) {
+  if (isAndroid && intent) {
     window.location.href = intent;
     return false;
   }
@@ -56,20 +59,22 @@ function letsSplytOpenPay(anchor, event) {
     window.location.href = web;
     return false;
   }
-  var opened = false;
-  var onVis = function() {
-    if (document.hidden) { opened = true; }
-  };
-  document.addEventListener('visibilitychange', onVis);
-  var iframe = document.createElement('iframe');
-  iframe.style.display = 'none';
-  iframe.src = app;
-  document.body.appendChild(iframe);
+  var leftPage = false;
+  var markLeft = function() { leftPage = true; };
+  window.addEventListener('pagehide', markLeft);
+  window.addEventListener('blur', markLeft);
+  document.addEventListener('visibilitychange', function() {
+    if (document.hidden) { leftPage = true; }
+  });
+  // Direct custom-scheme navigation from the tap — required on iOS (hidden iframe does not open apps).
+  window.location.href = app;
   setTimeout(function() {
-    document.removeEventListener('visibilitychange', onVis);
-    if (iframe.parentNode) { iframe.parentNode.removeChild(iframe); }
-    if (!opened && !document.hidden) { window.location.href = web; }
-  }, 1200);
+    window.removeEventListener('pagehide', markLeft);
+    window.removeEventListener('blur', markLeft);
+    if (!leftPage && !document.hidden) {
+      window.location.href = web;
+    }
+  }, 2800);
   return false;
 }
 `.trim();
