@@ -110,7 +110,7 @@ export async function renderSplitBreakdownHtml(token: string): Promise<{ html: s
   const viewerAmount =
     viewer.amount_owed !== null ? Number(viewer.amount_owed) : null;
 
-  let paymentLinks: BreakdownPaymentLink[] = [];
+  const paymentLinks: BreakdownPaymentLink[] = [];
   if (viewerAmount !== null && viewerAmount > 0) {
     const phoneContext = await resolveParticipantPhoneContext({
       user_id: viewer.user_id,
