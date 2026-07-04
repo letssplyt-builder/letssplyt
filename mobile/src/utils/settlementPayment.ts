@@ -2,7 +2,11 @@ import type { PaymentProvider } from '@letssplyt/shared/profile.types';
 import type { IOwePaymentHandle } from '@letssplyt/shared/settlement.types';
 import { Alert, Linking } from 'react-native';
 import type { SelfReportPaymentMethod } from '../services/settlement.service';
-import { buildPaymentDeepLink, isHttpOrAppUrl } from './paymentDeepLinks';
+import {
+  buildPaymentDeepLink,
+  isCustomSchemeUrl,
+  isHttpOrAppUrl,
+} from './paymentDeepLinks';
 
 export function providerToSelfReportMethod(provider: PaymentProvider): SelfReportPaymentMethod {
   switch (provider) {
@@ -41,14 +45,37 @@ export function buildAllPaidMethodOptions(handles: IOwePaymentHandle[]): Array<{
   return options;
 }
 
-export async function openPaymentDeepLink(url: string, label: string): Promise<void> {
+export async function openPaymentDeepLink(
+  url: string,
+  label: string,
+  webFallbackUrl?: string,
+): Promise<void> {
   if (!isHttpOrAppUrl(url)) {
     Alert.alert(label, url);
     return;
   }
-  try {
-    await Linking.openURL(url);
-  } catch {
+
+  const tryOpen = async (candidate: string): Promise<boolean> => {
+    try {
+      await Linking.openURL(candidate);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  if (isCustomSchemeUrl(url)) {
+    if (await tryOpen(url)) {
+      return;
+    }
+    if (webFallbackUrl && (await tryOpen(webFallbackUrl))) {
+      return;
+    }
+    Alert.alert(label, webFallbackUrl ?? url);
+    return;
+  }
+
+  if (!(await tryOpen(url))) {
     Alert.alert(label, url);
   }
 }
@@ -67,7 +94,10 @@ export function buildHandlePaymentOptions(
         eventTitle,
       );
       if (!link) return null;
-      return { ...link, handleDisplay: handle.handle_display };
+      return {
+        ...link,
+        handleDisplay: handle.handle_display,
+      };
     })
     .filter((row): row is NonNullable<typeof row> => row !== null);
 }

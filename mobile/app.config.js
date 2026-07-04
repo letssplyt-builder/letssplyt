@@ -76,6 +76,7 @@ module.exports = {
         'LetsSplyt uses your contacts to add members to your event.',
       NSFaceIDUsageDescription:
         'LetsSplyt uses Face ID to unlock your account and sign you in faster.',
+      LSApplicationQueriesSchemes: ['venmo', 'cashme', 'squarecash', 'paypal'],
     },
   },
   android: {
