@@ -121,9 +121,10 @@ cd backend && npm test
 
 ### Changes
 
-- Enable `coverageThreshold` when `CI=true`.
+- Enable `coverageThreshold` when `CI=true` (per-file gates on critical paths; global thresholds remain local-only until overall coverage catches up).
 - Per-file 100% for `splitCalculator.ts`, `crypto.ts`, `sanitize.ts`.
-- Document that integration tests already run via `test:coverage`.
+- Run `shared` `test:coverage` in CI alongside backend.
+- Integration tests already run via backend `test:coverage` (same `testMatch` as unit tests — audit item #3 was incorrect).
 
 ---
 

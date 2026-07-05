@@ -54,6 +54,13 @@ describe('sanitizePromptInput', () => {
 });
 
 describe('formatCurrency', () => {
+  it('CurrencyFormatError has expected shape', () => {
+    const err = new CurrencyFormatError('invalid currency formatting');
+    expect(err.name).toBe('CurrencyFormatError');
+    expect(err.code).toBe('CURRENCY_FORMAT_ERROR');
+    expect(err.message).toBe('invalid currency formatting');
+  });
+
   it('formats USD with correct symbol and separator', () => {
     expect(formatCurrency(1234.56, 'USD')).toBe('$1,234.56');
   });
@@ -81,6 +88,26 @@ describe('formatCurrency', () => {
 
   it('handles negative amounts (-$12.50)', () => {
     expect(formatCurrency(-12.5, 'USD')).toBe('-$12.50');
+  });
+
+  it('falls back when Intl.NumberFormat throws', () => {
+    const OriginalNumberFormat = Intl.NumberFormat;
+    Object.defineProperty(global.Intl, 'NumberFormat', {
+      configurable: true,
+      value: class {
+        constructor() {
+          throw new Error('Intl format failure');
+        }
+      },
+    });
+    try {
+      expect(formatCurrency(100, 'USD')).toBe('USD 100');
+    } finally {
+      Object.defineProperty(global.Intl, 'NumberFormat', {
+        configurable: true,
+        value: OriginalNumberFormat,
+      });
+    }
   });
 });
 

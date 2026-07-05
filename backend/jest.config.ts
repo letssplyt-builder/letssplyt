@@ -12,17 +12,32 @@ const config: Config = {
     '!src/**/index.ts',
   ],
   coverageReporters: ['text', 'lcov', 'html'],
-  // CI uploads lcov for Codecov; threshold enforcement is tracked separately as coverage grows.
-  ...(process.env.CI === 'true' ? {} : {
-    coverageThreshold: {
-      global: {
-        lines: 80,
-        branches: 70,
-        functions: 80,
-        statements: 80,
-      },
+  // Per-file 100% gates run in CI (mandated for PII + financial code). Global thresholds are local-only
+  // aspirational targets until overall backend coverage reaches the bar.
+  coverageThreshold: {
+    './src/infrastructure/security/crypto.ts': {
+      branches: 100,
+      functions: 100,
+      lines: 100,
+      statements: 100,
     },
-  }),
+    './src/infrastructure/security/sanitize.ts': {
+      branches: 100,
+      functions: 100,
+      lines: 100,
+      statements: 100,
+    },
+    ...(process.env.CI !== 'true'
+      ? {
+          global: {
+            lines: 80,
+            branches: 70,
+            functions: 80,
+            statements: 80,
+          },
+        }
+      : {}),
+  } as Config['coverageThreshold'],
   setupFilesAfterEnv: ['./src/__tests__/setup.ts'],
   moduleNameMapper: {
     '@letssplyt/shared/paymentHandleValidation':

@@ -77,6 +77,32 @@ describe('encrypt / decrypt', () => {
     expect(() => decrypt('only-two:parts', TEST_KEY)).toThrow(EncryptionError);
   });
 
+  it('wraps unexpected cipher failures as EncryptionError without leaking details', () => {
+    jest.isolateModules(() => {
+      jest.doMock('crypto', () => {
+        const actual = jest.requireActual<typeof import('crypto')>('crypto');
+        return {
+          ...actual,
+          createCipheriv: () => {
+            throw new Error('unexpected cipher failure');
+          },
+        };
+      });
+
+      const { encrypt: encryptWithMockedCipher, EncryptionError: MockedEncryptionError } =
+        require('../../../infrastructure/security/crypto') as typeof import('../../../infrastructure/security/crypto');
+
+      expect(() => encryptWithMockedCipher('secret', TEST_KEY)).toThrow(MockedEncryptionError);
+      try {
+        encryptWithMockedCipher('secret', TEST_KEY);
+      } catch (err) {
+        expect(err).toBeInstanceOf(MockedEncryptionError);
+        expect((err as InstanceType<typeof MockedEncryptionError>).message).toBe('Encryption failed');
+        expect((err as InstanceType<typeof MockedEncryptionError>).message).not.toContain('secret');
+      }
+    });
+  });
+
 });
 
 describe('encryptPhone / encryptHandle / decryptHandle', () => {
