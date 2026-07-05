@@ -41,6 +41,7 @@ const EXPECTED_MIGRATIONS = [
   '20260627000000_ai_audit_log_output_preview.sql',
   '20260627000001_receipt_discounts_item_scope.sql',
   '20260705140000_money_column_scale.sql',
+  '20260705160000_otp_atomic_attempt_increment.sql',
 ] as const;
 
 const REPO_ROOT = path.resolve(__dirname, '../../../../..');

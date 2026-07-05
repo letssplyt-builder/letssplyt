@@ -20,12 +20,29 @@ export function normalizeOtpCodeInput(code: string): string {
   return code.replace(/\D/g, '');
 }
 
-function hashOtpCode(code: string): string {
-  const salt = process.env.PII_HMAC_SALT;
-  if (!salt) {
+function otpHmacSecret(): string {
+  const dedicated = process.env.OTP_HMAC_SECRET?.trim();
+  if (dedicated) {
+    return dedicated;
+  }
+  const fallback = process.env.PII_HMAC_SALT;
+  if (!fallback) {
     throw new AppError('INTERNAL_ERROR', 'PII_HMAC_SALT not configured', 500, undefined, false);
   }
-  return crypto.createHmac('sha256', salt).update(code).digest('hex');
+  return fallback;
+}
+
+function hashOtpCode(code: string): string {
+  return crypto.createHmac('sha256', otpHmacSecret()).update(code).digest('hex');
+}
+
+function otpHashesEqual(storedHash: string, providedHash: string): boolean {
+  const stored = Buffer.from(storedHash, 'hex');
+  const provided = Buffer.from(providedHash, 'hex');
+  if (stored.length !== provided.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(stored, provided);
 }
 
 function buildOtpMessage(code: string): string {
@@ -65,6 +82,18 @@ export async function sendOTP(phoneHash: string, phoneE164: string): Promise<voi
   });
 }
 
+async function incrementOtpAttemptAtomic(otpId: string): Promise<number | null> {
+  const { data, error } = await supabaseAdmin.rpc('increment_otp_attempt', {
+    p_otp_id: otpId,
+  });
+
+  if (error) {
+    throw new AppError('INTERNAL_ERROR', 'Failed to record OTP attempt', 500, undefined, false);
+  }
+
+  return typeof data === 'number' ? data : null;
+}
+
 /** Verify OTP; throws AppError with mobile-compatible codes on failure. */
 export async function verifyOTP(phoneHash: string, code: string): Promise<void> {
   const normalizedCode = normalizeOtpCodeInput(code);
@@ -100,11 +129,12 @@ export async function verifyOTP(phoneHash: string, code: string): Promise<void> 
     throw new AppError('OTP_MAX_ATTEMPTS', 'Too many attempts. Request a new code.', 429);
   }
 
-  if (row.code_hash !== codeHash) {
-    await supabaseAdmin
-      .from('otp_verifications')
-      .update({ attempt_count: row.attempt_count + 1 })
-      .eq('id', row.id);
+  if (!otpHashesEqual(row.code_hash, codeHash)) {
+    const newAttemptCount = await incrementOtpAttemptAtomic(row.id);
+    if (newAttemptCount === null) {
+      await supabaseAdmin.from('otp_verifications').delete().eq('id', row.id);
+      throw new AppError('OTP_MAX_ATTEMPTS', 'Too many attempts. Request a new code.', 429);
+    }
     throw new AppError('INVALID_CODE', 'Invalid OTP code', 400);
   }
 

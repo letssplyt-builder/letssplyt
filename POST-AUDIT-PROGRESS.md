@@ -2,7 +2,7 @@
 
 **Source:** `CODEBASE-AUDIT-2026-07-05.md`  
 **Last updated:** 2026-07-05  
-**Current story:** PA-01 — OTP fail-closed + APP_ENV boot validation
+**Current story:** PA-07 — CI coverage enforcement
 
 > **AI:** Read this file at the start of every post-audit session. Find the first `[ ]` story in `POST-AUDIT-BUILD-SEQUENCE.md`, build it as **one PR**, run tests, wait for Pawan confirmation, then mark `[x]` with date.
 
@@ -18,7 +18,7 @@
 ## High
 
 - [x] PA-05 — Redis-backed rate limits + OTP counter TTL (H1) (2026-07-05)
-- [ ] PA-06 — Atomic OTP attempt counting + timing-safe compare (H4)
+- [x] PA-06 — Atomic OTP attempt counting + timing-safe compare (H4) (2026-07-05)
 - [ ] PA-07 — CI coverage enforcement + 100% gates on critical files (H5)
 - [ ] PA-08 — Security headers on HTML routes (H2)
 - [ ] PA-09 — Breakdown token expiry after settlement (H3)
