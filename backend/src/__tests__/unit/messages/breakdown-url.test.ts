@@ -4,12 +4,14 @@ import {
   buildShortBreakdownUrl,
   generateBreakdownTokenValue,
 } from '../../../modules/messages/breakdown-url';
+import { resetConfigForTests } from '../../../infrastructure/config';
 
 describe('breakdown-url', () => {
   const originalAppDomain = process.env.APP_DOMAIN;
 
   afterEach(() => {
     process.env.APP_DOMAIN = originalAppDomain;
+    resetConfigForTests();
   });
 
   it('generates 12-character base64url tokens', () => {

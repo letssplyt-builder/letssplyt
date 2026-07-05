@@ -2,14 +2,14 @@ import './infrastructure/sentry.instrument';
 import { isSentryEnabled } from './infrastructure/sentry.instrument';
 import app from './app';
 import logger from './infrastructure/logger';
-import { validateStartupEnv } from './infrastructure/startup-env';
+import { loadConfig } from './infrastructure/config';
 import { isMessagingDevBypassEnabled } from './infrastructure/notification/messaging-dev-bypass';
 import { isOtpDevBypassEnabled } from './modules/auth/auth.service';
 
 const PORT = Number(process.env.PORT ?? 3000);
 
 try {
-  validateStartupEnv();
+  loadConfig();
 } catch (error) {
   const message = error instanceof Error ? error.message : 'Invalid startup environment';
   logger.fatal({ msg: message });

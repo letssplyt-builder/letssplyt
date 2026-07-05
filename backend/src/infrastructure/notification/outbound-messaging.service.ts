@@ -4,6 +4,7 @@ import {
   createDevBypassMessageSid,
   isMessagingDevBypassEnabled,
 } from './messaging-dev-bypass';
+import { getConfig } from '../config';
 
 export interface OutboundMessageResult {
   messageId: string;
@@ -11,7 +12,7 @@ export interface OutboundMessageResult {
 }
 
 function publicStatusCallbackUrl(provider: 'twilio' | 'telnyx'): string | undefined {
-  const appUrl = process.env.APP_URL?.replace(/\/$/, '');
+  const appUrl = getConfig().appUrl;
   if (!appUrl) return undefined;
   try {
     const parsed = new URL(appUrl);
