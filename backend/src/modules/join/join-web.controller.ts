@@ -19,13 +19,14 @@ import { renderJoinFormPage } from './templates/join-form.html';
 import { renderJoinSuccessPage } from './templates/join-success.html';
 import { renderLockedPage } from './templates/locked.html';
 import { renderOtpEntryPage } from './templates/otp-entry.html';
+import { getConfig } from '../../infrastructure/config';
 
 function sendHtml(res: Response, html: string, status = 200): void {
   res.status(status).type('html').send(html);
 }
 
 function appBaseUrl(): string {
-  return process.env.APP_URL?.replace(/\/$/, '') ?? '';
+  return getConfig().appUrl;
 }
 
 function ensureCsrf(req: Request, res: Response): boolean {

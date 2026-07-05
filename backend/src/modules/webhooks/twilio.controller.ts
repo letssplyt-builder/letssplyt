@@ -5,9 +5,10 @@ import {
 } from '../../infrastructure/notification/messaging-inbound.service';
 import { applyDeliveryUpdate } from '../../infrastructure/notification/messaging-delivery.service';
 import { validateTwilioWebhook } from '../../infrastructure/twilio-signature';
+import { getConfig } from '../../infrastructure/config';
 
 function webhookUrl(req: Request): string {
-  const base = process.env.APP_URL?.replace(/\/$/, '') ?? 'http://localhost:3000';
+  const base = getConfig().appUrl;
   return `${base}${req.baseUrl}${req.path}`;
 }
 

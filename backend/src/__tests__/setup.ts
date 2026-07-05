@@ -1,4 +1,5 @@
 import { jest, beforeEach } from '@jest/globals';
+import { resetConfigForTests } from '../infrastructure/config';
 
 process.env.SUPABASE_URL = 'https://test.supabase.co';
 process.env.SUPABASE_PUBLISHABLE_KEY = 'test-anon-key';
@@ -42,4 +43,5 @@ jest.mock('../infrastructure/llm/factory', () => require('./mocks/llm.mock'));
 
 beforeEach(() => {
   jest.clearAllMocks();
+  resetConfigForTests();
 });
