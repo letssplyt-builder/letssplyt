@@ -84,6 +84,12 @@ jobs:
       - name: Build shared package
         run: npm run build --workspace=@letssplyt/shared
 
+      - name: Run shared tests with coverage
+        run: cd shared && npm run test:coverage
+        env:
+          CI: 'true'
+
+      # test:coverage runs unit + integration suites (see backend/jest.config.ts testMatch).
       - name: Run backend tests with coverage
         run: cd backend && npm run test:coverage
         env:

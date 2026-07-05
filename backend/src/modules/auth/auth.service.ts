@@ -127,7 +127,7 @@ export async function sendOtp(
   }
 
   try {
-    checkOtpRequestRate(phoneHash);
+    await checkOtpRequestRate(phoneHash);
   } catch (err) {
     if (err instanceof RateLimitError) {
       throw new AppError('OTP_RATE_LIMITED', err.message, 429);
@@ -179,7 +179,7 @@ async function verifyOtpCode(phoneHash: string, code: string): Promise<void> {
   } catch (err) {
     if (err instanceof AppError && err.code === 'INVALID_CODE') {
       try {
-        recordFailedOtpVerify(phoneHash);
+        await recordFailedOtpVerify(phoneHash);
       } catch (rateErr) {
         if (rateErr instanceof RateLimitError) {
           throw new AppError('TOO_MANY_REQUESTS', rateErr.message, 429, {

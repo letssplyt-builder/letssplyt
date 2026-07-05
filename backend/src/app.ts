@@ -22,8 +22,12 @@ import analyticsRoutes from './modules/analytics/analytics.routes';
 import healthRoutes from './modules/health/health.routes';
 import { handleHealthCheck } from './modules/health/health.controller';
 import { errorHandler } from './modules/auth/auth.controller';
+import { getConfig } from './infrastructure/config';
 
 const app = express();
+
+// Railway sits behind a reverse proxy — required for per-client IP rate limiting (audit C2).
+app.set('trust proxy', 1);
 
 const publicDir = path.resolve(__dirname, '..', 'public');
 
@@ -45,10 +49,7 @@ app.use(
   }),
 );
 
-const allowedOrigins = (process.env.APP_DOMAIN ?? 'http://localhost:3000')
-  .split(',')
-  .map((o) => o.trim())
-  .filter(Boolean);
+const allowedOrigins = getConfig().corsOrigins;
 
 app.use(
   cors({

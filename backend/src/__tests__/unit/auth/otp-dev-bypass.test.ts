@@ -20,6 +20,18 @@ describe('isOtpDevBypassEnabled', () => {
     expect(isOtpDevBypassEnabled()).toBe(false);
   });
 
+  it('returns false when APP_ENV is unset (fail closed)', () => {
+    delete process.env.APP_ENV;
+    process.env.OTP_DEV_BYPASS = 'true';
+    expect(isOtpDevBypassEnabled()).toBe(false);
+  });
+
+  it('returns false for unknown APP_ENV values', () => {
+    process.env.APP_ENV = 'local';
+    process.env.OTP_DEV_BYPASS = 'true';
+    expect(isOtpDevBypassEnabled()).toBe(false);
+  });
+
   it('returns true when OTP_DEV_BYPASS=true in development', () => {
     process.env.OTP_DEV_BYPASS = 'true';
     expect(isOtpDevBypassEnabled()).toBe(true);
@@ -30,8 +42,8 @@ describe('isOtpDevBypassEnabled', () => {
     expect(isOtpDevBypassEnabled()).toBe(true);
   });
 
-  it('defaults to bypass in development (Twilio Verify rejects test credentials)', () => {
-    expect(isOtpDevBypassEnabled()).toBe(true);
+  it('returns false by default in development with real Twilio SID', () => {
+    expect(isOtpDevBypassEnabled()).toBe(false);
   });
 
   it('returns false when OTP_DEV_BYPASS=false in development', () => {
@@ -46,6 +58,13 @@ describe('isOtpDevBypassEnabled', () => {
 
   it('returns false in staging', () => {
     process.env.APP_ENV = 'staging';
+    process.env.OTP_DEV_BYPASS = 'true';
     expect(isOtpDevBypassEnabled()).toBe(false);
+  });
+
+  it('returns true in test with ACtest credentials', () => {
+    process.env.APP_ENV = 'test';
+    process.env.TWILIO_ACCOUNT_SID = 'ACtest';
+    expect(isOtpDevBypassEnabled()).toBe(true);
   });
 });

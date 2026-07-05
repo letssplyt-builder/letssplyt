@@ -19,6 +19,7 @@ import type {
 } from '@letssplyt/shared/event.types';
 import { fetchReceiptReviewSnapshot } from '../receipts/receipt-review.read';
 import { buildEventSettlementSummary } from '../settlement/settlement-summary';
+import { getConfig } from '../../infrastructure/config';
 
 const DEFAULT_LIST_LIMIT = 20;
 const MAX_LIST_LIMIT = 50;
@@ -51,11 +52,7 @@ interface EventCursor {
 }
 
 function getAppBaseUrl(): string {
-  const domain = process.env.APP_DOMAIN ?? 'http://localhost:3000';
-  if (domain.startsWith('http://') || domain.startsWith('https://')) {
-    return domain.replace(/\/$/, '');
-  }
-  return `https://${domain}`;
+  return getConfig().appBaseUrl;
 }
 
 export function buildJoinUrl(token: string): string {

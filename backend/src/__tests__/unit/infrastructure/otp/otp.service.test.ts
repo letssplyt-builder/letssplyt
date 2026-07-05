@@ -79,18 +79,26 @@ describe('otp.service', () => {
     mockSupabase.__pushMockResultForTable('otp_verifications', {
       data: {
         id: 'otp-row-1',
-        code_hash: 'wrong-hash',
+        code_hash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
         expires_at: new Date(Date.now() + 600000).toISOString(),
         attempt_count: 0,
         verified_at: null,
       },
       error: null,
     });
-    mockSupabase.__pushMockResultForTable('otp_verifications', { data: null, error: null });
+    mockSupabase.rpc.mockImplementationOnce((fn) => {
+      if (fn === 'increment_otp_attempt') {
+        return Promise.resolve({ data: 1, error: null });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
 
     await expect(verifyOTP(PHONE_HASH, '111111')).rejects.toMatchObject({
       code: 'INVALID_CODE',
       statusCode: 400,
+    });
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('increment_otp_attempt', {
+      p_otp_id: 'otp-row-1',
     });
   });
 

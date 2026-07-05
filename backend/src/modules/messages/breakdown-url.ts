@@ -3,12 +3,10 @@ import { randomBytes } from 'crypto';
 /** 9 bytes → 12-char base64url token (~72 bits). Existing 24-char tokens still work. */
 export const BREAKDOWN_TOKEN_BYTE_LENGTH = 9;
 
+import { getConfig } from '../../infrastructure/config';
+
 function getAppBaseUrl(): string {
-  const domain = process.env.APP_DOMAIN ?? 'http://localhost:3000';
-  if (domain.startsWith('http://') || domain.startsWith('https://')) {
-    return domain.replace(/\/$/, '');
-  }
-  return `https://${domain}`;
+  return getConfig().appBaseUrl;
 }
 
 export function generateBreakdownTokenValue(): string {
