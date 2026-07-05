@@ -13,3 +13,8 @@ export function getRedisClient(): Redis | null {
   }
   return redisClient;
 }
+
+/** Clear cached client when tests change Upstash env vars. */
+export function resetRedisClientForTests(): void {
+  redisClient = null;
+}
