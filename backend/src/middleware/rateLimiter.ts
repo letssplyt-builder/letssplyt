@@ -1,12 +1,22 @@
 import rateLimit from 'express-rate-limit';
-import { RateLimitError } from '../infrastructure/errors';
+import { createUpstashRateLimitStore } from '../infrastructure/upstash-rate-limit-store';
+
+export {
+  checkOtpRequestRate,
+  recordFailedOtpVerify,
+  resetOtpRateLimitState,
+} from '../infrastructure/otp-rate-counter';
 import { isOtpDevBypassEnabled } from '../modules/auth/otp-dev-bypass';
 
+const GLOBAL_WINDOW_MS = 15 * 60 * 1000;
+const AUTH_WINDOW_MS = 60 * 1000;
+
 export const globalRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
+  windowMs: GLOBAL_WINDOW_MS,
   max: 100,
   standardHeaders: true,
   legacyHeaders: false,
+  store: createUpstashRateLimitStore('global', GLOBAL_WINDOW_MS),
   handler: (_req, res) => {
     res.status(429).json({
       error: {
@@ -18,11 +28,12 @@ export const globalRateLimiter = rateLimit({
 });
 
 export const authRateLimiter = rateLimit({
-  windowMs: 60 * 1000,
+  windowMs: AUTH_WINDOW_MS,
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
   skip: () => isOtpDevBypassEnabled(),
+  store: createUpstashRateLimitStore('auth', AUTH_WINDOW_MS),
   handler: (_req, res) => {
     res.status(429).json({
       error: {
@@ -32,42 +43,3 @@ export const authRateLimiter = rateLimit({
     });
   },
 });
-
-/** In-memory OTP rate tracking per phone hash (Redis upgrade in later stories). */
-const otpRequestCounts = new Map<string, { count: number; resetAt: number }>();
-const otpVerifyAttempts = new Map<string, { count: number; resetAt: number }>();
-
-export function checkOtpRequestRate(phoneHash: string, maxPerHour = 5): void {
-  if (isOtpDevBypassEnabled()) return;
-  const now = Date.now();
-  const entry = otpRequestCounts.get(phoneHash);
-  if (!entry || entry.resetAt < now) {
-    otpRequestCounts.set(phoneHash, { count: 1, resetAt: now + 60 * 60 * 1000 });
-    return;
-  }
-  entry.count += 1;
-  if (entry.count > maxPerHour) {
-    throw new RateLimitError('OTP rate limited for this phone', 3600);
-  }
-}
-
-/** Clears in-memory OTP counters — for integration tests only. */
-export function resetOtpRateLimitState(): void {
-  otpRequestCounts.clear();
-  otpVerifyAttempts.clear();
-}
-
-/** Counts only failed verification attempts (wrong code), per API spec. */
-export function recordFailedOtpVerify(phoneHash: string, maxPer10Min = 5): void {
-  if (isOtpDevBypassEnabled()) return;
-  const now = Date.now();
-  const entry = otpVerifyAttempts.get(phoneHash);
-  if (!entry || entry.resetAt < now) {
-    otpVerifyAttempts.set(phoneHash, { count: 1, resetAt: now + 10 * 60 * 1000 });
-    return;
-  }
-  entry.count += 1;
-  if (entry.count > maxPer10Min) {
-    throw new RateLimitError('Too many verification attempts', 600);
-  }
-}
