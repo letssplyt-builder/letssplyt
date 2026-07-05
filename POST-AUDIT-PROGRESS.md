@@ -17,7 +17,7 @@
 
 ## High
 
-- [ ] PA-05 — Redis-backed rate limits + OTP counter TTL (H1)
+- [x] PA-05 — Redis-backed rate limits + OTP counter TTL (H1) (2026-07-05)
 - [ ] PA-06 — Atomic OTP attempt counting + timing-safe compare (H4)
 - [ ] PA-07 — CI coverage enforcement + 100% gates on critical files (H5)
 - [ ] PA-08 — Security headers on HTML routes (H2)

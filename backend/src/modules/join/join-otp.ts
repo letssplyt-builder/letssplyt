@@ -26,7 +26,7 @@ export async function sendOtp(phoneE164: string): Promise<JoinOtpSendResult> {
   }
 
   try {
-    checkOtpRequestRate(phoneHash);
+    await checkOtpRequestRate(phoneHash);
   } catch (err) {
     if (err instanceof RateLimitError) {
       throw new AppError('OTP_RATE_LIMITED', err.message, 429);
