@@ -10,8 +10,8 @@
 
 ## Critical
 
-- [ ] PA-01 — OTP dev bypass fail-closed + APP_ENV boot validation (C1)
-- [ ] PA-02 — Express `trust proxy` + per-IP rate limit test (C2)
+- [x] PA-01 — OTP dev bypass fail-closed + APP_ENV boot validation (C1) (2026-07-05)
+- [x] PA-02 — Express `trust proxy` + per-IP rate limit test (C2) (2026-07-05)
 - [ ] PA-03 — Validated env config module at startup (M1, partial H6)
 - [ ] PA-04 — Money column scale / minor-units migration (C4)
 

@@ -25,6 +25,9 @@ import { errorHandler } from './modules/auth/auth.controller';
 
 const app = express();
 
+// Railway sits behind a reverse proxy — required for per-client IP rate limiting (audit C2).
+app.set('trust proxy', 1);
+
 const publicDir = path.resolve(__dirname, '..', 'public');
 
 app.get('/privacy', (_req, res) => res.redirect(301, '/privacy.html'));
