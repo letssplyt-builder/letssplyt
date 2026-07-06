@@ -12,7 +12,7 @@ jest.mock('@upstash/qstash', () => ({
 }));
 
 jest.mock('../../../modules/jobs/purge-pii.job', () => ({
-  runGuestPiiPurge: jest.fn(() => Promise.resolve({ purged: 3 })),
+  runGuestPiiPurge: jest.fn(() => Promise.resolve({ purged: 3, breakdown_tokens_cleared: 0 })),
 }));
 
 jest.mock('../../../modules/jobs/partition.job', () => ({
@@ -72,7 +72,7 @@ describe('jobs routes', () => {
       .send(body);
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ purged: 3 });
+    expect(res.body).toEqual({ purged: 3, breakdown_tokens_cleared: 0 });
     expect(mockVerify).toHaveBeenCalledWith({
       signature: 'valid-sig',
       body,
