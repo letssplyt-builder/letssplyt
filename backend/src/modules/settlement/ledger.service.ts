@@ -35,18 +35,33 @@ export async function getOwedToMe(userId: string): Promise<OwedToMeResponse> {
     ]),
   );
 
-  const { data: participantRows, error: participantsError } = await supabaseAdmin
-    .from('participants')
-    .select(
-      'id, event_id, display_name, amount_owed, payment_status, confirmed_at',
-    )
-    .in('event_id', eventIds)
-    .or(`user_id.is.null,user_id.neq.${userId}`)
-    .not('amount_owed', 'is', null);
+  const participantSelect =
+    'id, event_id, display_name, amount_owed, payment_status, confirmed_at';
 
-  if (participantsError) {
+  const [guestRowsResult, memberRowsResult] = await Promise.all([
+    supabaseAdmin
+      .from('participants')
+      .select(participantSelect)
+      .in('event_id', eventIds)
+      .is('user_id', null)
+      .not('amount_owed', 'is', null),
+    supabaseAdmin
+      .from('participants')
+      .select(participantSelect)
+      .in('event_id', eventIds)
+      .neq('user_id', userId)
+      .not('amount_owed', 'is', null),
+  ]);
+
+  if (guestRowsResult.error || memberRowsResult.error) {
     throw new AppError('LEDGER_FETCH_FAILED', 'Could not load owed-to-me ledger', 500);
   }
+
+  const participantById = new Map<string, Record<string, unknown>>();
+  for (const row of [...(guestRowsResult.data ?? []), ...(memberRowsResult.data ?? [])]) {
+    participantById.set(row.id as string, row as Record<string, unknown>);
+  }
+  const participantRows = [...participantById.values()];
 
   const data: OwedToMeEntry[] = [];
   let total = 0;
