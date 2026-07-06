@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import request from 'supertest';
 import app from '../../../app';
 import { mockSupabase } from '../../mocks/supabase.mock';
+import { pushEventRow } from '../../helpers/pushEventRow';
 import { createLLMProvider, mockLLMProvider } from '../../mocks/llm.mock';
 
 const USER_A = 'split-owner-a';
@@ -53,7 +54,7 @@ describe('Splits API', () => {
 
   it('POST /events/:id/split/calculate equal mode returns even splits', async () => {
     mockAuth(USER_A);
-    mockSupabase.__pushMockResultForTable('events', { data: EVENT_ROW, error: null });
+    pushEventRow(EVENT_ROW);
     mockSupabase.__pushMockResultForTable('participants', {
       data: [
         { id: PARTICIPANT_ALEX, display_name: 'Alex' },
@@ -77,7 +78,7 @@ describe('Splits API', () => {
 
   it('POST /events/:id/splits/assign runs NLP and returns assignments', async () => {
     mockAuth(USER_A);
-    mockSupabase.__pushMockResultForTable('events', { data: EVENT_ROW, error: null });
+    pushEventRow(EVENT_ROW);
     mockSupabase.__pushMockResultForTable('events', {
       data: [{ id: EVENT_ID }],
       error: null,
@@ -131,10 +132,7 @@ describe('Splits API', () => {
 
   it('POST /events/:id/split/calculate itemised returns 409 when receipt not confirmed', async () => {
     mockAuth(USER_A);
-    mockSupabase.__pushMockResultForTable('events', {
-      data: { ...EVENT_ROW, ai_stage: 'parsed' },
-      error: null,
-    });
+    pushEventRow({ ...EVENT_ROW, ai_stage: 'parsed' });
     mockSupabase.__pushMockResultForTable('participants', {
       data: [{ id: PARTICIPANT_ALEX, display_name: 'Alex' }],
       error: null,

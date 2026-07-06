@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/authenticate';
+import { requireEventAccess } from '../../middleware/eventAccess';
 import {
   handleCreateEvent,
   handleGetEvent,
@@ -30,28 +31,30 @@ import {
 } from '../settlement/settlement.controller';
 
 const router = Router();
+const requireOwner = requireEventAccess('owner');
+const requireMember = requireEventAccess('member');
 
 router.use(authenticate);
 
 router.get('/', handleListEvents);
 router.post('/', handleCreateEvent);
-router.get('/:id', handleGetEvent);
-router.delete('/:id', handleDeleteEvent);
-router.post('/:id/participants/manual', handleAddManualParticipant);
-router.delete('/:id/participants/:participantId', handleDeleteParticipant);
-router.post('/:id/lock', handleLockEvent);
-router.post('/:id/expenses/reset', handleResetExpenses);
-router.post('/:id/reopen', handleReopenEvent);
-router.post('/:id/join-token/regenerate', handleRegenerateJoinToken);
-router.get('/:id/messages/preview', handlePreviewMessages);
-router.post('/:id/messages/send', handleSendMessages);
-router.post('/:id/messages/retry/:participantId', handleRetryMessage);
-router.post('/:id/messages/nudge/:participantId', handleNudgeParticipant);
-router.post('/:id/splits/resend', handleResendRevisionMessages);
-router.post('/:id/settlement/:participantId/self-report', handleSelfReportPayment);
-router.post('/:id/settlement/:participantId/confirm', handleConfirmPayment);
-router.post('/:id/settlement/:participantId/dispute', handleDisputePayment);
-router.post('/:id/settlement/cash/:participantId', handleMarkParticipantPaid);
+router.get('/:id', requireMember, handleGetEvent);
+router.delete('/:id', requireOwner, handleDeleteEvent);
+router.post('/:id/participants/manual', requireOwner, handleAddManualParticipant);
+router.delete('/:id/participants/:participantId', requireOwner, handleDeleteParticipant);
+router.post('/:id/lock', requireOwner, handleLockEvent);
+router.post('/:id/expenses/reset', requireOwner, handleResetExpenses);
+router.post('/:id/reopen', requireOwner, handleReopenEvent);
+router.post('/:id/join-token/regenerate', requireOwner, handleRegenerateJoinToken);
+router.get('/:id/messages/preview', requireOwner, handlePreviewMessages);
+router.post('/:id/messages/send', requireOwner, handleSendMessages);
+router.post('/:id/messages/retry/:participantId', requireOwner, handleRetryMessage);
+router.post('/:id/messages/nudge/:participantId', requireOwner, handleNudgeParticipant);
+router.post('/:id/splits/resend', requireOwner, handleResendRevisionMessages);
+router.post('/:id/settlement/:participantId/self-report', requireMember, handleSelfReportPayment);
+router.post('/:id/settlement/:participantId/confirm', requireOwner, handleConfirmPayment);
+router.post('/:id/settlement/:participantId/dispute', requireOwner, handleDisputePayment);
+router.post('/:id/settlement/cash/:participantId', requireOwner, handleMarkParticipantPaid);
 
 router.use('/', splitsRouter);
 

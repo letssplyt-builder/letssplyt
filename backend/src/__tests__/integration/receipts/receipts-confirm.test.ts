@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import request from 'supertest';
 import app from '../../../app';
 import { mockSupabase } from '../../mocks/supabase.mock';
+import { pushEventRow } from '../../helpers/pushEventRow';
 
 const USER_A = 'receipt-payer-a';
 const USER_B = 'receipt-payer-b';
@@ -60,7 +61,7 @@ describe('POST /api/v1/receipts/confirm', () => {
 
   it('returns 200 with stacked percent and amount discounts', async () => {
     mockAuth(USER_A);
-    mockSupabase.__pushMockResultForTable('events', { data: LOCKED_PARSED_EVENT, error: null });
+    pushEventRow(LOCKED_PARSED_EVENT);
     queueSuccessfulConfirmMocks();
 
     const response = await request(app)
@@ -92,7 +93,7 @@ describe('POST /api/v1/receipts/confirm', () => {
 
   it('returns 400 when discount_total does not match resolved discounts', async () => {
     mockAuth(USER_A);
-    mockSupabase.__pushMockResultForTable('events', { data: LOCKED_PARSED_EVENT, error: null });
+    pushEventRow(LOCKED_PARSED_EVENT);
 
     const response = await request(app)
       .post('/api/v1/receipts/confirm')
@@ -114,7 +115,7 @@ describe('POST /api/v1/receipts/confirm', () => {
 
   it('returns 403 for non-owner payer', async () => {
     mockAuth(USER_B);
-    mockSupabase.__pushMockResultForTable('events', { data: LOCKED_PARSED_EVENT, error: null });
+    pushEventRow(LOCKED_PARSED_EVENT);
 
     const response = await request(app)
       .post('/api/v1/receipts/confirm')
@@ -136,10 +137,7 @@ describe('POST /api/v1/receipts/confirm', () => {
 
   it('returns 409 when event is not locked or sent', async () => {
     mockAuth(USER_A);
-    mockSupabase.__pushMockResultForTable('events', {
-      data: { ...LOCKED_PARSED_EVENT, status: 'open' },
-      error: null,
-    });
+    pushEventRow({ ...LOCKED_PARSED_EVENT, status: 'open' });
 
     const response = await request(app)
       .post('/api/v1/receipts/confirm')
@@ -168,7 +166,7 @@ describe('GET /api/v1/events/:id receipt_review with discounts', () => {
 
   it('includes discount lines on receipt_review for payer', async () => {
     mockAuth(USER_A);
-    mockSupabase.__pushMockResultForTable('events', { data: LOCKED_PARSED_EVENT, error: null });
+    pushEventRow(LOCKED_PARSED_EVENT);
     mockSupabase.__pushMockResultForTable('users', {
       data: { id: USER_A, display_name: 'Alex', avatar_colour: '#6366F1' },
       error: null,

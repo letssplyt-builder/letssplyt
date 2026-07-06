@@ -3,6 +3,7 @@ import request from 'supertest';
 import { hashPhone } from '../../../infrastructure/security';
 import app from '../../../app';
 import { mockSupabase } from '../../mocks/supabase.mock';
+import { pushEventRow } from '../../helpers/pushEventRow';
 
 const USER_A = 'event-owner-a';
 const USER_B = 'event-owner-b';
@@ -47,7 +48,7 @@ describe('Participants API integration', () => {
 
   it('POST manual participant with phone returns 201 and appears in GET /events/:id', async () => {
     mockAuth(USER_A);
-    mockSupabase.__pushMockResultForTable('events', { data: EVENT_ROW, error: null });
+    pushEventRow(EVENT_ROW);
     mockSupabase.__pushMockResultForTable('sms_opt_outs', { data: null, error: null });
     mockSupabase.__pushMockResultForTable('users', { data: null, error: null });
     mockSupabase.__pushMockResultForTable('participants', { data: [], error: null });
@@ -132,7 +133,7 @@ describe('Participants API integration', () => {
 
   it('DELETE pending participant returns 204', async () => {
     mockAuth(USER_A);
-    mockSupabase.__pushMockResultForTable('events', { data: EVENT_ROW, error: null });
+    pushEventRow(EVENT_ROW);
     mockSupabase.__pushMockResultForTable('participants', {
       data: {
         id: PARTICIPANT_ID,
@@ -152,7 +153,7 @@ describe('Participants API integration', () => {
 
   it('DELETE self_reported participant returns 400', async () => {
     mockAuth(USER_A);
-    mockSupabase.__pushMockResultForTable('events', { data: EVENT_ROW, error: null });
+    pushEventRow(EVENT_ROW);
     mockSupabase.__pushMockResultForTable('participants', {
       data: {
         id: PARTICIPANT_ID,
