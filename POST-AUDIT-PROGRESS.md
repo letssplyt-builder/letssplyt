@@ -2,7 +2,7 @@
 
 **Source:** `CODEBASE-AUDIT-2026-07-05.md`  
 **Last updated:** 2026-07-05  
-**Current story:** PA-13 — Global JSON body size limit
+**Current story:** PA-15 — Structured logging in financial cleanup paths
 
 > **AI:** Read this file at the start of every post-audit session. Find the first `[ ]` story in `POST-AUDIT-BUILD-SEQUENCE.md`, build it as **one PR**, run tests, wait for Pawan confirmation, then mark `[x]` with date.
 
@@ -31,7 +31,7 @@
 ## Medium
 
 - [x] PA-12 — JSON error handler contract (M5) (2026-07-05)
-- [ ] PA-13 — Global JSON body size limit (M6)
+- [x] PA-13 — Global JSON body size limit (M6) (2026-07-05)
 - [ ] PA-14 — Encryption key versioning + 12-byte GCM IV (M7)
 - [ ] PA-15 — Structured logging in financial cleanup paths (M8)
 - [ ] PA-16 — Split sanitize / formatCurrency / resolveParticipantPhone (M3)
