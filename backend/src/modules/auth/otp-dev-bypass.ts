@@ -1,6 +1,6 @@
 /**
  * Skip real OTP verification in local dev/test only.
- * Twilio test credentials cannot call live Verify; ACtest SIDs skip SMS in tests.
+ * Uses custom OTP (not Twilio Verify); ACtest SIDs skip SMS send in tests.
  *
  * FAIL CLOSED: unset or unknown APP_ENV never enables bypass (audit C1).
  */

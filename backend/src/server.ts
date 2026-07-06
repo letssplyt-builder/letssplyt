@@ -4,7 +4,7 @@ import app from './app';
 import logger from './infrastructure/logger';
 import { loadConfig } from './infrastructure/config';
 import { isMessagingDevBypassEnabled } from './infrastructure/notification/messaging-dev-bypass';
-import { isOtpDevBypassEnabled } from './modules/auth/auth.service';
+import { isOtpDevBypassEnabled } from './modules/auth/otp-dev-bypass';
 
 const PORT = Number(process.env.PORT ?? 3000);
 

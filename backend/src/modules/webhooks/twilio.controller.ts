@@ -34,8 +34,17 @@ function mapDeliveryStatus(messageStatus: string): 'sent' | 'delivered' | 'faile
   return 'sent';
 }
 
+function escapeXml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 function twimlMessage(text: string): string {
-  return `<Response><Message>${text}</Message></Response>`;
+  return `<Response><Message>${escapeXml(text)}</Message></Response>`;
 }
 
 export async function handleTwilioOptOut(

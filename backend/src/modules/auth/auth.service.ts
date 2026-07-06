@@ -11,8 +11,6 @@ import { upgradeGuestParticipantsToUser } from '../participants/participant-link
 import { isOtpDevBypassEnabled } from './otp-dev-bypass';
 import type { AuthSession, OtpRequestResponse } from '@letssplyt/shared/auth.types';
 
-export { isOtpDevBypassEnabled } from './otp-dev-bypass';
-
 export type OtpVerifyContext = 'login' | 'register' | 'join_event';
 
 export interface OtpVerifyDeviceContext {

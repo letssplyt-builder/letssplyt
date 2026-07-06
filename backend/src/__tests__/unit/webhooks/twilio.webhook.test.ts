@@ -19,8 +19,19 @@ jest.mock('../../../infrastructure/notification/process-sms-opt-out', () => ({
   ]),
 }));
 
+jest.mock('../../../infrastructure/notification/messaging-inbound.service', () => {
+  const actual = jest.requireActual<
+    typeof import('../../../infrastructure/notification/messaging-inbound.service')
+  >('../../../infrastructure/notification/messaging-inbound.service');
+  return {
+    ...actual,
+    handleInboundSmsKeyword: jest.fn(actual.handleInboundSmsKeyword),
+  };
+});
+
 import { validateTwilioWebhook } from '../../../infrastructure/twilio-signature';
 import { processSmsStopOptOut } from '../../../infrastructure/notification/process-sms-opt-out';
+import { handleInboundSmsKeyword } from '../../../infrastructure/notification/messaging-inbound.service';
 
 function createApp(basePath: string): express.Express {
   const app = express();
@@ -72,17 +83,37 @@ describe('Twilio webhooks', () => {
     expect(processSmsStopOptOut).toHaveBeenCalledWith('+12125551234');
   });
 
-  it('processes STOP on /webhooks/twilio/stop alias route', async () => {
-    const app = createApp('/webhooks/twilio');
+  it('processes STOP on /api/v1/webhooks/twilio/stop', async () => {
+    const app = createApp('/api/v1/webhooks/twilio');
 
     const res = await request(app)
-      .post('/webhooks/twilio/stop')
+      .post('/api/v1/webhooks/twilio/stop')
       .set('X-Twilio-Signature', TWILIO_SIGNATURE)
       .type('form')
       .send({ From: '+12125551234', Body: 'STOP' });
 
     expect(res.status).toBe(200);
     expect(processSmsStopOptOut).toHaveBeenCalledWith('+12125551234');
+  });
+
+  it('XML-escapes dynamic TwiML reply text', async () => {
+    jest.mocked(handleInboundSmsKeyword).mockResolvedValueOnce({
+      type: 'help',
+      replyText: 'Use <tag> & "quotes"',
+    });
+
+    const app = createApp('/api/v1/webhooks/twilio');
+
+    const res = await request(app)
+      .post('/api/v1/webhooks/twilio/opt-out')
+      .set('X-Twilio-Signature', TWILIO_SIGNATURE)
+      .type('form')
+      .send({ From: '+12125551234', Body: 'HELP' });
+
+    expect(res.status).toBe(200);
+    expect(res.text).toBe(
+      '<Response><Message>Use &lt;tag&gt; &amp; &quot;quotes&quot;</Message></Response>',
+    );
   });
 
   it('updates notification_log and participant delivery on delivered callback', async () => {

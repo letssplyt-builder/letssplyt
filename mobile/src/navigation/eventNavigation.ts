@@ -4,6 +4,7 @@ import {
   type ParamListBase,
 } from '@react-navigation/native';
 import type { MainTabParamList } from './types';
+import { logNavigationWarning } from '../utils/navigationLog';
 
 /** Find the bottom-tab navigator (Dashboard / Events). */
 export function getTabNavigation(
@@ -42,7 +43,7 @@ export function openEventDetail(
     return;
   }
 
-  console.warn('openEventDetail: could not resolve Events stack navigator');
+  logNavigationWarning('openEventDetail: could not resolve Events stack navigator');
 }
 
 /** After first-time QR from event create, land on event detail instead of the list/dashboard. */
@@ -106,7 +107,7 @@ export function navigateToHomeTab(navigation: NavigationProp<ParamListBase>): vo
     return;
   }
 
-  console.warn('navigateToHomeTab: tab navigator not found');
+  logNavigationWarning('navigateToHomeTab: tab navigator not found');
 }
 
 /**

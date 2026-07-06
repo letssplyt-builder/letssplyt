@@ -73,6 +73,10 @@ export function fromMinorUnits(minorAmount: number, currencyCode: string): numbe
 export function largestRemainderRound(shares: number[], currency: string): number[] {
   if (shares.length === 0) return [];
 
+  if (shares.some((amount) => amount < 0)) {
+    throw new Error('Shares cannot be negative');
+  }
+
   const multiplier = Math.pow(10, getCurrencyMinorUnits(currency));
   const targetMinor = Math.round(shares.reduce((a, b) => a + b, 0) * multiplier);
 
@@ -88,6 +92,13 @@ export function largestRemainderRound(shares: number[], currency: string): numbe
 
   const flooredSum = withFloor.reduce((sum, entry) => sum + entry.flooredMinor, 0);
   let unitsLeft = targetMinor - flooredSum;
+
+  if (unitsLeft < 0) {
+    throw new Error('largestRemainderRound: floored shares exceed target total');
+  }
+  if (unitsLeft > shares.length) {
+    throw new Error('largestRemainderRound: remainder units exceed share count');
+  }
 
   const indexed = [...withFloor];
   indexed.sort((a, b) => {
