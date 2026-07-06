@@ -55,6 +55,10 @@
     "./utils/receiptDiscounts": {
       "types": "./dist/utils/receiptDiscounts.d.ts",
       "default": "./dist/utils/receiptDiscounts.js"
+    },
+    "./utils/formatCurrency": {
+      "types": "./dist/utils/formatCurrency.d.ts",
+      "default": "./dist/utils/formatCurrency.js"
     }
   },
   "scripts": {
