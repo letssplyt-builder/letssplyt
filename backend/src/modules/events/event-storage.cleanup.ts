@@ -1,3 +1,4 @@
+import logger from '../../infrastructure/logger';
 import { supabaseAdmin } from '../../infrastructure/supabase';
 
 const RECEIPTS_BUCKET = 'receipts';
@@ -25,12 +26,17 @@ export async function deleteReceiptImagesForEvent(eventId: string): Promise<void
 
     const { error: removeError } = await bucket.remove(paths);
     if (removeError) {
-      console.warn(
-        `[event-storage] Could not delete receipt images for event ${eventId}: ${removeError.message}`,
-      );
+      logger.warn({
+        msg: 'Could not delete receipt images for event',
+        eventId,
+        dbMessage: removeError.message,
+      });
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.warn(`[event-storage] Storage cleanup skipped for event ${eventId}: ${message}`);
+    logger.warn({
+      msg: 'Storage cleanup skipped for event',
+      eventId,
+      err,
+    });
   }
 }
