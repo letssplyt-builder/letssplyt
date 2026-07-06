@@ -23,7 +23,10 @@ import analyticsRoutes from './modules/analytics/analytics.routes';
 import healthRoutes from './modules/health/health.routes';
 import { handleHealthCheck } from './modules/health/health.controller';
 import { errorHandler } from './modules/auth/auth.controller';
-import { getConfig } from './infrastructure/config';
+import { getConfig, loadConfig } from './infrastructure/config';
+
+// Validate env before reading CORS origins (audit H6 / PA-10).
+loadConfig();
 
 const app = express();
 
