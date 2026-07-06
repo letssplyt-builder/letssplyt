@@ -55,7 +55,7 @@ letssplyt/
 ├── shared/
 │   ├── package.json              ← name: "@letssplyt/shared"
 │   ├── types/                    ← auth, event, participant, receipt, settlement, api
-│   └── utils/                    ← splitCalculator.ts, formatCurrency.ts, currency.ts
+│   └── utils/                    ← splitCalculator.ts, formatCurrency.ts, paymentLinks.ts, receiptDiscounts.ts
 ├── backend/
 │   ├── src/
 │   │   ├── app.ts / server.ts
@@ -65,7 +65,7 @@ letssplyt/
 │   │   │   ├── llm/factory.ts    ← createLLMProvider()
 │   │   │   ├── llm/ai-audit.ts   ← writeAuditLog() — fire-and-forget, never throws
 │   │   │   ├── push.service.ts   ← sendPushNotification(), sendBatchPushNotifications()
-│   │   │   └── security/         ← encrypt, hashPhone, sanitizePromptInput, resolveParticipantPhone
+│   │   │   └── security/         ← crypto, sanitize, resolveParticipantPhone, phone-format
 │   │   ├── modules/
 │   │   │   ├── auth/
 │   │   │   ├── profile/

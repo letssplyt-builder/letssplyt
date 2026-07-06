@@ -91,7 +91,6 @@ app.get('/health', (req, res, next) => {
 });
 
 app.use('/api/v1/webhooks/twilio', twilioWebhookRouter);
-app.use('/webhooks/twilio', twilioWebhookRouter);
 app.use('/api/v1/webhooks/telnyx', telnyxWebhookRouter);
 app.use('/webhooks/telnyx', telnyxWebhookRouter);
 

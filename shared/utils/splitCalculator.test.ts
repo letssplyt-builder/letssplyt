@@ -1,4 +1,4 @@
-import { describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import {
   calculateSplits,
   fromMinorUnits,
@@ -86,6 +86,32 @@ describe('largestRemainderRound', () => {
     const shares = [total * 0.3333, total * 0.3333, total * 0.3334];
     const result = largestRemainderRound(shares, 'USD');
     expect(result.reduce((a, b) => a + b, 0)).toBe(10000);
+  });
+
+  it('throws on negative shares', () => {
+    expect(() => largestRemainderRound([-1, 11], 'USD')).toThrow(/Shares cannot be negative/);
+  });
+
+  it('throws when floored shares exceed target total', () => {
+    const floorSpy = jest.spyOn(Math, 'floor').mockReturnValue(600);
+    try {
+      expect(() => largestRemainderRound([5, 5], 'USD')).toThrow(
+        /floored shares exceed target total/,
+      );
+    } finally {
+      floorSpy.mockRestore();
+    }
+  });
+
+  it('throws when remainder units exceed share count', () => {
+    const floorSpy = jest.spyOn(Math, 'floor').mockReturnValue(0);
+    try {
+      expect(() => largestRemainderRound([5, 5], 'USD')).toThrow(
+        /remainder units exceed share count/,
+      );
+    } finally {
+      floorSpy.mockRestore();
+    }
   });
 
   it('returns empty array for empty input', () => {

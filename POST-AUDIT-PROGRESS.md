@@ -2,7 +2,7 @@
 
 **Source:** `CODEBASE-AUDIT-2026-07-05.md`  
 **Last updated:** 2026-07-05  
-**Current story:** PA-18 — JWT local verification for auth middleware
+**Current story:** PA-19 — Low-severity bundle (L1–L7)
 
 > **AI:** Read this file at the start of every post-audit session. Find the first `[ ]` story in `POST-AUDIT-BUILD-SEQUENCE.md`, build it as **one PR**, run tests, wait for Pawan confirmation, then mark `[x]` with date.
 
@@ -36,7 +36,7 @@
 - [x] PA-15 — Structured logging in financial cleanup paths (M8) (2026-07-05)
 - [x] PA-16 — Split sanitize / formatCurrency / resolveParticipantPhone (M3) (2026-07-05)
 - [x] PA-17 — PostgREST filter injection guardrails (M4) (2026-07-05)
-- [ ] PA-18 — JWT local verification for auth middleware (M2)
+- [x] PA-18 — JWT local verification for auth middleware (M2) — 2026-07-06
 
 ## Low
 
