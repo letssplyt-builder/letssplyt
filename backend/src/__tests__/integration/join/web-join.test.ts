@@ -61,6 +61,8 @@ describe('Web join integration', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers['content-type']).toMatch(/html/);
+    expect(response.headers['content-security-policy']).toContain("default-src 'none'");
+    expect(response.headers['referrer-policy']).toBe('no-referrer');
     expect(response.text).toContain('Join the group');
     expect(response.text).toContain('Friday Dinner');
     expect(response.text).toContain('name="display_name"');

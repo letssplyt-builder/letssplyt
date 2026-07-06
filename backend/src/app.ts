@@ -6,6 +6,7 @@ import * as Sentry from '@sentry/node';
 import logger from './infrastructure/logger';
 import { requestIdMiddleware } from './middleware/requestId';
 import { globalRateLimiter } from './middleware/rateLimiter';
+import { htmlSecurityHeaders } from './middleware/htmlSecurityHeaders';
 import { piiScrubberMiddleware } from './middleware/piiScrubber';
 import authRoutes from './modules/auth/auth.routes';
 import profileRoutes from './modules/profile/profile.routes';
@@ -87,9 +88,9 @@ app.use('/webhooks/twilio', twilioWebhookRouter);
 app.use('/api/v1/webhooks/telnyx', telnyxWebhookRouter);
 app.use('/webhooks/telnyx', telnyxWebhookRouter);
 
-app.use('/join', joinWebRoutes);
-app.use('/split', breakdownRoutes);
-app.use('/s', breakdownRoutes);
+app.use('/join', htmlSecurityHeaders, joinWebRoutes);
+app.use('/split', htmlSecurityHeaders, breakdownRoutes);
+app.use('/s', htmlSecurityHeaders, breakdownRoutes);
 
 app.use('/api/v1/join', joinAppRoutes);
 

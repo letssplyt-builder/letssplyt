@@ -146,6 +146,9 @@ describe('Split breakdown page', () => {
 
     expect(response.status).toBe(200);
     expect(response.headers['content-type']).toMatch(/html/);
+    expect(response.headers['content-security-policy']).toContain("default-src 'none'");
+    expect(response.headers['referrer-policy']).toBe('no-referrer');
+    expect(response.headers['cache-control']).toBe('private, no-store');
     expect(response.text).toContain('Team Dinner');
     expect(response.text).toContain('Jordan (you)');
     expect(response.text).toContain('Alex (organiser)');
@@ -159,6 +162,8 @@ describe('Split breakdown page', () => {
     const response = await request(app).get('/split/unknown-token');
 
     expect(response.status).toBe(404);
+    expect(response.headers['referrer-policy']).toBe('no-referrer');
+    expect(response.headers['cache-control']).toBe('private, no-store');
     expect(response.text).toContain('invalid or has expired');
   });
 });
