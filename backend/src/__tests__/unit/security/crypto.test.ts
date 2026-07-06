@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from '@jest/globals';
+import { createCipheriv, randomBytes } from 'crypto';
 import {
   encrypt,
   decrypt,
@@ -6,12 +7,22 @@ import {
   encryptHandle,
   decryptHandle,
   EncryptionError,
+  CURRENT_CIPHER_VERSION,
 } from '../../../infrastructure/security/crypto';
 
 const TEST_KEY =
   '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 const OTHER_KEY =
   'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210';
+
+function encryptLegacy(plaintext: string, keyHex: string): string {
+  const key = Buffer.from(keyHex, 'hex');
+  const iv = randomBytes(16);
+  const cipher = createCipheriv('aes-256-gcm', key, iv);
+  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+  const authTag = cipher.getAuthTag();
+  return `${iv.toString('hex')}:${authTag.toString('hex')}:${encrypted.toString('hex')}`;
+}
 
 describe('encrypt / decrypt', () => {
   it('round trip returns the original plaintext exactly', () => {
@@ -31,11 +42,26 @@ describe('encrypt / decrypt', () => {
     expect(() => decrypt(encrypted, OTHER_KEY)).toThrow(EncryptionError);
   });
 
+  it('new ciphertext uses v1 prefix and 12-byte IV', () => {
+    const encrypted = encrypt('versioned', TEST_KEY);
+    expect(encrypted.startsWith(`${CURRENT_CIPHER_VERSION}:`)).toBe(true);
+    const parts = encrypted.split(':');
+    expect(parts).toHaveLength(4);
+    expect(parts[1]).toHaveLength(24);
+  });
+
+  it('decrypts legacy 16-byte IV ciphertext without v1 prefix', () => {
+    const plaintext = 'legacy-row-from-db';
+    const legacy = encryptLegacy(plaintext, TEST_KEY);
+    expect(legacy.split(':')).toHaveLength(3);
+    expect(decrypt(legacy, TEST_KEY)).toBe(plaintext);
+  });
+
   it('the encrypted output never contains the plaintext as a substring', () => {
     const plaintext = 'super-secret-value';
     const encrypted = encrypt(plaintext, TEST_KEY);
     expect(encrypted).not.toContain(plaintext);
-    expect(encrypted.split(':')).toHaveLength(3);
+    expect(encrypted.split(':')).toHaveLength(4);
   });
 
   it('encrypting an empty string works without error', () => {
@@ -75,6 +101,26 @@ describe('encrypt / decrypt', () => {
 
   it('throws EncryptionError for malformed encrypted string format', () => {
     expect(() => decrypt('only-two:parts', TEST_KEY)).toThrow(EncryptionError);
+    expect(() => decrypt('v1:only:two', TEST_KEY)).toThrow(EncryptionError);
+    expect(() => decrypt('v2:aa:bb:cc', TEST_KEY)).toThrow(EncryptionError);
+    try {
+      decrypt('v2:aa:bb:cc', TEST_KEY);
+    } catch (err) {
+      expect((err as EncryptionError).message).toContain('Unsupported encrypted value version: v2');
+    }
+  });
+
+  it('wraps GCM auth failures as Decryption failed without leaking plaintext', () => {
+    const encrypted = encrypt('tamper-me', TEST_KEY);
+    const parts = encrypted.split(':');
+    parts[3] = `${parts[3]!.slice(0, -2)}ff`;
+    expect(() => decrypt(parts.join(':'), TEST_KEY)).toThrow(EncryptionError);
+    try {
+      decrypt(parts.join(':'), TEST_KEY);
+    } catch (err) {
+      expect((err as EncryptionError).message).toBe('Decryption failed');
+      expect((err as EncryptionError).message).not.toContain('tamper-me');
+    }
   });
 
   it('wraps unexpected cipher failures as EncryptionError without leaking details', () => {

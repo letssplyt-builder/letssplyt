@@ -58,8 +58,8 @@ describe('join-web.service', () => {
 
   it('phone encrypted before participant creation', () => {
     const encrypted = encryptPhoneForJoin(PHONE_E164);
-    expect(encrypted).toContain(':');
-    expect(encrypted.split(':')).toHaveLength(3);
+    expect(encrypted.startsWith('v1:')).toBe(true);
+    expect(encrypted.split(':')).toHaveLength(4);
   });
 
   it('sms_opt_outs checked by hash before OTP send', async () => {
