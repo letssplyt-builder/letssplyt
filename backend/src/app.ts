@@ -7,6 +7,10 @@ import logger from './infrastructure/logger';
 import { requestIdMiddleware } from './middleware/requestId';
 import { globalRateLimiter } from './middleware/rateLimiter';
 import { htmlSecurityHeaders } from './middleware/htmlSecurityHeaders';
+import {
+  jsonBodyParser,
+  urlencodedBodyParser,
+} from './middleware/jsonBodyParser';
 import { piiScrubberMiddleware } from './middleware/piiScrubber';
 import authRoutes from './modules/auth/auth.routes';
 import profileRoutes from './modules/profile/profile.routes';
@@ -65,8 +69,8 @@ app.use(
 // QStash job endpoints need the raw body for signature verification.
 app.use('/api/v1/jobs', express.raw({ type: 'application/json' }), jobsRoutes);
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: false }));
+app.use(jsonBodyParser);
+app.use(urlencodedBodyParser);
 app.use(requestIdMiddleware);
 app.use(
   pinoHttp({

@@ -55,6 +55,26 @@ describe('errorHandler middleware', () => {
     });
   });
 
+  it('returns JSON 413 for payload too large errors', async () => {
+    const err = Object.assign(new Error('request entity too large'), {
+      type: 'entity.too.large',
+      status: 413,
+      statusCode: 413,
+    });
+    const app = createApp(err);
+
+    const response = await request(app).get('/boom');
+
+    expect(response.status).toBe(413);
+    expect(response.body).toEqual({
+      error: {
+        code: 'PAYLOAD_TOO_LARGE',
+        message: 'Request body too large',
+      },
+    });
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+  });
+
   it('returns JSON 500 for unknown errors instead of Express HTML', async () => {
     const app = createApp(new Error('database exploded'));
 
