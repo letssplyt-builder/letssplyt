@@ -6,7 +6,9 @@ import { buildPaymentLinkTargets } from '@letssplyt/shared/paymentLinks';
 import type { PaymentProvider } from '@letssplyt/shared/profile.types';
 import { loadParticipantItemNames } from './messages.service';
 import { resolveParticipantPhoneContext } from './participant-phone';
+import { isBreakdownLinkClosed } from './breakdown-token-expiry';
 import {
+  renderBreakdownClosedPage,
   renderBreakdownNotFoundPage,
   renderBreakdownPage,
   type BreakdownPaymentLink,
@@ -48,13 +50,20 @@ export async function renderSplitBreakdownHtml(token: string): Promise<{ html: s
 
   const { data: eventRow, error: eventError } = await supabaseAdmin
     .from('events')
-    .select('id, title, payer_id, currency, locale, total_amount, deleted_at')
+    .select('id, title, payer_id, currency, locale, total_amount, deleted_at, fully_settled_at')
     .eq('id', viewer.event_id)
     .is('deleted_at', null)
     .maybeSingle();
 
   if (eventError || !eventRow) {
     return { html: renderBreakdownNotFoundPage(), status: 404 };
+  }
+
+  if (isBreakdownLinkClosed(eventRow.fully_settled_at as string | null)) {
+    return {
+      html: renderBreakdownClosedPage(eventRow.title as string),
+      status: 200,
+    };
   }
 
   const { data: payer, error: payerError } = await supabaseAdmin

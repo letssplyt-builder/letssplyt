@@ -1,5 +1,8 @@
 import { describe, expect, it } from '@jest/globals';
-import { renderBreakdownPage } from '../../../modules/messages/templates/breakdown.html';
+import {
+  renderBreakdownClosedPage,
+  renderBreakdownPage,
+} from '../../../modules/messages/templates/breakdown.html';
 
 describe('breakdown.html', () => {
   it('embeds native app URL on pay buttons and uses direct scheme navigation on iOS', () => {
@@ -25,5 +28,12 @@ describe('breakdown.html', () => {
     expect(html).toContain('data-app-url="venmo://paycharge');
     expect(html).toContain('window.location.href = app');
     expect(html).not.toContain('iframe.src = app');
+  });
+
+  it('renders split closed page with event title', () => {
+    const html = renderBreakdownClosedPage('Team Dinner');
+    expect(html).toContain('Split closed');
+    expect(html).toContain('This split has closed');
+    expect(html).toContain('Team Dinner');
   });
 });

@@ -36,6 +36,7 @@ describe('Split breakdown page', () => {
         locale: 'en-US',
         total_amount: 84,
         deleted_at: null,
+        fully_settled_at: null,
       },
       error: null,
     });
@@ -93,6 +94,7 @@ describe('Split breakdown page', () => {
         locale: 'en-US',
         total_amount: 84,
         deleted_at: null,
+        fully_settled_at: null,
       },
       error: null,
     });
@@ -153,6 +155,46 @@ describe('Split breakdown page', () => {
     expect(response.text).toContain('Jordan (you)');
     expect(response.text).toContain('Alex (organiser)');
     expect(response.text).toContain('Who owes what');
+  });
+
+  it('GET /split/:token returns closed page after settlement grace period', async () => {
+    const settledAt = new Date(Date.now() - 31 * 24 * 60 * 60 * 1000).toISOString();
+    mockSupabase.__resetMock();
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: {
+        id: VIEWER_ID,
+        event_id: EVENT_ID,
+        display_name: 'Jordan',
+        amount_owed: 42,
+        user_id: 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',
+        guest_pii_token: null,
+        country_code: 'US',
+        join_method: 'qr_app',
+      },
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('events', {
+      data: {
+        id: EVENT_ID,
+        title: 'Team Dinner',
+        payer_id: PAYER_ID,
+        currency: 'USD',
+        locale: 'en-US',
+        total_amount: 84,
+        deleted_at: null,
+        fully_settled_at: settledAt,
+      },
+      error: null,
+    });
+
+    const response = await request(app).get(`/split/${TOKEN}`);
+
+    expect(response.status).toBe(200);
+    expect(response.headers['cache-control']).toBe('private, no-store');
+    expect(response.text).toContain('Split closed');
+    expect(response.text).toContain('This split has closed');
+    expect(response.text).toContain('Team Dinner');
+    expect(response.text).not.toContain('Who owes what');
   });
 
   it('GET /split/:token returns 404 HTML for unknown token', async () => {

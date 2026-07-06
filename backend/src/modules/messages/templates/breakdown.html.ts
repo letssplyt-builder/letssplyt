@@ -230,3 +230,31 @@ export function renderBreakdownNotFoundPage(): string {
 </body>
 </html>`;
 }
+
+export function renderBreakdownClosedPage(eventTitle?: string): string {
+  const title = eventTitle ? escapeHtml(eventTitle) : 'This split';
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Split closed — LetsSplyt</title>
+  <style>${JOIN_PAGE_STYLES}</style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <div class="logo-row"><div class="logo-icon">✦</div><div class="logo-text">LetsSplyt</div></div>
+      <div class="invite-badge">Split closed</div>
+      <h1 class="event-name">${title}</h1>
+    </div>
+    <div class="body center">
+      <div class="success-icon">✓</div>
+      <h2 class="title">This split has closed</h2>
+      <p class="subtitle">The event is fully settled and this breakdown link is no longer available.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+}
