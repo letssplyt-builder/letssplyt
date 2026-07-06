@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import * as Sentry from '@sentry/node';
 import logger from '../infrastructure/logger';
 import { AppError } from '../infrastructure/errors';
+import { isPayloadTooLargeError } from './jsonBodyParser';
 
 const INTERNAL_ERROR_MESSAGE = 'An unexpected error occurred';
 
@@ -29,6 +30,16 @@ export function errorHandler(
         code: err.code,
         message: err.message,
         ...(err.details !== undefined ? { details: err.details } : {}),
+      },
+    });
+    return;
+  }
+
+  if (isPayloadTooLargeError(err)) {
+    res.status(413).json({
+      error: {
+        code: 'PAYLOAD_TOO_LARGE',
+        message: 'Request body too large',
       },
     });
     return;
