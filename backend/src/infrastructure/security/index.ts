@@ -8,11 +8,11 @@ export {
   EncryptionError,
   HashError,
 } from './crypto';
+export { sanitizePromptInput } from './sanitize';
+export { resolveParticipantPhone } from './resolveParticipantPhone';
 export {
-  sanitizePromptInput,
   formatCurrency,
   defaultLocaleForCurrency,
-  resolveParticipantPhone,
   CurrencyFormatError,
-} from './sanitize';
+} from '@letssplyt/shared/utils/formatCurrency';
 export { formatPhoneE164 } from './phone-format';
