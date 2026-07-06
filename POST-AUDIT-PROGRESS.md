@@ -2,7 +2,7 @@
 
 **Source:** `CODEBASE-AUDIT-2026-07-05.md`  
 **Last updated:** 2026-07-05  
-**Current story:** PA-16 — Split sanitize / formatCurrency / resolveParticipantPhone
+**Current story:** PA-17 — PostgREST filter injection guardrails
 
 > **AI:** Read this file at the start of every post-audit session. Find the first `[ ]` story in `POST-AUDIT-BUILD-SEQUENCE.md`, build it as **one PR**, run tests, wait for Pawan confirmation, then mark `[x]` with date.
 
@@ -34,7 +34,7 @@
 - [x] PA-13 — Global JSON body size limit (M6) (2026-07-05)
 - [x] PA-14 — Encryption key versioning + 12-byte GCM IV (M7) (2026-07-05)
 - [x] PA-15 — Structured logging in financial cleanup paths (M8) (2026-07-05)
-- [ ] PA-16 — Split sanitize / formatCurrency / resolveParticipantPhone (M3)
+- [x] PA-16 — Split sanitize / formatCurrency / resolveParticipantPhone (M3) (2026-07-05)
 - [ ] PA-17 — PostgREST filter injection guardrails (M4)
 - [ ] PA-18 — JWT local verification for auth middleware (M2)
 
