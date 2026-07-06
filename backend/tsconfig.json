@@ -9,7 +9,8 @@
       "@letssplyt/shared/paymentHandleValidation": ["../shared/dist/utils/paymentHandleValidation"],
       "@letssplyt/shared/paymentLinks": ["../shared/dist/utils/paymentLinks"],
       "@letssplyt/shared/utils/splitCalculator": ["../shared/dist/utils/splitCalculator"],
-      "@letssplyt/shared/utils/receiptDiscounts": ["../shared/dist/utils/receiptDiscounts"]
+      "@letssplyt/shared/utils/receiptDiscounts": ["../shared/dist/utils/receiptDiscounts"],
+      "@letssplyt/shared/utils/formatCurrency": ["../shared/dist/utils/formatCurrency"]
     }
   },
   "include": ["src/**/*"]

@@ -531,7 +531,7 @@ npx supabase db reset --db-url $SUPABASE_URL  # WARNING: wipes dev DB
 
 # Start backend (in one terminal):
 cd backend
-doppler run -- npm run dev  # starts on port 3000
+doppler run -- npm run dev  # starts on port 3000; predev rebuilds @letssplyt/shared
 
 # Live smoke tests (backend must be running on PORT, default 3000):
 cd backend
@@ -567,12 +567,11 @@ npx expo start          # shows QR code for Expo Go
 #   EXPO_PUBLIC_API_URL=http://192.168.x.x:3000 npx expo start
 # Find your Mac IP: System Settings → Network, or run: ipconfig getifaddr en0
 
-# OTP on a physical device (Send Code returns 503 / "Unable to send OTP"):
-# Twilio is called on every OTP request unless dev bypass is active.
-# OTP in development defaults to dev bypass (otpMode: dev-bypass in startup logs).
-# Twilio Verify does NOT support test credentials — twilioCode 20008 means you hit live Verify with test creds.
-# Any 6-digit code passes verify; no SMS sent. Use your real phone in the app.
-# For real SMS locally: TWILIO_USE_LIVE_VERIFY=true, OTP_DEV_BYPASS=false, live Twilio creds in Doppler.
+# OTP on a physical device:
+# Custom OTP is sent via SMS (Telnyx/Twilio) unless dev bypass is active.
+# In Doppler development, set OTP_DEV_BYPASS=true (recommended) — startup log shows otpMode: dev-bypass; any 6-digit code works.
+# If otpMode is custom-otp, enter the real SMS code or enable OTP_DEV_BYPASS=true and restart.
+# To test real SMS delivery locally: OTP_DEV_BYPASS=false, restart backend, request OTP again.
 ```
 
 ### `app.config.js`

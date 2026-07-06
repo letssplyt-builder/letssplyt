@@ -414,11 +414,13 @@ Open doppler.com → letssplyt → **development** environment first. Add each s
 | `TWILIO_AUTH_TOKEN` | Test Auth Token | Live Auth Token |
 | `TWILIO_PHONE_NUMBER` | `+15005550006` | Your Twilio number |
 | `TWILIO_VERIFY_SERVICE_SID` | Not used in dev (see below) | Your live Verify SID |
-| `OTP_DEV_BYPASS` | omit (defaults to bypass) or `true` | — (omit or `false`) |
+| `OTP_DEV_BYPASS` | **`true` (recommended for local dev)** — any 6-digit code works | omit or `false` |
 
-**OTP in development:** Twilio **Verify does not support test credentials** (error `20008`). With `APP_ENV=development`, the backend **defaults to OTP dev bypass** — no SMS, any 6-digit code works. Check backend logs for `otpMode: dev-bypass` on startup. Use your real phone number in the app. To test real SMS locally, set `TWILIO_USE_LIVE_VERIFY=true`, `OTP_DEV_BYPASS=false`, and use **live** Twilio credentials in Doppler.
+**OTP in development:** LetsSplyt uses **custom OTP** stored in Supabase (not Twilio Verify). After post-audit PA-01, bypass is **fail-closed**: with `APP_ENV=development`, bypass is active only when **`OTP_DEV_BYPASS=true`** OR `TWILIO_ACCOUNT_SID` is `ACtest`. Most Doppler development configs use Telnyx or live Twilio credentials — set **`OTP_DEV_BYPASS=true`** in Doppler development. On backend startup, confirm `"otpMode":"dev-bypass"` in the logs. If you see `"otpMode":"custom-otp"`, you must enter the real SMS code (or enable bypass).
 
-**OTP on your physical phone during local dev:** Expo Go auto-detects your Mac's LAN IP for API calls. OTP verify screen is complete (E03-S04). Dev bypass accepts any 6-digit code when `APP_ENV=development`. New user registration requires migration `20260608000000_users_auth_registration.sql` applied to Supabase.
+**OTP on your physical phone during local dev:** Expo Go auto-detects your Mac's LAN IP for API calls. With bypass active, any 6-digit code works on the verify screen. New user registration requires migration `20260608000000_users_auth_registration.sql` applied to Supabase.
+
+**To test real SMS locally (Telnyx or Twilio):** Set `OTP_DEV_BYPASS=false` in Doppler development and restart the backend. Request OTP and enter the code from the SMS. Optional: query `otp_verifications` in Supabase (hashed only) or check Telnyx Mission Control delivery logs.
 
 **AI (different providers per environment):**
 
@@ -630,6 +632,8 @@ doppler run -- npm run cleanup:phone -- +1XXXXXXXXXX
 cd ~/letssplyt/backend
 doppler run -- npm run dev
 ```
+
+`npm run dev` runs a **predev** hook that rebuilds `@letssplyt/shared` automatically (required after pulls that touch `shared/utils/`, e.g. `formatCurrency`). If you see `Cannot find module .../shared/dist/utils/formatCurrency.js`, run `npm run build:shared` from the repo root and restart.
 
 **Terminal 2 — Mobile:**
 ```bash
