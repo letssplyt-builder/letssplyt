@@ -66,6 +66,21 @@ export function fromMinorUnits(minorAmount: number, currencyCode: string): numbe
 }
 
 /**
+ * Guards impossible remainder states (defensive — should not occur with valid non-negative shares).
+ */
+export function validateLargestRemainderUnitsLeft(
+  unitsLeft: number,
+  shareCount: number,
+): void {
+  if (unitsLeft < 0) {
+    throw new Error('largestRemainderRound: floored shares exceed target total');
+  }
+  if (unitsLeft > shareCount) {
+    throw new Error('largestRemainderRound: remainder units exceed share count');
+  }
+}
+
+/**
  * Largest-remainder rounding in minor units.
  * Input shares are major-unit fractional amounts (e.g. 3.333... USD).
  * Tiebreaker: lowest index receives an extra minor unit first.
@@ -93,12 +108,7 @@ export function largestRemainderRound(shares: number[], currency: string): numbe
   const flooredSum = withFloor.reduce((sum, entry) => sum + entry.flooredMinor, 0);
   let unitsLeft = targetMinor - flooredSum;
 
-  if (unitsLeft < 0) {
-    throw new Error('largestRemainderRound: floored shares exceed target total');
-  }
-  if (unitsLeft > shares.length) {
-    throw new Error('largestRemainderRound: remainder units exceed share count');
-  }
+  validateLargestRemainderUnitsLeft(unitsLeft, shares.length);
 
   const indexed = [...withFloor];
   indexed.sort((a, b) => {
