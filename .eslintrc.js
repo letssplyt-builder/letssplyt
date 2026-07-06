@@ -15,6 +15,15 @@ module.exports = {
       },
     ],
     'no-console': 'warn',
+    // PostgREST filter injection guard (audit M4 / PA-17): use .eq/.in or multi-query merge instead.
+    'no-restricted-syntax': [
+      'error',
+      {
+        selector: "CallExpression[callee.property.name='or'] TemplateLiteral",
+        message:
+          'Avoid template literals in PostgREST .or() filters; use typed .eq/.in builders or merge separate queries.',
+      },
+    ],
   },
   ignorePatterns: ['dist/', 'node_modules/', '.expo/', 'coverage/'],
   overrides: [
