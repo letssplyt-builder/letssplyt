@@ -268,7 +268,7 @@ TELNYX_FROM_NUMBER=+1...
 **Important:** Use **Number B** as `phone_e164` in the app or curl — not your personal mobile. There is no Telnyx setting for this; you simply type Number B when LetsSplyt asks for a phone number.
 
 1. In the app: Register or request OTP with **Number B** in E.164 format
-2. If `OTP_DEV_BYPASS=true` (default local dev): no SMS is sent; any 6-digit code works — Telnyx not exercised
+2. If `OTP_DEV_BYPASS=true` in Doppler development (recommended for local dev): no SMS is sent; any 6-digit code works — Telnyx not exercised. Confirm `"otpMode":"dev-bypass"` in backend startup logs.
 3. To test real Telnyx send locally:
    - Set `OTP_DEV_BYPASS=false` in Doppler dev (or env)
    - Restart backend

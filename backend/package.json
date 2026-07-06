@@ -5,6 +5,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
+    "predev": "npm run build --workspace=@letssplyt/shared",
     "build": "tsc",
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit",
