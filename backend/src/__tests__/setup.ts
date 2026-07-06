@@ -39,6 +39,39 @@ jest.mock('twilio', () => require('./mocks/twilio.mock').twilioMockFactory());
 
 jest.mock('@supabase/supabase-js', () => require('./mocks/supabase.mock'));
 
+jest.mock('../infrastructure/supabase-jwt', () => {
+  class SupabaseJwtError extends Error {
+    readonly code = 'AUTH_REQUIRED';
+
+    constructor(message = 'Unauthorized') {
+      super(message);
+      this.name = 'SupabaseJwtError';
+    }
+  }
+
+  async function verifyFromMockGetUser(token: string): Promise<{ userId: string; email?: string }> {
+    const { mockSupabase } = require('./mocks/supabase.mock') as typeof import('./mocks/supabase.mock');
+    const getUser = mockSupabase.auth.getUser as unknown as (
+      accessToken: string,
+    ) => Promise<{
+      data: { user: { id: string; email?: string } | null };
+      error: { message: string } | null;
+    }>;
+    const { data, error } = await getUser(token);
+    if (error || !data.user?.id) {
+      throw new SupabaseJwtError();
+    }
+    return { userId: data.user.id, email: data.user.email ?? undefined };
+  }
+
+  return {
+    SupabaseJwtError,
+    verifySupabaseAccessToken: jest.fn(verifyFromMockGetUser),
+    verifyAccessTokenViaSupabaseAuth: jest.fn(verifyFromMockGetUser),
+    resetSupabaseJwtCacheForTests: jest.fn(),
+  };
+});
+
 jest.mock('../infrastructure/llm/factory', () => require('./mocks/llm.mock'));
 
 beforeEach(() => {
