@@ -2,11 +2,11 @@ import { validateStartupEnv, type AppEnv } from './startup-env';
 
 export interface AppConfig {
   appEnv: AppEnv;
-  /** Normalized Origin header values for CORS (may be multiple). */
+  /** Normalized Origin header values for CORS (from comma-separated APP_DOMAIN). */
   corsOrigins: string[];
-  /** Public HTTPS base URL for join/breakdown links (first APP_DOMAIN entry). */
+  /** Public web origin for join/breakdown/static links (first normalized APP_DOMAIN entry). */
   appBaseUrl: string;
-  /** Full app URL for webhooks and absolute links (APP_URL). */
+  /** Full backend URL for webhooks and server-side absolute links (APP_URL). */
   appUrl: string;
 }
 

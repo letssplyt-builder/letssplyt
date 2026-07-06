@@ -1,5 +1,9 @@
 import { describe, expect, it, afterEach } from '@jest/globals';
+import cors from 'cors';
+import express from 'express';
+import request from 'supertest';
 import {
+  getConfig,
   loadConfig,
   normalizeWebOrigin,
   resetConfigForTests,
@@ -49,5 +53,39 @@ describe('config', () => {
     ]);
     expect(config.appBaseUrl).toBe('https://letssplyt.app');
     expect(config.appUrl).toBe('https://letssplyt.app');
+  });
+
+  it('resolveAppDomainConfig rejects localhost fallback in staging', () => {
+    expect(() => resolveAppDomainConfig(undefined, 'staging')).toThrow(/APP_DOMAIN is required/);
+  });
+
+  it('CORS accepts browser Origin matching normalized domain-only APP_DOMAIN', async () => {
+    resetConfigForTests();
+    loadConfig({
+      APP_ENV: 'development',
+      APP_DOMAIN: 'letssplyt.app',
+      APP_URL: 'https://letssplyt.app',
+    });
+
+    const app = express();
+    app.use(
+      cors({
+        origin: getConfig().corsOrigins,
+        credentials: true,
+      }),
+    );
+    app.get('/ping', (_req, res) => {
+      res.json({ ok: true });
+    });
+
+    const allowed = await request(app)
+      .get('/ping')
+      .set('Origin', 'https://letssplyt.app');
+    expect(allowed.headers['access-control-allow-origin']).toBe('https://letssplyt.app');
+
+    const blocked = await request(app)
+      .get('/ping')
+      .set('Origin', 'https://evil.example');
+    expect(blocked.headers['access-control-allow-origin']).toBeUndefined();
   });
 });

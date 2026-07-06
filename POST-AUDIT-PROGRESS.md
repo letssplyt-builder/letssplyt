@@ -2,7 +2,7 @@
 
 **Source:** `CODEBASE-AUDIT-2026-07-05.md`  
 **Last updated:** 2026-07-05  
-**Current story:** PA-10 — CORS origin normalization from APP_DOMAIN
+**Current story:** PA-11 — RLS strategy + centralized route authz
 
 > **AI:** Read this file at the start of every post-audit session. Find the first `[ ]` story in `POST-AUDIT-BUILD-SEQUENCE.md`, build it as **one PR**, run tests, wait for Pawan confirmation, then mark `[x]` with date.
 
@@ -22,7 +22,7 @@
 - [x] PA-07 — CI coverage enforcement + 100% gates on critical files (H5) (2026-07-05)
 - [x] PA-08 — Security headers on HTML routes (H2) (2026-07-05)
 - [x] PA-09 — Breakdown token expiry after settlement (H3) (2026-07-05)
-- [ ] PA-10 — CORS origin normalization from APP_DOMAIN (H6 remainder)
+- [x] PA-10 — CORS origin normalization from APP_DOMAIN (H6 remainder) (2026-07-05)
 
 ## Architecture
 
