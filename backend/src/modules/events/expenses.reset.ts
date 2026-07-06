@@ -1,4 +1,5 @@
 import { AppError, Errors } from '../../infrastructure/errors';
+import logger from '../../infrastructure/logger';
 import { supabaseAdmin } from '../../infrastructure/supabase';
 import {
   assertEventOwner,
@@ -33,11 +34,18 @@ async function tryRpcReset(eventId: string): Promise<void> {
       p_event_id: eventId,
     });
     if (error) {
-      console.warn(`[resetExpenses] RPC reset_event_expenses_data failed: ${error.message}`);
+      logger.warn({
+        msg: 'reset_event_expenses_data RPC failed',
+        eventId,
+        dbMessage: error.message,
+      });
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    console.warn(`[resetExpenses] RPC call failed: ${message}`);
+    logger.warn({
+      msg: 'reset_event_expenses_data RPC call failed',
+      eventId,
+      err,
+    });
   }
 }
 
@@ -87,9 +95,11 @@ async function resetExpensesViaQueries(eventId: string): Promise<void> {
     .eq('event_id', eventId);
 
   if (auditError) {
-    console.warn(
-      `[resetExpenses] ai_audit_log cleanup failed for event ${eventId}: ${auditError.message}`,
-    );
+    logger.warn({
+      msg: 'ai_audit_log cleanup failed during expense reset',
+      eventId,
+      dbMessage: auditError.message,
+    });
   }
 
   const { error: eventUpdateError } = await supabaseAdmin
