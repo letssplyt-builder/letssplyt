@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 import {
   calculateSplits,
   fromMinorUnits,
   getCurrencyMinorUnits,
   largestRemainderRound,
   toMinorUnits,
+  validateLargestRemainderUnitsLeft,
   type Assignment,
   type ConfirmedReceiptItem,
   type ReceiptTotals,
@@ -93,25 +94,15 @@ describe('largestRemainderRound', () => {
   });
 
   it('throws when floored shares exceed target total', () => {
-    const floorSpy = jest.spyOn(Math, 'floor').mockReturnValue(600);
-    try {
-      expect(() => largestRemainderRound([5, 5], 'USD')).toThrow(
-        /floored shares exceed target total/,
-      );
-    } finally {
-      floorSpy.mockRestore();
-    }
+    expect(() => validateLargestRemainderUnitsLeft(-1, 2)).toThrow(
+      /floored shares exceed target total/,
+    );
   });
 
   it('throws when remainder units exceed share count', () => {
-    const floorSpy = jest.spyOn(Math, 'floor').mockReturnValue(0);
-    try {
-      expect(() => largestRemainderRound([5, 5], 'USD')).toThrow(
-        /remainder units exceed share count/,
-      );
-    } finally {
-      floorSpy.mockRestore();
-    }
+    expect(() => validateLargestRemainderUnitsLeft(5, 2)).toThrow(
+      /remainder units exceed share count/,
+    );
   });
 
   it('returns empty array for empty input', () => {
