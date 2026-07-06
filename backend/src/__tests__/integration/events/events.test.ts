@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import request from 'supertest';
 import app from '../../../app';
 import { mockSupabase } from '../../mocks/supabase.mock';
+import { pushEventRow } from '../../helpers/pushEventRow';
 
 const USER_A = 'event-owner-a';
 const USER_B = 'event-owner-b';
@@ -197,7 +198,7 @@ describe('Events API integration', () => {
 
   it('DELETE /events/:id returns 204 when messages not sent', async () => {
     mockAuth(USER_A);
-    mockSupabase.__pushMockResultForTable('events', { data: EVENT_ROW, error: null });
+    pushEventRow(EVENT_ROW);
     mockSupabase.__pushMockResultForTable('participants', { data: [], error: null });
     mockSupabase.__pushMockResultForTable('settlement_log', { data: null, error: null });
     mockSupabase.__pushMockResultForTable('notification_log', { data: null, error: null });
@@ -211,13 +212,10 @@ describe('Events API integration', () => {
 
   it('DELETE /events/:id returns 409 after messages sent', async () => {
     mockAuth(USER_A);
-    mockSupabase.__pushMockResultForTable('events', {
-      data: {
-        ...EVENT_ROW,
-        status: 'sent',
-        messages_sent_at: '2026-01-02T00:00:00.000Z',
-      },
-      error: null,
+    pushEventRow({
+      ...EVENT_ROW,
+      status: 'sent',
+      messages_sent_at: '2026-01-02T00:00:00.000Z',
     });
 
     const response = await request(app).delete(`/api/v1/events/${EVENT_ID}`).set(AUTH_A);

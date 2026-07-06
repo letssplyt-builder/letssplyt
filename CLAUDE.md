@@ -109,6 +109,8 @@ letssplyt/
 
 8. **Currency:** Use `getCurrencyMinorUnits(currency)` for all arithmetic. NEVER multiply by 100 universally — JPY has 0 decimal places, BHD has 3.
 
+9. **API authorization (ADR PA-11):** Express routes use `supabaseAdmin` + `requireEventAccess` middleware (`owner` or `member`). RLS protects Realtime/PostgREST; app authz is the API enforcement layer. See `docs/adr/PA-11-rls-and-route-authz.md`.
+
 ---
 
 ## Document Map

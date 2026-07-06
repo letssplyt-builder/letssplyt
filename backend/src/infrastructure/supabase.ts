@@ -15,7 +15,18 @@ const authConfig = {
   autoRefreshToken: false,
 } as const;
 
-/** Anon client — respects RLS. For server-side reads that use service patterns, prefer getSupabaseForUser. */
+/**
+ * Supabase clients for the LetsSplyt API layer.
+ *
+ * **Authorization model (ADR PA-11):** Express handlers use `supabaseAdmin` (service role)
+ * and enforce access in application code — primarily `requireEventAccess` route middleware
+ * plus service-layer asserts. PostgreSQL RLS remains enabled for Realtime and direct
+ * PostgREST access (defense-in-depth), but is not the primary gate for API routes.
+ *
+ * @see docs/adr/PA-11-rls-and-route-authz.md
+ */
+
+/** Anon client — JWT validation (`auth.getUser`) and flows that must respect RLS directly. */
 export const supabaseAnon: SupabaseClient = createClient(
   supabaseUrl,
   requireEnv('SUPABASE_PUBLISHABLE_KEY'),
@@ -23,13 +34,8 @@ export const supabaseAnon: SupabaseClient = createClient(
 );
 
 /**
- * @RESTRICTED USE ONLY. supabaseAdmin bypasses Row Level Security. Permitted uses:
- * (a) auth flows — creating and verifying users,
- * (b) background jobs and webhook handlers,
- * (c) analytics writes,
- * (d) cross-user writes like inserting a guest participant.
- * NEVER use supabaseAdmin in user-facing read endpoints.
- * If you are in a route handler reading data for the authenticated user, use getSupabaseForUser(jwt) instead.
+ * Service-role client — bypasses RLS. Standard for Express route handlers, jobs, and webhooks.
+ * User-scoped access is enforced via `requireEventAccess` middleware and service asserts.
  */
 export const supabaseAdmin: SupabaseClient = createClient(
   supabaseUrl,
@@ -37,7 +43,7 @@ export const supabaseAdmin: SupabaseClient = createClient(
   { auth: authConfig },
 );
 
-/** Creates a per-request client scoped to the user's JWT — RLS applies correctly. */
+/** Per-request client scoped to a user JWT — RLS applies. Used for profile reads today; optional for future read migration. */
 export function getSupabaseForUser(jwt: string): SupabaseClient {
   return createClient(supabaseUrl, requireEnv('SUPABASE_PUBLISHABLE_KEY'), {
     auth: authConfig,

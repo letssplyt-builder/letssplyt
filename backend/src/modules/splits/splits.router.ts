@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { authenticate } from '../../middleware/authenticate';
+import { requireEventAccess } from '../../middleware/eventAccess';
 import {
   getSplitAssignmentsHandler,
   postSplitCalculateHandler,
@@ -8,22 +8,21 @@ import {
 } from './splits.controller';
 
 const splitsRouter = Router();
+const requireOwner = requireEventAccess('owner');
 
-splitsRouter.use(authenticate);
-
-splitsRouter.get('/:id/split/assignments', (req, res, next) => {
+splitsRouter.get('/:id/split/assignments', requireOwner, (req, res, next) => {
   void getSplitAssignmentsHandler(req, res, next).catch(next);
 });
 
-splitsRouter.post('/:id/split/calculate', (req, res, next) => {
+splitsRouter.post('/:id/split/calculate', requireOwner, (req, res, next) => {
   void postSplitCalculateHandler(req, res, next).catch(next);
 });
 
-splitsRouter.post('/:id/split/confirm', (req, res, next) => {
+splitsRouter.post('/:id/split/confirm', requireOwner, (req, res, next) => {
   void postSplitConfirmHandler(req, res, next).catch(next);
 });
 
-splitsRouter.post('/:id/splits/assign', (req, res, next) => {
+splitsRouter.post('/:id/splits/assign', requireOwner, (req, res, next) => {
   void postSplitsAssignHandler(req, res, next).catch(next);
 });
 

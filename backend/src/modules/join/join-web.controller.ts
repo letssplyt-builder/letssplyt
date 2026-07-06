@@ -26,7 +26,7 @@ function sendHtml(res: Response, html: string, status = 200): void {
 }
 
 function appBaseUrl(): string {
-  return getConfig().appUrl;
+  return getConfig().appBaseUrl;
 }
 
 function ensureCsrf(req: Request, res: Response): boolean {
