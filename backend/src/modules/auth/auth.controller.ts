@@ -1,9 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
-import * as Sentry from '@sentry/node';
 import { z } from 'zod';
-import logger from '../../infrastructure/logger';
 import { sendOtp, verifyOtpAndCreateSession } from './auth.service';
-import { AppError } from '../../infrastructure/errors';
 
 const otpRequestSchema = z.object({
   phone_e164: z.string().regex(/^\+[1-9]\d{7,14}$/, 'Must be a valid E.164 phone number'),
@@ -83,32 +80,4 @@ export async function handleOtpVerify(
   } catch (err) {
     next(err);
   }
-}
-
-export function errorHandler(
-  err: unknown,
-  req: Request,
-  res: Response,
-  next: NextFunction,
-): void {
-  logger.error({
-    err,
-    requestId: req.requestId ?? null,
-    userId: req.user?.id ?? null,
-    msg: 'request error',
-  });
-
-  if (err instanceof AppError) {
-    res.status(err.statusCode).json({
-      error: {
-        code: err.code,
-        message: err.message,
-        details: err.details,
-      },
-    });
-    return;
-  }
-
-  Sentry.captureException(err);
-  next(err);
 }

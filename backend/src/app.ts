@@ -22,7 +22,7 @@ import jobsRoutes from './modules/jobs/jobs.routes';
 import analyticsRoutes from './modules/analytics/analytics.routes';
 import healthRoutes from './modules/health/health.routes';
 import { handleHealthCheck } from './modules/health/health.controller';
-import { errorHandler } from './modules/auth/auth.controller';
+import { errorHandler } from './middleware/errorHandler';
 import { getConfig, loadConfig } from './infrastructure/config';
 
 // Validate env before reading CORS origins (audit H6 / PA-10).
