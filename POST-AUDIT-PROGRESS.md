@@ -2,7 +2,7 @@
 
 **Source:** `CODEBASE-AUDIT-2026-07-05.md`  
 **Last updated:** 2026-07-05  
-**Current story:** PA-11 — RLS strategy + centralized route authz
+**Current story:** PA-12 — JSON error handler contract
 
 > **AI:** Read this file at the start of every post-audit session. Find the first `[ ]` story in `POST-AUDIT-BUILD-SEQUENCE.md`, build it as **one PR**, run tests, wait for Pawan confirmation, then mark `[x]` with date.
 
@@ -26,7 +26,7 @@
 
 ## Architecture
 
-- [ ] PA-11 — RLS strategy decision + centralized route authz (C3)
+- [x] PA-11 — RLS strategy + centralized route authz (C3) (2026-07-05)
 
 ## Medium
 

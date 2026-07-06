@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import request from 'supertest';
 import app from '../../../app';
 import { mockSupabase } from '../../mocks/supabase.mock';
+import { pushEventRow } from '../../helpers/pushEventRow';
 
 jest.mock('../../../infrastructure/notification/opt-out', () => ({
   isPhoneOptedOut: jest.fn(),
@@ -35,17 +36,14 @@ function mockAuth(userId: string): void {
 }
 
 function pushEventForSelfReportPush(): void {
-  mockSupabase.__pushMockResultForTable('events', {
-    data: {
-      id: EVENT_ID,
-      payer_id: PAYER_ID,
-      title: 'Dinner',
-      status: 'sent',
-      currency: 'USD',
-      locale: 'en-US',
-      deleted_at: null,
-    },
-    error: null,
+  pushEventRow({
+    id: EVENT_ID,
+    payer_id: PAYER_ID,
+    title: 'Dinner',
+    status: 'sent',
+    currency: 'USD',
+    locale: 'en-US',
+    deleted_at: null,
   });
 }
 
@@ -64,6 +62,11 @@ describe('Settlement API integration', () => {
 
   it('full lifecycle: pending → confirmed on self-report', async () => {
     mockAuth(PARTICIPANT_USER);
+    pushEventForSelfReportPush();
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: { id: PARTICIPANT_ID },
+      error: null,
+    });
     mockSupabase.__pushMockResultForTable('participants', {
       data: {
         id: PARTICIPANT_ID,
@@ -86,6 +89,7 @@ describe('Settlement API integration', () => {
       error: null,
     });
     mockSupabase.__pushMockResultForTable('settlement_log', { data: null, error: null });
+    pushEventForSelfReportPush();
     mockSupabase.__pushMockResultForTable('events', {
       data: { payer_id: PAYER_ID },
       error: null,
@@ -102,7 +106,6 @@ describe('Settlement API integration', () => {
       error: null,
     });
     mockSupabase.__pushMockResultForTable('events', { data: null, error: null });
-    pushEventForSelfReportPush();
     mockSupabase.__pushMockResultForTable('settlement_log', { data: null, error: null });
 
     const selfReport = await request(app)
@@ -117,6 +120,11 @@ describe('Settlement API integration', () => {
 
   it('full lifecycle: pending → confirmed → disputed', async () => {
     mockAuth(PARTICIPANT_USER);
+    pushEventForSelfReportPush();
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: { id: PARTICIPANT_ID },
+      error: null,
+    });
     mockSupabase.__pushMockResultForTable('participants', {
       data: {
         id: PARTICIPANT_ID,
@@ -163,17 +171,14 @@ describe('Settlement API integration', () => {
       .send({ payment_method: 'cash' });
 
     mockAuth(PAYER_ID);
-    mockSupabase.__pushMockResultForTable('events', {
-      data: {
-        id: EVENT_ID,
-        payer_id: PAYER_ID,
-        title: 'Dinner',
-        status: 'settled',
-        currency: 'USD',
-        locale: 'en-US',
-        deleted_at: null,
-      },
-      error: null,
+    pushEventRow({
+      id: EVENT_ID,
+      payer_id: PAYER_ID,
+      title: 'Dinner',
+      status: 'settled',
+      currency: 'USD',
+      locale: 'en-US',
+      deleted_at: null,
     });
     mockSupabase.__pushMockResultForTable('participants', {
       data: {
@@ -212,17 +217,14 @@ describe('Settlement API integration', () => {
   it('returns 429 on second nudge within 48h', async () => {
     mockAuth(PAYER_ID);
     const recent = new Date().toISOString();
-    mockSupabase.__pushMockResultForTable('events', {
-      data: {
-        id: EVENT_ID,
-        payer_id: PAYER_ID,
-        title: 'Dinner',
-        status: 'sent',
-        currency: 'USD',
-        locale: 'en-US',
-        deleted_at: null,
-      },
-      error: null,
+    pushEventRow({
+      id: EVENT_ID,
+      payer_id: PAYER_ID,
+      title: 'Dinner',
+      status: 'sent',
+      currency: 'USD',
+      locale: 'en-US',
+      deleted_at: null,
     });
     mockSupabase.__pushMockResultForTable('participants', {
       data: {
@@ -254,17 +256,14 @@ describe('Settlement API integration', () => {
 
   it('event settles when all owing participants are confirmed or opted_out', async () => {
     mockAuth(PAYER_ID);
-    mockSupabase.__pushMockResultForTable('events', {
-      data: {
-        id: EVENT_ID,
-        payer_id: PAYER_ID,
-        title: 'Dinner',
-        status: 'sent',
-        currency: 'USD',
-        locale: 'en-US',
-        deleted_at: null,
-      },
-      error: null,
+    pushEventRow({
+      id: EVENT_ID,
+      payer_id: PAYER_ID,
+      title: 'Dinner',
+      status: 'sent',
+      currency: 'USD',
+      locale: 'en-US',
+      deleted_at: null,
     });
     mockSupabase.__pushMockResultForTable('participants', {
       data: {
@@ -323,17 +322,14 @@ describe('Settlement API integration', () => {
 
   it('participant cannot confirm own payment (403)', async () => {
     mockAuth(PARTICIPANT_USER);
-    mockSupabase.__pushMockResultForTable('events', {
-      data: {
-        id: EVENT_ID,
-        payer_id: PAYER_ID,
-        title: 'Dinner',
-        status: 'sent',
-        currency: 'USD',
-        locale: 'en-US',
-        deleted_at: null,
-      },
-      error: null,
+    pushEventRow({
+      id: EVENT_ID,
+      payer_id: PAYER_ID,
+      title: 'Dinner',
+      status: 'sent',
+      currency: 'USD',
+      locale: 'en-US',
+      deleted_at: null,
     });
     mockSupabase.__pushMockResultForTable('participants', {
       data: {

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import request from 'supertest';
 import app from '../../../app';
 import { mockSupabase } from '../../mocks/supabase.mock';
+import { pushEventRow } from '../../helpers/pushEventRow';
 
 jest.mock('../../../modules/messages/messages.service', () => ({
   buildMessagePreviewsForEvent: jest.fn(),
@@ -93,7 +94,7 @@ describe('Messages send API integration', () => {
       channel: 'sms',
     });
 
-    mockSupabase.__pushMockResultForTable('events', { data: EVENT_ROW, error: null });
+    pushEventRow(EVENT_ROW);
     mockSupabase.__pushMockResultForTable('users', {
       data: { display_name: 'Alex Payer' },
       error: null,
@@ -180,7 +181,7 @@ describe('Messages send API integration', () => {
 
     mockSupabase.__resetMock();
     jest.clearAllMocks();
-    mockSupabase.__pushMockResultForTable('events', { data: EVENT_ROW, error: null });
+    pushEventRow(EVENT_ROW);
     mockSupabase.__pushMockResultForTable('users', {
       data: { display_name: 'Alex Payer' },
       error: null,

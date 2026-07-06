@@ -193,7 +193,7 @@ function mapEventRecord(row: EventRow): EventRecord {
   };
 }
 
-async function assertEventAccess(event: EventRow, userId: string): Promise<void> {
+export async function assertEventAccess(event: EventRow, userId: string): Promise<void> {
   if (event.payer_id === userId) {
     return;
   }

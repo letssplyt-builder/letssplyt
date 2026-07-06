@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import request from 'supertest';
 import app from '../../../app';
 import { mockSupabase } from '../../mocks/supabase.mock';
+import { pushEventRow } from '../../helpers/pushEventRow';
 
 const USER_A = 'event-owner-a';
 const USER_B = 'event-owner-b';
@@ -57,7 +58,7 @@ describe('POST /events/:id/expenses/reset', () => {
 
   it('returns 200 and clears expense flags when reset succeeds', async () => {
     mockAuth(USER_A);
-    mockSupabase.__pushMockResultForTable('events', { data: LOCKED_CALCULATED_EVENT, error: null });
+    pushEventRow(LOCKED_CALCULATED_EVENT);
     mockSupabase.__pushMockResultForTable('events', { data: RESET_EVENT, error: null });
     mockSupabase.__pushMockResultForTable('receipt_items', { data: [], error: null });
 
@@ -90,16 +91,13 @@ describe('POST /events/:id/expenses/reset', () => {
 
   it('returns 400 NOTHING_TO_RESET when no expense data exists', async () => {
     mockAuth(USER_A);
-    mockSupabase.__pushMockResultForTable('events', {
-      data: {
-        ...LOCKED_CALCULATED_EVENT,
-        ai_stage: 'none',
-        split_mode: null,
-        total_amount: null,
-        discount_amount: null,
-        receipt_scan_attempted: false,
-      },
-      error: null,
+    pushEventRow({
+      ...LOCKED_CALCULATED_EVENT,
+      ai_stage: 'none',
+      split_mode: null,
+      total_amount: null,
+      discount_amount: null,
+      receipt_scan_attempted: false,
     });
     mockSupabase.__pushMockResultForTable('receipt_items', { data: [], error: null });
 
@@ -113,12 +111,9 @@ describe('POST /events/:id/expenses/reset', () => {
 
   it('returns 409 when messages were already sent', async () => {
     mockAuth(USER_A);
-    mockSupabase.__pushMockResultForTable('events', {
-      data: {
-        ...LOCKED_CALCULATED_EVENT,
-        messages_sent_at: '2026-01-02T00:00:00.000Z',
-      },
-      error: null,
+    pushEventRow({
+      ...LOCKED_CALCULATED_EVENT,
+      messages_sent_at: '2026-01-02T00:00:00.000Z',
     });
 
     const response = await request(app)
