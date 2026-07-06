@@ -1,6 +1,9 @@
 import type { Request, Response, NextFunction } from 'express';
-import { supabaseAnon } from '../infrastructure/supabase';
 import { UnauthorizedError } from '../infrastructure/errors';
+import {
+  SupabaseJwtError,
+  verifySupabaseAccessToken,
+} from '../infrastructure/supabase-jwt';
 
 export async function authenticate(
   req: Request,
@@ -23,17 +26,19 @@ export async function authenticate(
     return;
   }
 
-  const { data, error } = await supabaseAnon.auth.getUser(token);
-
-  if (error || !data.user) {
-    res.status(401).json({
-      error: { code: 'AUTH_REQUIRED', message: 'Unauthorized' },
-    });
-    return;
+  try {
+    const verified = await verifySupabaseAccessToken(token);
+    req.user = { id: verified.userId, email: verified.email };
+    next();
+  } catch (err) {
+    if (err instanceof SupabaseJwtError) {
+      res.status(401).json({
+        error: { code: 'AUTH_REQUIRED', message: 'Unauthorized' },
+      });
+      return;
+    }
+    next(err);
   }
-
-  req.user = { id: data.user.id, email: data.user.email };
-  next();
 }
 
 export function requireAuth(

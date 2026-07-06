@@ -142,6 +142,62 @@ describe('event.service', () => {
       expect(page2.events).toHaveLength(1);
       expect(page2.has_more).toBe(false);
     });
+
+    it('merges creator and participant events without PostgREST .or string filters', async () => {
+      const participantEventId = 'event-33333333-3333-3333-3333-333333333333';
+      const otherUserId = 'other-user-99';
+
+      mockSupabase.__pushMockResultForTable('participants', {
+        data: [{ event_id: participantEventId }],
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('events', {
+        data: [{ id: participantEventId, payer_id: otherUserId }],
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('events', {
+        data: [
+          {
+            id: EVENT_ID,
+            title: 'My dinner',
+            status: 'open',
+            total_amount: null,
+            created_at: '2026-01-03T00:00:00.000Z',
+            payer_id: USER_ID,
+          },
+        ],
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('events', {
+        data: [
+          {
+            id: participantEventId,
+            title: 'Friend dinner',
+            status: 'open',
+            total_amount: 20,
+            created_at: '2026-01-02T00:00:00.000Z',
+            payer_id: otherUserId,
+          },
+        ],
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('users', {
+        data: [{ id: otherUserId, display_name: 'Bob' }],
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('participants', {
+        data: [{ payment_status: 'pending' }],
+        error: null,
+      });
+
+      const result = await listEvents(USER_ID, { role: 'all', limit: 10 });
+
+      expect(result.events).toHaveLength(2);
+      expect(result.events[0]?.id).toBe(EVENT_ID);
+      expect(result.events[1]?.id).toBe(participantEventId);
+      expect(result.events[1]?.role).toBe('participant');
+      expect(result.events[1]?.creator_name).toBe('Bob');
+    });
   });
 
   describe('lockEvent', () => {

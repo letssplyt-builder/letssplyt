@@ -1,8 +1,8 @@
 # LetsSplyt — Post-Audit Build Progress
 
 **Source:** `CODEBASE-AUDIT-2026-07-05.md`  
-**Last updated:** 2026-07-05  
-**Current story:** PA-12 — JSON error handler contract
+**Last updated:** 2026-07-06  
+**Current story:** Complete — all post-audit stories done
 
 > **AI:** Read this file at the start of every post-audit session. Find the first `[ ]` story in `POST-AUDIT-BUILD-SEQUENCE.md`, build it as **one PR**, run tests, wait for Pawan confirmation, then mark `[x]` with date.
 
@@ -30,14 +30,14 @@
 
 ## Medium
 
-- [ ] PA-12 — JSON error handler contract (M5)
-- [ ] PA-13 — Global JSON body size limit (M6)
-- [ ] PA-14 — Encryption key versioning + 12-byte GCM IV (M7)
-- [ ] PA-15 — Structured logging in financial cleanup paths (M8)
-- [ ] PA-16 — Split sanitize / formatCurrency / resolveParticipantPhone (M3)
-- [ ] PA-17 — PostgREST filter injection guardrails (M4)
-- [ ] PA-18 — JWT local verification for auth middleware (M2)
+- [x] PA-12 — JSON error handler contract (M5) (2026-07-05)
+- [x] PA-13 — Global JSON body size limit (M6) (2026-07-05)
+- [x] PA-14 — Encryption key versioning + 12-byte GCM IV (M7) (2026-07-05)
+- [x] PA-15 — Structured logging in financial cleanup paths (M8) (2026-07-05)
+- [x] PA-16 — Split sanitize / formatCurrency / resolveParticipantPhone (M3) (2026-07-05)
+- [x] PA-17 — PostgREST filter injection guardrails (M4) (2026-07-05)
+- [x] PA-18 — JWT local verification for auth middleware (M2) — 2026-07-06
 
 ## Low
 
-- [ ] PA-19 — PII scrubber metrics, TwiML escape, splitCalculator guards, route dedup, doc drift (L1–L7)
+- [x] PA-19 — PII scrubber metrics, TwiML escape, splitCalculator guards, route dedup, doc drift (L1–L7) — 2026-07-06

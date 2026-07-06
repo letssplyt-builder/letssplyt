@@ -309,6 +309,75 @@ async function fetchParticipantEventIds(userId: string): Promise<string[]> {
     .map((row) => row.id as string);
 }
 
+type EventListQueryRow = {
+  id: string;
+  title: string;
+  status: EventListItem['status'];
+  total_amount: number | null;
+  created_at: string;
+  payer_id: string;
+};
+
+function compareEventListRows(a: EventListQueryRow, b: EventListQueryRow): number {
+  if (a.created_at !== b.created_at) {
+    return a.created_at > b.created_at ? -1 : 1;
+  }
+  return a.id > b.id ? -1 : a.id < b.id ? 1 : 0;
+}
+
+function mergeEventListRows(
+  creatorRows: EventListQueryRow[],
+  participantRows: EventListQueryRow[],
+  fetchLimit: number,
+): EventListQueryRow[] {
+  const byId = new Map<string, EventListQueryRow>();
+  for (const row of [...creatorRows, ...participantRows]) {
+    byId.set(row.id, row);
+  }
+  return [...byId.values()].sort(compareEventListRows).slice(0, fetchLimit);
+}
+
+/** Creator + participant event lists without PostgREST `.or()` string interpolation. */
+async function fetchAllRoleEventRows(
+  userId: string,
+  participantEventIds: string[],
+  options: { cursor?: string; fetchLimit: number },
+): Promise<EventListQueryRow[]> {
+  const buildQuery = () => {
+    let query = supabaseAdmin
+      .from('events')
+      .select('id, title, status, total_amount, created_at, payer_id')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(options.fetchLimit);
+
+    if (options.cursor) {
+      const decoded = decodeEventCursor(options.cursor);
+      query = query.lt('created_at', decoded.created_at);
+    }
+
+    return query;
+  };
+
+  const [creatorResult, participantResult] = await Promise.all([
+    buildQuery().eq('payer_id', userId),
+    participantEventIds.length > 0
+      ? buildQuery().in('id', participantEventIds)
+      : Promise.resolve({ data: [] as EventListQueryRow[], error: null }),
+  ]);
+
+  if (creatorResult.error || participantResult.error) {
+    throw new AppError('EVENTS_LIST_FAILED', 'Could not list events', 500);
+  }
+
+  return mergeEventListRows(
+    (creatorResult.data ?? []) as EventListQueryRow[],
+    (participantResult.data ?? []) as EventListQueryRow[],
+    options.fetchLimit,
+  );
+}
+
 async function fetchCreatorNames(payerIds: string[]): Promise<Map<string, string>> {
   if (payerIds.length === 0) {
     return new Map();
@@ -335,47 +404,80 @@ export async function listEvents(
   const limit = Math.min(Math.max(options.limit ?? DEFAULT_LIST_LIMIT, 1), MAX_LIST_LIMIT);
   const role = options.role ?? 'all';
   const participantEventIds = role !== 'creator' ? await fetchParticipantEventIds(userId) : [];
+  const fetchLimit = limit + 1;
 
-  let query = supabaseAdmin
-    .from('events')
-    .select('id, title, status, total_amount, created_at, payer_id')
-    .is('deleted_at', null)
-    .order('created_at', { ascending: false })
-    .order('id', { ascending: false })
-    .limit(limit + 1);
+  let rows: EventListQueryRow[];
 
   if (role === 'creator') {
-    query = query.eq('payer_id', userId);
+    let query = supabaseAdmin
+      .from('events')
+      .select('id, title, status, total_amount, created_at, payer_id')
+      .is('deleted_at', null)
+      .eq('payer_id', userId)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(fetchLimit);
+
+    if (options.cursor) {
+      const decoded = decodeEventCursor(options.cursor);
+      query = query.lt('created_at', decoded.created_at);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw new AppError('EVENTS_LIST_FAILED', 'Could not list events', 500);
+    }
+    rows = (data ?? []) as EventListQueryRow[];
   } else if (role === 'participant') {
     if (participantEventIds.length === 0) {
       return { events: [], next_cursor: null, has_more: false };
     }
-    query = query.in('id', participantEventIds);
+
+    let query = supabaseAdmin
+      .from('events')
+      .select('id, title, status, total_amount, created_at, payer_id')
+      .is('deleted_at', null)
+      .in('id', participantEventIds)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(fetchLimit);
+
+    if (options.cursor) {
+      const decoded = decodeEventCursor(options.cursor);
+      query = query.lt('created_at', decoded.created_at);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw new AppError('EVENTS_LIST_FAILED', 'Could not list events', 500);
+    }
+    rows = (data ?? []) as EventListQueryRow[];
   } else if (participantEventIds.length > 0) {
-    query = query.or(`payer_id.eq.${userId},id.in.(${participantEventIds.join(',')})`);
+    rows = await fetchAllRoleEventRows(userId, participantEventIds, {
+      cursor: options.cursor,
+      fetchLimit,
+    });
   } else {
-    query = query.eq('payer_id', userId);
+    let query = supabaseAdmin
+      .from('events')
+      .select('id, title, status, total_amount, created_at, payer_id')
+      .is('deleted_at', null)
+      .eq('payer_id', userId)
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(fetchLimit);
+
+    if (options.cursor) {
+      const decoded = decodeEventCursor(options.cursor);
+      query = query.lt('created_at', decoded.created_at);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw new AppError('EVENTS_LIST_FAILED', 'Could not list events', 500);
+    }
+    rows = (data ?? []) as EventListQueryRow[];
   }
-
-  if (options.cursor) {
-    const decoded = decodeEventCursor(options.cursor);
-    query = query.lt('created_at', decoded.created_at);
-  }
-
-  const { data, error } = await query;
-
-  if (error) {
-    throw new AppError('EVENTS_LIST_FAILED', 'Could not list events', 500);
-  }
-
-  const rows = (data ?? []) as Array<{
-    id: string;
-    title: string;
-    status: EventListItem['status'];
-    total_amount: number | null;
-    created_at: string;
-    payer_id: string;
-  }>;
 
   const has_more = rows.length > limit;
   const pageRows = has_more ? rows.slice(0, limit) : rows;

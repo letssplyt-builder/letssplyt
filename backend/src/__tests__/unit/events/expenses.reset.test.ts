@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import logger from '../../../infrastructure/logger';
 import { mockSupabase } from '../../mocks/supabase.mock';
 import { resetEventExpenses } from '../../../modules/events/expenses.reset';
 
@@ -43,6 +44,7 @@ describe('resetEventExpenses', () => {
   beforeEach(() => {
     mockSupabase.__resetMock();
     jest.restoreAllMocks();
+    jest.spyOn(logger, 'warn').mockImplementation(() => undefined);
   });
 
   it('resets expense data via RPC when it clears all fields', async () => {
@@ -59,6 +61,32 @@ describe('resetEventExpenses', () => {
       reset: true,
       event_id: EVENT_ID,
       ai_stage: 'none',
+    });
+  });
+
+  it('logs structured warning when RPC reset fails but still completes via fallback', async () => {
+    mockSupabase.__pushMockResultForTable('events', { data: LOCKED_EVENT, error: null });
+    jest.spyOn(mockSupabase, 'rpc').mockResolvedValueOnce({
+      data: null,
+      error: { code: '42883', message: 'function reset_event_expenses_data does not exist' },
+    });
+    mockSupabase.__pushMockResultForTable('events', { data: LOCKED_EVENT, error: null });
+    mockSupabase.__pushMockResultForTable('receipt_items', { data: [{ id: 'item-1' }], error: null });
+    mockSupabase.__pushMockResultForTable('receipt_items', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('receipt_discounts', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('participants', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('ai_audit_log', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('events', { data: { id: EVENT_ID }, error: null });
+    mockSupabase.__pushMockResultForTable('events', { data: RESET_EVENT, error: null });
+    mockSupabase.__pushMockResultForTable('receipt_items', { data: [], error: null });
+
+    const result = await resetEventExpenses(USER_ID, EVENT_ID);
+
+    expect(result.reset).toBe(true);
+    expect(logger.warn).toHaveBeenCalledWith({
+      msg: 'reset_event_expenses_data RPC failed',
+      eventId: EVENT_ID,
+      dbMessage: 'function reset_event_expenses_data does not exist',
     });
   });
 

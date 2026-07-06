@@ -26,7 +26,7 @@ const authConfig = {
  * @see docs/adr/PA-11-rls-and-route-authz.md
  */
 
-/** Anon client — JWT validation (`auth.getUser`) and flows that must respect RLS directly. */
+/** Anon client — user-scoped RLS flows via `getSupabaseForUser`; route auth uses local JWT verification. */
 export const supabaseAnon: SupabaseClient = createClient(
   supabaseUrl,
   requireEnv('SUPABASE_PUBLISHABLE_KEY'),

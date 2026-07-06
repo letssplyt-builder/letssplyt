@@ -7,6 +7,10 @@ import logger from './infrastructure/logger';
 import { requestIdMiddleware } from './middleware/requestId';
 import { globalRateLimiter } from './middleware/rateLimiter';
 import { htmlSecurityHeaders } from './middleware/htmlSecurityHeaders';
+import {
+  jsonBodyParser,
+  urlencodedBodyParser,
+} from './middleware/jsonBodyParser';
 import { piiScrubberMiddleware } from './middleware/piiScrubber';
 import authRoutes from './modules/auth/auth.routes';
 import profileRoutes from './modules/profile/profile.routes';
@@ -22,7 +26,7 @@ import jobsRoutes from './modules/jobs/jobs.routes';
 import analyticsRoutes from './modules/analytics/analytics.routes';
 import healthRoutes from './modules/health/health.routes';
 import { handleHealthCheck } from './modules/health/health.controller';
-import { errorHandler } from './modules/auth/auth.controller';
+import { errorHandler } from './middleware/errorHandler';
 import { getConfig, loadConfig } from './infrastructure/config';
 
 // Validate env before reading CORS origins (audit H6 / PA-10).
@@ -65,8 +69,8 @@ app.use(
 // QStash job endpoints need the raw body for signature verification.
 app.use('/api/v1/jobs', express.raw({ type: 'application/json' }), jobsRoutes);
 
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: false }));
+app.use(jsonBodyParser);
+app.use(urlencodedBodyParser);
 app.use(requestIdMiddleware);
 app.use(
   pinoHttp({
@@ -87,7 +91,6 @@ app.get('/health', (req, res, next) => {
 });
 
 app.use('/api/v1/webhooks/twilio', twilioWebhookRouter);
-app.use('/webhooks/twilio', twilioWebhookRouter);
 app.use('/api/v1/webhooks/telnyx', telnyxWebhookRouter);
 app.use('/webhooks/telnyx', telnyxWebhookRouter);
 
