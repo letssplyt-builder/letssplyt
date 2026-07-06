@@ -62,20 +62,39 @@ export async function getVisibleNotifications(userId: string): Promise<{
 }> {
   const createdAfter = unreadWindowStart();
   const readAfter = readVisibleStart();
+  const selectFields = 'id, type, title, body, event_id, read_at, created_at';
 
-  const { data, error } = await supabaseAdmin
-    .from('user_notifications')
-    .select('id, type, title, body, event_id, read_at, created_at')
-    .eq('user_id', userId)
-    .gt('created_at', createdAfter)
-    .or(`read_at.is.null,read_at.gt.${readAfter}`)
-    .order('created_at', { ascending: false });
+  const [unreadResult, recentlyReadResult] = await Promise.all([
+    supabaseAdmin
+      .from('user_notifications')
+      .select(selectFields)
+      .eq('user_id', userId)
+      .gt('created_at', createdAfter)
+      .is('read_at', null)
+      .order('created_at', { ascending: false }),
+    supabaseAdmin
+      .from('user_notifications')
+      .select(selectFields)
+      .eq('user_id', userId)
+      .gt('created_at', createdAfter)
+      .gt('read_at', readAfter)
+      .order('created_at', { ascending: false }),
+  ]);
 
-  if (error) {
-    throw new Error(`INBOX_FETCH_FAILED: ${error.message}`);
+  if (unreadResult.error || recentlyReadResult.error) {
+    const message = unreadResult.error?.message ?? recentlyReadResult.error?.message ?? 'Unknown';
+    throw new Error(`INBOX_FETCH_FAILED: ${message}`);
   }
 
-  const rows = data ?? [];
+  const byId = new Map<string, Record<string, unknown>>();
+  for (const row of [...(unreadResult.data ?? []), ...(recentlyReadResult.data ?? [])]) {
+    byId.set(row.id as string, row as Record<string, unknown>);
+  }
+
+  const rows = [...byId.values()].sort(
+    (a, b) =>
+      new Date(b.created_at as string).getTime() - new Date(a.created_at as string).getTime(),
+  );
   const unreadCount = rows.filter((row) => row.read_at === null).length;
 
   return {

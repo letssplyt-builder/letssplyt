@@ -25,7 +25,7 @@ describe('ledger.service', () => {
       data: [{ id: EVENT_OWED, title: 'Dinner', currency: 'USD' }],
       error: null,
     });
-    mockSupabase.__pushMockResultForTable('participants', {
+    mockSupabase.__setMockResultForTable('participants', {
       data: [
         {
           id: 'part-pending',
