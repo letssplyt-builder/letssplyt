@@ -6,7 +6,6 @@ import {
   Pressable,
   StyleSheet,
   Text,
-  View,
 } from 'react-native';
 import { ThemedScreenLayout } from '../../components/layout/ThemedScreenLayout';
 import { useAppInsets } from '../../hooks/useAppInsets';

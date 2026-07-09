@@ -1,6 +1,6 @@
 import { BlurView } from 'expo-blur';
 import type { ReactNode } from 'react';
-import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { View, type StyleProp, type ViewStyle } from 'react-native';
 import { isExpoBlurNativeAvailable } from './blurSupported';
 import { useTheme } from './ThemeContext';
 import type { Theme } from './types';
