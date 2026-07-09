@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Animated, StyleSheet, Text, View } from 'react-native';
 import { useAppInsets } from '../hooks/useAppInsets';
-import { authColors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
+import type { Theme } from '../theme/types';
 
 interface BottomToastProps {
   message: string | null;
@@ -9,7 +10,50 @@ interface BottomToastProps {
   durationMs?: number;
 }
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    host: {
+      position: 'absolute',
+      left: 24,
+      right: 24,
+      alignItems: 'center',
+      zIndex: 100,
+    },
+    bubble: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      maxWidth: '100%',
+      paddingHorizontal: 18,
+      paddingVertical: 14,
+      borderRadius: 999,
+      backgroundColor: theme.modalSurface,
+      borderWidth: 1,
+      borderColor: theme.line,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.22,
+      shadowRadius: 16,
+      elevation: 8,
+    },
+    icon: {
+      fontSize: 15,
+      fontWeight: '800',
+      color: theme.good,
+    },
+    message: {
+      flexShrink: 1,
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.ink,
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function BottomToast({ message, onDismiss, durationMs = 3200 }: BottomToastProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const { tabBarTotalHeight } = useAppInsets();
   const opacity = useRef(new Animated.Value(0)).current;
   const translateY = useRef(new Animated.Value(16)).current;
@@ -53,41 +97,3 @@ export function BottomToast({ message, onDismiss, durationMs = 3200 }: BottomToa
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  host: {
-    position: 'absolute',
-    left: 24,
-    right: 24,
-    alignItems: 'center',
-    zIndex: 100,
-  },
-  bubble: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    maxWidth: '100%',
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-    borderRadius: 999,
-    backgroundColor: 'rgba(255, 255, 255, 0.96)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.8)',
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.18,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  icon: {
-    fontSize: 15,
-    fontWeight: '800',
-    color: '#059669',
-  },
-  message: {
-    flexShrink: 1,
-    fontSize: 14,
-    fontWeight: '600',
-    color: authColors.segmentActiveText,
-  },
-});

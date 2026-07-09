@@ -123,8 +123,8 @@ describe('HomeScreen', () => {
 
     await waitFor(() => {
       expect(screen.getByLabelText('Pay to tab')).toBeTruthy();
-      expect(screen.getByLabelText('Collect From tab')).toBeTruthy();
-      expect(screen.getByLabelText('Guest Collect tab')).toBeTruthy();
+      expect(screen.getByLabelText('Collect from tab')).toBeTruthy();
+      expect(screen.getByLabelText('Guests tab')).toBeTruthy();
     });
 
     fireEvent.press(screen.getByLabelText('Pay to tab'));
@@ -171,7 +171,9 @@ describe('HomeScreen', () => {
 
     await waitFor(() => {
       expect(
-        screen.getByLabelText('Owed to you $40.00. You owe $15.00.'),
+        screen.getByLabelText(
+          'Net balance $25.00. Owed to you $40.00. You owe $15.00.',
+        ),
       ).toBeTruthy();
       expect(screen.getByText('$40.00')).toBeTruthy();
       expect(screen.getByText('$15.00')).toBeTruthy();
@@ -197,7 +199,7 @@ describe('HomeScreen', () => {
       />,
     );
 
-    fireEvent.press(screen.getByLabelText('Close'));
+    fireEvent.press(screen.getByLabelText('Go back'));
 
     expect(closePostCreateQrAndOpenEventDetail).toHaveBeenCalledWith(
       navigation,

@@ -1,15 +1,16 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import Constants from 'expo-constants';
 import * as Notifications from 'expo-notifications';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import type { RootStackParamList } from '../../navigation/types';
 import { getDeviceId } from '../../services/deviceId';
 import { registerPushToken } from '../../services/profile.service';
 import { useAuthStore } from '../../store/authStore';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PushPermission'>;
 
@@ -18,7 +19,54 @@ function resolveProjectId(): string | undefined {
   return extra?.eas?.projectId ?? Constants.easConfig?.projectId;
 }
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    content: {
+      flex: 1,
+      padding: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    icon: {
+      fontSize: 56,
+      marginBottom: 24,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: '800',
+      color: theme.ink,
+      marginBottom: 12,
+      textAlign: 'center',
+      fontFamily: theme.fontDisplay,
+    },
+    body: {
+      fontSize: 16,
+      lineHeight: 24,
+      color: theme.ink2,
+      textAlign: 'center',
+      marginBottom: 32,
+      maxWidth: 320,
+      fontFamily: theme.fontBody,
+    },
+    allowButton: {
+      alignSelf: 'stretch',
+      marginBottom: 16,
+    },
+    skipButton: {
+      paddingVertical: 12,
+    },
+    skipText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.ink2,
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function PushPermissionScreen({ navigation }: Props) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const dismissPushPermission = useAuthStore((state) => state.dismissPushPermission);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -58,74 +106,28 @@ export function PushPermissionScreen({ navigation }: Props) {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.container}>
-        <Text style={styles.icon}>🔔</Text>
-        <Text style={styles.title}>Stay in the loop</Text>
-        <Text style={styles.body}>
-          Enable notifications to get payment reminders and confirmations
-        </Text>
+    <AuthGradientLayout contentStyle={styles.content}>
+      <Text style={styles.icon}>🔔</Text>
+      <Text style={styles.title}>Stay in the loop</Text>
+      <Text style={styles.body}>
+        Enable notifications to get payment reminders and confirmations
+      </Text>
 
-        <PrimaryButton
-          label={isSubmitting ? 'Setting up…' : 'Allow'}
-          onPress={() => void handleAllow()}
-          disabled={isSubmitting}
-          style={styles.allowButton}
-        />
+      <PrimaryButton
+        label={isSubmitting ? 'Setting up…' : 'Allow'}
+        onPress={() => void handleAllow()}
+        disabled={isSubmitting}
+        style={styles.allowButton}
+      />
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Not now"
-          onPress={goHome}
-          style={styles.skipButton}
-        >
-          <Text style={styles.skipText}>Not now</Text>
-        </Pressable>
-      </View>
-    </SafeAreaView>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Not now"
+        onPress={goHome}
+        style={styles.skipButton}
+      >
+        <Text style={styles.skipText}>Not now</Text>
+      </Pressable>
+    </AuthGradientLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  safe: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  container: {
-    flex: 1,
-    padding: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  icon: {
-    fontSize: 56,
-    marginBottom: 24,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: colors.text,
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  body: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: colors.textMuted,
-    textAlign: 'center',
-    marginBottom: 32,
-    maxWidth: 320,
-  },
-  allowButton: {
-    alignSelf: 'stretch',
-    marginBottom: 16,
-  },
-  skipButton: {
-    paddingVertical: 12,
-  },
-  skipText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.textMuted,
-  },
-});

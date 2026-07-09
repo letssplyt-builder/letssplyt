@@ -16,14 +16,16 @@ import { AllPaidSheet } from '../../components/settlement/AllPaidSheet';
 import { PayHandlesSheet } from '../../components/settlement/PayHandlesSheet';
 import { ParticipantPayActions } from '../../components/settlement/ParticipantPayActions';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
+import { ScreenTopBar } from '../../components/navigation/ScreenTopBar';
 import { useAppInsets } from '../../hooks/useAppInsets';
+import { useThemedStyles } from '../../hooks/useThemedStyles';
 import { openEventDetail } from '../../navigation/eventNavigation';
 import type { HomeStackParamList, MainTabParamList } from '../../navigation/types';
 import { isApiRequestError } from '../../services/api';
 import * as settlementService from '../../services/settlement.service';
 import { useSettlementStore } from '../../store/settlementStore';
-import { glassStyles } from '../../theme/glassStyles';
-import { authColors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 import { formatMoney } from '../../utils/events';
 import { appRefreshControl } from '../../utils/refreshControl';
 
@@ -32,7 +34,130 @@ type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList>
 >;
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    layout: {
+      paddingHorizontal: 0,
+    },
+    content: {
+      paddingHorizontal: 28,
+      paddingTop: 8,
+    },
+    loader: {
+      marginTop: 24,
+    },
+    header: {
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    avatar: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 12,
+    },
+    avatarText: {
+      color: theme.ink,
+      fontSize: 24,
+      fontWeight: '700',
+      fontFamily: theme.fontBody,
+    },
+    name: {
+      color: theme.ink,
+      fontSize: 22,
+      fontWeight: '800',
+      fontFamily: theme.fontDisplay,
+    },
+    net: {
+      color: theme.ink2,
+      fontSize: 18,
+      fontWeight: '600',
+      marginTop: 4,
+      fontFamily: theme.fontBody,
+    },
+    amountPositive: {
+      color: theme.good,
+    },
+    amountNegative: {
+      color: theme.bad,
+    },
+    nudgeButton: {
+      alignSelf: 'center',
+      marginBottom: 12,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      borderRadius: 100,
+      backgroundColor: theme.accentSoft,
+      borderWidth: 1,
+      borderColor: theme.accent,
+    },
+    nudgeButtonDisabled: {
+      opacity: 0.6,
+    },
+    nudgeButtonText: {
+      color: theme.ink,
+      fontSize: 14,
+      fontWeight: '700',
+      fontFamily: theme.fontBody,
+    },
+    empty: {
+      color: theme.ink2,
+      fontSize: 14,
+      marginBottom: 12,
+      fontFamily: theme.fontBody,
+    },
+    eventRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      borderRadius: theme.radiusSm,
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.line,
+      marginBottom: 8,
+    },
+    eventBody: {
+      flex: 1,
+    },
+    eventTitle: {
+      color: theme.ink,
+      fontSize: 15,
+      fontWeight: '600',
+      fontFamily: theme.fontBody,
+    },
+    eventMeta: {
+      color: theme.ink2,
+      fontSize: 12,
+      marginTop: 2,
+      fontFamily: theme.fontBody,
+    },
+    eventAmount: {
+      color: theme.ink,
+      fontSize: 15,
+      fontWeight: '700',
+      fontFamily: theme.fontBody,
+    },
+    seeMore: {
+      paddingVertical: 12,
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    seeMoreText: {
+      color: theme.ink,
+      fontSize: 14,
+      fontWeight: '600',
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function MemberDetailScreen({ navigation, route }: Props) {
+  const { theme } = useTheme();
+  const themed = useThemedStyles();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const { userId } = route.params;
   const { screenScrollBottomPadding } = useAppInsets();
   const memberDetail = useSettlementStore((state) => state.memberDetail);
@@ -170,6 +295,11 @@ export function MemberDetailScreen({ navigation, route }: Props) {
   return (
     <AuthGradientLayout contentStyle={styles.layout}>
       <StatusBar style="light" />
+      <ScreenTopBar
+        title={memberDetail?.counterparty.display_name ?? 'Member'}
+        titleAlign="start"
+        onBack={() => navigation.goBack()}
+      />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -178,24 +308,15 @@ export function MemberDetailScreen({ navigation, route }: Props) {
         removeClippedSubviews={false}
         refreshControl={appRefreshControl({
           refreshing: refreshing,
-          tintColor: authColors.textOnDark,
+          tintColor: theme.ink,
           onRefresh: () => {
             setRefreshing(true);
             void refresh().finally(() => setRefreshing(false));
           },
         })}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <Text style={styles.backText}>← Back</Text>
-        </Pressable>
-
         {isLoadingDetail && !memberDetail ? (
-          <ActivityIndicator color={authColors.textOnDark} style={styles.loader} />
+          <ActivityIndicator color={theme.ink} style={styles.loader} />
         ) : null}
 
         {memberDetail ? (
@@ -240,7 +361,7 @@ export function MemberDetailScreen({ navigation, route }: Props) {
               />
             ) : null}
 
-            <Text style={glassStyles.sectionTitle}>Outstanding</Text>
+            <Text style={themed.sectionTitle}>Outstanding</Text>
             {memberDetail.outstanding.length === 0 ? (
               <Text style={styles.empty}>No outstanding balances.</Text>
             ) : (
@@ -332,120 +453,3 @@ export function MemberDetailScreen({ navigation, route }: Props) {
     </AuthGradientLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  layout: {
-    paddingHorizontal: 0,
-  },
-  content: {
-    paddingHorizontal: 28,
-    paddingTop: 8,
-  },
-  backButton: {
-    marginBottom: 12,
-  },
-  backText: {
-    color: authColors.textOnDark,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  loader: {
-    marginTop: 24,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 12,
-  },
-  avatarText: {
-    color: authColors.textOnDark,
-    fontSize: 24,
-    fontWeight: '700',
-  },
-  name: {
-    color: authColors.textOnDark,
-    fontSize: 22,
-    fontWeight: '800',
-  },
-  net: {
-    color: authColors.textOnDarkMuted,
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 4,
-  },
-  amountPositive: {
-    color: '#6EE7B7',
-  },
-  amountNegative: {
-    color: authColors.errorOnDark,
-  },
-  nudgeButton: {
-    alignSelf: 'center',
-    marginBottom: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 100,
-    backgroundColor: 'rgba(99, 102, 241, 0.35)',
-    borderWidth: 1,
-    borderColor: 'rgba(129, 140, 248, 0.5)',
-  },
-  nudgeButtonDisabled: {
-    opacity: 0.6,
-  },
-  nudgeButtonText: {
-    color: authColors.textOnDark,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  empty: {
-    color: authColors.textOnDarkMuted,
-    fontSize: 14,
-    marginBottom: 12,
-  },
-  eventRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 14,
-    backgroundColor: authColors.glass,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-    marginBottom: 8,
-  },
-  eventBody: {
-    flex: 1,
-  },
-  eventTitle: {
-    color: authColors.textOnDark,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  eventMeta: {
-    color: authColors.textOnDarkMuted,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  eventAmount: {
-    color: authColors.textOnDark,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  seeMore: {
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  seeMoreText: {
-    color: authColors.textOnDark,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-});

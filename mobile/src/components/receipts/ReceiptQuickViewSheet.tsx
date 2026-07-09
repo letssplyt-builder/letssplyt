@@ -1,11 +1,9 @@
+import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { ReceiptReviewSnapshot } from '@letssplyt/shared/receipt.types';
-import {
-  CenteredCardModal,
-  centeredCardModalStyles,
-} from '../layout/CenteredCardModal';
+import { CenteredCardModal } from '../layout/CenteredCardModal';
+import { useCenteredCardModalStyles } from '../../hooks/useCenteredCardModalStyles';
 import { ReceiptReviewSlipReadOnly } from './ReceiptReviewSlipReadOnly';
-import { colors } from '../../theme/colors';
 
 interface ReceiptQuickViewSheetProps {
   visible: boolean;
@@ -14,10 +12,33 @@ interface ReceiptQuickViewSheetProps {
 }
 
 export function ReceiptQuickViewSheet({ visible, review, onClose }: ReceiptQuickViewSheetProps) {
+  const shared = useCenteredCardModalStyles();
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        title: {
+          ...shared.title,
+          marginBottom: 0,
+        },
+        hint: {
+          ...shared.hint,
+          marginBottom: 0,
+          marginTop: 4,
+        },
+        scroll: {
+          maxHeight: 420,
+        },
+        scrollContent: {
+          paddingBottom: 4,
+        },
+      }),
+    [shared],
+  );
+
   return (
     <CenteredCardModal visible={visible} onClose={onClose} dismissLabel="Close receipt view">
-      <View style={styles.header}>
-        <View style={styles.headerText}>
+      <View style={shared.header}>
+        <View style={shared.headerText}>
           <Text style={styles.title}>Receipt</Text>
           <Text style={styles.hint}>What everyone split</Text>
         </View>
@@ -26,9 +47,9 @@ export function ReceiptQuickViewSheet({ visible, review, onClose }: ReceiptQuick
           accessibilityLabel="Close receipt"
           onPress={onClose}
           hitSlop={12}
-          style={styles.closeBtn}
+          style={shared.closeBtn}
         >
-          <Text style={styles.closeIcon}>✕</Text>
+          <Text style={shared.closeIcon}>✕</Text>
         </Pressable>
       </View>
 
@@ -42,37 +63,3 @@ export function ReceiptQuickViewSheet({ visible, review, onClose }: ReceiptQuick
     </CenteredCardModal>
   );
 }
-
-const styles = StyleSheet.create({
-  header: {
-    ...centeredCardModalStyles.header,
-  },
-  headerText: {
-    ...centeredCardModalStyles.headerText,
-  },
-  title: {
-    ...centeredCardModalStyles.title,
-    marginBottom: 0,
-  },
-  hint: {
-    ...centeredCardModalStyles.hint,
-    marginBottom: 0,
-    marginTop: 4,
-  },
-  closeBtn: {
-    ...centeredCardModalStyles.closeBtn,
-  },
-  closeIcon: {
-    ...centeredCardModalStyles.closeIcon,
-  },
-  scroll: {
-    maxHeight: 420,
-  },
-  scrollContent: {
-    paddingBottom: 4,
-  },
-  subtitle: {
-    fontSize: 13,
-    color: colors.textMuted,
-  },
-});

@@ -1,14 +1,48 @@
+import { useMemo } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StyleSheet, Text } from 'react-native';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { FadeSlideIn } from '../../components/auth/FadeSlideIn';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import type { RootStackParamList } from '../../navigation/types';
-import { authColors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AppLocked'>;
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    content: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: 28,
+    },
+    title: {
+      color: theme.ink,
+      fontSize: 28,
+      fontWeight: '800',
+      marginBottom: 8,
+      fontFamily: theme.fontDisplay,
+    },
+    eventName: {
+      color: theme.ink,
+      fontSize: 18,
+      fontWeight: '700',
+      marginBottom: 12,
+      fontFamily: theme.fontBody,
+    },
+    body: {
+      color: theme.ink2,
+      fontSize: 15,
+      lineHeight: 22,
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function AppLockedScreen({ navigation, route }: Props) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const { creatorName, eventName } = route.params;
 
   return (
@@ -37,28 +71,3 @@ export function AppLockedScreen({ navigation, route }: Props) {
     </AuthGradientLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 28,
-  },
-  title: {
-    color: authColors.textOnDark,
-    fontSize: 28,
-    fontWeight: '800',
-    marginBottom: 8,
-  },
-  eventName: {
-    color: authColors.textOnDark,
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 12,
-  },
-  body: {
-    color: authColors.textOnDarkMuted,
-    fontSize: 15,
-    lineHeight: 22,
-  },
-});

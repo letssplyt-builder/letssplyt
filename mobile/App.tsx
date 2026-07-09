@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { ThemeProvider } from './src/theme/ThemeContext';
 import { withOptionalSentryWrap } from './src/utils/sentryAppRoot';
 
 const sentryDsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
@@ -19,8 +20,10 @@ function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <RootNavigator />
-        <StatusBar style="light" />
+        <ThemeProvider>
+          <RootNavigator />
+          <StatusBar style="light" />
+        </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

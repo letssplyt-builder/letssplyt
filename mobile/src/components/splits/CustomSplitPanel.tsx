@@ -1,12 +1,14 @@
+import { useMemo } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { SplitModeTabs } from './SplitModeTabs';
-import { colors } from '../../theme/colors';
 import {
   avatarColorFromName,
   formatSplitMoney,
   parseNumericInput,
   type SplitEntryTab,
 } from '../../screens/splits/splitEntry.utils';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 
 interface ParticipantRow {
   id: string;
@@ -31,6 +33,133 @@ interface CustomSplitPanelProps {
   progressRatio: number;
 }
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    panel: {
+      gap: 2,
+    },
+    progressBlock: {
+      marginBottom: 10,
+    },
+    progressTrack: {
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: theme.line,
+      overflow: 'hidden',
+      marginBottom: 6,
+    },
+    progressFill: {
+      height: '100%',
+      borderRadius: 3,
+    },
+    progressFillOk: {
+      backgroundColor: theme.good,
+    },
+    progressFillWarn: {
+      backgroundColor: theme.warn,
+    },
+    progressLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      fontFamily: theme.fontBody,
+    },
+    progressLabelOk: {
+      color: theme.good,
+    },
+    progressLabelWarn: {
+      color: theme.warn,
+    },
+    card: {
+      backgroundColor: theme.surfaceStrong,
+      borderRadius: theme.radiusSm,
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+      borderWidth: 1,
+      borderColor: theme.line,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.line,
+      gap: 10,
+    },
+    avatar: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarText: {
+      color: theme.ink,
+      fontWeight: '800',
+      fontSize: 13,
+    },
+    name: {
+      flex: 1,
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.ink,
+      fontFamily: theme.fontBody,
+    },
+    amountPill: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: theme.accent,
+      backgroundColor: theme.accentSoft,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: theme.radiusSm,
+      fontFamily: theme.fontDisplay,
+    },
+    input: {
+      minWidth: 76,
+      minHeight: 36,
+      borderWidth: 1,
+      borderColor: theme.line,
+      borderRadius: theme.radiusSm,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      fontSize: 15,
+      fontWeight: '700',
+      textAlign: 'right',
+      color: theme.ink,
+      backgroundColor: theme.surface,
+      fontFamily: theme.fontBody,
+    },
+    percentWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    inputSmall: {
+      width: 48,
+      minHeight: 36,
+      borderWidth: 1,
+      borderColor: theme.line,
+      borderRadius: theme.radiusSm,
+      paddingHorizontal: 6,
+      paddingVertical: 6,
+      fontSize: 15,
+      fontWeight: '700',
+      textAlign: 'center',
+      color: theme.ink,
+      backgroundColor: theme.surface,
+      fontFamily: theme.fontBody,
+    },
+    percentSuffix: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: theme.ink3,
+      minWidth: 56,
+      textAlign: 'right',
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function CustomSplitPanel({
   participants,
   currency,
@@ -48,6 +177,8 @@ export function CustomSplitPanel({
   allocationBalanced,
   progressRatio,
 }: CustomSplitPanelProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const clampedProgress = Math.min(1, Math.max(0, progressRatio));
 
   return (
@@ -105,7 +236,7 @@ export function CustomSplitPanel({
                   onChangeText={(text) => onAmountChange(participant.id, text)}
                   style={styles.input}
                   placeholder="0"
-                  placeholderTextColor={colors.textFaint}
+                  placeholderTextColor={theme.ink3}
                 />
               ) : null}
               {activeTab === 'percent' ? (
@@ -117,6 +248,7 @@ export function CustomSplitPanel({
                     onChangeText={(text) => onPercentChange(participant.id, text)}
                     style={styles.inputSmall}
                     placeholder="0"
+                    placeholderTextColor={theme.ink3}
                   />
                   <Text style={styles.percentSuffix}>
                     {formatSplitMoney(percentAmounts[index] ?? 0, currency)}
@@ -130,6 +262,7 @@ export function CustomSplitPanel({
                   value={portionInputs[participant.id] ?? '1'}
                   onChangeText={(text) => onPortionChange(participant.id, text)}
                   style={styles.inputSmall}
+                  placeholderTextColor={theme.ink3}
                 />
               ) : null}
             </View>
@@ -139,127 +272,3 @@ export function CustomSplitPanel({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  panel: {
-    gap: 2,
-  },
-  progressBlock: {
-    marginBottom: 10,
-  },
-  progressTrack: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.22)',
-    overflow: 'hidden',
-    marginBottom: 6,
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  progressFillOk: {
-    backgroundColor: '#34D399',
-  },
-  progressFillWarn: {
-    backgroundColor: '#FBBF24',
-  },
-  progressLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  progressLabelOk: {
-    color: '#A7F3D0',
-  },
-  progressLabelWarn: {
-    color: '#FDE68A',
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    shadowColor: '#0B3D45',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.borderLight,
-    gap: 10,
-  },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 13,
-  },
-  name: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  amountPill: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: colors.primary,
-    backgroundColor: colors.primaryLight,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  input: {
-    minWidth: 76,
-    minHeight: 36,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    fontSize: 15,
-    fontWeight: '700',
-    textAlign: 'right',
-    color: colors.text,
-    backgroundColor: colors.surfaceMuted,
-  },
-  percentWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  inputSmall: {
-    width: 48,
-    minHeight: 36,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 6,
-    fontSize: 15,
-    fontWeight: '700',
-    textAlign: 'center',
-    color: colors.text,
-    backgroundColor: colors.surfaceMuted,
-  },
-  percentSuffix: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textMuted,
-    minWidth: 56,
-    textAlign: 'right',
-  },
-});

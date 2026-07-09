@@ -8,17 +8,90 @@ import {
 } from '@letssplyt/shared/paymentHandleValidation';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { FadeSlideIn } from '../../components/auth/FadeSlideIn';
+import { ScreenTopBar } from '../../components/navigation/ScreenTopBar';
 import { GlassHandleInput } from '../../components/profile/GlassHandleInput';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import type { SettingsStackParamList } from '../../navigation/types';
 import { isApiRequestError } from '../../services/api';
 import { useProfileStore } from '../../store/profileStore';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 import { PROVIDER_OPTIONS, providerLabel } from '../../utils/profile';
-import { authColors } from '../../theme/colors';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'AddHandle'>;
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    content: {
+      paddingHorizontal: 0,
+    },
+    scroll: {
+      paddingHorizontal: 28,
+      paddingBottom: 24,
+      gap: 16,
+      paddingTop: 8,
+    },
+    subtitle: {
+      fontSize: 14,
+      color: theme.ink2,
+      marginBottom: 8,
+      lineHeight: 20,
+      fontFamily: theme.fontBody,
+    },
+    chipRow: {
+      gap: 10,
+      paddingVertical: 4,
+    },
+    chip: {
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 999,
+      borderWidth: 1.5,
+      borderColor: theme.line,
+      backgroundColor: theme.surface,
+    },
+    chipSelected: {
+      borderColor: theme.accent,
+      backgroundColor: theme.accentSoft,
+    },
+    chipText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.ink2,
+      fontFamily: theme.fontBody,
+    },
+    chipTextSelected: {
+      color: theme.accent,
+    },
+    lockedProvider: {
+      borderRadius: theme.radiusSm,
+      borderWidth: 1.5,
+      borderColor: theme.line,
+      backgroundColor: theme.surface,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      gap: 4,
+    },
+    lockedLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: theme.ink3,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      fontFamily: theme.fontBody,
+    },
+    lockedValue: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.ink,
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function AddHandleScreen({ navigation, route }: Props) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const addHandle = useProfileStore((state) => state.addHandle);
   const updateHandle = useProfileStore((state) => state.updateHandle);
   const isEditMode = Boolean(route.params?.handleId);
@@ -65,7 +138,13 @@ export function AddHandleScreen({ navigation, route }: Props) {
         await addHandle(selectedProvider, result.normalized);
       }
 
-      navigation.navigate('Profile', { toastMessage });
+      navigation.reset({
+        index: 1,
+        routes: [
+          { name: 'Settings' },
+          { name: 'Profile', params: { toastMessage } },
+        ],
+      });
     } catch (err) {
       if (isApiRequestError(err) && err.code === 'DUPLICATE_PROVIDER') {
         setValidationError(
@@ -103,19 +182,16 @@ export function AddHandleScreen({ navigation, route }: Props) {
         </FadeSlideIn>
       }
     >
+      <ScreenTopBar
+        title={isEditMode ? 'Edit payment method' : 'Add payment method'}
+        onBack={() => navigation.goBack()}
+      />
       <ScrollView
         contentContainerStyle={styles.scroll}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         <FadeSlideIn delay={0}>
-          <Pressable accessibilityRole="button" onPress={() => navigation.goBack()} style={styles.back}>
-            <Text style={styles.backText}>← Back</Text>
-          </Pressable>
-        </FadeSlideIn>
-
-        <FadeSlideIn delay={60}>
-          <Text style={styles.title}>{isEditMode ? 'Edit payment method' : 'Add payment method'}</Text>
           <Text style={styles.subtitle}>
             {isEditMode
               ? 'Update how friends can pay you on this app'
@@ -175,79 +251,3 @@ export function AddHandleScreen({ navigation, route }: Props) {
     </AuthGradientLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: 0,
-  },
-  scroll: {
-    paddingHorizontal: 28,
-    paddingBottom: 24,
-    gap: 16,
-  },
-  back: {
-    marginBottom: 8,
-  },
-  backText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: authColors.textOnDarkMuted,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: authColors.textOnDark,
-    marginBottom: 6,
-  },
-  subtitle: {
-    fontSize: 14,
-    color: authColors.textOnDarkMuted,
-    marginBottom: 8,
-    lineHeight: 20,
-  },
-  chipRow: {
-    gap: 10,
-    paddingVertical: 4,
-  },
-  chip: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 999,
-    borderWidth: 1.5,
-    borderColor: authColors.glassBorder,
-    backgroundColor: authColors.segmentInactive,
-  },
-  chipSelected: {
-    borderColor: 'rgba(255, 255, 255, 0.55)',
-    backgroundColor: authColors.segmentActive,
-  },
-  chipText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: authColors.segmentInactiveText,
-  },
-  chipTextSelected: {
-    color: authColors.segmentActiveText,
-  },
-  lockedProvider: {
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: authColors.glassBorder,
-    backgroundColor: authColors.glass,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 4,
-  },
-  lockedLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: authColors.textOnDarkFaint,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-  },
-  lockedValue: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: authColors.textOnDark,
-  },
-});

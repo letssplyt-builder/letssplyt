@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
+import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ThemedScreenLayout } from '../../components/layout/ThemedScreenLayout';
 import { FadeSlideIn } from '../../components/auth/FadeSlideIn';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { useAppInsets } from '../../hooks/useAppInsets';
@@ -10,11 +10,53 @@ import { getApiErrorCode, isApiRequestError } from '../../services/api';
 import { fetchBalance } from '../../services/event.service';
 import * as profileService from '../../services/profile.service';
 import { formatMoney } from '../../utils/events';
-import { authColors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'DeleteConfirm'>;
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    subtitle: {
+      fontSize: 15,
+      lineHeight: 22,
+      color: theme.ink2,
+      marginBottom: 20,
+      fontFamily: theme.fontBody,
+    },
+    emphasis: {
+      fontWeight: '800',
+      color: theme.ink,
+    },
+    input: {
+      borderRadius: theme.radiusSm,
+      borderWidth: 1,
+      borderColor: theme.line,
+      backgroundColor: theme.modalInset,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.ink,
+      letterSpacing: 1,
+      fontFamily: theme.fontBody,
+    },
+    readyHint: {
+      marginTop: 10,
+      fontSize: 13,
+      lineHeight: 18,
+      color: theme.ink2,
+      fontFamily: theme.fontBody,
+    },
+    buttonWrap: {
+      marginTop: 24,
+    },
+  });
+}
+
 export function DeleteConfirmScreen({ navigation }: Props) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const [confirmText, setConfirmText] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
   const [isCheckingBalance, setIsCheckingBalance] = useState(true);
@@ -35,8 +77,8 @@ export function DeleteConfirmScreen({ navigation }: Props) {
       })
       .catch(() => {
         Alert.alert('Could not verify balance', 'Check your connection and try again.', [
-          { text: 'OK', onPress: () => navigation.goBack() },
-        ]);
+          { text: 'OK', onPress: () => navigation.goBack() }],
+        );
       })
       .finally(() => setIsCheckingBalance(false));
   }, [navigation]);
@@ -67,17 +109,14 @@ export function DeleteConfirmScreen({ navigation }: Props) {
   };
 
   return (
-    <AuthGradientLayout contentStyle={styles.content}>
-      <ScrollView
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: screenScrollBottomPadding }}
-      >
+    <ThemedScreenLayout
+      topBar={{
+        title: 'Confirm deletion',
+        onBack: () => navigation.goBack(),
+      }}
+      scrollContentContainerStyle={{ paddingBottom: screenScrollBottomPadding }}
+    >
         <FadeSlideIn delay={0}>
-          <Pressable accessibilityRole="button" onPress={() => navigation.goBack()} style={styles.back}>
-            <Text style={styles.backText}>← Back</Text>
-          </Pressable>
-          <Text style={styles.title}>Confirm deletion</Text>
           <Text style={styles.subtitle}>
             Type <Text style={styles.emphasis}>DELETE</Text> below to permanently delete your account.
           </Text>
@@ -90,7 +129,7 @@ export function DeleteConfirmScreen({ navigation }: Props) {
             autoCapitalize="characters"
             autoCorrect={false}
             placeholder="Type DELETE"
-            placeholderTextColor={authColors.textOnDarkFaint}
+            placeholderTextColor={theme.ink3}
             style={styles.input}
             accessibilityLabel="Type DELETE to confirm account deletion"
             editable={!isCheckingBalance && !hasOutstandingDebt}
@@ -112,58 +151,6 @@ export function DeleteConfirmScreen({ navigation }: Props) {
             />
           </View>
         </FadeSlideIn>
-      </ScrollView>
-    </AuthGradientLayout>
+    </ThemedScreenLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: 28,
-  },
-  back: {
-    marginBottom: 12,
-  },
-  backText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: authColors.textOnDarkMuted,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: authColors.textOnDark,
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: authColors.textOnDarkMuted,
-    marginBottom: 20,
-  },
-  emphasis: {
-    fontWeight: '800',
-    color: authColors.textOnDark,
-  },
-  input: {
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-    backgroundColor: authColors.glass,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 18,
-    fontWeight: '700',
-    color: authColors.textOnDark,
-    letterSpacing: 1,
-  },
-  readyHint: {
-    marginTop: 10,
-    fontSize: 13,
-    lineHeight: 18,
-    color: authColors.textOnDarkMuted,
-  },
-  buttonWrap: {
-    marginTop: 24,
-  },
-});

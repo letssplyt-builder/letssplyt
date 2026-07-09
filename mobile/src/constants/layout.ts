@@ -1,6 +1,9 @@
 import { Platform } from 'react-native';
 import type { ViewStyle } from 'react-native';
 
+/** Horizontal padding for screen body content below the top header strip. */
+export const SCREEN_HORIZONTAL_PADDING = 28;
+
 /** Top padding inside the tab bar (above icons). */
 export const TAB_BAR_PADDING_TOP = 6;
 

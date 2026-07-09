@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
+import { ScreenTopBar } from '../../components/navigation/ScreenTopBar';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { splitActionBarFooterStyle } from '../../constants/layout';
 import { useAppInsets } from '../../hooks/useAppInsets';
@@ -26,14 +27,262 @@ import {
   formatSplitMoney,
 } from '../splits/splitEntry.utils';
 import { useSplitStore } from '../../store/splitStore';
-import { authColors, colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 import { completeEventWithoutSms } from '../../utils/messageFlow';
 
 type Props = NativeStackScreenProps<EventsStackParamList, 'MessagePreview'>;
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    layout: {
+      paddingHorizontal: 0,
+    },
+    scroll: {
+      paddingHorizontal: 20,
+      paddingBottom: 24,
+    },
+    hint: {
+      fontSize: 12,
+      color: theme.ink2,
+      marginBottom: 12,
+      fontFamily: theme.fontBody,
+    },
+    pickerRow: {
+      gap: 12,
+      paddingBottom: 16,
+    },
+    pickerItem: {
+      alignItems: 'center',
+      width: 56,
+    },
+    pickerAvatar: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: 'transparent',
+    },
+    pickerAvatarSelected: {
+      width: 50,
+      height: 50,
+      borderRadius: 25,
+      borderWidth: 3,
+    },
+    pickerAvatarText: {
+      color: theme.ink,
+      fontWeight: '800',
+      fontSize: 16,
+    },
+    pickerName: {
+      marginTop: 6,
+      fontSize: 10,
+      color: theme.ink3,
+      textAlign: 'center',
+      fontFamily: theme.fontBody,
+    },
+    viewedDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: theme.good,
+      marginTop: 4,
+    },
+    card: {
+      backgroundColor: theme.surfaceStrong,
+      borderRadius: theme.radius,
+      padding: 18,
+      borderWidth: 1,
+      borderColor: theme.line,
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginBottom: 16,
+      paddingBottom: 14,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.line,
+    },
+    cardAvatar: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cardAvatarText: {
+      color: theme.ink,
+      fontWeight: '800',
+      fontSize: 17,
+    },
+    cardHeaderText: {
+      flex: 1,
+    },
+    cardName: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: theme.ink,
+      fontFamily: theme.fontBody,
+    },
+    cardAmount: {
+      fontSize: 12,
+      color: theme.ink2,
+      marginTop: 2,
+      fontFamily: theme.fontBody,
+    },
+    channelPill: {
+      backgroundColor: theme.accentSoft,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: theme.radiusSm,
+    },
+    channelPillText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: theme.accent,
+      fontFamily: theme.fontBody,
+    },
+    breakdownLinkCard: {
+      borderRadius: theme.radiusSm,
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.line,
+      padding: 14,
+      marginBottom: 14,
+    },
+    breakdownLinkCardPressed: {
+      opacity: 0.92,
+    },
+    breakdownLinkTitle: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: theme.ink,
+      marginBottom: 4,
+      fontFamily: theme.fontBody,
+    },
+    breakdownLinkSubtitle: {
+      fontSize: 12,
+      color: theme.ink2,
+      lineHeight: 18,
+      marginBottom: 8,
+      fontFamily: theme.fontBody,
+    },
+    breakdownLinkUrl: {
+      fontSize: 12,
+      color: theme.accent,
+      fontWeight: '600',
+      fontFamily: theme.fontBody,
+    },
+    messageText: {
+      fontSize: 14,
+      lineHeight: 22,
+      color: theme.ink2,
+      marginBottom: 14,
+      fontFamily: theme.fontBody,
+    },
+    linksSection: {
+      gap: 8,
+    },
+    linkRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: theme.radiusSm,
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.line,
+    },
+    linkIcon: {
+      width: 26,
+      height: 26,
+      borderRadius: 8,
+      backgroundColor: theme.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    linkIconText: {
+      color: theme.accentInk,
+      fontWeight: '700',
+      fontSize: 11,
+    },
+    linkLabel: {
+      flex: 1,
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.ink2,
+      fontFamily: theme.fontBody,
+    },
+    linkMuted: {
+      fontSize: 11,
+      color: theme.ink3,
+      fontFamily: theme.fontBody,
+    },
+    centered: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 24,
+    },
+    loadingText: {
+      marginTop: 12,
+      color: theme.ink2,
+      fontSize: 15,
+      fontFamily: theme.fontBody,
+    },
+    errorText: {
+      color: theme.bad,
+      fontSize: 15,
+      textAlign: 'center',
+      marginBottom: 12,
+      fontFamily: theme.fontBody,
+    },
+    retryBtn: {
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      backgroundColor: theme.surfaceStrong,
+      borderRadius: theme.radiusSm,
+      borderWidth: 1,
+      borderColor: theme.line,
+    },
+    retryText: {
+      color: theme.accent,
+      fontWeight: '700',
+      fontFamily: theme.fontBody,
+    },
+    sendErrorBanner: {
+      backgroundColor: theme.warnSoft,
+      borderRadius: theme.radiusSm,
+      borderWidth: 1,
+      borderColor: theme.warn,
+      padding: 12,
+      marginBottom: 12,
+    },
+    sendErrorText: {
+      color: theme.bad,
+      fontSize: 14,
+      fontWeight: '600',
+      fontFamily: theme.fontBody,
+    },
+    sendErrorAction: {
+      marginTop: 4,
+      color: theme.ink2,
+      fontSize: 12,
+      fontWeight: '600',
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function MessagePreviewScreen({ navigation, route }: Props) {
   const { eventId } = route.params;
   const { rawBottom } = useAppInsets();
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const [previews, setPreviews] = useState<MessagePreviewItem[]>([]);
   const storeCurrency = useSplitStore((s) =>
     s.eventId === eventId ? s.currency : 'USD',
@@ -119,6 +368,7 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
 
   return (
     <AuthGradientLayout
+      contentStyle={styles.layout}
       footerStyle={splitActionBarFooterStyle(rawBottom)}
       footer={
         <PrimaryButton
@@ -132,17 +382,11 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
       }
     >
       <StatusBar style="light" />
-      <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} accessibilityRole="button">
-          <Text style={styles.back}>‹ Back</Text>
-        </Pressable>
-        <Text style={styles.title}>Preview</Text>
-        <View style={styles.headerSpacer} />
-      </View>
+      <ScreenTopBar title="Preview" onBack={() => navigation.goBack()} />
 
       {loading || (sending && previews.length === 0) ? (
         <View style={styles.centered}>
-          <ActivityIndicator size="large" color={authColors.ctaSurface} />
+          <ActivityIndicator size="large" color={theme.accent} />
           <Text style={styles.loadingText}>
             {previews.length === 0 ? 'Completing event…' : 'Crafting your messages…'}
           </Text>
@@ -280,249 +524,3 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
     </AuthGradientLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 4,
-    marginBottom: 8,
-  },
-  back: {
-    color: authColors.ctaSurface,
-    fontWeight: '600',
-    fontSize: 15,
-  },
-  title: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: authColors.ctaSurface,
-  },
-  headerSpacer: {
-    minWidth: 48,
-  },
-  editLink: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: authColors.textOnDarkMuted,
-  },
-  scroll: {
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-  },
-  hint: {
-    fontSize: 12,
-    color: authColors.textOnDarkMuted,
-    marginBottom: 12,
-  },
-  pickerRow: {
-    gap: 12,
-    paddingBottom: 16,
-  },
-  pickerItem: {
-    alignItems: 'center',
-    width: 56,
-  },
-  pickerAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  pickerAvatarSelected: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    borderWidth: 3,
-  },
-  pickerAvatarText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 16,
-  },
-  pickerName: {
-    marginTop: 6,
-    fontSize: 10,
-    color: authColors.textOnDarkMuted,
-    textAlign: 'center',
-  },
-  viewedDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10B981',
-    marginTop: 4,
-  },
-  card: {
-    backgroundColor: colors.background,
-    borderRadius: 20,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#F0EEF8',
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginBottom: 16,
-    paddingBottom: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E8E6F0',
-  },
-  cardAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cardAvatarText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 17,
-  },
-  cardHeaderText: {
-    flex: 1,
-  },
-  cardName: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: colors.text,
-  },
-  cardAmount: {
-    fontSize: 12,
-    color: colors.textMuted,
-    marginTop: 2,
-  },
-  channelPill: {
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  channelPillText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  breakdownLinkCard: {
-    borderRadius: 14,
-    backgroundColor: '#F8F7FF',
-    borderWidth: 1,
-    borderColor: '#E0DDFF',
-    padding: 14,
-    marginBottom: 14,
-  },
-  breakdownLinkCardPressed: {
-    opacity: 0.92,
-  },
-  breakdownLinkTitle: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  breakdownLinkSubtitle: {
-    fontSize: 12,
-    color: colors.textMuted,
-    lineHeight: 18,
-    marginBottom: 8,
-  },
-  breakdownLinkUrl: {
-    fontSize: 12,
-    color: colors.primary,
-    fontWeight: '600',
-  },
-  messageText: {
-    fontSize: 14,
-    lineHeight: 22,
-    color: colors.textMuted,
-    marginBottom: 14,
-  },
-  linksSection: {
-    gap: 8,
-  },
-  linkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 12,
-    backgroundColor: '#F8F7FF',
-    borderWidth: 1,
-    borderColor: '#E0DDFF',
-  },
-  linkIcon: {
-    width: 26,
-    height: 26,
-    borderRadius: 8,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  linkIconText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 11,
-  },
-  linkLabel: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textMuted,
-  },
-  linkMuted: {
-    fontSize: 11,
-    color: colors.textMuted,
-  },
-  centered: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  loadingText: {
-    marginTop: 12,
-    color: authColors.textOnDarkMuted,
-    fontSize: 15,
-  },
-  errorText: {
-    color: '#FEE2E2',
-    fontSize: 15,
-    textAlign: 'center',
-    marginBottom: 12,
-  },
-  retryBtn: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    backgroundColor: authColors.ctaSurface,
-    borderRadius: 12,
-  },
-  retryText: {
-    color: colors.primary,
-    fontWeight: '700',
-  },
-  sendErrorBanner: {
-    backgroundColor: authColors.errorBgOnDark,
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 12,
-  },
-  sendErrorText: {
-    color: authColors.errorOnDark,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  sendErrorAction: {
-    marginTop: 4,
-    color: authColors.textOnDarkMuted,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-});

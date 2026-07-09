@@ -1,16 +1,117 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { FadeSlideIn } from '../../components/auth/FadeSlideIn';
+import { ScreenTopBar } from '../../components/navigation/ScreenTopBar';
 import { fetchBalance } from '../../services/event.service';
 import { formatMoney } from '../../utils/events';
 import type { SettingsStackParamList } from '../../navigation/types';
-import { authColors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'DeleteWarn'>;
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    layout: {
+      paddingHorizontal: 0,
+    },
+    body: {
+      flex: 1,
+      paddingHorizontal: 28,
+    },
+    subtitle: {
+      fontSize: 15,
+      lineHeight: 22,
+      color: theme.ink2,
+      marginBottom: 20,
+      fontFamily: theme.fontBody,
+    },
+    loader: {
+      marginTop: 12,
+    },
+    listCard: {
+      borderRadius: theme.radiusSm,
+      borderWidth: 1,
+      borderColor: theme.line,
+      backgroundColor: theme.surface,
+      padding: 16,
+      gap: 10,
+    },
+    listItem: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: theme.ink2,
+      fontFamily: theme.fontBody,
+    },
+    blockCard: {
+      borderRadius: theme.radiusSm,
+      borderWidth: 1,
+      borderColor: theme.bad,
+      backgroundColor: theme.warnSoft,
+      padding: 16,
+      gap: 8,
+    },
+    blockTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.bad,
+      fontFamily: theme.fontBody,
+    },
+    blockText: {
+      fontSize: 14,
+      lineHeight: 22,
+      color: theme.ink2,
+      fontFamily: theme.fontBody,
+    },
+    footer: {
+      gap: 12,
+    },
+    continueButton: {
+      paddingVertical: 14,
+      borderRadius: theme.radiusSm,
+      alignItems: 'center',
+      backgroundColor: theme.warnSoft,
+      borderWidth: 1.5,
+      borderColor: theme.bad,
+    },
+    continueText: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.bad,
+      fontFamily: theme.fontBody,
+    },
+    cancelWrap: {
+      paddingVertical: 10,
+      alignItems: 'center',
+    },
+    cancelText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.ink2,
+      fontFamily: theme.fontBody,
+    },
+    cancelOnlyButton: {
+      paddingVertical: 14,
+      borderRadius: theme.radiusSm,
+      alignItems: 'center',
+      borderWidth: 1.5,
+      borderColor: theme.line,
+      backgroundColor: theme.surface,
+    },
+    cancelOnlyText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: theme.ink2,
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function DeleteWarnScreen({ navigation }: Props) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const [isCheckingBalance, setIsCheckingBalance] = useState(true);
   const [youOwe, setYouOwe] = useState(0);
   const [currency, setCurrency] = useState('USD');
@@ -64,19 +165,17 @@ export function DeleteWarnScreen({ navigation }: Props) {
   );
 
   return (
-    <AuthGradientLayout contentStyle={styles.content} footer={footer}>
+    <AuthGradientLayout contentStyle={styles.layout} footer={footer}>
+      <ScreenTopBar title="Delete your account?" onBack={() => navigation.goBack()} />
+      <View style={styles.body}>
       <FadeSlideIn delay={0}>
-        <Pressable accessibilityRole="button" onPress={() => navigation.goBack()} style={styles.back}>
-          <Text style={styles.backText}>← Back</Text>
-        </Pressable>
-        <Text style={styles.title}>Delete your account?</Text>
         <Text style={styles.subtitle}>
           This permanently removes your LetsSplyt account and cannot be undone.
         </Text>
       </FadeSlideIn>
 
       {isCheckingBalance ? (
-        <ActivityIndicator color={authColors.textOnDark} style={styles.loader} />
+        <ActivityIndicator color={theme.ink} style={styles.loader} />
       ) : hasOutstandingDebt ? (
         <FadeSlideIn delay={60}>
           <View style={styles.blockCard}>
@@ -107,104 +206,7 @@ export function DeleteWarnScreen({ navigation }: Props) {
           </View>
         </FadeSlideIn>
       )}
+      </View>
     </AuthGradientLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: 28,
-  },
-  back: {
-    marginBottom: 12,
-  },
-  backText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: authColors.textOnDarkMuted,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: authColors.textOnDark,
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: authColors.textOnDarkMuted,
-    marginBottom: 20,
-  },
-  loader: {
-    marginTop: 12,
-  },
-  listCard: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-    backgroundColor: authColors.glass,
-    padding: 16,
-    gap: 10,
-  },
-  listItem: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: authColors.textOnDarkMuted,
-  },
-  blockCard: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: 'rgba(248, 113, 113, 0.45)',
-    backgroundColor: 'rgba(220, 38, 38, 0.16)',
-    padding: 16,
-    gap: 8,
-  },
-  blockTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#FCA5A5',
-  },
-  blockText: {
-    fontSize: 14,
-    lineHeight: 22,
-    color: authColors.textOnDarkMuted,
-  },
-  footer: {
-    gap: 12,
-  },
-  continueButton: {
-    paddingVertical: 14,
-    borderRadius: 18,
-    alignItems: 'center',
-    backgroundColor: 'rgba(220, 38, 38, 0.22)',
-    borderWidth: 1.5,
-    borderColor: 'rgba(248, 113, 113, 0.55)',
-  },
-  continueText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#F87171',
-  },
-  cancelWrap: {
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  cancelText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: authColors.textOnDarkMuted,
-  },
-  cancelOnlyButton: {
-    paddingVertical: 14,
-    borderRadius: 18,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: authColors.glassBorder,
-    backgroundColor: authColors.glass,
-  },
-  cancelOnlyText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: authColors.textOnDarkMuted,
-  },
-});

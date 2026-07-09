@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
@@ -6,11 +6,76 @@ import { FadeSlideIn } from '../../components/auth/FadeSlideIn';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import type { RootStackParamList } from '../../navigation/types';
 import { useAuthStore } from '../../store/authStore';
-import { authColors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'BiometricOptIn'>;
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    content: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingBottom: 24,
+    },
+    eyebrow: {
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
+      color: theme.ink3,
+      marginBottom: 8,
+      fontFamily: theme.fontBody,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: '800',
+      color: theme.ink,
+      marginBottom: 12,
+      letterSpacing: -0.5,
+      fontFamily: theme.fontDisplay,
+    },
+    subtitle: {
+      fontSize: 15,
+      lineHeight: 22,
+      color: theme.ink2,
+      marginBottom: 32,
+      fontFamily: theme.fontBody,
+    },
+    iconCircle: {
+      alignSelf: 'center',
+      width: 88,
+      height: 88,
+      borderRadius: 44,
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.line,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    iconGlyph: {
+      fontSize: 36,
+      color: theme.ink2,
+    },
+    footer: {
+      gap: 12,
+    },
+    skipWrap: {
+      alignItems: 'center',
+      paddingVertical: 10,
+    },
+    skipText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.ink2,
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function BiometricOptInScreen({ navigation }: Props) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const enrollBiometricStorage = useAuthStore((state) => state.enrollBiometricStorage);
   const skipBiometricStorage = useAuthStore((state) => state.skipBiometricStorage);
   const needsPushPermission = useAuthStore((state) => state.needsPushPermission);
@@ -80,59 +145,3 @@ export function BiometricOptInScreen({ navigation }: Props) {
     </AuthGradientLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingBottom: 24,
-  },
-  eyebrow: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    color: authColors.textOnDarkFaint,
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: authColors.textOnDark,
-    marginBottom: 12,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: authColors.textOnDarkMuted,
-    marginBottom: 32,
-  },
-  iconCircle: {
-    alignSelf: 'center',
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: authColors.glass,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  iconGlyph: {
-    fontSize: 36,
-    color: authColors.textOnDarkMuted,
-  },
-  footer: {
-    gap: 12,
-  },
-  skipWrap: {
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  skipText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: authColors.textOnDarkMuted,
-  },
-});

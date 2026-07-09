@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
+import { ScreenTopBar } from '../../components/navigation/ScreenTopBar';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { splitActionBarFooterStyle } from '../../constants/layout';
 import { useAppInsets } from '../../hooks/useAppInsets';
@@ -20,7 +21,8 @@ import { finishEventFlowToEventDetail } from '../../navigation/eventNavigation';
 import { useEventStore } from '../../store/eventStore';
 import { retryParticipantMessage, type SendResultStatus } from '../../services/messages.service';
 import { isApiRequestError } from '../../services/api';
-import { authColors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 import { avatarColorFromName } from '../splits/splitEntry.utils';
 import {
   deriveMessageDeliveryStatus,
@@ -54,9 +56,115 @@ function statusLabel(status: MessageDeliveryStatus): string {
   }
 }
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    layout: {
+      paddingHorizontal: 0,
+    },
+    loader: {
+      marginTop: 40,
+    },
+    scroll: {
+      paddingHorizontal: 28,
+      paddingBottom: 24,
+    },
+    error: {
+      color: theme.bad,
+      backgroundColor: theme.warnSoft,
+      padding: 12,
+      borderRadius: theme.radiusSm,
+      marginBottom: 12,
+      fontSize: 13,
+      fontFamily: theme.fontBody,
+    },
+    list: {
+      gap: 10,
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.line,
+      borderRadius: theme.radiusSm,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+    },
+    avatar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarText: {
+      color: theme.ink,
+      fontWeight: '800',
+      fontSize: 14,
+    },
+    name: {
+      flex: 1,
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.ink,
+      fontFamily: theme.fontBody,
+    },
+    statusWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    spinner: {
+      marginRight: 2,
+    },
+    statusBadge: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: theme.ink3,
+      minWidth: 52,
+      textAlign: 'right',
+      fontFamily: theme.fontBody,
+    },
+    statusDelivered: {
+      color: theme.good,
+      fontSize: 16,
+    },
+    statusFailed: {
+      color: theme.bad,
+    },
+    statusSkipped: {
+      color: theme.ink3,
+    },
+    retryBtn: {
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+      borderRadius: theme.radiusSm,
+      backgroundColor: theme.surfaceStrong,
+      borderWidth: 1,
+      borderColor: theme.line,
+    },
+    retryText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: theme.ink,
+      fontFamily: theme.fontBody,
+    },
+    failedSummary: {
+      marginTop: 16,
+      fontSize: 13,
+      lineHeight: 18,
+      color: theme.bad,
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function DeliveryTrackingScreen({ navigation, route }: Props) {
   const { eventId, sendResults = [] } = route.params;
   const { rawBottom } = useAppInsets();
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const [rows, setRows] = useState<TrackingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -204,8 +312,11 @@ export function DeliveryTrackingScreen({ navigation, route }: Props) {
       });
   };
 
+  const subtitle = allTerminal ? 'All messages sent' : 'Sending to members…';
+
   return (
     <AuthGradientLayout
+      contentStyle={styles.layout}
       footerStyle={splitActionBarFooterStyle(rawBottom)}
       footer={
         <PrimaryButton
@@ -218,17 +329,14 @@ export function DeliveryTrackingScreen({ navigation, route }: Props) {
       }
     >
       <StatusBar style="light" />
-      <View style={styles.header}>
-        <Text style={styles.title}>Sending messages…</Text>
-        {allTerminal ? (
-          <Text style={styles.subtitle}>All messages sent</Text>
-        ) : (
-          <Text style={styles.subtitle}>Sending to members…</Text>
-        )}
-      </View>
+      <ScreenTopBar
+        title="Sending messages…"
+        subtitle={subtitle}
+        titleAlign="start"
+      />
 
       {loading ? (
-        <ActivityIndicator color={authColors.textOnDark} style={styles.loader} />
+        <ActivityIndicator color={theme.ink} style={styles.loader} />
       ) : (
         <ScrollView
           contentContainerStyle={styles.scroll}
@@ -260,7 +368,7 @@ export function DeliveryTrackingScreen({ navigation, route }: Props) {
                     {showSpinner ? (
                       <ActivityIndicator
                         size="small"
-                        color={authColors.textOnDarkMuted}
+                        color={theme.ink3}
                         style={styles.spinner}
                       />
                     ) : null}
@@ -304,110 +412,3 @@ export function DeliveryTrackingScreen({ navigation, route }: Props) {
     </AuthGradientLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  header: {
-    paddingHorizontal: 28,
-    paddingTop: 8,
-    paddingBottom: 12,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: authColors.textOnDark,
-  },
-  subtitle: {
-    marginTop: 4,
-    fontSize: 13,
-    color: authColors.textOnDarkMuted,
-  },
-  loader: {
-    marginTop: 40,
-  },
-  scroll: {
-    paddingHorizontal: 28,
-    paddingBottom: 24,
-  },
-  error: {
-    color: authColors.errorOnDark,
-    backgroundColor: authColors.errorBgOnDark,
-    padding: 12,
-    borderRadius: 12,
-    marginBottom: 12,
-    fontSize: 13,
-  },
-  list: {
-    gap: 10,
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: authColors.glass,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 14,
-  },
-  name: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: '600',
-    color: authColors.textOnDark,
-  },
-  statusWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  spinner: {
-    marginRight: 2,
-  },
-  statusBadge: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: authColors.textOnDarkMuted,
-    minWidth: 52,
-    textAlign: 'right',
-  },
-  statusDelivered: {
-    color: '#6EE7B7',
-    fontSize: 16,
-  },
-  statusFailed: {
-    color: authColors.errorOnDark,
-  },
-  statusSkipped: {
-    color: authColors.textOnDarkFaint,
-  },
-  retryBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
-    backgroundColor: authColors.glassStrong,
-  },
-  retryText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: authColors.textOnDark,
-  },
-  failedSummary: {
-    marginTop: 16,
-    fontSize: 13,
-    lineHeight: 18,
-    color: authColors.errorOnDark,
-  },
-});

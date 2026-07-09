@@ -1,8 +1,11 @@
 import type { ReactNode } from 'react';
+import { useMemo } from 'react';
 import { Modal, Platform, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { keyboardSheetLift } from '../../constants/layout';
 import { useAppInsets } from '../../hooks/useAppInsets';
 import { useKeyboardHeight } from '../../hooks/useKeyboardHeight';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 
 interface BottomSheetModalProps {
   visible: boolean;
@@ -12,6 +15,31 @@ interface BottomSheetModalProps {
   keyboardAware?: boolean;
   dismissLabel?: string;
   sheetStyle?: StyleProp<ViewStyle>;
+}
+
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    root: {
+      flex: 1,
+      justifyContent: 'flex-end',
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0,0,0,0.68)',
+    },
+    sheetWrap: {
+      justifyContent: 'flex-end',
+    },
+    sheet: {
+      borderTopLeftRadius: theme.radius,
+      borderTopRightRadius: theme.radius,
+      borderWidth: 1,
+      borderColor: theme.line,
+      backgroundColor: theme.modalSurface,
+      paddingHorizontal: 24,
+      paddingTop: 10,
+    },
+  });
 }
 
 /**
@@ -26,6 +54,8 @@ export function BottomSheetModal({
   dismissLabel = 'Dismiss',
   sheetStyle,
 }: BottomSheetModalProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const { bottom, rawBottom } = useAppInsets();
   const keyboardHeight = useKeyboardHeight(visible && keyboardAware);
   const sheetLift = keyboardAware ? keyboardSheetLift(keyboardHeight, rawBottom) : 0;
@@ -53,25 +83,3 @@ export function BottomSheetModal({
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(11, 61, 69, 0.55)',
-  },
-  sheetWrap: {
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.14)',
-    paddingHorizontal: 24,
-    paddingTop: 10,
-  },
-});

@@ -3,7 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,6 +11,7 @@ import {
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
+import { ScreenTopBar } from '../../components/navigation/ScreenTopBar';
 import { CustomSplitPanel } from '../../components/splits/CustomSplitPanel';
 import { ItemisedSplitPanel } from '../../components/splits/ItemisedSplitPanel';
 import { SplitPathToggle, type SplitPath } from '../../components/splits/SplitPathToggle';
@@ -22,11 +22,12 @@ import type { EventsStackParamList } from '../../navigation/types';
 import * as eventService from '../../services/event.service';
 import * as splitsService from '../../services/splits.service';
 import { useSplitStore } from '../../store/splitStore';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 import {
   assignmentsFromApiRows,
   hydrateSplitEntryState,
 } from './splitEntry.hydrate';
-import { colors } from '../../theme/colors';
 import {
   amountsFromPercents,
   computeEvenAmounts,
@@ -40,10 +41,100 @@ import {
 
 type Props = NativeStackScreenProps<EventsStackParamList, 'SplitEntry'>;
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    layout: {
+      paddingHorizontal: 0,
+    },
+    loading: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.bgGradient[0],
+    },
+    scroll: {
+      paddingHorizontal: 20,
+      paddingTop: 2,
+    },
+    hero: {
+      marginBottom: 14,
+    },
+    eyebrow: {
+      fontSize: 11,
+      fontWeight: '700',
+      letterSpacing: 0.8,
+      textTransform: 'uppercase',
+      color: theme.ink3,
+      marginBottom: 4,
+      fontFamily: theme.fontBody,
+    },
+    title: {
+      fontSize: 22,
+      fontWeight: '800',
+      color: theme.ink,
+      letterSpacing: -0.3,
+      lineHeight: 28,
+      marginBottom: 10,
+      fontFamily: theme.fontDisplay,
+    },
+    totalPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.line,
+      borderRadius: theme.radiusSm,
+      paddingVertical: 10,
+      paddingHorizontal: 14,
+    },
+    totalLabel: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: theme.ink2,
+      fontFamily: theme.fontBody,
+    },
+    totalValue: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: theme.ink,
+      letterSpacing: -0.5,
+      fontFamily: theme.fontDisplay,
+    },
+    totalInputBlock: {
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.line,
+      borderRadius: theme.radiusSm,
+      paddingVertical: 10,
+      paddingHorizontal: 14,
+    },
+    totalInput: {
+      fontSize: 22,
+      fontWeight: '800',
+      color: theme.ink,
+      letterSpacing: -0.3,
+      paddingVertical: 2,
+      marginTop: 2,
+      fontFamily: theme.fontDisplay,
+    },
+    error: {
+      marginTop: 16,
+      color: theme.bad,
+      fontSize: 14,
+      fontWeight: '600',
+      textAlign: 'center',
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function SplitEntryScreen({ navigation, route }: Props) {
   const { eventId, mode = 'itemised' } = route.params;
   const setCalculated = useSplitStore((s) => s.setCalculated);
   const { rawBottom } = useAppInsets();
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const [loading, setLoading] = useState(true);
   const [participants, setParticipants] = useState<
@@ -341,13 +432,14 @@ export function SplitEntryScreen({ navigation, route }: Props) {
   if (loading) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator size="large" color={colors.primary} />
+        <ActivityIndicator size="large" color={theme.accent} />
       </View>
     );
   }
 
   return (
     <AuthGradientLayout
+      contentStyle={styles.layout}
       footerStyle={splitActionBarFooterStyle(rawBottom)}
       footer={
         <PrimaryButton
@@ -361,19 +453,12 @@ export function SplitEntryScreen({ navigation, route }: Props) {
       }
     >
       <StatusBar style="light" />
+      <ScreenTopBar title="Split bill" titleAlign="start" onBack={() => navigation.goBack()} />
       <ScrollView
         contentContainerStyle={[styles.scroll, { paddingBottom: 24 }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Pressable
-          onPress={() => navigation.goBack()}
-          accessibilityRole="button"
-          style={styles.backBtn}
-        >
-          <Text style={styles.back}>← Back</Text>
-        </Pressable>
-
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>Fair play</Text>
           <Text style={styles.title}>Lets Splyt</Text>
@@ -394,7 +479,7 @@ export function SplitEntryScreen({ navigation, route }: Props) {
                 onChangeText={setManualTotalInput}
                 style={styles.totalInput}
                 placeholder="0.00"
-                placeholderTextColor="rgba(255,255,255,0.45)"
+                placeholderTextColor={theme.ink3}
               />
             </View>
           )}
@@ -453,88 +538,3 @@ export function SplitEntryScreen({ navigation, route }: Props) {
     </AuthGradientLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  loading: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background,
-  },
-  scroll: {
-    paddingHorizontal: 20,
-    paddingTop: 2,
-  },
-  backBtn: {
-    marginBottom: 6,
-  },
-  back: {
-    color: 'rgba(255,255,255,0.85)',
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  hero: {
-    marginBottom: 14,
-  },
-  eyebrow: {
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-    textTransform: 'uppercase',
-    color: 'rgba(255,255,255,0.55)',
-    marginBottom: 4,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: -0.3,
-    lineHeight: 28,
-    marginBottom: 10,
-  },
-  totalPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-  },
-  totalLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.72)',
-  },
-  totalValue: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: -0.5,
-  },
-  totalInputBlock: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.18)',
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-  },
-  totalInput: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#FFFFFF',
-    letterSpacing: -0.3,
-    paddingVertical: 2,
-    marginTop: 2,
-  },
-  error: {
-    marginTop: 16,
-    color: '#FECACA',
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-});

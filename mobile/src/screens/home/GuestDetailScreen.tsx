@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -7,29 +7,134 @@ import {
   ActivityIndicator,
   Alert,
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
+import { ScreenTopBar } from '../../components/navigation/ScreenTopBar';
 import { useAppInsets } from '../../hooks/useAppInsets';
+import { useThemedStyles } from '../../hooks/useThemedStyles';
 import { openEventDetail } from '../../navigation/eventNavigation';
 import type { HomeStackParamList, MainTabParamList } from '../../navigation/types';
 import { isApiRequestError } from '../../services/api';
 import * as settlementService from '../../services/settlement.service';
 import { useSettlementStore } from '../../store/settlementStore';
-import { glassStyles } from '../../theme/glassStyles';
-import { authColors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 import { formatMoney } from '../../utils/events';
+import { appRefreshControl } from '../../utils/refreshControl';
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<HomeStackParamList, 'GuestDetail'>,
   BottomTabScreenProps<MainTabParamList>
 >;
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    layout: {
+      paddingHorizontal: 0,
+    },
+    content: {
+      paddingHorizontal: 28,
+      paddingTop: 8,
+    },
+    loader: {
+      marginTop: 24,
+    },
+    header: {
+      alignItems: 'center',
+      marginBottom: 24,
+    },
+    name: {
+      color: theme.ink,
+      fontSize: 22,
+      fontWeight: '800',
+      fontFamily: theme.fontDisplay,
+    },
+    net: {
+      color: theme.ink2,
+      fontSize: 18,
+      fontWeight: '600',
+      marginTop: 4,
+      fontFamily: theme.fontBody,
+    },
+    nudgeButton: {
+      alignSelf: 'center',
+      marginBottom: 16,
+      paddingHorizontal: 20,
+      paddingVertical: 10,
+      borderRadius: 100,
+      backgroundColor: theme.accentSoft,
+      borderWidth: 1,
+      borderColor: theme.accent,
+    },
+    nudgeButtonDisabled: {
+      opacity: 0.6,
+    },
+    nudgeButtonText: {
+      color: theme.ink,
+      fontSize: 14,
+      fontWeight: '700',
+      fontFamily: theme.fontBody,
+    },
+    empty: {
+      color: theme.ink2,
+      fontSize: 14,
+      marginBottom: 12,
+      fontFamily: theme.fontBody,
+    },
+    eventRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+      borderRadius: theme.radiusSm,
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.line,
+      marginBottom: 8,
+    },
+    eventBody: {
+      flex: 1,
+    },
+    eventTitle: {
+      color: theme.ink,
+      fontSize: 15,
+      fontWeight: '600',
+      fontFamily: theme.fontBody,
+    },
+    eventMeta: {
+      color: theme.ink2,
+      fontSize: 12,
+      marginTop: 2,
+      fontFamily: theme.fontBody,
+    },
+    eventAmount: {
+      color: theme.ink,
+      fontSize: 15,
+      fontWeight: '700',
+      fontFamily: theme.fontBody,
+    },
+    seeMore: {
+      paddingVertical: 12,
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    seeMoreText: {
+      color: theme.ink,
+      fontSize: 14,
+      fontWeight: '600',
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function GuestDetailScreen({ navigation, route }: Props) {
+  const { theme } = useTheme();
+  const themed = useThemedStyles();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const { phoneHash } = route.params;
   const { screenScrollBottomPadding } = useAppInsets();
   const guestDetail = useSettlementStore((state) => state.guestDetail);
@@ -39,6 +144,7 @@ export function GuestDetailScreen({ navigation, route }: Props) {
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [nudgeLoading, setNudgeLoading] = useState(false);
+
   const refresh = useCallback(async () => {
     await loadGuestDetail(phoneHash);
   }, [loadGuestDetail, phoneHash]);
@@ -88,33 +194,27 @@ export function GuestDetailScreen({ navigation, route }: Props) {
   return (
     <AuthGradientLayout contentStyle={styles.layout}>
       <StatusBar style="light" />
+      <ScreenTopBar
+        title={guestDetail?.display_name ?? 'Guest'}
+        titleAlign="start"
+        onBack={() => navigation.goBack()}
+      />
       <ScrollView
         contentContainerStyle={[
           styles.content,
           { paddingBottom: screenScrollBottomPadding },
         ]}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            tintColor={authColors.textOnDark}
-            onRefresh={() => {
-              setRefreshing(true);
-              void refresh().finally(() => setRefreshing(false));
-            }}
-          />
-        }
+        refreshControl={appRefreshControl({
+          refreshing: refreshing,
+          tintColor: theme.ink,
+          onRefresh: () => {
+            setRefreshing(true);
+            void refresh().finally(() => setRefreshing(false));
+          },
+        })}
       >
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Back"
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <Text style={styles.backText}>← Back</Text>
-        </Pressable>
-
         {isLoadingDetail && !guestDetail ? (
-          <ActivityIndicator color={authColors.textOnDark} style={styles.loader} />
+          <ActivityIndicator color={theme.ink} style={styles.loader} />
         ) : null}
 
         {guestDetail ? (
@@ -138,7 +238,7 @@ export function GuestDetailScreen({ navigation, route }: Props) {
               </Pressable>
             ) : null}
 
-            <Text style={glassStyles.sectionTitle}>Outstanding</Text>
+            <Text style={themed.sectionTitle}>Outstanding</Text>
             {guestDetail.outstanding.length === 0 ? (
               <Text style={styles.empty}>No outstanding balances.</Text>
             ) : (
@@ -192,101 +292,3 @@ export function GuestDetailScreen({ navigation, route }: Props) {
     </AuthGradientLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  layout: {
-    paddingHorizontal: 0,
-  },
-  content: {
-    paddingHorizontal: 28,
-    paddingTop: 8,
-  },
-  backButton: {
-    marginBottom: 12,
-  },
-  backText: {
-    color: authColors.textOnDark,
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  loader: {
-    marginTop: 24,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  name: {
-    color: authColors.textOnDark,
-    fontSize: 22,
-    fontWeight: '800',
-  },
-  net: {
-    color: authColors.textOnDarkMuted,
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 4,
-  },
-  nudgeButton: {
-    alignSelf: 'center',
-    marginBottom: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 100,
-    backgroundColor: 'rgba(99, 102, 241, 0.35)',
-    borderWidth: 1,
-    borderColor: 'rgba(129, 140, 248, 0.5)',
-  },
-  nudgeButtonDisabled: {
-    opacity: 0.6,
-  },
-  nudgeButtonText: {
-    color: authColors.textOnDark,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  empty: {
-    color: authColors.textOnDarkMuted,
-    fontSize: 14,
-    marginBottom: 12,
-  },
-  eventRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 14,
-    backgroundColor: authColors.glass,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-    marginBottom: 8,
-  },
-  eventBody: {
-    flex: 1,
-  },
-  eventTitle: {
-    color: authColors.textOnDark,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  eventMeta: {
-    color: authColors.textOnDarkMuted,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  eventAmount: {
-    color: authColors.textOnDark,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  seeMore: {
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  seeMoreText: {
-    color: authColors.textOnDark,
-    fontSize: 14,
-    fontWeight: '600',
-  },
-});

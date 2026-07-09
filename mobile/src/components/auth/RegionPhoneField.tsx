@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   AUTH_COUNTRIES,
@@ -7,7 +7,8 @@ import {
   US_NATIONAL_DISPLAY_MAX_LENGTH,
   type AuthCountryCode,
 } from '../../utils/phone';
-import { authColors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 
 interface RegionPhoneFieldProps {
   region: AuthCountryCode;
@@ -16,12 +17,110 @@ interface RegionPhoneFieldProps {
   onChangeText: (text: string) => void;
 }
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    wrap: {
+      width: '100%',
+      gap: 12,
+    },
+    regionBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      alignSelf: 'center',
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 100,
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.line,
+    },
+    regionBadgeFlag: {
+      fontSize: 14,
+    },
+    regionBadgeText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: theme.ink2,
+      letterSpacing: 0.3,
+      fontFamily: theme.fontBody,
+    },
+    segmentRow: {
+      flexDirection: 'row',
+      gap: 10,
+    },
+    segment: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      paddingVertical: 12,
+      borderRadius: theme.radiusSm,
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.line,
+    },
+    segmentActive: {
+      backgroundColor: theme.accent,
+      borderColor: theme.accent,
+    },
+    segmentFlag: {
+      fontSize: 16,
+    },
+    segmentLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.ink2,
+      fontFamily: theme.fontBody,
+    },
+    segmentLabelActive: {
+      color: theme.accentInk,
+    },
+    inputCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minHeight: 54,
+      paddingHorizontal: 16,
+      borderRadius: theme.radiusSm,
+      borderWidth: 1.5,
+    },
+    dialCode: {
+      fontSize: 17,
+      fontWeight: '600',
+      color: theme.ink2,
+      letterSpacing: 0.2,
+      minWidth: 28,
+      fontFamily: theme.fontBody,
+    },
+    divider: {
+      width: 1,
+      height: 22,
+      backgroundColor: theme.line,
+      marginHorizontal: 12,
+    },
+    input: {
+      flex: 1,
+      fontSize: 18,
+      fontWeight: '500',
+      color: theme.ink,
+      letterSpacing: 0.4,
+      paddingVertical: 0,
+      minHeight: 24,
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function RegionPhoneField({
   region,
   onRegionChange,
   value,
   onChangeText,
 }: RegionPhoneFieldProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const meta = AUTH_COUNTRIES[region];
   const showRegionPicker = SUPPORTED_AUTH_REGIONS.length > 1 && onRegionChange;
   const [focused, setFocused] = useState(false);
@@ -37,12 +136,12 @@ export function RegionPhoneField({
 
   const borderColor = focusAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [authColors.glassBorder, 'rgba(255, 255, 255, 0.5)'],
+    outputRange: [theme.line, theme.accent],
   });
 
   const cardBg = focusAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [authColors.glass, 'rgba(255, 255, 255, 0.14)'],
+    outputRange: [theme.surface, theme.surfaceStrong],
   });
 
   return (
@@ -92,7 +191,7 @@ export function RegionPhoneField({
           accessibilityHint={`Enter your ${meta.label} mobile number`}
           keyboardType="phone-pad"
           placeholder="(555) - 000 - 0000"
-          placeholderTextColor="rgba(255, 255, 255, 0.38)"
+          placeholderTextColor={theme.ink3}
           value={value}
           onChangeText={(text) => onChangeText(handleUsNationalPhoneInput(text))}
           onFocus={() => setFocused(true)}
@@ -105,93 +204,3 @@ export function RegionPhoneField({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  wrap: {
-    width: '100%',
-    gap: 12,
-  },
-  regionBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    alignSelf: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 100,
-    backgroundColor: authColors.pillOnDark,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-  },
-  regionBadgeFlag: {
-    fontSize: 14,
-  },
-  regionBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: authColors.textOnDarkMuted,
-    letterSpacing: 0.3,
-  },
-  segmentRow: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  segment: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    borderRadius: 14,
-    backgroundColor: authColors.segmentInactive,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-  },
-  segmentActive: {
-    backgroundColor: authColors.segmentActive,
-    borderColor: authColors.segmentActive,
-  },
-  segmentFlag: {
-    fontSize: 16,
-  },
-  segmentLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: authColors.segmentInactiveText,
-  },
-  segmentLabelActive: {
-    color: authColors.segmentActiveText,
-  },
-  inputCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minHeight: 54,
-    paddingHorizontal: 16,
-    borderRadius: 16,
-    borderWidth: 1.5,
-  },
-  dialCode: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: authColors.textOnDarkMuted,
-    letterSpacing: 0.2,
-    minWidth: 28,
-  },
-  divider: {
-    width: 1,
-    height: 22,
-    backgroundColor: authColors.glassBorder,
-    marginHorizontal: 12,
-  },
-  input: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '500',
-    color: authColors.textOnDark,
-    letterSpacing: 0.4,
-    paddingVertical: 0,
-    minHeight: 24,
-  },
-});

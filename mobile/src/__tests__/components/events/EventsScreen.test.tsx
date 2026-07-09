@@ -88,7 +88,7 @@ describe('EventsScreen', () => {
     jest.clearAllMocks();
   });
 
-  it('renders You created | You participated | Settled tabs', async () => {
+  it('renders You created | You joined | Settled tabs', async () => {
     render(
       <EventsScreen
         navigation={navigation}
@@ -98,7 +98,7 @@ describe('EventsScreen', () => {
 
     await waitFor(() => {
       expect(screen.getByText('You created')).toBeTruthy();
-      expect(screen.getByText('You participated')).toBeTruthy();
+      expect(screen.getByText('You joined')).toBeTruthy();
       expect(screen.getByText('Settled')).toBeTruthy();
     });
   });
@@ -134,7 +134,7 @@ describe('EventsScreen', () => {
     });
   });
 
-  it('shows only joined active events on Participated tab', async () => {
+  it('shows only joined active events on You joined tab', async () => {
     render(
       <EventsScreen
         navigation={navigation}
@@ -146,7 +146,7 @@ describe('EventsScreen', () => {
       expect(screen.getByText('Friday Dinner')).toBeTruthy();
     });
 
-    fireEvent.press(screen.getByText('You participated'));
+    fireEvent.press(screen.getByText('You joined'));
 
     await waitFor(() => {
       expect(screen.getByText('Team Lunch')).toBeTruthy();

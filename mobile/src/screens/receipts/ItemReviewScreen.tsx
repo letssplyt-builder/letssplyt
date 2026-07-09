@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import type { ReceiptAdditionalCharge } from '@letssplyt/shared/receipt.types';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
+import { ScreenTopBar } from '../../components/navigation/ScreenTopBar';
 import { ReceiptReviewSlip } from '../../components/receipts/ReceiptReviewSlip';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { splitActionBarFooterStyle } from '../../constants/layout';
@@ -19,8 +20,9 @@ import { useAppInsets } from '../../hooks/useAppInsets';
 import type { EventsStackParamList } from '../../navigation/types';
 import * as eventService from '../../services/event.service';
 import * as receiptsService from '../../services/receipts.service';
-import { authColors } from '../../theme/colors';
-import { glassStyles } from '../../theme/glassStyles';
+import { getApiErrorCode, isApiRequestError } from '../../services/api';
+import { useTheme } from '../../theme/ThemeContext';
+import { SCREEN_HORIZONTAL_PADDING } from '../../constants/layout';
 import {
   computeDiscountTotal,
   computeReviewTotal,
@@ -37,6 +39,7 @@ type Props = NativeStackScreenProps<EventsStackParamList, 'ItemReview'>;
 export function ItemReviewScreen({ navigation, route }: Props) {
   const { eventId, parseResult, flow = 'initial' } = route.params;
   const isEditFlow = flow === 'edit';
+  const { theme } = useTheme();
   const { rawBottom } = useAppInsets();
 
   const initialSnapshot = useMemo(() => parseResultToSnapshot(parseResult), [parseResult]);
@@ -201,8 +204,21 @@ export function ItemReviewScreen({ navigation, route }: Props) {
         discount_total: discountTotal,
       });
       navigation.replace('SplitEntry', { eventId, mode: 'itemised' });
-    } catch {
-      setConfirmError("Couldn't save items. Check your connection and try again.");
+    } catch (err: unknown) {
+      const code = isApiRequestError(err) ? err.code : getApiErrorCode(err);
+      if (code === 'SETTLEMENTS_IN_PROGRESS') {
+        setConfirmError(
+          'Cannot edit the bill while a payment is self-reported or confirmed. Resolve those first.',
+        );
+      } else if (code === 'INVALID_AI_STAGE') {
+        setConfirmError('This event is not ready to save items. Pull to refresh and try again.');
+      } else if (code === 'NETWORK_ERROR' || code === 'AUTH_REQUIRED') {
+        setConfirmError("Couldn't save items. Check your connection and try again.");
+      } else if (isApiRequestError(err) && err.message) {
+        setConfirmError(err.message);
+      } else {
+        setConfirmError("Couldn't save items. Check your connection and try again.");
+      }
     } finally {
       setConfirming(false);
     }
@@ -225,20 +241,14 @@ export function ItemReviewScreen({ navigation, route }: Props) {
     >
       <StatusBar style="light" />
 
-      <View style={styles.topBar}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          onPress={() => navigation.goBack()}
-          style={styles.back}
-        >
-          <Text style={styles.backText}>← Back</Text>
-        </Pressable>
-        <Text style={styles.screenTitle}>Review items</Text>
-        <View style={styles.backPlaceholder} />
-      </View>
+      <ScreenTopBar
+        title="Review items"
+        onBack={() => navigation.goBack()}
+      />
 
-      <Text style={styles.subtitle}>Fix anything the scanner missed before you split.</Text>
+      <Text style={[styles.subtitle, { color: theme.ink2 }]}>
+        Fix anything the scanner missed before you split.
+      </Text>
 
       <ScrollView
         style={styles.scroll}
@@ -248,7 +258,7 @@ export function ItemReviewScreen({ navigation, route }: Props) {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            tintColor={authColors.textOnDark}
+            tintColor={theme.ink}
             onRefresh={() => void onRefresh()}
           />
         }
@@ -277,7 +287,7 @@ export function ItemReviewScreen({ navigation, route }: Props) {
         />
 
         {confirmError ? (
-          <Text style={[glassStyles.errorText, styles.error]}>{confirmError}</Text>
+          <Text style={[styles.error, { color: theme.bad }]}>{confirmError}</Text>
         ) : null}
       </ScrollView>
     </AuthGradientLayout>
@@ -288,37 +298,11 @@ const styles = StyleSheet.create({
   layout: {
     paddingHorizontal: 0,
   },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 28,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  back: {
-    minWidth: 72,
-  },
-  backText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: authColors.textOnDarkMuted,
-  },
-  backPlaceholder: {
-    minWidth: 72,
-  },
-  screenTitle: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '800',
-    color: authColors.textOnDark,
-    textAlign: 'center',
-  },
   subtitle: {
     fontSize: 14,
     lineHeight: 20,
-    color: authColors.textOnDarkMuted,
     textAlign: 'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: SCREEN_HORIZONTAL_PADDING + 4,
     marginBottom: 16,
   },
   scroll: {

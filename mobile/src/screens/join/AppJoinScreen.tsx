@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
@@ -9,11 +9,61 @@ import { getApiErrorCode, isApiRequestError } from '../../services/api';
 import * as joinService from '../../services/join.service';
 import { useAuthStore } from '../../store/authStore';
 import { useJoinStore } from '../../store/joinStore';
-import { authColors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AppJoin'>;
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    content: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: 28,
+    },
+    kicker: {
+      color: theme.ink2,
+      fontSize: 14,
+      fontWeight: '600',
+      marginBottom: 8,
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+      fontFamily: theme.fontBody,
+    },
+    title: {
+      color: theme.ink,
+      fontSize: 32,
+      fontWeight: '800',
+      marginBottom: 8,
+      fontFamily: theme.fontDisplay,
+    },
+    subtitle: {
+      color: theme.ink2,
+      fontSize: 16,
+      marginBottom: 16,
+      fontFamily: theme.fontBody,
+    },
+    body: {
+      color: theme.ink2,
+      fontSize: 15,
+      lineHeight: 22,
+      fontFamily: theme.fontBody,
+    },
+    footer: {
+      gap: 12,
+    },
+    error: {
+      color: theme.bad,
+      fontSize: 14,
+      textAlign: 'center',
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function AppJoinScreen({ navigation, route }: Props) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const { token } = route.params;
   const user = useAuthStore((state) => state.user);
   const [eventName, setEventName] = useState<string | null>(null);
@@ -126,7 +176,7 @@ export function AppJoinScreen({ navigation, route }: Props) {
       }
     >
       {loading ? (
-        <ActivityIndicator color={authColors.textOnDark} size="large" />
+        <ActivityIndicator color={theme.ink} size="large" />
       ) : (
         <FadeSlideIn>
           <Text style={styles.kicker}>You&apos;re invited</Text>
@@ -142,43 +192,3 @@ export function AppJoinScreen({ navigation, route }: Props) {
     </AuthGradientLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 28,
-  },
-  kicker: {
-    color: authColors.textOnDarkMuted,
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  title: {
-    color: authColors.textOnDark,
-    fontSize: 32,
-    fontWeight: '800',
-    marginBottom: 8,
-  },
-  subtitle: {
-    color: authColors.textOnDarkMuted,
-    fontSize: 16,
-    marginBottom: 16,
-  },
-  body: {
-    color: authColors.textOnDarkMuted,
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  footer: {
-    gap: 12,
-  },
-  error: {
-    color: '#FCA5A5',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-});

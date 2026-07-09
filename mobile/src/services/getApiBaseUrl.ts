@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 
 const DEFAULT_PORT = 3000;
 
@@ -22,6 +23,11 @@ export function normalizeApiBaseUrl(raw: string): string {
 export function getApiBaseUrl(): string {
   const configured = Constants.expoConfig?.extra?.apiUrl as string | undefined;
   if (configured && !configured.includes('localhost') && !configured.includes('127.0.0.1')) {
+    return normalizeApiBaseUrl(configured);
+  }
+
+  // iOS Simulator shares the Mac loopback — LAN IP is unnecessary and often blocked by firewall.
+  if (Platform.OS === 'ios' && !Constants.isDevice && configured) {
     return normalizeApiBaseUrl(configured);
   }
 

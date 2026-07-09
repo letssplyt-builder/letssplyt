@@ -1,12 +1,14 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type {
   EventDetailResponse,
   EventParticipantSummary,
   ParticipantAssignedItem,
 } from '@letssplyt/shared/event.types';
+import { useThemedStyles } from '../../hooks/useThemedStyles';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 import { EventMemberRow } from './EventMemberRow';
-import { authColors } from '../../theme/colors';
-import { glassStyles } from '../../theme/glassStyles';
 import {
   formatEventDate,
   formatMoney,
@@ -22,12 +24,174 @@ interface ParticipantEventDetailProps {
   onViewReceipt?: () => void;
 }
 
+type DetailStyles = ReturnType<typeof makeStyles>;
+
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    container: {
+      gap: 4,
+    },
+    headerMeta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      marginBottom: 16,
+    },
+    hostLine: {
+      flex: 1,
+      fontSize: 13,
+      color: theme.ink2,
+      lineHeight: 18,
+      fontFamily: theme.fontBody,
+    },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      flexShrink: 0,
+    },
+    receiptHeaderIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: 10,
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.line,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    receiptHeaderIconPressed: {
+      opacity: 0.88,
+      transform: [{ scale: 0.97 }],
+    },
+    receiptHeaderIconGlyph: {
+      fontSize: 16,
+    },
+    statusChip: {
+      backgroundColor: theme.surface,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 100,
+    },
+    statusChipText: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: theme.ink2,
+      fontFamily: theme.fontBody,
+    },
+    shareHero: {
+      backgroundColor: theme.surfaceStrong,
+      borderRadius: theme.radius,
+      borderWidth: 1,
+      borderColor: theme.line,
+      padding: 22,
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    shareLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: theme.ink2,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      marginBottom: 6,
+      fontFamily: theme.fontBody,
+    },
+    shareAmount: {
+      fontSize: 36,
+      fontWeight: '800',
+      color: theme.ink,
+      letterSpacing: -0.5,
+      marginBottom: 8,
+      fontFamily: theme.fontDisplay,
+    },
+    sharePending: {
+      fontSize: 28,
+      fontWeight: '800',
+      color: theme.ink2,
+      marginBottom: 8,
+      fontFamily: theme.fontDisplay,
+    },
+    shareStatus: {
+      fontSize: 13,
+      color: theme.ink2,
+      textAlign: 'center',
+      lineHeight: 19,
+      fontFamily: theme.fontBody,
+    },
+    shareStatusPaid: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: theme.good,
+      textAlign: 'center',
+      lineHeight: 19,
+      fontFamily: theme.fontBody,
+    },
+    sectionCard: {
+      backgroundColor: theme.surface,
+      borderRadius: theme.radius,
+      borderWidth: 1,
+      borderColor: theme.line,
+      padding: 16,
+      marginBottom: 16,
+      gap: 10,
+    },
+    splitBody: {
+      fontSize: 13,
+      color: theme.ink2,
+      lineHeight: 19,
+      fontFamily: theme.fontBody,
+    },
+    itemList: {
+      gap: 2,
+      marginTop: 4,
+    },
+    itemRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingVertical: 8,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.line,
+    },
+    itemInfo: {
+      flex: 1,
+      minWidth: 0,
+      paddingRight: 12,
+    },
+    itemName: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.ink,
+      fontFamily: theme.fontBody,
+    },
+    itemMeta: {
+      fontSize: 11,
+      color: theme.ink2,
+      marginTop: 2,
+      fontFamily: theme.fontBody,
+    },
+    itemAmount: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: theme.ink,
+      fontFamily: theme.fontBody,
+    },
+    memberList: {
+      marginBottom: 8,
+    },
+  });
+}
+
 function AssignedItemsSection({
   items,
   currency,
+  styles,
 }: {
   items: ParticipantAssignedItem[];
   currency: string;
+  styles: DetailStyles;
 }) {
   if (items.length === 0) {
     return (
@@ -58,10 +222,14 @@ function SplitBreakdownSection({
   splitMode,
   myItems,
   currency,
+  styles,
+  sectionTitleStyle,
 }: {
   splitMode: EventDetailResponse['event']['split_mode'];
   myItems?: ParticipantAssignedItem[];
   currency: string;
+  styles: DetailStyles;
+  sectionTitleStyle: object;
 }) {
   if (!splitMode) {
     return null;
@@ -71,16 +239,19 @@ function SplitBreakdownSection({
 
   return (
     <View style={styles.sectionCard}>
-      <Text style={glassStyles.sectionTitle}>How your share was calculated</Text>
+      <Text style={sectionTitleStyle}>How your share was calculated</Text>
       {modeDescription ? <Text style={styles.splitBody}>{modeDescription}</Text> : null}
       {splitMode === 'itemised' ? (
-        <AssignedItemsSection items={myItems ?? []} currency={currency} />
+        <AssignedItemsSection items={myItems ?? []} currency={currency} styles={styles} />
       ) : null}
     </View>
   );
 }
 
 export function ParticipantEventDetail({ detail, onViewReceipt }: ParticipantEventDetailProps) {
+  const { theme } = useTheme();
+  const themed = useThemedStyles();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const { event, participants, my_items: myItems } = detail;
   const selfParticipant = participants.find((participant) => participant.is_self);
   const hero = resolveParticipantShareHero(
@@ -148,9 +319,11 @@ export function ParticipantEventDetail({ detail, onViewReceipt }: ParticipantEve
         splitMode={event.split_mode}
         myItems={myItems}
         currency={event.currency}
+        styles={styles}
+        sectionTitleStyle={themed.sectionTitle}
       />
 
-      <Text style={glassStyles.sectionTitle}>Members · {participants.length}</Text>
+      <Text style={themed.sectionTitle}>Members · {participants.length}</Text>
       <View style={styles.memberList}>
         {sortedParticipants.map((participant: EventParticipantSummary) => (
           <EventMemberRow
@@ -168,144 +341,3 @@ export function ParticipantEventDetail({ detail, onViewReceipt }: ParticipantEve
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    gap: 4,
-  },
-  headerMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 16,
-  },
-  hostLine: {
-    flex: 1,
-    fontSize: 13,
-    color: authColors.textOnDarkMuted,
-    lineHeight: 18,
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexShrink: 0,
-  },
-  receiptHeaderIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
-    backgroundColor: authColors.pillOnDark,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  receiptHeaderIconPressed: {
-    opacity: 0.88,
-    transform: [{ scale: 0.97 }],
-  },
-  receiptHeaderIconGlyph: {
-    fontSize: 16,
-  },
-  statusChip: {
-    backgroundColor: authColors.pillOnDark,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 100,
-  },
-  statusChipText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: authColors.textOnDarkMuted,
-  },
-  shareHero: {
-    backgroundColor: authColors.glassStrong,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-    padding: 22,
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  shareLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: authColors.textOnDarkMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: 6,
-  },
-  shareAmount: {
-    fontSize: 36,
-    fontWeight: '800',
-    color: authColors.textOnDark,
-    letterSpacing: -0.5,
-    marginBottom: 8,
-  },
-  sharePending: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: authColors.textOnDarkMuted,
-    marginBottom: 8,
-  },
-  shareStatus: {
-    fontSize: 13,
-    color: authColors.textOnDarkMuted,
-    textAlign: 'center',
-    lineHeight: 19,
-  },
-  shareStatusPaid: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#34D399',
-    textAlign: 'center',
-    lineHeight: 19,
-  },
-  sectionCard: {
-    ...glassStyles.card,
-    marginBottom: 16,
-    gap: 10,
-  },
-  splitBody: {
-    fontSize: 13,
-    color: authColors.textOnDarkMuted,
-    lineHeight: 19,
-  },
-  itemList: {
-    gap: 2,
-    marginTop: 4,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: authColors.glassBorder,
-  },
-  itemInfo: {
-    flex: 1,
-    minWidth: 0,
-    paddingRight: 12,
-  },
-  itemName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: authColors.textOnDark,
-  },
-  itemMeta: {
-    fontSize: 11,
-    color: authColors.textOnDarkMuted,
-    marginTop: 2,
-  },
-  itemAmount: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: authColors.textOnDark,
-  },
-  memberList: {
-    marginBottom: 8,
-  },
-});

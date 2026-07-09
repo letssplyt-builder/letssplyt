@@ -36,9 +36,13 @@ import { QRDisplayModal } from '../../components/events/QRDisplayModal';
 import { ReceiptQuickViewSheet } from '../../components/receipts/ReceiptQuickViewSheet';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { BottomToast } from '../../components/BottomToast';
+import { HeaderStatusChip } from '../../components/navigation/HeaderStatusChip';
+import { ScreenTopBar } from '../../components/navigation/ScreenTopBar';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { splitActionBarFooterStyle } from '../../constants/layout';
 import { useAppInsets } from '../../hooks/useAppInsets';
+import { useThemedStyles } from '../../hooks/useThemedStyles';
+import { useTheme } from '../../theme/ThemeContext';
 import { getSupabase } from '../../lib/supabase';
 import { navigateInEventFlow } from '../../navigation/eventFlowNavigation';
 import type { EventsStackParamList, MainTabParamList } from '../../navigation/types';
@@ -49,8 +53,6 @@ import { useAuthStore } from '../../store/authStore';
 import { useEventStore } from '../../store/eventStore';
 import { useSettlementStore } from '../../store/settlementStore';
 import { useSplitStore } from '../../store/splitStore';
-import { glassStyles } from '../../theme/glassStyles';
-import { authColors } from '../../theme/colors';
 import { receiptReviewToParseResult } from '../receipts/itemReview.utils';
 import { formatMoney, isPayerParticipant, statusChipLabel } from '../../utils/events';
 import { openMessagePreviewOrComplete } from '../../utils/messageFlow';
@@ -142,6 +144,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const [settlementActionLoading, setSettlementActionLoading] = useState<Record<string, string>>(
     {},
   );
+  const settlementSwipeHintPlayedRef = useRef(false);
   const [selfReportLoading, setSelfReportLoading] = useState(false);
   const [paySheetOpen, setPaySheetOpen] = useState(false);
   const [allPaidSheetOpen, setAllPaidSheetOpen] = useState(false);
@@ -149,8 +152,10 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const loadEventLedger = useSettlementStore((state) => state.loadEventLedger);
   const getIOweForEvent = useSettlementStore((state) => state.getIOweForEvent);
   const skipFocusRefreshRef = useRef(false);
-  const settlementSwipeHintPlayedRef = useRef(false);
   const isFocused = useIsFocused();
+  const { theme } = useTheme();
+  const themed = useThemedStyles();
+  const styles = useMemo(() => makeEventDetailStyles(theme, themed), [theme, themed]);
 
   const refreshDetail = useCallback(async () => {
     setFetchError(false);
@@ -345,6 +350,47 @@ export function EventDetailScreen({ navigation, route }: Props) {
     return match?.id ?? null;
   }, [settlementRosterParticipants, showOrganiserCollectionActions]);
 
+  const settlementSummary = useMemo(() => {
+    if (!currentEvent?.summary) {
+      return { total: 0, collected: 0, outstanding: 0 };
+    }
+    return currentEvent.summary;
+  }, [currentEvent?.summary]);
+
+  const settlementProgress = useMemo(() => {
+    const payers = settlementRosterParticipants.filter((row) => !row.is_organiser);
+    let confirmedAmount = 0;
+    let saysPaidAmount = 0;
+    let paidCount = 0;
+
+    for (const row of payers) {
+      const amount = row.amount_owed ?? 0;
+      if (
+        row.payment_status === 'confirmed' ||
+        row.payment_status === 'payer_marked' ||
+        row.payment_status === 'settled'
+      ) {
+        confirmedAmount += amount;
+        paidCount += 1;
+      } else if (row.payment_status === 'self_reported') {
+        saysPaidAmount += amount;
+      }
+    }
+
+    const totalAmount =
+      settlementSummary.collected + settlementSummary.outstanding > 0
+        ? settlementSummary.collected + settlementSummary.outstanding
+        : settlementSummary.total;
+
+    return {
+      confirmedAmount,
+      saysPaidAmount,
+      totalAmount,
+      paidCount,
+      participantCount: payers.length,
+    };
+  }, [settlementRosterParticipants, settlementSummary]);
+
   const openItemReview = (flow: 'initial' | 'edit' = 'initial') => {
     const review = currentEvent?.receipt_review;
     if (!review) {
@@ -504,13 +550,6 @@ export function EventDetailScreen({ navigation, route }: Props) {
     }
   };
 
-  const settlementSummary = useMemo(() => {
-    if (!currentEvent?.summary) {
-      return { total: 0, collected: 0, outstanding: 0 };
-    }
-    return currentEvent.summary;
-  }, [currentEvent?.summary]);
-
   const handleAddParticipantsBatch = async (
     entries: GroupBuilderSubmitPayload[],
   ): Promise<AddMembersBatchResult> => {
@@ -631,7 +670,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
     return (
       <AuthGradientLayout contentStyle={styles.loadingLayout}>
         <StatusBar style="light" />
-        <ActivityIndicator color={authColors.textOnDark} style={styles.centerLoader} />
+        <ActivityIndicator color={theme.ink} style={styles.centerLoader} />
       </AuthGradientLayout>
     );
   }
@@ -659,34 +698,35 @@ export function EventDetailScreen({ navigation, route }: Props) {
     >
       <StatusBar style="light" />
 
-      <View style={styles.topBar}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Go back"
-          onPress={() => navigation.goBack()}
-          style={styles.back}
-        >
-          <Text style={styles.backText}>← Back</Text>
-        </Pressable>
-        <Text style={styles.screenTitle} numberOfLines={1}>
-          {event?.title ?? 'Event'}
-        </Text>
-        {showOverflowMenu ? (
-          <EventDetailOverflowMenu
-            showReopen={event?.status === 'locked'}
-            reopenLoading={isReopening}
-            onReopen={confirmReopenJoinWindow}
-            showReset={showResetExpenses}
-            resetLoading={isResettingExpenses}
-            onReset={confirmResetExpenses}
-            showDelete={showDeleteEvent}
-            deleteLoading={isDeletingEvent}
-            onDelete={confirmDeleteEvent}
-          />
-        ) : (
-          <View style={styles.topBarPlaceholder} />
-        )}
-      </View>
+      <ScreenTopBar
+        title={event?.title ?? 'Event'}
+        titleAlign="start"
+        onBack={() => navigation.goBack()}
+        trailing={
+          isPayer && event ? (
+            <View style={styles.headerTrailing}>
+              {joining ? (
+                <HeaderStatusChip
+                  label={statusChipLabel(event.status, { role: 'creator' })}
+                />
+              ) : null}
+              {showOverflowMenu ? (
+                <EventDetailOverflowMenu
+                  showReopen={event.status === 'locked'}
+                  reopenLoading={isReopening}
+                  onReopen={confirmReopenJoinWindow}
+                  showReset={showResetExpenses}
+                  resetLoading={isResettingExpenses}
+                  onReset={confirmResetExpenses}
+                  showDelete={showDeleteEvent}
+                  deleteLoading={isDeletingEvent}
+                  onDelete={confirmDeleteEvent}
+                />
+              ) : null}
+            </View>
+          ) : undefined
+        }
+      />
 
       <ScrollView
         style={styles.scroll}
@@ -702,7 +742,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            tintColor={authColors.textOnDark}
+            tintColor={theme.ink}
             onRefresh={() => {
               setRefreshing(true);
               void refreshDetail().finally(() => setRefreshing(false));
@@ -748,7 +788,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
                   value={joinUrl}
                   size={160}
                   backgroundColor="transparent"
-                  color={authColors.textOnDark}
+                  color={theme.ink}
                 />
               ) : (
                 <Text style={styles.expiredLabel}>No join link</Text>
@@ -769,7 +809,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
               />
             </View>
 
-            <Text style={glassStyles.sectionTitle}>Members · {memberCount}</Text>
+            <Text style={themed.sectionTitle}>Members · {memberCount}</Text>
             <View style={styles.memberList}>
               {participants.map((participant) => (
                 <EventMemberRow
@@ -809,13 +849,13 @@ export function EventDetailScreen({ navigation, route }: Props) {
                 Add at least one more member besides you to lock this event.
               </Text>
             ) : null}
-            {lockError ? <Text style={glassStyles.errorText}>{lockError}</Text> : null}
+            {lockError ? <Text style={themed.errorText}>{lockError}</Text> : null}
           </>
         ) : isPayer ? (
           <View style={styles.settlementPhase}>
             <View style={styles.settlementHeader}>
               <View style={styles.settlementTitleRow}>
-                <Text style={glassStyles.heading}>Settlement phase</Text>
+                <Text style={themed.heading}>Settlement phase</Text>
                 {showReceiptQuickView ? (
                   <Pressable
                     accessibilityRole="button"
@@ -863,15 +903,14 @@ export function EventDetailScreen({ navigation, route }: Props) {
             </View>
 
             <SettlementProgressBar
-              collected={settlementSummary.collected}
-              total={
-                settlementSummary.collected + settlementSummary.outstanding > 0
-                  ? settlementSummary.collected + settlementSummary.outstanding
-                  : settlementSummary.total
-              }
+              confirmedAmount={settlementProgress.confirmedAmount}
+              saysPaidAmount={settlementProgress.saysPaidAmount}
+              totalAmount={settlementProgress.totalAmount}
+              paidCount={settlementProgress.paidCount}
+              participantCount={settlementProgress.participantCount}
             />
 
-            <Text style={glassStyles.sectionTitle}>
+            <Text style={themed.sectionTitle}>
               Members · {settlementRosterParticipants.length}
             </Text>
             <View style={styles.memberList}>
@@ -955,8 +994,15 @@ export function EventDetailScreen({ navigation, route }: Props) {
           joinUrl={joinUrl}
           tokenExpiresAt={tokenExpiresAt}
           isRegenerating={isRegenerating}
+          participants={participants.map((participant) => ({
+            id: participant.id,
+            displayName: participant.display_name,
+          }))}
+          lockEnabled={lockEnabled}
+          lockLoading={isLocking}
           onClose={() => setQrFullscreen(false)}
           onRegenerate={() => void handleRegenerate()}
+          onLockAndSplit={() => void handleLock()}
         />
       ) : null}
 
@@ -1001,7 +1047,11 @@ export function EventDetailScreen({ navigation, route }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+import type { Theme } from '../../theme/types';
+import type { ThemedStyles } from '../../theme/makeThemedStyles';
+
+function makeEventDetailStyles(theme: Theme, themed: ThemedStyles) {
+  return StyleSheet.create({
   layout: {
     paddingHorizontal: 0,
   },
@@ -1012,53 +1062,33 @@ const styles = StyleSheet.create({
   centerLoader: {
     marginTop: 40,
   },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 28,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  back: {
-    minWidth: 72,
-  },
-  backText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: authColors.textOnDarkMuted,
-  },
-  topBarPlaceholder: {
-    minWidth: 36,
-    minHeight: 36,
-  },
-  screenTitle: {
-    flex: 1,
-    fontSize: 18,
-    fontWeight: '800',
-    color: authColors.textOnDark,
-    textAlign: 'center',
-  },
   scroll: {
     flex: 1,
   },
   content: {
     paddingHorizontal: 28,
   },
+  headerTrailing: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexShrink: 0,
+  },
   bannerError: {
     fontSize: 13,
-    color: authColors.errorOnDark,
-    backgroundColor: authColors.errorBgOnDark,
+    color: theme.bad,
+    backgroundColor: theme.warnSoft,
     padding: 12,
     borderRadius: 12,
     marginBottom: 12,
   },
   qrCard: {
     alignSelf: 'center',
-    backgroundColor: authColors.glassStrong,
+    backgroundColor: theme.surfaceStrong,
     padding: 20,
-    borderRadius: 20,
+    borderRadius: theme.radius,
     borderWidth: 1,
-    borderColor: authColors.glassBorder,
+    borderColor: theme.line,
     marginBottom: 16,
     minHeight: 200,
     minWidth: 200,
@@ -1066,13 +1096,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   qrExpired: {
-    backgroundColor: 'rgba(245, 158, 11, 0.14)',
-    borderColor: 'rgba(245, 158, 11, 0.35)',
+    backgroundColor: theme.warnSoft,
+    borderColor: theme.warn,
   },
   expiredLabel: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#FCD34D',
+    color: theme.warn,
     textAlign: 'center',
   },
   linkActions: {
@@ -1095,7 +1125,7 @@ const styles = StyleSheet.create({
   },
   lockHint: {
     fontSize: 12,
-    color: authColors.textOnDarkMuted,
+    color: theme.ink2,
     marginTop: 8,
     lineHeight: 17,
   },
@@ -1119,9 +1149,9 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 10,
-    backgroundColor: authColors.pillOnDark,
+    backgroundColor: theme.surface,
     borderWidth: 1,
-    borderColor: authColors.glassBorder,
+    borderColor: theme.line,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1133,7 +1163,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   organiserStatusChip: {
-    backgroundColor: authColors.pillOnDark,
+    backgroundColor: theme.surface,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 100,
@@ -1141,10 +1171,10 @@ const styles = StyleSheet.create({
   organiserStatusChipText: {
     fontSize: 11,
     fontWeight: '700',
-    color: authColors.textOnDarkMuted,
+    color: theme.ink2,
   },
   summaryCard: {
-    ...glassStyles.cardStrong,
+    ...themed.cardStrong,
     marginBottom: 20,
   },
   summaryColumns: {
@@ -1160,13 +1190,13 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   summaryColumnTotal: {
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: theme.surface,
   },
   summaryColumnCollected: {
-    backgroundColor: 'rgba(110, 231, 183, 0.14)',
+    backgroundColor: theme.accentSoft,
   },
   summaryColumnOutstanding: {
-    backgroundColor: 'rgba(252, 165, 165, 0.14)',
+    backgroundColor: theme.warnSoft,
   },
   summaryAmount: {
     fontSize: 16,
@@ -1174,20 +1204,21 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   summaryAmountTotal: {
-    color: authColors.textOnDark,
+    color: theme.ink,
   },
   summaryAmountCollected: {
-    color: '#6EE7B7',
+    color: theme.good,
   },
   summaryAmountOutstanding: {
-    color: authColors.errorOnDark,
+    color: theme.bad,
   },
   summaryLabel: {
     marginTop: 4,
     fontSize: 11,
     fontWeight: '600',
-    color: authColors.textOnDarkMuted,
+    color: theme.ink2,
     textAlign: 'center',
     flexShrink: 0,
   },
-});
+  });
+}

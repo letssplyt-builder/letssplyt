@@ -1,8 +1,9 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
+import { ScreenTopBar } from '../../components/navigation/ScreenTopBar';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { splitActionBarFooterStyle } from '../../constants/layout';
 import { useAppInsets } from '../../hooks/useAppInsets';
@@ -11,7 +12,8 @@ import { confirmEventSplit } from '../../services/messages.service';
 import { isApiRequestError } from '../../services/api';
 import { useEventStore } from '../../store/eventStore';
 import { useSplitStore } from '../../store/splitStore';
-import { authColors, colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 import {
   avatarColorFromName,
   formatSplitMoney,
@@ -24,9 +26,223 @@ import {
 
 type Props = NativeStackScreenProps<EventsStackParamList, 'SplitReview'>;
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    layout: {
+      paddingHorizontal: 0,
+    },
+    scroll: {
+      paddingHorizontal: 20,
+      paddingTop: 8,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
+      gap: 12,
+      marginBottom: 8,
+    },
+    totalPill: {
+      backgroundColor: theme.surface,
+      borderRadius: 999,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderWidth: 1,
+      borderColor: theme.line,
+      marginTop: 4,
+    },
+    totalPillText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: theme.ink,
+      fontFamily: theme.fontBody,
+    },
+    hintMuted: {
+      fontSize: 13,
+      color: theme.ink2,
+      marginBottom: 12,
+      lineHeight: 18,
+      fontFamily: theme.fontBody,
+    },
+    ledgerCard: {
+      backgroundColor: theme.surfaceStrong,
+      borderRadius: theme.radius,
+      borderWidth: 1,
+      borderColor: theme.line,
+      overflow: 'hidden',
+    },
+    ledgerHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 12,
+      paddingTop: 10,
+      paddingBottom: 6,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.line,
+    },
+    ledgerHeaderName: {
+      flex: 1,
+      fontSize: 10,
+      fontWeight: '700',
+      color: theme.ink3,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+      fontFamily: theme.fontBody,
+    },
+    ledgerHeaderAmount: {
+      minWidth: 88,
+      textAlign: 'right',
+      fontSize: 10,
+      fontWeight: '700',
+      color: theme.ink3,
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+      fontFamily: theme.fontBody,
+    },
+    ledgerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.line,
+      minHeight: 44,
+    },
+    ledgerRowLast: {
+      borderBottomWidth: 0,
+    },
+    ledgerNameCol: {
+      flex: 1,
+      minWidth: 0,
+      marginRight: 12,
+    },
+    ledgerIdentity: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    ledgerNameWrap: {
+      flex: 1,
+      minWidth: 0,
+    },
+    avatar: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarText: {
+      color: theme.ink,
+      fontWeight: '800',
+      fontSize: 12,
+    },
+    name: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: theme.ink,
+      fontFamily: theme.fontBody,
+    },
+    items: {
+      fontSize: 11,
+      color: theme.ink3,
+      marginTop: 1,
+      lineHeight: 14,
+      fontFamily: theme.fontBody,
+    },
+    amount: {
+      minWidth: 88,
+      fontSize: 15,
+      fontWeight: '800',
+      color: theme.ink,
+      textAlign: 'right',
+      fontFamily: theme.fontDisplay,
+    },
+    ledgerFooter: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.line,
+    },
+    ledgerFooterOk: {
+      backgroundColor: theme.accentSoft,
+    },
+    ledgerFooterBad: {
+      backgroundColor: theme.warnSoft,
+    },
+    ledgerFooterLabel: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: theme.ink2,
+      fontFamily: theme.fontBody,
+    },
+    ledgerFooterValue: {
+      fontSize: 16,
+      fontWeight: '800',
+      fontFamily: theme.fontDisplay,
+    },
+    totalTextOk: {
+      color: theme.good,
+    },
+    totalTextBad: {
+      color: theme.bad,
+    },
+    hintError: {
+      marginTop: 12,
+      fontSize: 14,
+      color: theme.bad,
+      fontWeight: '600',
+      lineHeight: 20,
+      fontFamily: theme.fontBody,
+    },
+    footerWrap: {
+      gap: 12,
+    },
+    footerMeta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    footerMetaLabel: {
+      flex: 1,
+      fontSize: 12,
+      color: theme.ink2,
+      fontFamily: theme.fontBody,
+    },
+    balancePill: {
+      borderRadius: 999,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+    },
+    balancePillOk: {
+      backgroundColor: theme.accentSoft,
+    },
+    balancePillBad: {
+      backgroundColor: theme.warnSoft,
+    },
+    balancePillText: {
+      fontSize: 11,
+      fontWeight: '800',
+      fontFamily: theme.fontBody,
+    },
+    balancePillTextOk: {
+      color: theme.good,
+    },
+    balancePillTextBad: {
+      color: theme.bad,
+    },
+  });
+}
+
 export function SplitReviewScreen({ navigation, route }: Props) {
   const { eventId } = route.params;
   const { rawBottom } = useAppInsets();
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const eventTitle = useEventStore((s) =>
     s.currentEvent?.event.id === eventId ? s.currentEvent.event.title : null,
   );
@@ -66,6 +282,7 @@ export function SplitReviewScreen({ navigation, route }: Props) {
 
   return (
     <AuthGradientLayout
+      contentStyle={styles.layout}
       footerStyle={splitActionBarFooterStyle(rawBottom)}
       footer={
         <View style={styles.footerWrap}>
@@ -128,20 +345,14 @@ export function SplitReviewScreen({ navigation, route }: Props) {
       }
     >
       <StatusBar style="light" />
+      <ScreenTopBar
+        title="Review split"
+        subtitle={eventTitle ?? undefined}
+        titleAlign="start"
+        onBack={() => navigation.goBack()}
+      />
       <ScrollView contentContainerStyle={[styles.scroll, { paddingBottom: 24 }]}>
-        <Pressable onPress={() => navigation.goBack()} accessibilityRole="button">
-          <Text style={styles.back}>‹ Back</Text>
-        </Pressable>
-
         <View style={styles.headerRow}>
-          <View style={styles.headerText}>
-            <Text style={styles.title}>Review split</Text>
-            {eventTitle ? (
-              <Text style={styles.subtitle} numberOfLines={2}>
-                {eventTitle}
-              </Text>
-            ) : null}
-          </View>
           <View style={styles.totalPill}>
             <Text style={styles.totalPillText}>{formatSplitMoney(billTotal, currency)} total</Text>
           </View>
@@ -225,219 +436,3 @@ export function SplitReviewScreen({ navigation, route }: Props) {
     </AuthGradientLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  scroll: {
-    paddingHorizontal: 20,
-    paddingTop: 8,
-  },
-  back: {
-    color: authColors.ctaSurface,
-    fontWeight: '600',
-    fontSize: 15,
-    marginBottom: 12,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: 12,
-    marginBottom: 8,
-  },
-  headerText: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: authColors.ctaSurface,
-    marginBottom: 4,
-  },
-  subtitle: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: authColors.textOnDark,
-    lineHeight: 20,
-  },
-  totalPill: {
-    backgroundColor: authColors.glassStrong,
-    borderRadius: 999,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-    marginTop: 4,
-  },
-  totalPillText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: authColors.textOnDark,
-  },
-  hintMuted: {
-    fontSize: 13,
-    color: authColors.textOnDarkMuted,
-    marginBottom: 12,
-    lineHeight: 18,
-  },
-  ledgerCard: {
-    backgroundColor: colors.background,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: '#E8E6F0',
-    overflow: 'hidden',
-  },
-  ledgerHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingTop: 10,
-    paddingBottom: 6,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E8E6F0',
-  },
-  ledgerHeaderName: {
-    flex: 1,
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  ledgerHeaderAmount: {
-    minWidth: 88,
-    textAlign: 'right',
-    fontSize: 10,
-    fontWeight: '700',
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  ledgerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#F0EEF8',
-    minHeight: 44,
-  },
-  ledgerRowLast: {
-    borderBottomWidth: 0,
-  },
-  ledgerNameCol: {
-    flex: 1,
-    minWidth: 0,
-    marginRight: 12,
-  },
-  ledgerIdentity: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  ledgerNameWrap: {
-    flex: 1,
-    minWidth: 0,
-  },
-  avatar: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 12,
-  },
-  name: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  items: {
-    fontSize: 11,
-    color: colors.textMuted,
-    marginTop: 1,
-    lineHeight: 14,
-  },
-  amount: {
-    minWidth: 88,
-    fontSize: 15,
-    fontWeight: '800',
-    color: colors.text,
-    textAlign: 'right',
-  },
-  ledgerFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E8E6F0',
-  },
-  ledgerFooterOk: {
-    backgroundColor: '#F0FDF4',
-  },
-  ledgerFooterBad: {
-    backgroundColor: '#FEF2F2',
-  },
-  ledgerFooterLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textMuted,
-  },
-  ledgerFooterValue: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  totalTextOk: {
-    color: '#047857',
-  },
-  totalTextBad: {
-    color: '#B91C1C',
-  },
-  hintError: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#FEE2E2',
-    fontWeight: '600',
-    lineHeight: 20,
-  },
-  footerWrap: {
-    gap: 12,
-  },
-  footerMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  footerMetaLabel: {
-    flex: 1,
-    fontSize: 12,
-    color: authColors.textOnDarkMuted,
-  },
-  balancePill: {
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  balancePillOk: {
-    backgroundColor: 'rgba(16, 185, 129, 0.18)',
-  },
-  balancePillBad: {
-    backgroundColor: 'rgba(239, 68, 68, 0.18)',
-  },
-  balancePillText: {
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  balancePillTextOk: {
-    color: '#6EE7B7',
-  },
-  balancePillTextBad: {
-    color: '#FCA5A5',
-  },
-});

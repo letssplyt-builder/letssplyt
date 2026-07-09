@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { BalanceSummary } from '../../services/event.service';
-import { authColors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import { ThemedSurface } from '../../theme/ThemedSurface';
 import { formatMoney } from '../../utils/events';
 
 interface BalanceHeroCardProps {
@@ -18,18 +20,25 @@ function netLabel(net: number, unavailable: boolean): string {
 }
 
 export function BalanceHeroCard({ balance, isLoading, error, onRetry }: BalanceHeroCardProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   if (isLoading) {
-    return <View style={[styles.card, styles.skeleton]} accessibilityLabel="Loading balance" />;
+    return (
+      <ThemedSurface strong style={styles.card}>
+        <View style={styles.skeleton} accessibilityLabel="Loading balance" />
+      </ThemedSurface>
+    );
   }
 
   if (error) {
     return (
-      <View style={[styles.card, styles.errorCard]}>
+      <ThemedSurface style={[styles.card, styles.errorCard]}>
         <Text style={styles.errorText}>Couldn&apos;t load your balance.</Text>
         <Pressable accessibilityRole="button" onPress={onRetry} style={styles.retryButton}>
           <Text style={styles.retryText}>Retry</Text>
         </Pressable>
-      </View>
+      </ThemedSurface>
     );
   }
 
@@ -42,137 +51,160 @@ export function BalanceHeroCard({ balance, isLoading, error, onRetry }: BalanceH
   const youOwe = balance.you_owe ?? 0;
   const net = balance.net_balance ?? owedToYou - youOwe;
   const currency = balance.currency ?? 'USD';
+  const netPositive = net > 0;
+  const netNegative = net < 0;
 
   return (
-    <View
-      accessibilityRole="summary"
-      accessibilityLabel={`Owed to you ${formatMoney(owedToYou, currency)}. You owe ${formatMoney(youOwe, currency)}.`}
-      style={[styles.card, styles.heroCard]}
+    <ThemedSurface
+      strong
+      style={styles.card}
+      // accessibility on ThemedSurface wrapper via child
     >
-      <View style={styles.columns}>
-        <View style={styles.column}>
-          <Text style={styles.columnLabel}>Owed to you</Text>
-          <Text style={[styles.columnAmount, styles.positive]}>
-            {unavailable ? '—' : formatMoney(owedToYou, currency)}
-          </Text>
-        </View>
-        <View style={styles.divider} />
-        <View style={styles.column}>
-          <Text style={styles.columnLabel}>You owe</Text>
-          <Text style={[styles.columnAmount, styles.negative]}>
-            {unavailable ? '—' : formatMoney(youOwe, currency)}
-          </Text>
-        </View>
-      </View>
-      <View style={styles.netRow}>
-        <Text style={styles.netLabel}>Net</Text>
+      <View
+        accessibilityRole="summary"
+        accessibilityLabel={`Net balance ${formatMoney(net, currency)}. Owed to you ${formatMoney(owedToYou, currency)}. You owe ${formatMoney(youOwe, currency)}.`}
+        style={styles.inner}
+      >
+        <Text style={styles.heroLabel}>Net balance</Text>
         <Text
           style={[
-            styles.netAmount,
-            net > 0 ? styles.positive : net < 0 ? styles.negative : styles.neutral,
+            styles.heroAmount,
+            netPositive && styles.positive,
+            netNegative && styles.negative,
+            !netPositive && !netNegative && styles.neutral,
+            theme.heroGlow ? styles.heroGlow : null,
           ]}
         >
           {unavailable ? '—' : formatMoney(net, currency)}
         </Text>
+        <Text style={styles.heroHint}>{netLabel(net, unavailable)}</Text>
+
+        <View style={styles.divider} />
+
+        <View style={styles.columns}>
+          <View style={styles.column}>
+            <Text style={styles.columnLabel}>Owed to you</Text>
+            <Text style={[styles.columnAmount, styles.positive]}>
+              {unavailable ? '—' : formatMoney(owedToYou, currency)}
+            </Text>
+          </View>
+          <View style={styles.columnDivider} />
+          <View style={styles.column}>
+            <Text style={styles.columnLabel}>You owe</Text>
+            <Text style={[styles.columnAmount, styles.negative]}>
+              {unavailable ? '—' : formatMoney(youOwe, currency)}
+            </Text>
+          </View>
+        </View>
       </View>
-      <Text style={styles.netHint}>{netLabel(net, unavailable)}</Text>
-    </View>
+    </ThemedSurface>
   );
 }
 
-const styles = StyleSheet.create({
-  card: {
-    borderRadius: 18,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-  },
-  heroCard: {
-    backgroundColor: authColors.glassStrong,
-  },
-  skeleton: {
-    height: 108,
-    backgroundColor: authColors.glass,
-    opacity: 0.7,
-  },
-  errorCard: {
-    backgroundColor: authColors.errorBgOnDark,
-    alignItems: 'center',
-  },
-  errorText: {
-    fontSize: 14,
-    color: authColors.errorOnDark,
-    marginBottom: 12,
-  },
-  retryButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-    backgroundColor: authColors.glass,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-  },
-  retryText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: authColors.textOnDark,
-  },
-  columns: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-  },
-  column: {
-    flex: 1,
-    gap: 4,
-  },
-  divider: {
-    width: 1,
-    backgroundColor: authColors.glassBorder,
-    marginHorizontal: 12,
-  },
-  columnLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: authColors.textOnDarkFaint,
-    textTransform: 'uppercase',
-    letterSpacing: 0.7,
-  },
-  columnAmount: {
-    fontSize: 24,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  positive: {
-    color: '#6EE7B7',
-  },
-  negative: {
-    color: authColors.errorOnDark,
-  },
-  neutral: {
-    color: authColors.textOnDarkMuted,
-  },
-  netRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: authColors.glassBorder,
-  },
-  netLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: authColors.textOnDarkMuted,
-  },
-  netAmount: {
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  netHint: {
-    fontSize: 12,
-    color: authColors.textOnDarkFaint,
-    marginTop: 6,
-  },
-});
+function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
+  return StyleSheet.create({
+    card: {
+      marginBottom: 16,
+      padding: 18,
+    },
+    inner: {
+      gap: 4,
+    },
+    skeleton: {
+      height: 132,
+      opacity: 0.5,
+    },
+    errorCard: {
+      alignItems: 'center',
+      padding: 16,
+    },
+    errorText: {
+      fontSize: 14,
+      color: theme.bad,
+      marginBottom: 12,
+      fontFamily: theme.fontBody,
+    },
+    retryButton: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: theme.radiusSm,
+      borderWidth: 1,
+      borderColor: theme.line,
+      backgroundColor: theme.surface,
+    },
+    retryText: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.ink,
+      fontFamily: theme.fontBody,
+    },
+    heroLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: theme.ink3,
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      fontFamily: theme.fontBody,
+    },
+    heroAmount: {
+      fontSize: theme.heroSize,
+      fontWeight: '800',
+      letterSpacing: -1,
+      fontVariant: ['tabular-nums'],
+      fontFamily: theme.fontDisplay,
+      color: theme.ink,
+    },
+    heroGlow: {
+      textShadowColor: 'rgba(94,234,212,0.5)',
+      textShadowOffset: { width: 0, height: 0 },
+      textShadowRadius: 18,
+    },
+    heroHint: {
+      fontSize: 12,
+      color: theme.ink2,
+      marginTop: 2,
+      fontFamily: theme.fontBody,
+    },
+    divider: {
+      height: 1,
+      backgroundColor: theme.line,
+      marginVertical: 14,
+    },
+    columns: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+    },
+    column: {
+      flex: 1,
+      gap: 4,
+    },
+    columnDivider: {
+      width: 1,
+      backgroundColor: theme.line,
+      marginHorizontal: 12,
+    },
+    columnLabel: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: theme.ink3,
+      textTransform: 'uppercase',
+      letterSpacing: 0.7,
+      fontFamily: theme.fontBody,
+    },
+    columnAmount: {
+      fontSize: 20,
+      fontWeight: '800',
+      fontVariant: ['tabular-nums'],
+      fontFamily: theme.fontDisplay,
+    },
+    positive: {
+      color: theme.good,
+    },
+    negative: {
+      color: theme.bad,
+    },
+    neutral: {
+      color: theme.ink2,
+    },
+  });
+}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -7,7 +7,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import { authColors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 
 interface EventDetailOverflowMenuProps {
   showReopen?: boolean;
@@ -19,6 +20,88 @@ interface EventDetailOverflowMenuProps {
   showDelete?: boolean;
   deleteLoading?: boolean;
   onDelete?: () => void;
+}
+
+function makeStyles(theme: Theme) {
+  const iconRadius = theme.id === 'aurora' ? 20 : theme.radiusSm;
+
+  return StyleSheet.create({
+    placeholder: {
+      minWidth: 40,
+      minHeight: 40,
+    },
+    trigger: {
+      minWidth: 40,
+      minHeight: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: iconRadius,
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.line,
+    },
+    triggerPressed: {
+      backgroundColor: theme.surfaceStrong,
+      transform: [{ scale: 0.96 }],
+    },
+    triggerIcon: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: theme.ink2,
+      lineHeight: 20,
+      marginTop: -2,
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0,0,0,0.68)',
+    },
+    dropdown: {
+      position: 'absolute',
+      top: 56,
+      right: 20,
+      alignItems: 'flex-end',
+    },
+    menuCard: {
+      minWidth: 220,
+      backgroundColor: theme.modalSurface,
+      borderRadius: theme.radiusSm,
+      borderWidth: 1,
+      borderColor: theme.line,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.25,
+      shadowRadius: 20,
+      elevation: 8,
+      overflow: 'hidden',
+    },
+    menuItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: 12,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+    },
+    menuItemPressed: {
+      backgroundColor: theme.modalInset,
+    },
+    menuLabel: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.ink,
+      fontFamily: theme.fontBody,
+    },
+    menuLabelDestructive: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.bad,
+      fontFamily: theme.fontBody,
+    },
+    divider: {
+      height: StyleSheet.hairlineWidth,
+      backgroundColor: theme.line,
+    },
+  });
 }
 
 /** Compact ⋮ menu for infrequent payer actions on Event Detail. */
@@ -33,6 +116,8 @@ export function EventDetailOverflowMenu({
   deleteLoading,
   onDelete,
 }: EventDetailOverflowMenuProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const [open, setOpen] = useState(false);
 
   if (!showReopen && !showReset && !showDelete) {
@@ -90,7 +175,7 @@ export function EventDetailOverflowMenu({
               >
                 <Text style={styles.menuLabel}>Reopen join window</Text>
                 {reopenLoading ? (
-                  <ActivityIndicator color={authColors.textOnDarkMuted} size="small" />
+                  <ActivityIndicator color={theme.ink3} size="small" />
                 ) : null}
               </Pressable>
             ) : null}
@@ -110,7 +195,7 @@ export function EventDetailOverflowMenu({
               >
                 <Text style={styles.menuLabelDestructive}>Reset expenses</Text>
                 {resetLoading ? (
-                  <ActivityIndicator color={authColors.errorOnDark} size="small" />
+                  <ActivityIndicator color={theme.bad} size="small" />
                 ) : null}
               </Pressable>
             ) : null}
@@ -130,7 +215,7 @@ export function EventDetailOverflowMenu({
               >
                 <Text style={styles.menuLabelDestructive}>Delete event</Text>
                 {deleteLoading ? (
-                  <ActivityIndicator color={authColors.errorOnDark} size="small" />
+                  <ActivityIndicator color={theme.bad} size="small" />
                 ) : null}
               </Pressable>
             ) : null}
@@ -140,78 +225,3 @@ export function EventDetailOverflowMenu({
     </>
   );
 }
-
-const styles = StyleSheet.create({
-  placeholder: {
-    minWidth: 36,
-    minHeight: 36,
-  },
-  trigger: {
-    minWidth: 36,
-    minHeight: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 18,
-    backgroundColor: authColors.glass,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-  },
-  triggerPressed: {
-    backgroundColor: authColors.glassStrong,
-  },
-  triggerIcon: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: authColors.textOnDarkMuted,
-    lineHeight: 20,
-    marginTop: -2,
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(11, 61, 69, 0.35)',
-  },
-  dropdown: {
-    position: 'absolute',
-    top: 56,
-    right: 20,
-    alignItems: 'flex-end',
-  },
-  menuCard: {
-    minWidth: 200,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(11, 61, 69, 0.08)',
-    shadowColor: '#0B3D45',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.16,
-    shadowRadius: 20,
-    elevation: 8,
-    overflow: 'hidden',
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-  },
-  menuItemPressed: {
-    backgroundColor: '#F8F7FF',
-  },
-  menuLabel: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#1E1B3A',
-  },
-  menuLabelDestructive: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#DC2626',
-  },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: '#E0DDFF',
-  },
-});

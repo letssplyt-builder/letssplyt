@@ -1,4 +1,7 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 
 export type SplitPath = 'itemised' | 'custom';
 
@@ -8,7 +11,43 @@ interface SplitPathToggleProps {
   showItemised: boolean;
 }
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    wrap: {
+      flexDirection: 'row',
+      gap: 8,
+      marginBottom: 12,
+    },
+    segment: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 10,
+      borderRadius: theme.radiusSm,
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.line,
+    },
+    segmentActive: {
+      backgroundColor: theme.accent,
+      borderColor: theme.accent,
+    },
+    label: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: theme.ink2,
+      fontFamily: theme.fontBody,
+    },
+    labelActive: {
+      color: theme.accentInk,
+    },
+  });
+}
+
 export function SplitPathToggle({ value, onChange, showItemised }: SplitPathToggleProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   if (!showItemised) return null;
 
   return (
@@ -34,33 +73,3 @@ export function SplitPathToggle({ value, onChange, showItemised }: SplitPathTogg
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  wrap: {
-    flexDirection: 'row',
-    gap: 8,
-    marginBottom: 12,
-  },
-  segment: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-  },
-  segmentActive: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#FFFFFF',
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: 'rgba(255,255,255,0.9)',
-  },
-  labelActive: {
-    color: '#0B3D45',
-  },
-});

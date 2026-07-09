@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   Pressable,
@@ -20,7 +20,8 @@ import { apiPost, getApiErrorCode, isApiRequestError } from '../../services/api'
 import { getDeviceId } from '../../services/deviceId';
 import { useAuthStore } from '../../store/authStore';
 import { useJoinStore } from '../../store/joinStore';
-import { authColors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'OTPVerify'>;
 
@@ -33,7 +34,152 @@ function maskPhoneLastFour(phoneE164: string): string {
   return `•••• ${digits.slice(-4)}`;
 }
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    content: {
+      flex: 1,
+    },
+    backButton: {
+      paddingTop: 4,
+      paddingBottom: 8,
+      alignSelf: 'flex-start',
+    },
+    backText: {
+      fontSize: 17,
+      color: theme.ink,
+      fontWeight: '600',
+      fontFamily: theme.fontBody,
+    },
+    centerStage: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingBottom: 16,
+    },
+    eyebrow: {
+      fontSize: 12,
+      fontWeight: '700',
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
+      color: theme.ink3,
+      marginBottom: 8,
+      fontFamily: theme.fontBody,
+    },
+    title: {
+      fontSize: 32,
+      fontWeight: '800',
+      color: theme.ink,
+      marginBottom: 8,
+      letterSpacing: -0.5,
+      fontFamily: theme.fontDisplay,
+    },
+    subtitle: {
+      fontSize: 15,
+      color: theme.ink2,
+      marginBottom: 28,
+      textAlign: 'center',
+      fontFamily: theme.fontBody,
+    },
+    phoneHighlight: {
+      color: theme.ink,
+      fontWeight: '700',
+    },
+    nameWrap: {
+      width: '100%',
+      maxWidth: 340,
+      marginBottom: 22,
+    },
+    nameInput: {
+      width: '100%',
+      height: 52,
+      borderRadius: theme.radiusSm,
+      borderWidth: 1,
+      borderColor: theme.line,
+      backgroundColor: theme.surface,
+      paddingHorizontal: 18,
+      fontSize: 17,
+      color: theme.ink,
+      fontFamily: theme.fontBody,
+    },
+    infoWrap: {
+      width: '100%',
+      maxWidth: 340,
+      marginBottom: 20,
+    },
+    digitRow: {
+      flexDirection: 'row',
+      gap: 10,
+      marginBottom: 20,
+    },
+    feedbackWrap: {
+      width: '100%',
+      maxWidth: 340,
+    },
+    errorBox: {
+      width: '100%',
+      maxWidth: 340,
+      backgroundColor: theme.warnSoft,
+      borderRadius: theme.radiusSm,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: theme.bad,
+    },
+    errorText: {
+      color: theme.bad,
+      fontSize: 14,
+      textAlign: 'center',
+      fontFamily: theme.fontBody,
+    },
+    hint: {
+      fontSize: 13,
+      color: theme.ink3,
+      textAlign: 'center',
+      fontFamily: theme.fontBody,
+    },
+    footer: {
+      gap: 12,
+    },
+    resendWrap: {
+      alignItems: 'center',
+      paddingVertical: 8,
+    },
+    resendText: {
+      fontSize: 14,
+      color: theme.ink2,
+      fontFamily: theme.fontBody,
+    },
+    resendMuted: {
+      color: theme.ink3,
+      fontWeight: '600',
+    },
+    resendActive: {
+      color: theme.ink,
+      fontWeight: '700',
+    },
+    infoBox: {
+      width: '100%',
+      maxWidth: 340,
+      backgroundColor: theme.accentSoft,
+      borderRadius: theme.radiusSm,
+      padding: 14,
+      marginBottom: 20,
+      borderWidth: 1,
+      borderColor: theme.line,
+    },
+    infoText: {
+      color: theme.ink,
+      fontSize: 14,
+      lineHeight: 20,
+      textAlign: 'center',
+      fontWeight: '500',
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function OTPVerifyScreen({ navigation, route }: Props) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const { phoneE164, accountExists = false, joinToken } = route.params;
   const isExistingAccount = accountExists;
   const [digits, setDigits] = useState<string[]>(Array(OTP_LENGTH).fill(''));
@@ -112,6 +258,7 @@ export function OTPVerifyScreen({ navigation, route }: Props) {
       digits,
       displayName,
       isExistingAccount,
+      joinToken,
       phoneE164,
       setLoading,
     ],
@@ -267,7 +414,7 @@ export function OTPVerifyScreen({ navigation, route }: Props) {
               accessibilityLabel="Your name"
               accessibilityHint="Required only when creating a new account"
               placeholder="Your name"
-              placeholderTextColor={authColors.textOnDarkFaint}
+              placeholderTextColor={theme.ink3}
               value={displayName}
               onChangeText={setDisplayName}
               style={styles.nameInput}
@@ -314,135 +461,3 @@ export function OTPVerifyScreen({ navigation, route }: Props) {
     </AuthGradientLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  content: {
-    flex: 1,
-  },
-  backButton: {
-    paddingTop: 4,
-    paddingBottom: 8,
-    alignSelf: 'flex-start',
-  },
-  backText: {
-    fontSize: 17,
-    color: authColors.textOnDark,
-    fontWeight: '600',
-  },
-  centerStage: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingBottom: 16,
-  },
-  eyebrow: {
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1.2,
-    textTransform: 'uppercase',
-    color: authColors.textOnDarkFaint,
-    marginBottom: 8,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: authColors.textOnDark,
-    marginBottom: 8,
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: authColors.textOnDarkMuted,
-    marginBottom: 28,
-    textAlign: 'center',
-  },
-  phoneHighlight: {
-    color: authColors.textOnDark,
-    fontWeight: '700',
-  },
-  nameWrap: {
-    width: '100%',
-    maxWidth: 340,
-    marginBottom: 22,
-  },
-  nameInput: {
-    width: '100%',
-    height: 52,
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-    backgroundColor: authColors.glass,
-    paddingHorizontal: 18,
-    fontSize: 17,
-    color: authColors.textOnDark,
-  },
-  infoWrap: {
-    width: '100%',
-    maxWidth: 340,
-    marginBottom: 20,
-  },
-  digitRow: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 20,
-  },
-  feedbackWrap: {
-    width: '100%',
-    maxWidth: 340,
-  },
-  errorBox: {
-    width: '100%',
-    maxWidth: 340,
-    backgroundColor: authColors.errorBgOnDark,
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: 'rgba(252, 165, 165, 0.25)',
-  },
-  errorText: {
-    color: authColors.errorOnDark,
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  hint: {
-    fontSize: 13,
-    color: authColors.textOnDarkFaint,
-    textAlign: 'center',
-  },
-  footer: {
-    gap: 12,
-  },
-  resendWrap: {
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  resendText: {
-    fontSize: 14,
-    color: authColors.textOnDarkMuted,
-  },
-  resendMuted: {
-    color: authColors.textOnDarkFaint,
-    fontWeight: '600',
-  },
-  resendActive: {
-    color: authColors.textOnDark,
-    fontWeight: '700',
-  },
-  infoBox: {
-    width: '100%',
-    maxWidth: 340,
-    backgroundColor: authColors.infoBgOnDark,
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-  },
-  infoText: {
-    color: authColors.infoOnDark,
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-    fontWeight: '500',
-  },
-});

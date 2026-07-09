@@ -67,8 +67,14 @@ function sumCharges(charges: z.infer<typeof confirmChargeSchema>[]): number {
   return Number(total.toFixed(2));
 }
 
-const PRE_SEND_RECONFIRM_STAGES = ['parsed', 'parsed_confirmed', 'calculated', 'calculating'] as const;
-const POST_SEND_RECONFIRM_STAGES = ['messaging', 'complete'] as const;
+const RECONFIRM_ALLOWED_STAGES = [
+  'parsed',
+  'parsed_confirmed',
+  'calculated',
+  'calculating',
+  'messaging',
+  'complete',
+] as const;
 
 function isValidItemId(id: string | undefined): boolean {
   return Boolean(id && /^[0-9a-f-]{36}$/i.test(id));
@@ -242,9 +248,7 @@ export async function confirmReceipt(
   const nextAiStage =
     eventRow.ai_stage === 'parsed' ? 'parsed_confirmed' : eventRow.ai_stage;
 
-  const allowedStages = isPostSend
-    ? [...POST_SEND_RECONFIRM_STAGES]
-    : [...PRE_SEND_RECONFIRM_STAGES];
+  const allowedStages = [...RECONFIRM_ALLOWED_STAGES];
 
   const { data: claimed, error: claimError } = await supabaseAdmin
     .from('events')

@@ -15,6 +15,7 @@ const config: Config = {
     '^expo-haptics$': '<rootDir>/src/__tests__/mocks/expo-haptics.ts',
     '^expo-constants$': '<rootDir>/src/__tests__/mocks/expo-constants.ts',
     '^expo-linear-gradient$': '<rootDir>/src/__tests__/mocks/expo-linear-gradient.tsx',
+    '^expo-blur$': '<rootDir>/src/__tests__/mocks/expo-blur.tsx',
     '^expo-status-bar$': '<rootDir>/src/__tests__/mocks/expo-status-bar.tsx',
     '\\.(jpg|jpeg|png|gif|svg)$': '<rootDir>/src/__tests__/mocks/fileMock.ts',
   },

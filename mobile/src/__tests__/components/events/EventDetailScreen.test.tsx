@@ -454,7 +454,8 @@ describe('EventDetailScreen', () => {
       expect(screen.getByText('Settlement phase')).toBeTruthy();
       expect(screen.getByText('Total bill')).toBeTruthy();
       expect(screen.getByText('Collected')).toBeTruthy();
-      expect(screen.getByText('Outstanding')).toBeTruthy();
+      expect(screen.getAllByText('Outstanding').length).toBeGreaterThan(0);
+      expect(screen.getByText('Collection progress')).toBeTruthy();
       expect(screen.getByText('$120.00')).toBeTruthy();
       expect(screen.getByText('$45.00')).toBeTruthy();
       expect(screen.getByText('$75.00')).toBeTruthy();
@@ -751,6 +752,23 @@ describe('EventDetailScreen', () => {
     );
   });
 
+  it('shows Delete event in overflow menu during open (joining) phase', async () => {
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('More options')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByLabelText('More options'));
+
+    expect(screen.getByLabelText('Delete event')).toBeTruthy();
+  });
+
   it('shows Reopen join window when event locked (payer)', async () => {
     jest.mocked(eventService.fetchEventById).mockResolvedValue(mockDetailLocked);
 
@@ -987,7 +1005,7 @@ describe('EventDetailScreen', () => {
     });
   });
 
-  it('settlement phase shows Dispute swipe on paid registered member', async () => {
+  it('settlement phase shows Dispute on self-reported registered member', async () => {
     jest.mocked(settlementService.disputePayment).mockResolvedValue({
       payment_status: 'disputed',
     });
@@ -1004,7 +1022,7 @@ describe('EventDetailScreen', () => {
           user_id: 'user-member-1',
           display_name: 'Sam',
           join_method: 'qr_app',
-          payment_status: 'confirmed',
+          payment_status: 'self_reported',
           amount_owed: 30,
           self_reported_method: 'venmo',
         },
@@ -1037,7 +1055,7 @@ describe('EventDetailScreen', () => {
     });
   });
 
-  it('shows Dispute for registered user who joined via browser (qr_web)', async () => {
+  it('shows Dispute for self-reported user who joined via browser (qr_web)', async () => {
     jest.mocked(eventService.fetchEventById).mockResolvedValue({
       ...mockDetailLocked,
       event: {
@@ -1051,7 +1069,7 @@ describe('EventDetailScreen', () => {
           user_id: 'user-member-2',
           display_name: 'Sam',
           join_method: 'qr_web',
-          payment_status: 'confirmed',
+          payment_status: 'self_reported',
           amount_owed: 30,
           self_reported_method: 'venmo',
         },
@@ -1077,7 +1095,7 @@ describe('EventDetailScreen', () => {
     });
   });
 
-  it('does not show Dispute swipe for guest without user_id', async () => {
+  it('does not show Dispute for confirmed guest without user_id', async () => {
     jest.mocked(eventService.fetchEventById).mockResolvedValue({
       ...mockDetailLocked,
       event: {

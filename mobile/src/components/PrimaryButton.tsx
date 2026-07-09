@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -6,9 +7,9 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
-import { authColors, colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 
-type ButtonVariant = 'brand' | 'inverse';
+type ButtonVariant = 'brand' | 'inverse' | 'outline';
 
 interface PrimaryButtonProps {
   label: string;
@@ -31,8 +32,11 @@ export function PrimaryButton({
   accessibilityRole = 'button',
   variant = 'brand',
 }: PrimaryButtonProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const isDisabled = disabled || loading;
   const isInverse = variant === 'inverse';
+  const isOutline = variant === 'outline';
 
   return (
     <Pressable
@@ -42,16 +46,29 @@ export function PrimaryButton({
       onPress={onPress}
       style={({ pressed }) => [
         styles.button,
-        isInverse ? styles.buttonInverse : styles.buttonBrand,
+        isOutline
+          ? styles.buttonOutline
+          : isInverse
+            ? styles.buttonInverse
+            : styles.buttonBrand,
         isDisabled && styles.buttonDisabled,
         pressed && !isDisabled && styles.buttonPressed,
         style,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={isInverse ? authColors.ctaText : '#FFFFFF'} />
+        <ActivityIndicator color={isInverse || isOutline ? theme.accentInk : theme.accentInk} />
       ) : (
-        <Text style={[styles.label, isInverse ? styles.labelInverse : styles.labelBrand]}>
+        <Text
+          style={[
+            styles.label,
+            isOutline
+              ? styles.labelOutline
+              : isInverse
+                ? styles.labelInverse
+                : styles.labelBrand,
+          ]}
+        >
           {label}
         </Text>
       )}
@@ -59,44 +76,45 @@ export function PrimaryButton({
   );
 }
 
-const styles = StyleSheet.create({
-  button: {
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  buttonBrand: {
-    backgroundColor: colors.primary,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  buttonInverse: {
-    backgroundColor: authColors.ctaSurface,
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  buttonPressed: {
-    opacity: 0.92,
-    transform: [{ scale: 0.99 }],
-  },
-  buttonDisabled: {
-    opacity: 0.65,
-  },
-  label: {
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  labelBrand: {
-    color: '#FFFFFF',
-  },
-  labelInverse: {
-    color: authColors.ctaText,
-  },
-});
+function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
+  return StyleSheet.create({
+    button: {
+      height: 56,
+      borderRadius: 28,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    buttonBrand: {
+      backgroundColor: theme.accent,
+    },
+    buttonInverse: {
+      backgroundColor: theme.ink,
+    },
+    buttonOutline: {
+      backgroundColor: 'transparent',
+      borderWidth: 1.5,
+      borderColor: theme.line,
+    },
+    buttonPressed: {
+      opacity: 0.92,
+      transform: [{ scale: 0.99 }],
+    },
+    buttonDisabled: {
+      opacity: 0.65,
+    },
+    label: {
+      fontSize: 17,
+      fontWeight: '700',
+      fontFamily: theme.fontBody,
+    },
+    labelBrand: {
+      color: theme.accentInk,
+    },
+    labelInverse: {
+      color: theme.accentInk,
+    },
+    labelOutline: {
+      color: theme.ink,
+    },
+  });
+}

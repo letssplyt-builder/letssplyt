@@ -31,6 +31,10 @@ module.exports = {
   orientation: 'portrait',
   scheme: 'letssplyt',
   userInterfaceStyle: 'automatic',
+  /** Transparent 3-button nav bar under edge-to-edge (§4B); requires native rebuild after change. */
+  androidNavigationBar: {
+    enforceContrast: false,
+  },
   plugins: [
     'expo-dev-client',
     [

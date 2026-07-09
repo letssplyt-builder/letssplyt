@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import DraggableFlatList, {
   type RenderItemParams,
@@ -17,17 +17,139 @@ import type { PaymentHandle } from '@letssplyt/shared/profile.types';
 import { BottomToast } from '../../components/BottomToast';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { FadeSlideIn } from '../../components/auth/FadeSlideIn';
+import { ScreenTopBar } from '../../components/navigation/ScreenTopBar';
 import { SwipeableHandleRow } from '../../components/profile/SwipeableHandleRow';
 import { useAppInsets } from '../../hooks/useAppInsets';
 import type { SettingsStackParamList } from '../../navigation/types';
 import { useAuthStore } from '../../store/authStore';
 import { useProfileStore } from '../../store/profileStore';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 import { initialsFromDisplayName, providerLabel } from '../../utils/profile';
-import { authColors } from '../../theme/colors';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'Profile'>;
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    layout: {
+      paddingHorizontal: 0,
+    },
+    listContent: {
+      paddingHorizontal: 28,
+    },
+    headerBlock: {
+      paddingTop: 4,
+      paddingBottom: 8,
+    },
+    footerBlock: {
+      gap: 14,
+      marginTop: 8,
+    },
+    loader: {
+      marginTop: 48,
+    },
+    avatar: {
+      width: 88,
+      height: 88,
+      borderRadius: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+      alignSelf: 'center',
+      marginBottom: 14,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.2,
+      shadowRadius: 16,
+      elevation: 6,
+    },
+    avatarText: {
+      fontSize: 30,
+      fontWeight: '800',
+      color: '#FFFFFF',
+    },
+    displayName: {
+      fontSize: 26,
+      fontWeight: '800',
+      color: theme.ink,
+      textAlign: 'center',
+      fontFamily: theme.fontDisplay,
+    },
+    nameHint: {
+      marginTop: 4,
+      marginBottom: 20,
+      textAlign: 'center',
+      fontSize: 12,
+      color: theme.ink3,
+      fontFamily: theme.fontBody,
+    },
+    nameInput: {
+      fontSize: 26,
+      fontWeight: '800',
+      color: theme.ink,
+      textAlign: 'center',
+      marginBottom: 20,
+      borderBottomWidth: 2,
+      borderBottomColor: theme.line,
+      paddingVertical: 4,
+      fontFamily: theme.fontDisplay,
+    },
+    sectionTitle: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: theme.ink3,
+      textTransform: 'uppercase',
+      letterSpacing: 0.9,
+      marginBottom: 10,
+      fontFamily: theme.fontBody,
+    },
+    emptyHint: {
+      fontSize: 13,
+      color: theme.ink2,
+      marginBottom: 12,
+      lineHeight: 20,
+      fontFamily: theme.fontBody,
+    },
+    addButton: {
+      paddingVertical: 14,
+      alignItems: 'center',
+      borderRadius: theme.radiusSm,
+      borderWidth: 1.5,
+      borderColor: theme.line,
+      backgroundColor: theme.surface,
+    },
+    addButtonText: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: theme.ink,
+      fontFamily: theme.fontBody,
+    },
+    trustCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      borderRadius: theme.radiusSm,
+      borderWidth: 1,
+      borderColor: theme.line,
+      backgroundColor: theme.surface,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+    },
+    trustIcon: {
+      fontSize: 14,
+    },
+    trustText: {
+      flex: 1,
+      fontSize: 11,
+      color: theme.ink2,
+      lineHeight: 16,
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function ProfileScreen({ navigation, route }: Props) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const authUser = useAuthStore((state) => state.user);
   const { user, handles, isLoading, loadProfile, deleteHandle, reorderHandles, updateDisplayName } =
     useProfileStore();
@@ -107,18 +229,8 @@ export function ProfileScreen({ navigation, route }: Props) {
 
   const listHeader = (
     <View style={styles.headerBlock}>
-      <FadeSlideIn delay={0}>
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => navigation.goBack()}
-          style={styles.back}
-        >
-          <Text style={styles.backText}>← Back</Text>
-        </Pressable>
-      </FadeSlideIn>
-
       {isLoading && !user && !authUser ? (
-        <ActivityIndicator color={authColors.textOnDark} style={styles.loader} />
+        <ActivityIndicator color={theme.ink} style={styles.loader} />
       ) : (
         <>
           <FadeSlideIn delay={60}>
@@ -136,7 +248,7 @@ export function ProfileScreen({ navigation, route }: Props) {
                 autoFocus
                 style={styles.nameInput}
                 maxLength={50}
-                placeholderTextColor={authColors.textOnDarkFaint}
+                placeholderTextColor={theme.ink3}
               />
             ) : (
               <Pressable
@@ -183,6 +295,7 @@ export function ProfileScreen({ navigation, route }: Props) {
 
   return (
     <AuthGradientLayout contentStyle={styles.layout}>
+      <ScreenTopBar title="Profile" onBack={() => navigation.popToTop()} />
       <BottomToast message={toastMessage} onDismiss={() => setToastMessage(null)} />
       <DraggableFlatList
         data={handles}
@@ -204,120 +317,3 @@ export function ProfileScreen({ navigation, route }: Props) {
     </AuthGradientLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  layout: {
-    paddingHorizontal: 0,
-  },
-  listContent: {
-    paddingHorizontal: 28,
-  },
-  headerBlock: {
-    paddingTop: 4,
-    paddingBottom: 8,
-  },
-  footerBlock: {
-    gap: 14,
-    marginTop: 8,
-  },
-  back: {
-    marginBottom: 12,
-  },
-  backText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: authColors.textOnDarkMuted,
-  },
-  loader: {
-    marginTop: 48,
-  },
-  avatar: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-    marginBottom: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 6,
-  },
-  avatarText: {
-    fontSize: 30,
-    fontWeight: '800',
-    color: '#FFFFFF',
-  },
-  displayName: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: authColors.textOnDark,
-    textAlign: 'center',
-  },
-  nameHint: {
-    marginTop: 4,
-    marginBottom: 20,
-    textAlign: 'center',
-    fontSize: 12,
-    color: authColors.textOnDarkFaint,
-  },
-  nameInput: {
-    fontSize: 26,
-    fontWeight: '800',
-    color: authColors.textOnDark,
-    textAlign: 'center',
-    marginBottom: 20,
-    borderBottomWidth: 2,
-    borderBottomColor: 'rgba(255, 255, 255, 0.55)',
-    paddingVertical: 4,
-  },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: authColors.textOnDarkFaint,
-    textTransform: 'uppercase',
-    letterSpacing: 0.9,
-    marginBottom: 10,
-  },
-  emptyHint: {
-    fontSize: 13,
-    color: authColors.textOnDarkMuted,
-    marginBottom: 12,
-    lineHeight: 20,
-  },
-  addButton: {
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderRadius: 18,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.35)',
-    backgroundColor: authColors.glass,
-  },
-  addButtonText: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: authColors.textOnDark,
-  },
-  trustCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-    backgroundColor: authColors.glass,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-  },
-  trustIcon: {
-    fontSize: 14,
-  },
-  trustText: {
-    flex: 1,
-    fontSize: 11,
-    color: authColors.textOnDarkMuted,
-    lineHeight: 16,
-  },
-});
