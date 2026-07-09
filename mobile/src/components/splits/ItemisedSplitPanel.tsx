@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors } from '../../theme/colors';
 import { formatSplitMoney } from '../../screens/splits/splitEntry.utils';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 import { ItemAssignPopup } from './ItemAssignPopup';
 
 interface LineItem {
@@ -24,6 +25,146 @@ interface ItemisedSplitPanelProps {
   onAssignItem: (itemId: string, participantIds: string[]) => void;
 }
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    panel: {
+      gap: 10,
+    },
+    statsCard: {
+      backgroundColor: theme.surfaceStrong,
+      borderRadius: theme.radiusSm,
+      padding: 12,
+      borderWidth: 1,
+      borderColor: theme.line,
+    },
+    statsRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: 10,
+    },
+    statsEyebrow: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: theme.ink3,
+      letterSpacing: 0.3,
+      textTransform: 'uppercase',
+      fontFamily: theme.fontBody,
+    },
+    statsValue: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: theme.ink,
+      marginTop: 2,
+      fontFamily: theme.fontDisplay,
+    },
+    statsMuted: {
+      color: theme.ink3,
+      fontWeight: '600',
+    },
+    ringOuter: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      borderWidth: 2,
+      borderColor: theme.accentSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    ringInner: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: theme.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    ringInnerDone: {
+      backgroundColor: theme.accentSoft,
+    },
+    ringText: {
+      fontSize: 12,
+      fontWeight: '800',
+      color: theme.accent,
+      fontFamily: theme.fontDisplay,
+    },
+    statsTrack: {
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: theme.line,
+      overflow: 'hidden',
+    },
+    statsFill: {
+      height: '100%',
+      borderRadius: 3,
+    },
+    statsFillPending: {
+      backgroundColor: theme.warn,
+    },
+    statsFillDone: {
+      backgroundColor: theme.good,
+    },
+    listHint: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: theme.ink2,
+      marginBottom: 2,
+      fontFamily: theme.fontBody,
+    },
+    itemList: {
+      gap: 8,
+    },
+    itemCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.surfaceStrong,
+      borderRadius: theme.radiusSm,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      gap: 8,
+      borderWidth: 1,
+      borderColor: theme.line,
+    },
+    itemCardUnassigned: {
+      borderColor: theme.warn,
+      backgroundColor: theme.warnSoft,
+    },
+    itemDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+    },
+    itemDotOk: {
+      backgroundColor: theme.good,
+    },
+    itemDotWarn: {
+      backgroundColor: theme.warn,
+    },
+    itemBody: {
+      flex: 1,
+    },
+    itemName: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.ink,
+      fontFamily: theme.fontBody,
+    },
+    itemMeta: {
+      fontSize: 11,
+      fontWeight: '500',
+      color: theme.ink3,
+      marginTop: 1,
+      fontFamily: theme.fontBody,
+    },
+    itemPrice: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: theme.accent,
+      fontFamily: theme.fontDisplay,
+    },
+  });
+}
+
 export function ItemisedSplitPanel({
   items,
   currency,
@@ -32,6 +173,8 @@ export function ItemisedSplitPanel({
   assignments,
   onAssignItem,
 }: ItemisedSplitPanelProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const allAssigned = assignedCount >= items.length && items.length > 0;
   const progress = items.length > 0 ? assignedCount / items.length : 0;
 
@@ -115,144 +258,3 @@ export function ItemisedSplitPanel({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  panel: {
-    gap: 10,
-  },
-  statsCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    shadowColor: '#0B3D45',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  statsEyebrow: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textMuted,
-    letterSpacing: 0.3,
-    textTransform: 'uppercase',
-  },
-  statsValue: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: colors.text,
-    marginTop: 2,
-  },
-  statsMuted: {
-    color: colors.textMuted,
-    fontWeight: '600',
-  },
-  ringOuter: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    borderWidth: 2,
-    borderColor: colors.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ringInner: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surfaceMuted,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ringInnerDone: {
-    backgroundColor: '#D1FAE5',
-  },
-  ringText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: colors.primary,
-  },
-  statsTrack: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.surfaceMuted,
-    overflow: 'hidden',
-  },
-  statsFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  statsFillPending: {
-    backgroundColor: '#FBBF24',
-  },
-  statsFillDone: {
-    backgroundColor: '#34D399',
-  },
-  listHint: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.78)',
-    marginBottom: 2,
-  },
-  itemList: {
-    gap: 8,
-  },
-  itemCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 14,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    gap: 8,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    shadowColor: '#0B3D45',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 1,
-  },
-  itemCardUnassigned: {
-    borderColor: '#FCD34D',
-    backgroundColor: '#FFFBEB',
-  },
-  itemDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  itemDotOk: {
-    backgroundColor: '#34D399',
-  },
-  itemDotWarn: {
-    backgroundColor: '#F59E0B',
-  },
-  itemBody: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  itemMeta: {
-    fontSize: 11,
-    fontWeight: '500',
-    color: colors.textMuted,
-    marginTop: 1,
-  },
-  itemPrice: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-});

@@ -6,7 +6,8 @@ import { useProfileStore } from '../../../store/profileStore';
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
-const mockNavigation = { goBack: mockGoBack, navigate: mockNavigate };
+const mockReset = jest.fn();
+const mockNavigation = { goBack: mockGoBack, navigate: mockNavigate, reset: mockReset };
 const mockRoute = { key: 'AddHandle', name: 'AddHandle' as const, params: {} };
 
 describe('AddHandleScreen', () => {
@@ -80,7 +81,7 @@ describe('AddHandleScreen', () => {
     addHandleSpy.mockRestore();
   });
 
-  it('navigates to Profile with toast after successful save', async () => {
+  it('resets stack to Profile with toast after successful save', async () => {
     jest.spyOn(useProfileStore.getState(), 'addHandle').mockResolvedValue();
 
     render(<AddHandleScreen navigation={mockNavigation as never} route={mockRoute as never} />);
@@ -88,10 +89,15 @@ describe('AddHandleScreen', () => {
     fireEvent.press(screen.getByText('Save'));
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith('Profile', {
-        toastMessage: 'Payment method added successfully',
+      expect(mockReset).toHaveBeenCalledWith({
+        index: 1,
+        routes: [
+          { name: 'Settings' },
+          { name: 'Profile', params: { toastMessage: 'Payment method added successfully' } },
+        ],
       });
     });
+    expect(mockNavigate).not.toHaveBeenCalled();
   });
 
   it('shows inline error when provider already exists on profile', async () => {

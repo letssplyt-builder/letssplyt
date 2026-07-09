@@ -2,10 +2,12 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { IOwePaymentHandle } from '@letssplyt/shared/settlement.types';
 import type { PaymentProvider } from '@letssplyt/shared/profile.types';
-import { CenteredCardModal, centeredCardModalStyles as shared } from '../layout/CenteredCardModal';
+import { CenteredCardModal } from '../layout/CenteredCardModal';
+import { useCenteredCardModalStyles } from '../../hooks/useCenteredCardModalStyles';
 import type { SelfReportPaymentMethod } from '../../services/settlement.service';
 import { buildAllPaidMethodOptions } from '../../utils/settlementPayment';
 import { providerLabel, providerVisual } from '../../utils/profile';
+import { useTheme } from '../../theme/ThemeContext';
 
 interface AllPaidSheetProps {
   visible: boolean;
@@ -26,6 +28,54 @@ export function AllPaidSheet({
   loading = false,
   onConfirm,
 }: AllPaidSheetProps) {
+  const { theme } = useTheme();
+  const shared = useCenteredCardModalStyles();
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        optionList: {
+          gap: 8,
+          marginBottom: 16,
+        },
+        optionRow: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10,
+          paddingVertical: 12,
+          paddingHorizontal: 12,
+          borderRadius: theme.radiusSm,
+          borderWidth: 1.5,
+          borderColor: theme.line,
+          backgroundColor: theme.modalInset,
+        },
+        badge: {
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          alignItems: 'center',
+          justifyContent: 'center',
+        },
+        badgeText: {
+          color: theme.ink,
+          fontSize: 13,
+          fontWeight: '800',
+        },
+        cashBadge: {
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: theme.ink3,
+        },
+        cashBadgeText: {
+          color: theme.ink,
+          fontSize: 16,
+          fontWeight: '800',
+        },
+      }),
+    [theme],
+  );
   const options = useMemo(() => buildAllPaidMethodOptions(handles), [handles]);
   const [selectedId, setSelectedId] = useState<string>(() => options[0]?.id ?? 'cash-other');
 
@@ -104,7 +154,7 @@ export function AllPaidSheet({
         style={[shared.okBtn, (!selected || loading) && shared.okBtnDisabled]}
       >
         {loading ? (
-          <ActivityIndicator color="#FFFFFF" />
+          <ActivityIndicator color={theme.accentInk} />
         ) : (
           <Text style={shared.okText}>OK</Text>
         )}
@@ -112,46 +162,3 @@ export function AllPaidSheet({
     </CenteredCardModal>
   );
 }
-
-const styles = StyleSheet.create({
-  optionList: {
-    gap: 8,
-    marginBottom: 16,
-  },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: '#E0DDFF',
-    backgroundColor: '#F8F7FF',
-  },
-  badge: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '800',
-  },
-  cashBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#64748B',
-  },
-  cashBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-});

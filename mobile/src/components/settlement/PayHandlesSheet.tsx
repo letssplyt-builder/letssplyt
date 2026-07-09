@@ -1,7 +1,9 @@
+import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { IOwePaymentHandle } from '@letssplyt/shared/settlement.types';
-import { CenteredCardModal, centeredCardModalStyles as shared } from '../layout/CenteredCardModal';
-import { colors } from '../../theme/colors';
+import { CenteredCardModal } from '../layout/CenteredCardModal';
+import { useCenteredCardModalStyles } from '../../hooks/useCenteredCardModalStyles';
+import { useTheme } from '../../theme/ThemeContext';
 import { formatMoney } from '../../utils/events';
 import { providerLabel, providerVisual } from '../../utils/profile';
 import { buildHandlePaymentOptions, openPaymentDeepLink } from '../../utils/settlementPayment';
@@ -29,6 +31,73 @@ export function PayHandlesSheet({
   eventTitleForLink,
   handles,
 }: PayHandlesSheetProps) {
+  const { theme } = useTheme();
+  const shared = useCenteredCardModalStyles();
+  const styles = useMemo(
+    () =>
+      StyleSheet.create({
+        eventLine: {
+          fontSize: 13,
+          fontWeight: '600',
+          color: theme.ink2,
+          marginTop: 4,
+          lineHeight: 18,
+          fontFamily: theme.fontBody,
+        },
+        optionScroll: {
+          maxHeight: 320,
+        },
+        optionScrollContent: {
+          paddingBottom: 4,
+        },
+        payCard: {
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 14,
+          paddingVertical: 14,
+          paddingHorizontal: 14,
+          borderRadius: theme.radiusSm,
+          borderWidth: 1.5,
+          borderColor: theme.line,
+          backgroundColor: theme.modalInset,
+          minHeight: 72,
+          marginBottom: 8,
+        },
+        badge: {
+          width: 44,
+          height: 44,
+          borderRadius: 12,
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        },
+        badgeText: {
+          color: theme.ink,
+          fontWeight: '800',
+          fontSize: 13,
+        },
+        payBody: {
+          flex: 1,
+          minWidth: 0,
+        },
+        payProvider: {
+          fontSize: 16,
+          fontWeight: '800',
+          color: theme.ink,
+          lineHeight: 22,
+          fontFamily: theme.fontBody,
+        },
+        payHandle: {
+          fontSize: 14,
+          fontWeight: '600',
+          color: theme.ink2,
+          marginTop: 4,
+          lineHeight: 20,
+          fontFamily: theme.fontBody,
+        },
+      }),
+    [theme],
+  );
   const paymentOptions = buildHandlePaymentOptions(handles, amount, eventTitleForLink);
   const acceptsLine = `${payerDisplayName} accepts payment via`;
 
@@ -94,62 +163,3 @@ export function PayHandlesSheet({
     </CenteredCardModal>
   );
 }
-
-const styles = StyleSheet.create({
-  eventLine: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textMuted,
-    marginTop: 4,
-    lineHeight: 18,
-  },
-  optionScroll: {
-    maxHeight: 320,
-  },
-  optionScrollContent: {
-    paddingBottom: 4,
-  },
-  payCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceMuted,
-    minHeight: 72,
-    marginBottom: 8,
-  },
-  badge: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  badgeText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 13,
-  },
-  payBody: {
-    flex: 1,
-    minWidth: 0,
-  },
-  payProvider: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: colors.text,
-    lineHeight: 22,
-  },
-  payHandle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.textMuted,
-    marginTop: 4,
-    lineHeight: 20,
-  },
-});

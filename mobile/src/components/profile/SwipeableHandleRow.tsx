@@ -1,6 +1,9 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import type { PaymentHandle } from '@letssplyt/shared/profile.types';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 import { ProfileHandleCard } from './ProfileHandleCard';
 
 interface SwipeableHandleRowProps {
@@ -11,6 +14,47 @@ interface SwipeableHandleRowProps {
   onDelete: () => void;
 }
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    row: {
+      marginBottom: 12,
+    },
+    actions: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+      paddingLeft: 12,
+      paddingBottom: 0,
+    },
+    deleteButton: {
+      width: 84,
+      borderRadius: theme.radiusSm,
+      backgroundColor: theme.bad,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+      paddingVertical: 12,
+      shadowColor: theme.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.35,
+      shadowRadius: 8,
+      elevation: 4,
+    },
+    deleteButtonPressed: {
+      opacity: 0.9,
+      transform: [{ scale: 0.98 }],
+    },
+    deleteIcon: {
+      fontSize: 18,
+    },
+    deleteLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: '#FFFFFF',
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function SwipeableHandleRow({
   handle,
   isDragging,
@@ -18,6 +62,9 @@ export function SwipeableHandleRow({
   onDrag,
   onDelete,
 }: SwipeableHandleRowProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   return (
     <View style={styles.row}>
       <Swipeable
@@ -48,41 +95,3 @@ export function SwipeableHandleRow({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  row: {
-    marginBottom: 12,
-  },
-  actions: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    paddingLeft: 12,
-    paddingBottom: 0,
-  },
-  deleteButton: {
-    width: 84,
-    borderRadius: 18,
-    backgroundColor: '#B91C1C',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingVertical: 12,
-    shadowColor: '#7F1D1D',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  deleteButtonPressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.98 }],
-  },
-  deleteIcon: {
-    fontSize: 18,
-  },
-  deleteLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-});

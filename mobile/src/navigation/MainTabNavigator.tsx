@@ -1,30 +1,59 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { CommonActions } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StyleSheet, Text } from 'react-native';
 import { useNotificationStore } from '../store/notificationStore';
 import { TAB_BAR_CONTENT_HEIGHT, TAB_BAR_PADDING_TOP } from '../constants/layout';
+import { TabBarBackground } from '../components/navigation/TabBarBackground';
 import { useAppInsets } from '../hooks/useAppInsets';
+import { useTheme } from '../theme/ThemeContext';
 import { HomeStackNavigator } from './HomeStackNavigator';
 import { EventsStackNavigator } from './EventsStackNavigator';
 import { SettingsStackNavigator } from './SettingsStackNavigator';
-import { authColors } from '../theme/colors';
 import type { MainTabParamList } from './types';
 
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-function TabIcon({ label, focused }: { label: string; focused: boolean }) {
+function TabIcon({
+  label,
+  focused,
+  color,
+  activeColor,
+}: {
+  label: string;
+  focused: boolean;
+  color: string;
+  activeColor: string;
+}) {
   return (
-    <Text style={[styles.tabIcon, focused && styles.tabIconFocused]} accessibilityElementsHidden>
+    <Text
+      style={[styles.tabIcon, { color: focused ? activeColor : color }]}
+      accessibilityElementsHidden
+    >
       {label}
     </Text>
   );
 }
 
 export function MainTabNavigator() {
+  const { theme } = useTheme();
   const { tabBarPaddingBottom } = useAppInsets();
   const tabBarHeight = TAB_BAR_PADDING_TOP + TAB_BAR_CONTENT_HEIGHT + tabBarPaddingBottom;
   const loadUnreadCount = useNotificationStore((state) => state.loadUnreadCount);
+  const tabStyles = useMemo(
+    () =>
+      StyleSheet.create({
+        tabLabel: {
+          fontSize: 10,
+          fontWeight: '600',
+          letterSpacing: 0.2,
+          marginTop: 2,
+          marginBottom: 0,
+          fontFamily: theme.fontBody,
+        },
+      }),
+    [theme.fontBody],
+  );
 
   useEffect(() => {
     void loadUnreadCount();
@@ -34,27 +63,23 @@ export function MainTabNavigator() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: authColors.textOnDark,
-        tabBarInactiveTintColor: authColors.textOnDarkMuted,
+        tabBarActiveTintColor: theme.accent,
+        tabBarInactiveTintColor: theme.ink2,
         tabBarStyle: {
           position: 'absolute',
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: 'rgba(11, 61, 69, 0.92)',
-          borderTopColor: 'rgba(255, 255, 255, 0.12)',
-          borderTopWidth: StyleSheet.hairlineWidth,
+          backgroundColor: theme.tabBar,
+          borderTopWidth: 0,
+          elevation: 0,
           height: tabBarHeight,
           paddingTop: TAB_BAR_PADDING_TOP,
           paddingBottom: tabBarPaddingBottom,
-          elevation: 8,
-          shadowColor: '#000000',
-          shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.18,
-          shadowRadius: 8,
         },
+        tabBarBackground: () => <TabBarBackground />,
         tabBarItemStyle: styles.tabItem,
-        tabBarLabelStyle: styles.tabLabel,
+        tabBarLabelStyle: tabStyles.tabLabel,
       }}
     >
       <Tab.Screen
@@ -62,7 +87,9 @@ export function MainTabNavigator() {
         component={HomeStackNavigator}
         options={{
           tabBarLabel: 'Dashboard',
-          tabBarIcon: ({ focused }) => <TabIcon label="⬡" focused={focused} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon label="⬡" focused={focused} color={theme.ink2} activeColor={theme.accent} />
+          ),
         }}
         listeners={({ navigation }) => ({
           tabPress: (e) => {
@@ -89,7 +116,9 @@ export function MainTabNavigator() {
         component={EventsStackNavigator}
         options={{
           tabBarLabel: 'Events',
-          tabBarIcon: ({ focused }) => <TabIcon label="☰" focused={focused} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon label="☰" focused={focused} color={theme.ink2} activeColor={theme.accent} />
+          ),
         }}
         listeners={({ navigation }) => ({
           tabPress: (e) => {
@@ -116,7 +145,9 @@ export function MainTabNavigator() {
         component={SettingsStackNavigator}
         options={{
           tabBarLabel: 'Settings',
-          tabBarIcon: ({ focused }) => <TabIcon label="⚙" focused={focused} />,
+          tabBarIcon: ({ focused }) => (
+            <TabIcon label="⚙" focused={focused} color={theme.ink2} activeColor={theme.accent} />
+          ),
         }}
         listeners={({ navigation }) => ({
           tabPress: (e) => {
@@ -149,19 +180,8 @@ const styles = StyleSheet.create({
     minHeight: TAB_BAR_CONTENT_HEIGHT,
     justifyContent: 'center',
   },
-  tabLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-    marginTop: 2,
-    marginBottom: 0,
-  },
   tabIcon: {
     fontSize: 18,
-    color: authColors.textOnDarkMuted,
     lineHeight: 20,
-  },
-  tabIconFocused: {
-    color: authColors.textOnDark,
   },
 });

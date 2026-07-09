@@ -17,16 +17,18 @@ import { CreateEventModal } from '../../components/events/CreateEventModal';
 import { EventFab } from '../../components/events/EventFab';
 import { EventRoleSection } from '../../components/events/EventRoleSection';
 import { NotificationBellButton } from '../../components/notifications/NotificationBellButton';
+import { ScreenTopBar } from '../../components/navigation/ScreenTopBar';
 import { QRDisplayModal } from '../../components/events/QRDisplayModal';
 import { SegmentedControl } from '../../components/events/SegmentedControl';
+import { SCREEN_HORIZONTAL_PADDING } from '../../constants/layout';
 import { useAppInsets } from '../../hooks/useAppInsets';
 import { closePostCreateQrAndOpenEventDetail } from '../../navigation/eventNavigation';
 import type { EventsStackParamList, MainTabParamList } from '../../navigation/types';
 import { fetchEvents, regenerateJoinToken } from '../../services/event.service';
 import type { EventListItem } from '@letssplyt/shared/event.types';
 import { useEventStore } from '../../store/eventStore';
-import { glassStyles } from '../../theme/glassStyles';
-import { authColors } from '../../theme/colors';
+import { useThemedStyles } from '../../hooks/useThemedStyles';
+import { useTheme } from '../../theme/ThemeContext';
 import {
   filterEventsBySegment,
   groupEventsByStatus,
@@ -45,7 +47,7 @@ const EVENTS_TABS = ['created', 'participated', 'settled'] as const;
 
 const EVENTS_TAB_LABELS: Record<EventsTab, string> = {
   created: 'You created',
-  participated: 'You participated',
+  participated: 'You joined',
   settled: 'Settled',
 };
 
@@ -93,6 +95,8 @@ function renderActiveEventsByStatus(
 }
 
 export function EventsScreen({ navigation }: Props) {
+  const { theme } = useTheme();
+  const themed = useThemedStyles();
   const { screenScrollBottomPadding } = useAppInsets();
   const {
     createModalOpen,
@@ -205,6 +209,12 @@ export function EventsScreen({ navigation }: Props) {
   return (
     <AuthGradientLayout contentStyle={styles.layout}>
       <StatusBar style="light" />
+      <ScreenTopBar
+        leading={<Text style={themed.heading}>Events</Text>}
+        trailing={
+          <NotificationBellButton onPress={() => navigation.navigate('Notifications')} />
+        }
+      />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -213,7 +223,7 @@ export function EventsScreen({ navigation }: Props) {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            tintColor={authColors.textOnDark}
+            tintColor={theme.ink}
             onRefresh={() => {
               setRefreshing(true);
               void refreshList().finally(() => setRefreshing(false));
@@ -223,10 +233,6 @@ export function EventsScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.header}>
-          <View style={styles.headerRow}>
-            <Text style={glassStyles.heading}>Events</Text>
-            <NotificationBellButton onPress={() => navigation.navigate('Notifications')} />
-          </View>
           <SegmentedControl
             compact
             segments={EVENTS_TABS}
@@ -235,12 +241,12 @@ export function EventsScreen({ navigation }: Props) {
             onChange={setTab}
           />
           {listError ? (
-            <Text style={glassStyles.errorText}>Something went wrong. Pull to retry.</Text>
+            <Text style={themed.errorText}>Something went wrong. Pull to retry.</Text>
           ) : null}
         </View>
 
         {isLoading ? (
-          <ActivityIndicator color={authColors.textOnDark} style={styles.loader} />
+          <ActivityIndicator color={theme.ink} style={styles.loader} />
         ) : tab === 'settled' ? (
           settledTabIsEmpty ? (
             <Text style={styles.emptyTab}>{SETTLED_EMPTY_MESSAGE}</Text>
@@ -312,24 +318,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
   },
   content: {
-    paddingHorizontal: 28,
-    paddingTop: 8,
+    paddingHorizontal: SCREEN_HORIZONTAL_PADDING,
+    paddingTop: 16,
   },
   header: {
     marginBottom: 16,
     gap: 12,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
   },
   loader: {
     marginVertical: 16,
   },
   emptyTab: {
     fontSize: 13,
-    color: authColors.textOnDarkMuted,
+    color: 'rgba(255,255,255,0.72)',
     lineHeight: 18,
   },
 });

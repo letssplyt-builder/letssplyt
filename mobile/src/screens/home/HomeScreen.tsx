@@ -18,7 +18,9 @@ import { EventFab } from '../../components/events/EventFab';
 import { QRDisplayModal } from '../../components/events/QRDisplayModal';
 import { SegmentedControl } from '../../components/events/SegmentedControl';
 import { NotificationBellButton } from '../../components/notifications/NotificationBellButton';
+import { ScreenTopBar } from '../../components/navigation/ScreenTopBar';
 import { CounterpartyRow } from '../../components/settlement/CounterpartyRow';
+import { SCREEN_HORIZONTAL_PADDING } from '../../constants/layout';
 import { useAppInsets } from '../../hooks/useAppInsets';
 import { closePostCreateQrAndOpenEventDetail, openEventDetail } from '../../navigation/eventNavigation';
 import type {
@@ -30,8 +32,8 @@ import { fetchBalance, regenerateJoinToken, type BalanceSummary } from '../../se
 import { useAuthStore } from '../../store/authStore';
 import { useEventStore } from '../../store/eventStore';
 import { useSettlementStore } from '../../store/settlementStore';
-import { glassStyles } from '../../theme/glassStyles';
-import { authColors } from '../../theme/colors';
+import { useThemedStyles } from '../../hooks/useThemedStyles';
+import { useTheme } from '../../theme/ThemeContext';
 import { appRefreshControl } from '../../utils/refreshControl';
 import { pickDefaultHomeSegment, type HomeSegment } from '../../utils/dashboardSegments';
 
@@ -43,15 +45,17 @@ type Props = CompositeScreenProps<
   >
 >;
 
-const HOME_SEGMENTS = ['pay', 'collect', 'guests'] as const;
+const HOME_SEGMENTS = ['collect', 'pay', 'guests'] as const;
 
 const HOME_SEGMENT_LABELS: Record<HomeSegment, string> = {
+  collect: 'Collect from',
   pay: 'Pay to',
-  collect: 'Collect From',
-  guests: 'Guest Collect',
+  guests: 'Guests',
 };
 
 export function HomeScreen({ navigation }: Props) {
+  const { theme } = useTheme();
+  const themed = useThemedStyles();
   const { screenScrollBottomPadding } = useAppInsets();
   const user = useAuthStore((state) => state.user);
   const {
@@ -167,12 +171,12 @@ export function HomeScreen({ navigation }: Props) {
   const renderCounterpartyLoadingOrError = () => {
     if (counterpartyError) {
       return (
-        <Text style={glassStyles.errorText}>Couldn&apos;t load balances. Pull to retry.</Text>
+        <Text style={themed.errorText}>Couldn&apos;t load balances. Pull to retry.</Text>
       );
     }
 
     if (isLoadingCounterparties) {
-      return <ActivityIndicator color={authColors.textOnDark} style={styles.loader} />;
+      return <ActivityIndicator color={theme.ink} style={styles.loader} />;
     }
 
     return null;
@@ -268,6 +272,17 @@ export function HomeScreen({ navigation }: Props) {
   return (
     <AuthGradientLayout contentStyle={styles.layout}>
       <StatusBar style="light" />
+      <ScreenTopBar
+        leading={
+          <View>
+            <Text style={themed.heading}>Hi{user ? `, ${user.display_name}` : ''}</Text>
+            <Text style={themed.subheading}>Your dashboard</Text>
+          </View>
+        }
+        trailing={
+          <NotificationBellButton onPress={() => navigation.navigate('Notifications')} />
+        }
+      />
       <ScrollView
         contentContainerStyle={[
           styles.content,
@@ -276,7 +291,7 @@ export function HomeScreen({ navigation }: Props) {
         removeClippedSubviews={false}
         refreshControl={appRefreshControl({
           refreshing: refreshing,
-          tintColor: authColors.textOnDark,
+          tintColor: theme.ink,
           onRefresh: () => {
             setRefreshing(true);
             void refreshData().finally(() => setRefreshing(false));
@@ -284,14 +299,6 @@ export function HomeScreen({ navigation }: Props) {
         })}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.header}>
-          <View style={styles.headerText}>
-            <Text style={glassStyles.heading}>Hi{user ? `, ${user.display_name}` : ''}</Text>
-            <Text style={glassStyles.subheading}>Your dashboard</Text>
-          </View>
-          <NotificationBellButton onPress={() => navigation.navigate('Notifications')} />
-        </View>
-
         <BalanceHeroCard
           balance={balance}
           isLoading={balanceLoading}
@@ -349,25 +356,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
   },
   content: {
-    paddingHorizontal: 28,
-    paddingTop: 8,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  headerText: {
-    flex: 1,
-    paddingRight: 8,
+    paddingHorizontal: SCREEN_HORIZONTAL_PADDING,
+    paddingTop: 16,
   },
   listArea: {
     marginTop: 16,
   },
   emptySection: {
     fontSize: 13,
-    color: authColors.textOnDarkMuted,
+    color: 'rgba(255,255,255,0.72)',
     lineHeight: 18,
     marginBottom: 4,
   },

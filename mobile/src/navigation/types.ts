@@ -39,6 +39,7 @@ export type LegalDocumentScreenParams = { document: 'terms' | 'privacy' };
 
 export type SettingsStackParamList = {
   Settings: undefined;
+  Appearance: undefined;
   Profile: { toastMessage?: string } | undefined;
   AddHandle: {
     handleId?: string;

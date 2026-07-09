@@ -1,16 +1,79 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
-import { authColors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
+
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    section: {
+      marginBottom: 20,
+    },
+    sectionTitle: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: theme.ink3,
+      textTransform: 'uppercase',
+      letterSpacing: 0.9,
+      marginBottom: 8,
+      paddingHorizontal: 4,
+    },
+    card: {
+      borderRadius: theme.radiusSm,
+      borderWidth: 1,
+      borderColor: theme.line,
+      backgroundColor: theme.surface,
+      overflow: 'hidden',
+    },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.line,
+    },
+    rowText: {
+      flex: 1,
+      paddingRight: 12,
+    },
+    rowLabel: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: theme.ink,
+      fontFamily: theme.fontBody,
+    },
+    destructiveLabel: {
+      color: theme.bad,
+    },
+    rowSubtitle: {
+      marginTop: 4,
+      fontSize: 12,
+      color: theme.ink3,
+      lineHeight: 17,
+      fontFamily: theme.fontBody,
+    },
+    chevron: {
+      fontSize: 22,
+      color: theme.ink3,
+      lineHeight: 22,
+    },
+  });
+}
 
 export function SettingSection({
   title,
   children,
 }: {
-  title: string;
+  title?: string;
   children: React.ReactNode;
 }) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+      {title ? <Text style={styles.sectionTitle}>{title}</Text> : null}
       <View style={styles.card}>{children}</View>
     </View>
   );
@@ -31,6 +94,9 @@ export function SettingRow({
   showChevron?: boolean;
   right?: React.ReactNode;
 }) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   const content = (
     <View style={styles.row}>
       <View style={styles.rowText}>
@@ -65,6 +131,9 @@ export function SettingToggle({
   onValueChange: (value: boolean) => void;
   disabled?: boolean;
 }) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   return (
     <View style={styles.row}>
       <View style={styles.rowText}>
@@ -75,63 +144,9 @@ export function SettingToggle({
         value={value}
         onValueChange={onValueChange}
         disabled={disabled}
-        trackColor={{ false: 'rgba(255,255,255,0.2)', true: '#1A8F9E' }}
-        thumbColor="#FFFFFF"
+        trackColor={{ false: theme.line, true: theme.accent }}
+        thumbColor={theme.ink}
       />
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  section: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: authColors.textOnDarkFaint,
-    textTransform: 'uppercase',
-    letterSpacing: 0.9,
-    marginBottom: 8,
-    paddingHorizontal: 4,
-  },
-  card: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-    backgroundColor: authColors.glass,
-    overflow: 'hidden',
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-  },
-  rowText: {
-    flex: 1,
-    paddingRight: 12,
-  },
-  rowLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: authColors.textOnDark,
-  },
-  destructiveLabel: {
-    color: '#F87171',
-  },
-  rowSubtitle: {
-    marginTop: 4,
-    fontSize: 12,
-    color: authColors.textOnDarkMuted,
-    lineHeight: 17,
-  },
-  chevron: {
-    fontSize: 22,
-    color: authColors.textOnDarkMuted,
-    lineHeight: 22,
-  },
-});

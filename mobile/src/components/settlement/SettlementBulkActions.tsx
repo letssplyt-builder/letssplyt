@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { authColors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 
 interface BulkAction {
   id: string;
@@ -12,7 +14,44 @@ interface SettlementBulkActionsProps {
   loadingId?: string | null;
 }
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    wrap: {
+      marginTop: 16,
+      marginBottom: 8,
+      gap: 10,
+    },
+    row: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 8,
+    },
+    button: {
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      borderRadius: theme.radiusSm,
+      backgroundColor: theme.accentSoft,
+      borderWidth: 1,
+      borderColor: theme.accent,
+      minWidth: 120,
+      alignItems: 'center',
+    },
+    buttonPressed: {
+      opacity: 0.88,
+    },
+    buttonText: {
+      color: theme.ink,
+      fontSize: 14,
+      fontWeight: '700',
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function SettlementBulkActions({ actions, loadingId }: SettlementBulkActionsProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   if (actions.length === 0) return null;
 
   return (
@@ -31,7 +70,7 @@ export function SettlementBulkActions({ actions, loadingId }: SettlementBulkActi
             ]}
           >
             {loadingId === action.id ? (
-              <ActivityIndicator size="small" color={authColors.textOnDark} />
+              <ActivityIndicator size="small" color={theme.ink} />
             ) : (
               <Text style={styles.buttonText}>{action.label}</Text>
             )}
@@ -41,34 +80,3 @@ export function SettlementBulkActions({ actions, loadingId }: SettlementBulkActi
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  wrap: {
-    marginTop: 16,
-    marginBottom: 8,
-    gap: 10,
-  },
-  row: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  button: {
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: 'rgba(99, 102, 241, 0.28)',
-    borderWidth: 1,
-    borderColor: 'rgba(129, 140, 248, 0.45)',
-    minWidth: 120,
-    alignItems: 'center',
-  },
-  buttonPressed: {
-    opacity: 0.88,
-  },
-  buttonText: {
-    color: authColors.textOnDark,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-});

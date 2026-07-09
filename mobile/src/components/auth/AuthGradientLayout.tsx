@@ -2,9 +2,13 @@ import type { ReactNode } from 'react';
 import { useEffect, useRef } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Animated, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+  type Edge,
+} from 'react-native-safe-area-context';
 import { systemFooterPadding, stickyFooterPadding } from '../../constants/layout';
-import { authColors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
 
 type BottomSafeAreaMode = 'tabBar' | 'system';
 
@@ -18,14 +22,18 @@ interface AuthGradientLayoutProps {
    * `system` — respect OS home-indicator inset (auth / join flows without tab bar).
    */
   bottomSafeArea?: BottomSafeAreaMode;
+  /** Override SafeAreaView edges — e.g. omit `top` when a modal applies top inset manually. */
+  safeAreaEdges?: readonly Edge[];
 }
 
 function FloatingOrb({
+  color,
   style,
   duration = 5200,
   driftY = 14,
   driftX = -10,
 }: {
+  color: string;
   style: object;
   duration?: number;
   driftY?: number;
@@ -62,54 +70,58 @@ function FloatingOrb({
   });
 
   return (
-    <Animated.View style={[style, { transform: [{ translateY }, { translateX }] }]} />
+    <Animated.View
+      style={[style, { backgroundColor: color, transform: [{ translateY }, { translateX }] }]}
+    />
   );
 }
 
-/**
- * Full-screen dark teal gradient with softly drifting ambient orbs.
- */
+/** Full-screen themed gradient with softly drifting ambient orbs. */
 export function AuthGradientLayout({
   children,
   footer,
   contentStyle,
   footerStyle,
   bottomSafeArea = 'tabBar',
+  safeAreaEdges,
 }: AuthGradientLayoutProps) {
+  const { theme } = useTheme();
   const insets = useSafeAreaInsets();
-  const safeAreaEdges =
+  const defaultSafeAreaEdges =
     bottomSafeArea === 'system'
       ? (['top', 'left', 'right', 'bottom'] as const)
       : (['top', 'left', 'right'] as const);
+  const resolvedSafeAreaEdges = safeAreaEdges ?? defaultSafeAreaEdges;
   const footerBottomPad =
     bottomSafeArea === 'system'
       ? systemFooterPadding(insets.bottom)
       : stickyFooterPadding(insets.bottom);
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, { backgroundColor: theme.bgGradient[0] }]}>
       <LinearGradient
-        colors={[authColors.gradientTop, authColors.gradientMid, authColors.gradientBottom]}
+        colors={theme.bgGradient}
         locations={[0, 0.45, 1]}
         style={StyleSheet.absoluteFill}
       />
-      <FloatingOrb style={[styles.orb, styles.orbTop]} duration={5600} driftY={18} driftX={-12} />
       <FloatingOrb
+        color={theme.orb1}
+        style={[styles.orb, styles.orbTop]}
+        duration={5600}
+        driftY={18}
+        driftX={-12}
+      />
+      <FloatingOrb
+        color={theme.orb2}
         style={[styles.orb, styles.orbBottom]}
         duration={4800}
         driftY={-16}
         driftX={14}
       />
-      <SafeAreaView style={styles.safe} edges={safeAreaEdges}>
+      <SafeAreaView style={styles.safe} edges={resolvedSafeAreaEdges}>
         <View style={[styles.content, contentStyle]}>{children}</View>
         {footer ? (
-          <View
-            style={[
-              styles.footer,
-              { paddingBottom: footerBottomPad },
-              footerStyle,
-            ]}
-          >
+          <View style={[styles.footer, { paddingBottom: footerBottomPad }, footerStyle]}>
             {footer}
           </View>
         ) : null}
@@ -121,7 +133,6 @@ export function AuthGradientLayout({
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: authColors.gradientTop,
   },
   safe: {
     flex: 1,
@@ -138,7 +149,6 @@ const styles = StyleSheet.create({
   orb: {
     position: 'absolute',
     borderRadius: 999,
-    backgroundColor: authColors.glowTeal,
   },
   orbTop: {
     width: 280,
@@ -152,7 +162,6 @@ const styles = StyleSheet.create({
     height: 220,
     bottom: 120,
     left: -70,
-    backgroundColor: authColors.glowCyan,
     opacity: 0.85,
   },
 });

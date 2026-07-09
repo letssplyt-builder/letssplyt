@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { colors } from '../../theme/colors';
 import { avatarColorFromName, formatSplitMoney } from '../../screens/splits/splitEntry.utils';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 
 interface ParticipantOption {
   id: string;
@@ -20,6 +21,141 @@ interface ItemAssignPopupProps {
   onConfirm: (participantIds: string[]) => void;
 }
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    overlay: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: 24,
+    },
+    backdrop: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: 'rgba(0,0,0,0.68)',
+    },
+    card: {
+      backgroundColor: theme.modalSurface,
+      borderRadius: theme.radius,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: theme.line,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      marginBottom: 12,
+      gap: 8,
+    },
+    headerText: {
+      flex: 1,
+    },
+    itemName: {
+      fontSize: 18,
+      fontWeight: '800',
+      color: theme.ink,
+      marginBottom: 4,
+      fontFamily: theme.fontDisplay,
+    },
+    itemPrice: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: theme.accent,
+      fontFamily: theme.fontDisplay,
+    },
+    closeBtn: {
+      padding: 4,
+    },
+    closeIcon: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: theme.ink3,
+    },
+    subtitle: {
+      fontSize: 16,
+      fontWeight: '800',
+      color: theme.ink,
+      marginBottom: 4,
+      fontFamily: theme.fontBody,
+    },
+    hint: {
+      fontSize: 13,
+      color: theme.ink3,
+      marginBottom: 14,
+      lineHeight: 18,
+      fontFamily: theme.fontBody,
+    },
+    memberList: {
+      gap: 8,
+      marginBottom: 16,
+    },
+    memberRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: theme.radiusSm,
+      borderWidth: 1.5,
+      borderColor: theme.line,
+      backgroundColor: theme.modalInset,
+    },
+    memberRowSelected: {
+      borderColor: theme.accent,
+      backgroundColor: theme.accentSoft,
+    },
+    avatar: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarText: {
+      color: theme.ink,
+      fontWeight: '800',
+      fontSize: 15,
+    },
+    memberName: {
+      flex: 1,
+      fontSize: 16,
+      fontWeight: '700',
+      color: theme.ink,
+      fontFamily: theme.fontBody,
+    },
+    check: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: theme.line,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.modalInset,
+    },
+    checkSelected: {
+      borderColor: theme.accent,
+      backgroundColor: theme.accent,
+    },
+    checkMark: {
+      color: theme.accentInk,
+      fontSize: 14,
+      fontWeight: '800',
+    },
+    okBtn: {
+      height: 48,
+      borderRadius: theme.radiusSm,
+      backgroundColor: theme.accent,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    okText: {
+      color: theme.accentInk,
+      fontSize: 17,
+      fontWeight: '800',
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function ItemAssignPopup({
   visible,
   itemName,
@@ -30,6 +166,8 @@ export function ItemAssignPopup({
   onClose,
   onConfirm,
 }: ItemAssignPopupProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const [pendingIds, setPendingIds] = useState<string[]>(selectedIds);
 
   useEffect(() => {
@@ -128,133 +266,3 @@ export function ItemAssignPopup({
     </Modal>
   );
 }
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 24,
-  },
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(11, 61, 69, 0.55)',
-  },
-  card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 24,
-    padding: 20,
-    shadowColor: '#0B3D45',
-    shadowOffset: { width: 0, height: 16 },
-    shadowOpacity: 0.22,
-    shadowRadius: 24,
-    elevation: 12,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: 12,
-    gap: 8,
-  },
-  headerText: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  itemPrice: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.primary,
-  },
-  closeBtn: {
-    padding: 4,
-  },
-  closeIcon: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: colors.textMuted,
-  },
-  subtitle: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  hint: {
-    fontSize: 13,
-    color: colors.textMuted,
-    marginBottom: 14,
-    lineHeight: 18,
-  },
-  memberList: {
-    gap: 8,
-    marginBottom: 16,
-  },
-  memberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceMuted,
-  },
-  memberRowSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryLight,
-  },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
-    fontSize: 15,
-  },
-  memberName: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.text,
-  },
-  check: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-  checkSelected: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primary,
-  },
-  checkMark: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
-  },
-  okBtn: {
-    height: 48,
-    borderRadius: 14,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  okText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '800',
-  },
-});

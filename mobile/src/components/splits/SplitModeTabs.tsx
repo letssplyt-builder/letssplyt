@@ -1,6 +1,8 @@
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { SplitEntryTab } from '../../screens/splits/splitEntry.utils';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 
 const TABS: SplitEntryTab[] = ['even', 'amount', 'percent', 'portion'];
 
@@ -16,7 +18,42 @@ interface SplitModeTabsProps {
   onChange: (tab: SplitEntryTab) => void;
 }
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    wrap: {
+      flexDirection: 'row',
+      gap: 6,
+      marginBottom: 10,
+    },
+    tab: {
+      flex: 1,
+      paddingVertical: 8,
+      borderRadius: theme.radiusSm,
+      alignItems: 'center',
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.line,
+    },
+    tabActive: {
+      backgroundColor: theme.accentSoft,
+      borderColor: theme.accent,
+    },
+    label: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: theme.ink3,
+      fontFamily: theme.fontBody,
+    },
+    labelActive: {
+      color: theme.accent,
+    },
+  });
+}
+
 export function SplitModeTabs({ value, onChange }: SplitModeTabsProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   return (
     <View style={styles.wrap} accessibilityRole="tablist">
       {TABS.map((tab) => {
@@ -37,32 +74,3 @@ export function SplitModeTabs({ value, onChange }: SplitModeTabsProps) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  wrap: {
-    flexDirection: 'row',
-    gap: 6,
-    marginBottom: 10,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 10,
-    alignItems: 'center',
-    backgroundColor: colors.surfaceMuted,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-  },
-  tabActive: {
-    backgroundColor: colors.primaryLight,
-    borderColor: colors.primaryBorder,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.textMuted,
-  },
-  labelActive: {
-    color: colors.primaryDark,
-  },
-});

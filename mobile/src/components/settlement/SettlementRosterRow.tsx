@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import {
   ActivityIndicator,
   Animated,
@@ -9,7 +9,8 @@ import {
   View,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { authColors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 import { formatMoney, isRegisteredEventParticipant } from '../../utils/events';
 import { rosterPaymentStatusDisplay } from '../../utils/settlementDisplay';
 
@@ -62,13 +63,6 @@ export function hasSettlementSwipeActions(
   return hasPaidAction || hasDisputeAction;
 }
 
-const STATUS_TONE_COLORS = {
-  paid: '#34D399',
-  pending: '#FBBF24',
-  disputed: '#FBBF24',
-  muted: authColors.textOnDarkMuted,
-} as const;
-
 const openSettlementSwipeables = new Set<SettlementSwipeHandle>();
 
 function closeOtherSwipeables(current: SettlementSwipeHandle | null): void {
@@ -81,6 +75,156 @@ function closeOtherSwipeables(current: SettlementSwipeHandle | null): void {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function statusToneColor(
+  theme: Theme,
+  tone: 'paid' | 'pending' | 'disputed' | 'muted',
+): string {
+  switch (tone) {
+    case 'paid':
+      return theme.good;
+    case 'pending':
+    case 'disputed':
+      return theme.warn;
+    default:
+      return theme.ink3;
+  }
+}
+
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    shell: {
+      marginBottom: 8,
+    },
+    shrinkRow: {
+      flexDirection: 'row',
+      alignItems: 'stretch',
+    },
+    actionSlot: {
+      overflow: 'hidden',
+    },
+    actionSlotInnerLeft: {
+      width: ACTION_SLOT_WIDTH,
+      flexDirection: 'row',
+      alignItems: 'stretch',
+    },
+    actionSlotInnerRight: {
+      width: ACTION_SLOT_WIDTH,
+      flexDirection: 'row',
+      alignItems: 'stretch',
+    },
+    actionSlotGap: {
+      width: ACTION_SLOT_GAP,
+      flexShrink: 0,
+    },
+    card: {
+      flex: 1,
+      minWidth: 0,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      backgroundColor: theme.surface,
+      borderRadius: theme.radiusSm,
+      borderWidth: 1,
+      borderColor: theme.line,
+      gap: 10,
+      overflow: 'hidden',
+    },
+    cardRailLeft: {
+      paddingLeft: 14,
+    },
+    cardRailRight: {
+      paddingRight: 14,
+    },
+    railLeft: {
+      position: 'absolute',
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: 5,
+      backgroundColor: theme.bad,
+      opacity: 0.85,
+    },
+    railRight: {
+      position: 'absolute',
+      right: 0,
+      top: 0,
+      bottom: 0,
+      width: 5,
+      backgroundColor: theme.good,
+      opacity: 0.85,
+    },
+    selfRow: {
+      borderColor: theme.accentSoft,
+      backgroundColor: theme.accentSoft,
+    },
+    avatar: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: theme.surfaceStrong,
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    avatarText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: theme.accent,
+      fontFamily: theme.fontBody,
+    },
+    info: {
+      flex: 1,
+      minWidth: 0,
+    },
+    name: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.ink,
+      fontFamily: theme.fontBody,
+    },
+    statusMeta: {
+      fontSize: 11,
+      fontWeight: '600',
+      marginTop: 2,
+      fontFamily: theme.fontBody,
+    },
+    amount: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: theme.ink,
+      flexShrink: 0,
+      maxWidth: '36%',
+      fontVariant: ['tabular-nums'],
+      fontFamily: theme.fontDisplay,
+    },
+    swipeButton: {
+      width: ACTION_BUTTON_WIDTH,
+      flexShrink: 0,
+      minHeight: 52,
+      borderRadius: theme.radiusSm,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 6,
+    },
+    swipeButtonPressed: {
+      opacity: 0.9,
+      transform: [{ scale: 0.98 }],
+    },
+    swipeButtonDisabled: {
+      opacity: 0.7,
+    },
+    swipeButtonText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: theme.ink,
+      textAlign: 'center',
+      fontFamily: theme.fontBody,
+    },
+  });
 }
 
 export function SettlementRosterRow({
@@ -98,6 +242,9 @@ export function SettlementRosterRow({
   onDispute,
   onMarkCash,
 }: SettlementRosterRowProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
   const panX = useRef(new Animated.Value(0)).current;
   const dragStartX = useRef(0);
   const swipeHandleRef = useRef<SettlementSwipeHandle | null>(null);
@@ -347,7 +494,7 @@ export function SettlementRosterRow({
         <Text
           style={[
             styles.statusMeta,
-            { color: STATUS_TONE_COLORS[statusDisplay.tone] },
+            { color: statusToneColor(theme, statusDisplay.tone) },
           ]}
           numberOfLines={1}
         >
@@ -383,7 +530,9 @@ export function SettlementRosterRow({
               <SwipeActionButton
                 label="Dispute"
                 loading={loadingAction === 'dispute'}
-                backgroundColor="#B91C1C"
+                backgroundColor={theme.bad}
+                textColor={theme.ink}
+                styles={styles}
                 onPress={runDisputeAction}
               />
               <View style={styles.actionSlotGap} />
@@ -400,7 +549,9 @@ export function SettlementRosterRow({
               <SwipeActionButton
                 label="Mark paid"
                 loading={loadingAction === 'mark-cash'}
-                backgroundColor="#059669"
+                backgroundColor={theme.good}
+                textColor={theme.accentInk}
+                styles={styles}
                 onPress={runPaidAction}
               />
             </View>
@@ -416,11 +567,15 @@ function SwipeActionButton({
   onPress,
   loading,
   backgroundColor,
+  textColor,
+  styles,
 }: {
   label: string;
   onPress: () => void;
   loading?: boolean;
   backgroundColor: string;
+  textColor: string;
+  styles: ReturnType<typeof makeStyles>;
 }) {
   return (
     <Pressable
@@ -436,135 +591,10 @@ function SwipeActionButton({
       ]}
     >
       {loading ? (
-        <ActivityIndicator size="small" color="#FFFFFF" />
+        <ActivityIndicator size="small" color={textColor} />
       ) : (
-        <Text style={styles.swipeButtonText}>{label}</Text>
+        <Text style={[styles.swipeButtonText, { color: textColor }]}>{label}</Text>
       )}
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  shell: {
-    marginBottom: 8,
-  },
-  shrinkRow: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-  },
-  actionSlot: {
-    overflow: 'hidden',
-  },
-  actionSlotInnerLeft: {
-    width: ACTION_SLOT_WIDTH,
-    flexDirection: 'row',
-    alignItems: 'stretch',
-  },
-  actionSlotInnerRight: {
-    width: ACTION_SLOT_WIDTH,
-    flexDirection: 'row',
-    alignItems: 'stretch',
-  },
-  actionSlotGap: {
-    width: ACTION_SLOT_GAP,
-    flexShrink: 0,
-  },
-  card: {
-    flex: 1,
-    minWidth: 0,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    backgroundColor: authColors.glass,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-    gap: 10,
-    overflow: 'hidden',
-  },
-  cardRailLeft: {
-    paddingLeft: 14,
-  },
-  cardRailRight: {
-    paddingRight: 14,
-  },
-  railLeft: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 5,
-    backgroundColor: 'rgba(185, 28, 28, 0.72)',
-  },
-  railRight: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    bottom: 0,
-    width: 5,
-    backgroundColor: 'rgba(5, 150, 105, 0.78)',
-  },
-  selfRow: {
-    borderColor: 'rgba(129, 140, 248, 0.45)',
-    backgroundColor: 'rgba(99, 102, 241, 0.14)',
-  },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: authColors.pillOnDark,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  avatarText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: authColors.textOnDark,
-  },
-  info: {
-    flex: 1,
-    minWidth: 0,
-  },
-  name: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: authColors.textOnDark,
-  },
-  statusMeta: {
-    fontSize: 11,
-    fontWeight: '600',
-    marginTop: 2,
-  },
-  amount: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: authColors.textOnDark,
-    flexShrink: 0,
-    maxWidth: '36%',
-  },
-  swipeButton: {
-    width: ACTION_BUTTON_WIDTH,
-    flexShrink: 0,
-    minHeight: 52,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 6,
-  },
-  swipeButtonPressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.98 }],
-  },
-  swipeButtonDisabled: {
-    opacity: 0.7,
-  },
-  swipeButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
-    textAlign: 'center',
-  },
-});

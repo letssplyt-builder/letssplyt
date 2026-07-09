@@ -1,4 +1,5 @@
 const mockExpoConstants = {
+  isDevice: true,
   expoConfig: {
     extra: {
       apiUrl: 'http://localhost:3000',

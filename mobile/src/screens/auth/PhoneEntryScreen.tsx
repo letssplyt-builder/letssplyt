@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StyleSheet, Text, View } from 'react-native';
 import type { OtpRequestResponse } from '@letssplyt/shared/auth.types';
@@ -10,7 +10,8 @@ import type { RootStackParamList } from '../../navigation/types';
 import { apiPost, isApiRequestError } from '../../services/api';
 import { useAuthStore } from '../../store/authStore';
 import { useJoinStore } from '../../store/joinStore';
-import { authColors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 import { SMS_OPT_IN_DISCLOSURE } from '../../content/smsConsent';
 import {
   DEFAULT_AUTH_REGION,
@@ -22,7 +23,102 @@ import {
 
 type Props = NativeStackScreenProps<RootStackParamList, 'PhoneEntry'>;
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    content: {
+      flex: 1,
+    },
+    centerStage: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'stretch',
+      width: '100%',
+      paddingBottom: 24,
+    },
+    title: {
+      fontSize: 34,
+      fontWeight: '800',
+      color: theme.ink,
+      textAlign: 'center',
+      lineHeight: 40,
+      letterSpacing: -0.6,
+      marginBottom: 10,
+      alignSelf: 'center',
+      fontFamily: theme.fontDisplay,
+    },
+    subtitleWrap: {
+      width: '100%',
+      alignSelf: 'stretch',
+      marginBottom: 32,
+    },
+    subtitle: {
+      width: '100%',
+      fontSize: 15,
+      color: theme.ink2,
+      textAlign: 'center',
+      lineHeight: 22,
+      fontFamily: theme.fontBody,
+    },
+    phoneBlock: {
+      width: '100%',
+      maxWidth: 300,
+      alignSelf: 'center',
+    },
+    feedbackWrap: {
+      width: '100%',
+      maxWidth: 300,
+      alignSelf: 'center',
+      marginTop: 20,
+    },
+    hint: {
+      marginTop: 20,
+      fontSize: 13,
+      color: theme.ink3,
+      textAlign: 'center',
+      fontFamily: theme.fontBody,
+    },
+    errorBox: {
+      width: '100%',
+      backgroundColor: theme.warnSoft,
+      borderRadius: theme.radiusSm,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: theme.bad,
+    },
+    errorText: {
+      color: theme.bad,
+      fontSize: 14,
+      lineHeight: 20,
+      textAlign: 'center',
+      fontFamily: theme.fontBody,
+    },
+    footer: {
+      gap: 12,
+    },
+    smsConsent: {
+      textAlign: 'center',
+      fontSize: 11,
+      color: theme.ink3,
+      lineHeight: 16,
+      fontFamily: theme.fontBody,
+    },
+    legal: {
+      textAlign: 'center',
+      fontSize: 11,
+      color: theme.ink3,
+      lineHeight: 16,
+      fontFamily: theme.fontBody,
+    },
+    legalLink: {
+      color: theme.accent,
+      fontWeight: '600',
+    },
+  });
+}
+
 export function PhoneEntryScreen({ navigation, route }: Props) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const initialPhone = route.params?.initialPhone ?? '';
   const joinToken = route.params?.joinToken;
   const [phoneValue, setPhoneValue] = useState(() =>
@@ -154,88 +250,3 @@ export function PhoneEntryScreen({ navigation, route }: Props) {
     </AuthGradientLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  content: {
-    flex: 1,
-  },
-  centerStage: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'stretch',
-    width: '100%',
-    paddingBottom: 24,
-  },
-  title: {
-    fontSize: 34,
-    fontWeight: '800',
-    color: authColors.textOnDark,
-    textAlign: 'center',
-    lineHeight: 40,
-    letterSpacing: -0.6,
-    marginBottom: 10,
-    alignSelf: 'center',
-  },
-  subtitleWrap: {
-    width: '100%',
-    alignSelf: 'stretch',
-    marginBottom: 32,
-  },
-  subtitle: {
-    width: '100%',
-    fontSize: 15,
-    color: authColors.textOnDarkMuted,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  phoneBlock: {
-    width: '100%',
-    maxWidth: 300,
-    alignSelf: 'center',
-  },
-  feedbackWrap: {
-    width: '100%',
-    maxWidth: 300,
-    alignSelf: 'center',
-    marginTop: 20,
-  },
-  hint: {
-    marginTop: 20,
-    fontSize: 13,
-    color: authColors.textOnDarkFaint,
-    textAlign: 'center',
-  },
-  errorBox: {
-    width: '100%',
-    backgroundColor: authColors.errorBgOnDark,
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(252, 165, 165, 0.25)',
-  },
-  errorText: {
-    color: authColors.errorOnDark,
-    fontSize: 14,
-    lineHeight: 20,
-    textAlign: 'center',
-  },
-  footer: {
-    gap: 12,
-  },
-  smsConsent: {
-    textAlign: 'center',
-    fontSize: 11,
-    color: authColors.textOnDarkFaint,
-    lineHeight: 16,
-  },
-  legal: {
-    textAlign: 'center',
-    fontSize: 11,
-    color: authColors.textOnDarkFaint,
-    lineHeight: 16,
-  },
-  legalLink: {
-    color: '#A5F3FC',
-    fontWeight: '600',
-  },
-});

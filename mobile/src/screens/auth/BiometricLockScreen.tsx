@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
@@ -6,11 +6,70 @@ import { FadeSlideIn } from '../../components/auth/FadeSlideIn';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import type { RootStackParamList } from '../../navigation/types';
 import { useAuthStore } from '../../store/authStore';
-import { authColors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'BiometricLock'>;
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    content: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingBottom: 24,
+    },
+    spinner: {
+      marginBottom: 24,
+    },
+    iconCircle: {
+      width: 88,
+      height: 88,
+      borderRadius: 44,
+      backgroundColor: theme.surface,
+      borderWidth: 1,
+      borderColor: theme.line,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 24,
+    },
+    iconGlyph: {
+      fontSize: 36,
+      color: theme.ink2,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: '800',
+      color: theme.ink,
+      textAlign: 'center',
+      marginBottom: 8,
+      fontFamily: theme.fontDisplay,
+    },
+    subtitle: {
+      fontSize: 15,
+      color: theme.ink2,
+      textAlign: 'center',
+      fontFamily: theme.fontBody,
+    },
+    footer: {
+      gap: 12,
+    },
+    altWrap: {
+      alignItems: 'center',
+      paddingVertical: 10,
+    },
+    altText: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.ink2,
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function BiometricLockScreen({ navigation }: Props) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const unlockApp = useAuthStore((state) => state.unlockApp);
   const clearSession = useAuthStore((state) => state.clearSession);
   const user = useAuthStore((state) => state.user);
@@ -73,7 +132,7 @@ export function BiometricLockScreen({ navigation }: Props) {
     >
       <FadeSlideIn delay={0}>
         {isUnlocking ? (
-          <ActivityIndicator color={authColors.textOnDark} size="large" style={styles.spinner} />
+          <ActivityIndicator color={theme.ink} size="large" style={styles.spinner} />
         ) : (
           <View style={styles.iconCircle}>
             <Text style={styles.iconGlyph}>◎</Text>
@@ -89,54 +148,3 @@ export function BiometricLockScreen({ navigation }: Props) {
     </AuthGradientLayout>
   );
 }
-
-const styles = StyleSheet.create({
-  content: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingBottom: 24,
-  },
-  spinner: {
-    marginBottom: 24,
-  },
-  iconCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: authColors.glass,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-  },
-  iconGlyph: {
-    fontSize: 36,
-    color: authColors.textOnDarkMuted,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: authColors.textOnDark,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 15,
-    color: authColors.textOnDarkMuted,
-    textAlign: 'center',
-  },
-  footer: {
-    gap: 12,
-  },
-  altWrap: {
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  altText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: authColors.textOnDarkMuted,
-  },
-});

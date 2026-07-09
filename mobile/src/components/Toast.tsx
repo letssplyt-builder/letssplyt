@@ -1,12 +1,52 @@
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePushToastStore } from '../store/pushToastStore';
-import { colors } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
+import type { Theme } from '../theme/types';
 
 const DISMISS_MS = 4000;
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    wrapper: {
+      position: 'absolute',
+      left: 16,
+      right: 16,
+      zIndex: 1000,
+      elevation: 8,
+    },
+    toast: {
+      backgroundColor: theme.modalSurface,
+      borderRadius: theme.radiusSm,
+      borderWidth: 1,
+      borderColor: theme.line,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.18,
+      shadowRadius: 8,
+    },
+    title: {
+      fontSize: 15,
+      fontWeight: '700',
+      color: theme.ink,
+      marginBottom: 2,
+      fontFamily: theme.fontBody,
+    },
+    body: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: theme.ink2,
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function Toast() {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const insets = useSafeAreaInsets();
   const toast = usePushToastStore((state) => state.toast);
   const clearPushToast = usePushToastStore((state) => state.clearPushToast);
@@ -33,36 +73,3 @@ export function Toast() {
     </Pressable>
   );
 }
-
-const styles = StyleSheet.create({
-  wrapper: {
-    position: 'absolute',
-    left: 16,
-    right: 16,
-    zIndex: 1000,
-    elevation: 8,
-  },
-  toast: {
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-  },
-  title: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: colors.text,
-    marginBottom: 2,
-  },
-  body: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: colors.textMuted,
-  },
-});

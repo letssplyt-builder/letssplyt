@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
@@ -8,13 +8,95 @@ import {
   scanReceiptDocument,
 } from '../../services/document-scanner.service';
 import type { EventsStackParamList } from '../../navigation/types';
-import { colors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 
 type Props = NativeStackScreenProps<EventsStackParamList, 'ReceiptScan'>;
 
 type ScanState = 'launching' | 'error';
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: theme.bgGradient[0],
+      paddingHorizontal: 24,
+    },
+    back: {
+      marginBottom: 24,
+    },
+    backText: {
+      color: theme.ink2,
+      fontSize: 16,
+      fontWeight: '600',
+      fontFamily: theme.fontBody,
+    },
+    center: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 8,
+    },
+    statusText: {
+      color: theme.ink,
+      fontSize: 17,
+      fontWeight: '600',
+      marginTop: 20,
+      textAlign: 'center',
+      fontFamily: theme.fontBody,
+    },
+    hintText: {
+      color: theme.ink2,
+      fontSize: 14,
+      lineHeight: 20,
+      marginTop: 12,
+      textAlign: 'center',
+      fontFamily: theme.fontBody,
+    },
+    errorTitle: {
+      color: theme.ink,
+      fontSize: 18,
+      fontWeight: '700',
+      marginBottom: 8,
+      textAlign: 'center',
+      fontFamily: theme.fontBody,
+    },
+    errorBody: {
+      color: theme.ink2,
+      fontSize: 15,
+      lineHeight: 22,
+      textAlign: 'center',
+      marginBottom: 20,
+      fontFamily: theme.fontBody,
+    },
+    retryButton: {
+      backgroundColor: theme.accent,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+      borderRadius: theme.radiusSm,
+    },
+    retryButtonText: {
+      color: theme.accentInk,
+      fontWeight: '700',
+      fontSize: 15,
+      fontFamily: theme.fontBody,
+    },
+    manualLink: {
+      alignSelf: 'center',
+      paddingVertical: 12,
+    },
+    manualLinkText: {
+      color: theme.ink2,
+      fontSize: 15,
+      fontWeight: '500',
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function ReceiptScanScreen({ navigation, route }: Props) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const { eventId } = route.params;
   const insets = useSafeAreaInsets();
   const scanStarted = useRef(false);
@@ -70,7 +152,7 @@ export function ReceiptScanScreen({ navigation, route }: Props) {
 
       {scanState === 'launching' ? (
         <View style={styles.center}>
-          <ActivityIndicator color="#fff" size="large" />
+          <ActivityIndicator color={theme.ink} size="large" />
           <Text style={styles.statusText}>Opening scanner…</Text>
           <Text style={styles.hintText}>
             Position the receipt in frame. The scanner will detect edges and crop automatically.
@@ -102,73 +184,3 @@ export function ReceiptScanScreen({ navigation, route }: Props) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0A0A0A',
-    paddingHorizontal: 24,
-  },
-  back: {
-    marginBottom: 24,
-  },
-  backText: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 8,
-  },
-  statusText: {
-    color: '#fff',
-    fontSize: 17,
-    fontWeight: '600',
-    marginTop: 20,
-    textAlign: 'center',
-  },
-  hintText: {
-    color: 'rgba(255,255,255,0.65)',
-    fontSize: 14,
-    lineHeight: 20,
-    marginTop: 12,
-    textAlign: 'center',
-  },
-  errorTitle: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  errorBody: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 15,
-    lineHeight: 22,
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  retryButton: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-  },
-  retryButtonText: {
-    color: colors.primary,
-    fontWeight: '700',
-    fontSize: 15,
-  },
-  manualLink: {
-    alignSelf: 'center',
-    paddingVertical: 12,
-  },
-  manualLinkText: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: 15,
-    fontWeight: '500',
-  },
-});

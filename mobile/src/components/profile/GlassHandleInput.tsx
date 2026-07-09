@@ -1,6 +1,7 @@
-import { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, TextInput, View } from 'react-native';
-import { authColors } from '../../theme/colors';
+import { useMemo } from 'react';
+import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 
 interface GlassHandleInputProps {
   value: string;
@@ -10,6 +11,39 @@ interface GlassHandleInputProps {
   hint?: string;
 }
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    wrap: {
+      gap: 8,
+    },
+    inputShell: {
+      borderWidth: 1.5,
+      borderRadius: theme.radiusSm,
+      backgroundColor: theme.modalInset,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+    },
+    input: {
+      fontSize: 16,
+      color: theme.ink,
+      fontWeight: '500',
+      fontFamily: theme.fontBody,
+    },
+    hint: {
+      fontSize: 12,
+      color: theme.ink2,
+      lineHeight: 18,
+      fontFamily: theme.fontBody,
+    },
+    error: {
+      fontSize: 12,
+      color: theme.bad,
+      lineHeight: 18,
+      fontFamily: theme.fontBody,
+    },
+  });
+}
+
 export function GlassHandleInput({
   value,
   onChangeText,
@@ -17,65 +51,23 @@ export function GlassHandleInput({
   error,
   hint,
 }: GlassHandleInputProps) {
-  const focusAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.timing(focusAnim, {
-      toValue: error ? 1 : 0,
-      duration: 180,
-      useNativeDriver: false,
-    }).start();
-  }, [error, focusAnim]);
-
-  const borderColor = error
-    ? authColors.errorOnDark
-    : focusAnim.interpolate({
-        inputRange: [0, 1],
-        outputRange: [authColors.glassBorder, authColors.glassBorder],
-      });
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
 
   return (
     <View style={styles.wrap}>
-      <Animated.View style={[styles.inputShell, { borderColor }]}>
+      <View style={[styles.inputShell, { borderColor: error ? theme.bad : theme.line }]}>
         <TextInput
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
-          placeholderTextColor={authColors.textOnDarkFaint}
+          placeholderTextColor={theme.ink3}
           style={styles.input}
           autoCapitalize="none"
           autoCorrect={false}
         />
-      </Animated.View>
+      </View>
       {error ? <Text style={styles.error}>{error}</Text> : hint ? <Text style={styles.hint}>{hint}</Text> : null}
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  wrap: {
-    gap: 8,
-  },
-  inputShell: {
-    borderWidth: 1.5,
-    borderRadius: 18,
-    backgroundColor: authColors.glassStrong,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  input: {
-    fontSize: 16,
-    color: authColors.textOnDark,
-    fontWeight: '500',
-  },
-  hint: {
-    fontSize: 12,
-    color: authColors.textOnDarkMuted,
-    lineHeight: 18,
-  },
-  error: {
-    fontSize: 12,
-    color: authColors.errorOnDark,
-    lineHeight: 18,
-  },
-});

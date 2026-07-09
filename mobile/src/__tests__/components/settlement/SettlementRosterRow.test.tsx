@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, screen } from '@testing-library/react-native';
 import { SettlementRosterRow, hasSettlementSwipeActions } from '../../../components/settlement/SettlementRosterRow';
+import { renderWithTheme } from '../../helpers/renderWithTheme';
 
 jest.mock('@react-navigation/native', () => {
   const React = require('react');
@@ -17,7 +18,7 @@ describe('SettlementRosterRow', () => {
   });
 
   it('renders a static row without swipe actions when no actions apply', () => {
-    render(
+    renderWithTheme(
       <SettlementRosterRow
         displayName="Jordan"
         paymentStatus="pending"
@@ -34,7 +35,7 @@ describe('SettlementRosterRow', () => {
   });
 
   it('shows mark paid action for pending members', () => {
-    render(
+    renderWithTheme(
       <SettlementRosterRow
         displayName="Jordan"
         paymentStatus="pending"
@@ -48,7 +49,7 @@ describe('SettlementRosterRow', () => {
   });
 
   it('shows dispute action for paid registered members', () => {
-    render(
+    renderWithTheme(
       <SettlementRosterRow
         displayName="Jordan"
         paymentStatus="self_reported"
@@ -66,7 +67,7 @@ describe('SettlementRosterRow', () => {
   it('calls mark paid handler from the revealed action button', () => {
     const onMarkCash = jest.fn();
 
-    render(
+    renderWithTheme(
       <SettlementRosterRow
         displayName="Jordan"
         paymentStatus="pending"

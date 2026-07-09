@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { authColors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 import { formatMoney, joinMethodLabel } from '../../utils/events';
 
 interface EventMemberRowProps {
@@ -17,6 +19,105 @@ interface EventMemberRowProps {
   variant: 'joining' | 'settlement' | 'participant';
 }
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 8,
+      paddingHorizontal: 10,
+      backgroundColor: theme.surface,
+      borderRadius: theme.radiusSm,
+      borderWidth: 1,
+      borderColor: theme.line,
+      marginBottom: 6,
+      gap: 10,
+      minHeight: 48,
+    },
+    selfRow: {
+      backgroundColor: theme.accentSoft,
+      borderColor: theme.accent,
+    },
+    avatar: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: theme.surfaceStrong,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    avatarText: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: theme.ink,
+    },
+    info: {
+      flex: 1,
+      minWidth: 0,
+    },
+    name: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: theme.ink,
+      fontFamily: theme.fontBody,
+    },
+    methodChip: {
+      alignSelf: 'flex-start',
+      marginTop: 3,
+      backgroundColor: theme.surfaceStrong,
+      paddingHorizontal: 7,
+      paddingVertical: 2,
+      borderRadius: 100,
+    },
+    methodChipText: {
+      fontSize: 10,
+      fontWeight: '700',
+      color: theme.ink2,
+      fontFamily: theme.fontBody,
+    },
+    organiserChip: {
+      backgroundColor: theme.accentSoft,
+    },
+    organiserChipText: {
+      color: theme.accent,
+    },
+    statusMeta: {
+      fontSize: 11,
+      color: theme.ink2,
+      marginTop: 2,
+      textTransform: 'capitalize',
+      fontFamily: theme.fontBody,
+    },
+    amount: {
+      fontSize: 13,
+      fontWeight: '700',
+      color: theme.ink,
+      fontFamily: theme.fontDisplay,
+    },
+    removeButton: {
+      width: 30,
+      height: 30,
+      borderRadius: 9,
+      backgroundColor: theme.warnSoft,
+      borderWidth: 1,
+      borderColor: theme.bad,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    removeButtonPressed: {
+      opacity: 0.85,
+      transform: [{ scale: 0.96 }],
+    },
+    removeIcon: {
+      fontSize: 18,
+      lineHeight: 20,
+      fontWeight: '600',
+      color: theme.bad,
+      marginTop: -1,
+    },
+  });
+}
+
 export function EventMemberRow({
   displayName,
   joinMethod,
@@ -31,6 +132,8 @@ export function EventMemberRow({
   onRemove,
   variant,
 }: EventMemberRowProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const initial = displayName.charAt(0).toUpperCase();
 
   return (
@@ -81,7 +184,7 @@ export function EventMemberRow({
           ]}
         >
           {isRemoving ? (
-            <ActivityIndicator size="small" color="#F87171" />
+            <ActivityIndicator size="small" color={theme.bad} />
           ) : (
             <Text style={styles.removeIcon}>×</Text>
           )}
@@ -90,96 +193,3 @@ export function EventMemberRow({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    backgroundColor: authColors.glass,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-    marginBottom: 6,
-    gap: 10,
-    minHeight: 48,
-  },
-  selfRow: {
-    backgroundColor: 'rgba(99, 102, 241, 0.14)',
-    borderColor: 'rgba(129, 140, 248, 0.35)',
-  },
-  avatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: authColors.pillOnDark,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: authColors.textOnDark,
-  },
-  info: {
-    flex: 1,
-    minWidth: 0,
-  },
-  name: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: authColors.textOnDark,
-  },
-  methodChip: {
-    alignSelf: 'flex-start',
-    marginTop: 3,
-    backgroundColor: authColors.pillOnDark,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    borderRadius: 100,
-  },
-  methodChipText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: authColors.textOnDarkMuted,
-  },
-  organiserChip: {
-    backgroundColor: 'rgba(99, 102, 241, 0.22)',
-  },
-  organiserChipText: {
-    color: '#C7D2FE',
-  },
-  statusMeta: {
-    fontSize: 11,
-    color: authColors.textOnDarkMuted,
-    marginTop: 2,
-    textTransform: 'capitalize',
-  },
-  amount: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: authColors.textOnDark,
-  },
-  removeButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 9,
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
-    borderWidth: 1,
-    borderColor: 'rgba(248, 113, 113, 0.28)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  removeButtonPressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.96 }],
-  },
-  removeIcon: {
-    fontSize: 18,
-    lineHeight: 20,
-    fontWeight: '600',
-    color: '#F87171',
-    marginTop: -1,
-  },
-});

@@ -15,7 +15,8 @@ import {
 import { BottomSheetModal } from '../layout/BottomSheetModal';
 import { PrimaryButton } from '../PrimaryButton';
 import { SegmentedControl } from './SegmentedControl';
-import { authColors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 import {
   AUTH_COUNTRIES,
   DEFAULT_AUTH_REGION,
@@ -66,6 +67,176 @@ function createEmptyManualRows(count = DEFAULT_MANUAL_ROWS): ManualInputRow[] {
   }));
 }
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    container: {
+      width: '100%',
+      gap: 14,
+    },
+    handle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: theme.line,
+      alignSelf: 'center',
+    },
+    heading: {
+      fontSize: 20,
+      fontWeight: '800',
+      color: theme.ink,
+      fontFamily: theme.fontDisplay,
+    },
+    subheading: {
+      fontSize: 13,
+      color: theme.ink2,
+      lineHeight: 18,
+      fontFamily: theme.fontBody,
+    },
+    tabPanel: {
+      gap: 10,
+      minHeight: CONTACT_LIST_HEIGHT + 52,
+    },
+    namesScroll: {
+      maxHeight: CONTACT_LIST_HEIGHT + 80,
+    },
+    field: {
+      borderWidth: 1.5,
+      borderColor: theme.line,
+      borderRadius: theme.radiusSm,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      fontSize: 16,
+      color: theme.ink,
+      backgroundColor: theme.modalInset,
+      width: '100%',
+      fontFamily: theme.fontBody,
+    },
+    loader: {
+      marginVertical: 16,
+    },
+    noticeBox: {
+      gap: 8,
+      padding: 14,
+      borderRadius: theme.radiusSm,
+      backgroundColor: theme.warnSoft,
+      borderWidth: 1,
+      borderColor: theme.warn,
+    },
+    noticeText: {
+      fontSize: 13,
+      color: theme.ink2,
+      lineHeight: 18,
+      fontFamily: theme.fontBody,
+    },
+    noticeLink: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: theme.accent,
+      textDecorationLine: 'underline',
+      fontFamily: theme.fontBody,
+    },
+    contactList: {
+      height: CONTACT_LIST_HEIGHT,
+      borderRadius: theme.radiusSm,
+      borderWidth: 1,
+      borderColor: theme.line,
+      backgroundColor: theme.modalInset,
+    },
+    contactRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      minHeight: 56,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.line,
+    },
+    contactRowSelected: {
+      backgroundColor: theme.accentSoft,
+    },
+    checkbox: {
+      width: 24,
+      height: 24,
+      borderRadius: 8,
+      borderWidth: 1.5,
+      borderColor: theme.line,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.modalSurface,
+    },
+    checkboxSelected: {
+      backgroundColor: theme.accent,
+      borderColor: theme.accent,
+    },
+    checkmark: {
+      fontSize: 14,
+      fontWeight: '800',
+      color: theme.accentInk,
+    },
+    contactTextWrap: {
+      flex: 1,
+      minWidth: 0,
+    },
+    contactName: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: theme.ink,
+      fontFamily: theme.fontBody,
+    },
+    contactPhone: {
+      fontSize: 13,
+      color: theme.ink2,
+      marginTop: 2,
+      fontFamily: theme.fontBody,
+    },
+    emptyContacts: {
+      fontSize: 13,
+      color: theme.ink2,
+      padding: 20,
+      textAlign: 'center',
+      fontFamily: theme.fontBody,
+    },
+    personBlock: {
+      gap: 8,
+      marginBottom: 4,
+    },
+    personBlockSpaced: {
+      marginTop: 8,
+      paddingTop: 12,
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.line,
+    },
+    personLabel: {
+      fontSize: 11,
+      fontWeight: '700',
+      color: theme.ink3,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      fontFamily: theme.fontBody,
+    },
+    addPersonLink: {
+      alignSelf: 'flex-start',
+      paddingVertical: 8,
+    },
+    addPersonLinkText: {
+      fontSize: 14,
+      fontWeight: '700',
+      color: theme.accent,
+      fontFamily: theme.fontBody,
+    },
+    error: {
+      fontSize: 13,
+      color: theme.bad,
+      lineHeight: 18,
+      fontFamily: theme.fontBody,
+    },
+    doneButton: {
+      marginTop: 4,
+    },
+  });
+}
+
 export function AddMembersSheet({
   visible,
   isSubmitting,
@@ -74,6 +245,8 @@ export function AddMembersSheet({
   onClose,
   onSubmitBatch,
 }: AddMembersSheetProps) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const [tab, setTab] = useState<AddMembersTab>('contacts');
   const [searchQuery, setSearchQuery] = useState('');
   const [staging, setStaging] = useState<GroupBuilderEntry[]>([]);
@@ -220,7 +393,6 @@ export function AddMembersSheet({
       onClose={onClose}
       keyboardAware={tab === 'names'}
       dismissLabel="Dismiss add members"
-      sheetStyle={styles.sheetBg}
     >
       <View style={[styles.container, { maxHeight: SHEET_MAX_HEIGHT }]}>
         <View style={styles.handle} />
@@ -242,14 +414,14 @@ export function AddMembersSheet({
               value={searchQuery}
               onChangeText={setSearchQuery}
               placeholder="Search contacts"
-              placeholderTextColor={authColors.textOnDarkFaint}
+              placeholderTextColor={theme.ink3}
               style={styles.field}
               editable={!busy}
               accessibilityLabel="Search contacts"
             />
 
             {contactsLoading ? (
-              <ActivityIndicator color={authColors.textOnDark} style={styles.loader} />
+              <ActivityIndicator color={theme.ink} style={styles.loader} />
             ) : contactsDenied ? (
               <View style={styles.noticeBox}>
                 <Text style={styles.noticeText}>
@@ -328,7 +500,7 @@ export function AddMembersSheet({
                     )
                   }
                   placeholder="Full name"
-                  placeholderTextColor={authColors.textOnDarkFaint}
+                  placeholderTextColor={theme.ink3}
                   style={styles.field}
                   editable={!busy}
                   accessibilityLabel={`Person ${index + 1} name`}
@@ -345,7 +517,7 @@ export function AddMembersSheet({
                     )
                   }
                   placeholder={`Phone (${AUTH_COUNTRIES[DEFAULT_AUTH_REGION].dial}) — optional`}
-                  placeholderTextColor={authColors.textOnDarkFaint}
+                  placeholderTextColor={theme.ink3}
                   keyboardType="phone-pad"
                   maxLength={US_NATIONAL_DISPLAY_MAX_LENGTH}
                   style={styles.field}
@@ -383,160 +555,3 @@ export function AddMembersSheet({
     </BottomSheetModal>
   );
 }
-
-const styles = StyleSheet.create({
-  sheetBg: {
-    backgroundColor: authColors.gradientMid,
-  },
-  container: {
-    width: '100%',
-    gap: 14,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: authColors.glassBorder,
-    alignSelf: 'center',
-  },
-  heading: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: authColors.textOnDark,
-  },
-  subheading: {
-    fontSize: 13,
-    color: authColors.textOnDarkMuted,
-    lineHeight: 18,
-  },
-  tabPanel: {
-    gap: 10,
-    minHeight: CONTACT_LIST_HEIGHT + 52,
-  },
-  namesScroll: {
-    maxHeight: CONTACT_LIST_HEIGHT + 80,
-  },
-  field: {
-    borderWidth: 1.5,
-    borderColor: authColors.glassBorder,
-    borderRadius: 14,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: authColors.textOnDark,
-    backgroundColor: authColors.glassStrong,
-    width: '100%',
-  },
-  loader: {
-    marginVertical: 16,
-  },
-  noticeBox: {
-    gap: 8,
-    padding: 14,
-    borderRadius: 14,
-    backgroundColor: authColors.errorBgOnDark,
-  },
-  noticeText: {
-    fontSize: 13,
-    color: authColors.textOnDarkMuted,
-    lineHeight: 18,
-  },
-  noticeLink: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: authColors.textOnDark,
-    textDecorationLine: 'underline',
-  },
-  contactList: {
-    height: CONTACT_LIST_HEIGHT,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-    backgroundColor: authColors.glassStrong,
-  },
-  contactRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    minHeight: 56,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: authColors.glassBorder,
-  },
-  contactRowSelected: {
-    backgroundColor: 'rgba(45, 212, 191, 0.12)',
-  },
-  checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
-    borderWidth: 1.5,
-    borderColor: authColors.glassBorder,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkboxSelected: {
-    backgroundColor: 'rgba(45, 212, 191, 0.35)',
-    borderColor: 'rgba(45, 212, 191, 0.8)',
-  },
-  checkmark: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: authColors.textOnDark,
-  },
-  contactTextWrap: {
-    flex: 1,
-    minWidth: 0,
-  },
-  contactName: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: authColors.textOnDark,
-  },
-  contactPhone: {
-    fontSize: 13,
-    color: authColors.textOnDarkMuted,
-    marginTop: 2,
-  },
-  emptyContacts: {
-    fontSize: 13,
-    color: authColors.textOnDarkMuted,
-    padding: 20,
-    textAlign: 'center',
-  },
-  personBlock: {
-    gap: 8,
-    marginBottom: 4,
-  },
-  personBlockSpaced: {
-    marginTop: 8,
-    paddingTop: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: authColors.glassBorder,
-  },
-  personLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: authColors.textOnDarkMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  addPersonLink: {
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
-  },
-  addPersonLinkText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: authColors.textOnDarkMuted,
-  },
-  error: {
-    fontSize: 13,
-    color: authColors.errorOnDark,
-    lineHeight: 18,
-  },
-  doneButton: {
-    marginTop: 4,
-  },
-});

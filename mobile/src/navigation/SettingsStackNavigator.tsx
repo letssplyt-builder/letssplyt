@@ -5,6 +5,7 @@ import { DeleteWarnScreen } from '../screens/profile/DeleteWarnScreen';
 import { DeletedScreen } from '../screens/profile/DeletedScreen';
 import { LegalDocumentScreen } from '../screens/profile/LegalDocumentScreen';
 import { ProfileScreen } from '../screens/profile/ProfileScreen';
+import { AppearanceScreen } from '../screens/profile/AppearanceScreen';
 import { SettingsScreen } from '../screens/profile/SettingsScreen';
 import type { SettingsStackParamList } from './types';
 
@@ -14,6 +15,7 @@ export function SettingsStackNavigator() {
   return (
     <SettingsStack.Navigator screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <SettingsStack.Screen name="Settings" component={SettingsScreen} />
+      <SettingsStack.Screen name="Appearance" component={AppearanceScreen} />
       <SettingsStack.Screen name="Profile" component={ProfileScreen} />
       <SettingsStack.Screen name="AddHandle" component={AddHandleScreen} />
       <SettingsStack.Screen name="DeleteWarn" component={DeleteWarnScreen} />

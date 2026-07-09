@@ -1,16 +1,41 @@
-import { forwardRef, useEffect, useRef } from 'react';
+import { forwardRef, useEffect, useMemo, useRef } from 'react';
 import { Animated, StyleSheet, TextInput, type TextInputProps } from 'react-native';
-import { authColors } from '../../theme/colors';
+import { useTheme } from '../../theme/ThemeContext';
+import type { Theme } from '../../theme/types';
 
 interface OtpDigitBoxProps extends TextInputProps {
   filled: boolean;
   index: number;
 }
 
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    digitBox: {
+      width: 48,
+      height: 58,
+      borderRadius: theme.radiusSm,
+      borderWidth: 1,
+      borderColor: theme.line,
+      backgroundColor: theme.surface,
+      textAlign: 'center',
+      fontSize: 24,
+      fontWeight: '700',
+      color: theme.ink,
+      fontFamily: theme.fontBody,
+    },
+    digitBoxFilled: {
+      borderColor: theme.accent,
+      backgroundColor: theme.surfaceStrong,
+    },
+  });
+}
+
 export const OtpDigitBox = forwardRef<TextInput, OtpDigitBoxProps>(function OtpDigitBox(
   { filled, index, style, ...rest },
   ref,
 ) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const scale = useRef(new Animated.Value(1)).current;
   const entry = useRef(new Animated.Value(0)).current;
 
@@ -64,23 +89,4 @@ export const OtpDigitBox = forwardRef<TextInput, OtpDigitBoxProps>(function OtpD
       />
     </Animated.View>
   );
-});
-
-const styles = StyleSheet.create({
-  digitBox: {
-    width: 48,
-    height: 58,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: authColors.glassBorder,
-    backgroundColor: authColors.glass,
-    textAlign: 'center',
-    fontSize: 24,
-    fontWeight: '700',
-    color: authColors.textOnDark,
-  },
-  digitBoxFilled: {
-    borderColor: authColors.ctaSurface,
-    backgroundColor: authColors.glassStrong,
-  },
 });
