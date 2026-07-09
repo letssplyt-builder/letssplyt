@@ -3,12 +3,10 @@ import { useCallback, useMemo, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import {
   Alert,
-  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  View,
 } from 'react-native';
 import type { ReceiptAdditionalCharge } from '@letssplyt/shared/receipt.types';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
