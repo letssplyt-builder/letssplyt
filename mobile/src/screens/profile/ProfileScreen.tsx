@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import DraggableFlatList, {
   type RenderItemParams,
@@ -11,6 +11,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import type { PaymentHandle } from '@letssplyt/shared/profile.types';
@@ -28,6 +29,9 @@ import type { Theme } from '../../theme/types';
 import { initialsFromDisplayName, providerLabel } from '../../utils/profile';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'Profile'>;
+
+const LIST_HORIZONTAL_PADDING = 56;
+const DRAG_HANDLE_WIDTH = 52;
 
 function makeStyles(theme: Theme) {
   return StyleSheet.create({
@@ -157,6 +161,15 @@ export function ProfileScreen({ navigation, route }: Props) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [draftName, setDraftName] = useState('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const swipeHintPlayedRef = useRef(false);
+  const firstHandleId = handles[0]?.id;
+  const { width: windowWidth } = useWindowDimensions();
+  const dragHitSlop = useMemo(
+    () => ({
+      right: -(windowWidth - LIST_HORIZONTAL_PADDING - DRAG_HANDLE_WIDTH),
+    }),
+    [windowWidth],
+  );
 
   useEffect(() => {
     const message = route.params?.toastMessage;
@@ -221,10 +234,14 @@ export function ProfileScreen({ navigation, route }: Props) {
           onPress={() => openEditHandle(item)}
           onDrag={drag}
           onDelete={() => confirmDelete(item)}
+          playMountHint={!swipeHintPlayedRef.current && item.id === firstHandleId}
+          onSwipeHintPlayed={() => {
+            swipeHintPlayedRef.current = true;
+          }}
         />
       </ScaleDecorator>
     ),
-    [navigation],
+    [firstHandleId, navigation],
   );
 
   const listHeader = (
@@ -300,6 +317,8 @@ export function ProfileScreen({ navigation, route }: Props) {
       <DraggableFlatList
         data={handles}
         keyExtractor={(item) => item.id}
+        activationDistance={20}
+        dragHitSlop={dragHitSlop}
         onDragEnd={({ data }) => {
           void reorderHandles(data.map((handle) => handle.id)).catch(() => {
             Alert.alert('Could not reorder', 'Please try again.');
