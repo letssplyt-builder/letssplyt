@@ -1,9 +1,43 @@
+import type { ReceiptDiscountLine } from '@letssplyt/shared/receipt.types';
+import {
+  resolveItemLineDiscounts,
+  sumBillDiscountResolved,
+} from '@letssplyt/shared/utils/receiptDiscounts';
 import {
   fromMinorUnits,
   largestRemainderRound,
 } from '@letssplyt/shared/utils/splitCalculator';
 
 export type SplitEntryTab = 'even' | 'amount' | 'percent' | 'portion';
+
+export interface SplitFoodItem {
+  id: string;
+  name: string;
+  unit_price: number;
+  quantity: number;
+  /** Resolved item-scoped discount for this line. */
+  line_discount: number;
+}
+
+export interface SplitPricedItem {
+  id: string;
+  name: string;
+  /** Gross line total (unit_price × quantity). */
+  price: number;
+  lineDiscount: number;
+  netPrice: number;
+}
+
+export interface SplitLineExplainer {
+  name: string;
+  /** Human-readable math for this person's share of the line. */
+  detail: string;
+}
+
+export interface SplitPersonExplainer {
+  participant_id: string;
+  lines: SplitLineExplainer[];
+}
 
 const AVATAR_PALETTE = ['#6366F1', '#0E5C66', '#7C3AED', '#EC4899', '#F59E0B', '#14B8A6'];
 
@@ -71,4 +105,101 @@ export function allItemsAssigned(
 ): boolean {
   if (itemIds.length === 0) return false;
   return itemIds.every((id) => (assignments.get(id)?.length ?? 0) > 0);
+}
+
+export function attachLineDiscountsToFoodItems(
+  items: Array<{ id: string; name: string; unit_price: number; quantity: number }>,
+  discounts: ReceiptDiscountLine[],
+): SplitFoodItem[] {
+  const lineDiscounts = resolveItemLineDiscounts(
+    items.map((item) => ({
+      id: item.id,
+      unit_price: item.unit_price,
+      quantity: item.quantity,
+    })),
+    discounts.map((discount) => ({
+      name: discount.name,
+      type: discount.type,
+      value: discount.value,
+      scope: discount.scope ?? 'bill',
+      item_id: discount.item_id,
+    })),
+  );
+
+  return items.map((item) => ({
+    ...item,
+    line_discount: lineDiscounts.get(item.id) ?? 0,
+  }));
+}
+
+export function toPricedSplitItems(items: SplitFoodItem[]): SplitPricedItem[] {
+  return items.map((item) => {
+    const price = Number((item.unit_price * item.quantity).toFixed(2));
+    const lineDiscount = Number((item.line_discount ?? 0).toFixed(2));
+    const netPrice = Number(Math.max(0, price - lineDiscount).toFixed(2));
+    return {
+      id: item.id,
+      name: item.name,
+      price,
+      lineDiscount,
+      netPrice,
+    };
+  });
+}
+
+export function hasBillScopedDiscounts(
+  items: SplitFoodItem[],
+  discounts: ReceiptDiscountLine[],
+): boolean {
+  if (discounts.length === 0) return false;
+  const billTotal = sumBillDiscountResolved(
+    items.map((item) => ({
+      id: item.id,
+      unit_price: item.unit_price,
+      quantity: item.quantity,
+    })),
+    discounts.map((discount) => ({
+      name: discount.name,
+      type: discount.type,
+      value: discount.value,
+      scope: discount.scope ?? 'bill',
+      item_id: discount.item_id,
+    })),
+  );
+  return billTotal > 0;
+}
+
+/** Build per-person item math for Split Review (client-side; no API change). */
+export function buildSplitPersonExplainers(
+  items: SplitPricedItem[],
+  assignments: Map<string, string[]>,
+  currency: string,
+): SplitPersonExplainer[] {
+  const byParticipant = new Map<string, SplitLineExplainer[]>();
+
+  for (const item of items) {
+    const assigneeIds = assignments.get(item.id) ?? [];
+    if (assigneeIds.length === 0) continue;
+
+    const shareNet = Number((item.netPrice / assigneeIds.length).toFixed(2));
+    const detail =
+      item.lineDiscount > 0
+        ? assigneeIds.length > 1
+          ? `${formatSplitMoney(item.price, currency)} − ${formatSplitMoney(item.lineDiscount, currency)} → ${formatSplitMoney(item.netPrice, currency)} ÷ ${assigneeIds.length} = ${formatSplitMoney(shareNet, currency)}`
+          : `${formatSplitMoney(item.price, currency)} − ${formatSplitMoney(item.lineDiscount, currency)} → ${formatSplitMoney(item.netPrice, currency)}`
+        : assigneeIds.length > 1
+          ? `${formatSplitMoney(item.price, currency)} ÷ ${assigneeIds.length} = ${formatSplitMoney(shareNet, currency)}`
+          : formatSplitMoney(item.price, currency);
+
+    for (const participantId of assigneeIds) {
+      const lines = byParticipant.get(participantId) ?? [];
+      lines.push({ name: item.name, detail });
+      byParticipant.set(participantId, lines);
+    }
+  }
+
+  return Array.from(byParticipant.entries()).map(([participant_id, lines]) => ({
+    participant_id,
+    lines,
+  }));
 }

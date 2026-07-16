@@ -1,4 +1,5 @@
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { ReceiptDiscountLine } from '@letssplyt/shared/receipt.types';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -30,12 +31,17 @@ import {
 } from './splitEntry.hydrate';
 import {
   amountsFromPercents,
+  attachLineDiscountsToFoodItems,
+  buildSplitPersonExplainers,
   computeEvenAmounts,
   formatSplitMoney,
+  hasBillScopedDiscounts,
   isPercentTotalValid,
   isWithinMoneyTolerance,
   parseNumericInput,
+  toPricedSplitItems,
   type SplitEntryTab,
+  type SplitFoodItem,
   allItemsAssigned,
 } from './splitEntry.utils';
 
@@ -143,9 +149,8 @@ export function SplitEntryScreen({ navigation, route }: Props) {
   const [currency, setCurrency] = useState('USD');
   const [billTotal, setBillTotal] = useState(0);
   const [manualTotalInput, setManualTotalInput] = useState('');
-  const [foodItems, setFoodItems] = useState<
-    Array<{ id: string; name: string; unit_price: number; quantity: number }>
-  >([]);
+  const [foodItems, setFoodItems] = useState<SplitFoodItem[]>([]);
+  const [receiptDiscounts, setReceiptDiscounts] = useState<ReceiptDiscountLine[]>([]);
 
   const hasReceiptItems = foodItems.length > 0;
   const [splitPath, setSplitPath] = useState<SplitPath>(
@@ -176,7 +181,7 @@ export function SplitEntryScreen({ navigation, route }: Props) {
       const review = detail.receipt_review;
       let hasItems = false;
       if (review) {
-        const items = review.items
+        const baseItems = review.items
           .filter((item) => item.id)
           .map((item) => ({
             id: item.id!,
@@ -184,8 +189,11 @@ export function SplitEntryScreen({ navigation, route }: Props) {
             unit_price: item.unit_price,
             quantity: item.quantity,
           }));
+        const discounts = review.discounts ?? [];
+        const items = attachLineDiscountsToFoodItems(baseItems, discounts);
         hasItems = items.length > 0;
         setFoodItems(items);
+        setReceiptDiscounts(discounts);
         const subtotal = review.items.reduce(
           (sum, item) => sum + item.unit_price * item.quantity,
           0,
@@ -197,6 +205,7 @@ export function SplitEntryScreen({ navigation, route }: Props) {
         setBillTotal(Number(total.toFixed(2)));
       } else {
         setFoodItems([]);
+        setReceiptDiscounts([]);
         const total = detail.event.total_amount ?? 0;
         setBillTotal(total);
         setManualTotalInput(total > 0 ? String(total) : '');
@@ -360,14 +369,10 @@ export function SplitEntryScreen({ navigation, route }: Props) {
     portionSum,
   ]);
 
-  const foodItemsWithPrice = useMemo(
-    () =>
-      foodItems.map((item) => ({
-        id: item.id,
-        name: item.name,
-        price: Number((item.unit_price * item.quantity).toFixed(2)),
-      })),
-    [foodItems],
+  const foodItemsWithPrice = useMemo(() => toPricedSplitItems(foodItems), [foodItems]);
+  const showBillDiscountNote = useMemo(
+    () => hasBillScopedDiscounts(foodItems, receiptDiscounts),
+    [foodItems, receiptDiscounts],
   );
 
   const onReview = async () => {
@@ -414,12 +419,20 @@ export function SplitEntryScreen({ navigation, route }: Props) {
         });
       }
 
+      const explainers =
+        splitPath === 'itemised' && itemisedReady
+          ? buildSplitPersonExplainers(foodItemsWithPrice, assignments, currency)
+          : [];
+      const hasItemDiscounts = foodItemsWithPrice.some((item) => item.lineDiscount > 0);
+
       setCalculated(
         eventId,
         currency,
         effectiveTotal,
         response.splits,
         response.total_check,
+        explainers,
+        hasItemDiscounts,
       );
       navigation.navigate('SplitReview', { eventId });
     } catch {
@@ -498,6 +511,7 @@ export function SplitEntryScreen({ navigation, route }: Props) {
             assignedCount={assignedCount}
             participants={participants}
             assignments={assignments}
+            showBillDiscountNote={showBillDiscountNote}
             onAssignItem={(itemId, participantIds) =>
               setAssignments((prev) => {
                 const next = new Map(prev);

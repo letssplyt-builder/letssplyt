@@ -101,7 +101,7 @@ function makeStyles(theme: Theme) {
     },
     ledgerRow: {
       flexDirection: 'row',
-      alignItems: 'center',
+      alignItems: 'flex-start',
       paddingVertical: 10,
       paddingHorizontal: 12,
       borderBottomWidth: StyleSheet.hairlineWidth,
@@ -150,6 +150,27 @@ function makeStyles(theme: Theme) {
       lineHeight: 14,
       fontFamily: theme.fontBody,
     },
+    explainerBlock: {
+      marginTop: 4,
+      gap: 2,
+    },
+    explainerLine: {
+      fontSize: 11,
+      color: theme.ink2,
+      lineHeight: 15,
+      fontFamily: theme.fontBody,
+    },
+    explainerName: {
+      fontWeight: '700',
+      color: theme.ink3,
+    },
+    discountFootnote: {
+      marginTop: 12,
+      fontSize: 12,
+      color: theme.ink3,
+      lineHeight: 17,
+      fontFamily: theme.fontBody,
+    },
     amount: {
       minWidth: 88,
       fontSize: 15,
@@ -157,6 +178,7 @@ function makeStyles(theme: Theme) {
       color: theme.ink,
       textAlign: 'right',
       fontFamily: theme.fontDisplay,
+      paddingTop: 4,
     },
     ledgerFooter: {
       flexDirection: 'row',
@@ -262,6 +284,13 @@ export function SplitReviewScreen({ navigation, route }: Props) {
   const billTotal = useSplitStore((s) => s.billTotal);
   const currency = useSplitStore((s) => s.currency);
   const totalCheck = useSplitStore((s) => s.totalCheck);
+  const personExplainers = useSplitStore((s) => s.personExplainers);
+  const hasItemDiscounts = useSplitStore((s) => s.hasItemDiscounts);
+
+  const explainerByParticipant = useMemo(() => {
+    const map = new Map(personExplainers.map((row) => [row.participant_id, row.lines]));
+    return map;
+  }, [personExplainers]);
 
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
@@ -371,8 +400,11 @@ export function SplitReviewScreen({ navigation, route }: Props) {
           {splits.map((row, index) => {
             const avatarColor = avatarColorFromName(row.display_name);
             const isLast = index === splits.length - 1;
+            const explainLines = explainerByParticipant.get(row.participant_id);
             const itemsLabel =
-              row.item_names.length > 0 ? row.item_names.join(', ') : null;
+              !explainLines && row.item_names.length > 0
+                ? row.item_names.join(', ')
+                : null;
 
             return (
               <View
@@ -391,7 +423,21 @@ export function SplitReviewScreen({ navigation, route }: Props) {
                       <Text style={styles.name} numberOfLines={1}>
                         {row.display_name}
                       </Text>
-                      {itemsLabel ? (
+                      {explainLines && explainLines.length > 0 ? (
+                        <View style={styles.explainerBlock}>
+                          {explainLines.map((line) => (
+                            <Text
+                              key={`${row.participant_id}-${line.name}-${line.detail}`}
+                              style={styles.explainerLine}
+                              numberOfLines={2}
+                            >
+                              <Text style={styles.explainerName}>{line.name}</Text>
+                              {'  '}
+                              {line.detail}
+                            </Text>
+                          ))}
+                        </View>
+                      ) : itemsLabel ? (
                         <Text style={styles.items} numberOfLines={1}>
                           {itemsLabel}
                         </Text>
@@ -420,6 +466,12 @@ export function SplitReviewScreen({ navigation, route }: Props) {
             </Text>
           </View>
         </View>
+
+        {hasItemDiscounts ? (
+          <Text style={styles.discountFootnote}>
+            Item discounts are applied to that product before tax and tip.
+          </Text>
+        ) : null}
 
         {!canSend ? (
           <Text style={styles.hintError}>
