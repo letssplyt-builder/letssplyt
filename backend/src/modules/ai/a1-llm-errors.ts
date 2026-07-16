@@ -10,6 +10,41 @@ export function isAiQuotaError(err: unknown): boolean {
   );
 }
 
+/** Transient model/network failures that should be retried inside A1. */
+export function isTransientAiError(err: unknown): boolean {
+  if (err instanceof AppError) {
+    return false;
+  }
+  if (isAiQuotaError(err)) {
+    return false;
+  }
+  const message = (err instanceof Error ? err.message : String(err)).toLowerCase();
+  if (
+    message.includes('api key') ||
+    message.includes('permission') ||
+    message.includes('invalid argument')
+  ) {
+    return false;
+  }
+  return (
+    message.includes('timeout') ||
+    message.includes('503') ||
+    message.includes('500') ||
+    message.includes('502') ||
+    message.includes('504') ||
+    message.includes('unavailable') ||
+    message.includes('overloaded') ||
+    message.includes('econnreset') ||
+    message.includes('fetch failed') ||
+    message.includes('network') ||
+    message.includes('empty response') ||
+    message.includes('blocked') ||
+    message.includes('gemini request failed') ||
+    message.includes('anthropic request failed') ||
+    message.includes('no candidates')
+  );
+}
+
 /** Map provider SDK failures to operational API errors (no raw SDK dumps to clients). */
 export function toA1AppError(err: unknown): AppError {
   if (err instanceof AppError) {

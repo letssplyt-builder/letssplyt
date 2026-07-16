@@ -27,6 +27,8 @@ const PARSE_HINTS = [
   'Almost there…',
 ] as const;
 
+const RETRY_HINT = 'Still reading — trying once more…';
+
 function receiptFlowErrorMessage(err: unknown, phase: 'upload' | 'parse'): string {
   if (!isApiRequestError(err)) {
     return phase === 'upload'
@@ -45,14 +47,20 @@ function receiptFlowErrorMessage(err: unknown, phase: 'upload' | 'parse'): strin
   return err.message;
 }
 
-function phaseLabel(phase: ProcessPhase, parseHintIndex: number): string {
+function phaseLabel(
+  phase: ProcessPhase,
+  parseHintIndex: number,
+  isAutoRetrying: boolean,
+): string {
   switch (phase) {
     case 'preparing':
       return 'Preparing photo…';
     case 'uploading':
       return 'Uploading receipt…';
     case 'reading':
-      return PARSE_HINTS[parseHintIndex] ?? PARSE_HINTS[0];
+      return isAutoRetrying
+        ? RETRY_HINT
+        : (PARSE_HINTS[parseHintIndex] ?? PARSE_HINTS[0]);
     case 'finishing':
       return 'Opening your review…';
     default:
@@ -89,9 +97,10 @@ export function ReceiptPreviewScreen({ navigation, route }: Props) {
     uploadToken: string;
   } | null>(null);
   const [uploadedStoragePath, setUploadedStoragePath] = useState<string | null>(null);
+  const [isAutoRetrying, setIsAutoRetrying] = useState(false);
 
   useEffect(() => {
-    if (uploadState !== 'processing' || processPhase !== 'reading') {
+    if (uploadState !== 'processing' || processPhase !== 'reading' || isAutoRetrying) {
       return undefined;
     }
     setParseHintIndex(0);
@@ -99,7 +108,7 @@ export function ReceiptPreviewScreen({ navigation, route }: Props) {
       setParseHintIndex((index) => (index + 1) % PARSE_HINTS.length);
     }, 2800);
     return () => clearInterval(timer);
-  }, [uploadState, processPhase]);
+  }, [uploadState, processPhase, isAutoRetrying]);
 
   const finishAfterParse = useCallback(
     async (
@@ -107,6 +116,7 @@ export function ReceiptPreviewScreen({ navigation, route }: Props) {
       parseResult: Awaited<ReturnType<typeof receiptsService.parseReceipt>>,
     ) => {
       setProcessPhase('finishing');
+      setIsAutoRetrying(false);
       navigation.replace('ItemReview', {
         eventId,
         storagePath,
@@ -119,7 +129,16 @@ export function ReceiptPreviewScreen({ navigation, route }: Props) {
   const runParse = useCallback(
     async (storagePath: string) => {
       setProcessPhase('reading');
-      const parseResult = await receiptsService.parseReceipt(eventId, storagePath);
+      setIsAutoRetrying(false);
+      const parseResult = await receiptsService.parseReceiptWithRetry(
+        eventId,
+        storagePath,
+        {
+          onRetry: () => {
+            setIsAutoRetrying(true);
+          },
+        },
+      );
       await finishAfterParse(storagePath, parseResult);
     },
     [eventId, finishAfterParse],
@@ -155,6 +174,7 @@ export function ReceiptPreviewScreen({ navigation, route }: Props) {
         await runParse(storagePath);
       } catch (err) {
         setUploadState('error');
+        setIsAutoRetrying(false);
         setUploadedStoragePath(storagePath);
         setErrorMessage(receiptFlowErrorMessage(err, 'parse'));
       }
@@ -205,9 +225,11 @@ export function ReceiptPreviewScreen({ navigation, route }: Props) {
     if (!uploadedStoragePath) return;
     setUploadState('processing');
     setProcessPhase('reading');
+    setIsAutoRetrying(false);
     setErrorMessage(null);
     void runParse(uploadedStoragePath).catch((err) => {
       setUploadState('error');
+      setIsAutoRetrying(false);
       setErrorMessage(receiptFlowErrorMessage(err, 'parse'));
     });
   }, [uploadedStoragePath, runParse]);
@@ -287,7 +309,9 @@ export function ReceiptPreviewScreen({ navigation, route }: Props) {
         <View style={styles.overlay} accessibilityLiveRegion="polite">
           <View style={styles.overlayCard}>
             <ActivityIndicator color="#fff" size="large" />
-            <Text style={styles.overlayTitle}>{phaseLabel(processPhase, parseHintIndex)}</Text>
+            <Text style={styles.overlayTitle}>
+              {phaseLabel(processPhase, parseHintIndex, isAutoRetrying)}
+            </Text>
             <Text style={styles.overlaySubtitle}>
               This usually takes a few seconds. Keep the app open.
             </Text>
