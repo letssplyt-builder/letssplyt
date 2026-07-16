@@ -89,7 +89,6 @@ export function HomeScreen({ navigation }: Props) {
   const [isRegenerating, setIsRegenerating] = useState(false);
 
   const loadBalance = useCallback(async () => {
-    setBalanceLoading(true);
     setBalanceError(false);
     try {
       const result = await fetchBalance();

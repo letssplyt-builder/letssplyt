@@ -117,6 +117,60 @@ async function countParticipants(eventId: string): Promise<number> {
   return (data ?? []).length;
 }
 
+async function countParticipantsByEventIds(
+  eventIds: string[],
+): Promise<Map<string, number>> {
+  const counts = new Map<string, number>();
+  for (const id of eventIds) {
+    counts.set(id, 0);
+  }
+  if (eventIds.length === 0) {
+    return counts;
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('participants')
+    .select('event_id')
+    .in('event_id', eventIds);
+
+  if (error) {
+    throw new AppError('PARTICIPANTS_COUNT_FAILED', 'Could not count participants', 500);
+  }
+
+  for (const row of data ?? []) {
+    const eventId = row.event_id as string;
+    counts.set(eventId, (counts.get(eventId) ?? 0) + 1);
+  }
+
+  return counts;
+}
+
+async function fetchViewerPaymentStatuses(
+  userId: string,
+  eventIds: string[],
+): Promise<Map<string, string | null>> {
+  const statuses = new Map<string, string | null>();
+  if (eventIds.length === 0) {
+    return statuses;
+  }
+
+  const { data, error } = await supabaseAdmin
+    .from('participants')
+    .select('event_id, payment_status')
+    .eq('user_id', userId)
+    .in('event_id', eventIds);
+
+  if (error) {
+    throw new AppError('EVENTS_LIST_FAILED', 'Could not load viewer payment status', 500);
+  }
+
+  for (const row of data ?? []) {
+    statuses.set(row.event_id as string, (row.payment_status as string | null) ?? null);
+  }
+
+  return statuses;
+}
+
 async function deactivateActiveTokens(eventId: string): Promise<void> {
   const { error } = await supabaseAdmin
     .from('event_join_tokens')
@@ -489,32 +543,32 @@ export async function listEvents(
   ];
   const creatorNames = await fetchCreatorNames(creatorPayerIds);
 
-  const events: EventListItem[] = await Promise.all(
-    pageRows.map(async (row) => {
-      const isCreator = row.payer_id === userId;
-      let viewer_payment_status: string | null | undefined = undefined;
-      if (!isCreator) {
-        const { data: viewerRow } = await supabaseAdmin
-          .from('participants')
-          .select('payment_status')
-          .eq('event_id', row.id)
-          .eq('user_id', userId)
-          .maybeSingle();
-        viewer_payment_status = (viewerRow?.payment_status as string | null) ?? null;
-      }
-      return {
-        id: row.id,
-        title: row.title,
-        status: row.status,
-        participant_count: await countParticipants(row.id),
-        total_amount: row.total_amount,
-        created_at: row.created_at,
-        role: isCreator ? 'creator' : 'participant',
-        creator_name: isCreator ? null : (creatorNames.get(row.payer_id) ?? null),
-        viewer_payment_status,
-      };
-    }),
-  );
+  const eventIds = pageRows.map((row) => row.id);
+  const participantEventIdsForViewer = pageRows
+    .filter((row) => row.payer_id !== userId)
+    .map((row) => row.id);
+
+  const [participantCounts, viewerStatuses] = await Promise.all([
+    countParticipantsByEventIds(eventIds),
+    fetchViewerPaymentStatuses(userId, participantEventIdsForViewer),
+  ]);
+
+  const events: EventListItem[] = pageRows.map((row) => {
+    const isCreator = row.payer_id === userId;
+    return {
+      id: row.id,
+      title: row.title,
+      status: row.status,
+      participant_count: participantCounts.get(row.id) ?? 0,
+      total_amount: row.total_amount,
+      created_at: row.created_at,
+      role: isCreator ? 'creator' : 'participant',
+      creator_name: isCreator ? null : (creatorNames.get(row.payer_id) ?? null),
+      viewer_payment_status: isCreator
+        ? undefined
+        : (viewerStatuses.get(row.id) ?? null),
+    };
+  });
 
   const last = pageRows[pageRows.length - 1];
   const next_cursor =

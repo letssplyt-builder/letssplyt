@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import {
@@ -18,6 +18,14 @@ import type { EventsStackParamList } from '../../navigation/types';
 type Props = NativeStackScreenProps<EventsStackParamList, 'ReceiptPreview'>;
 
 type UploadState = 'idle' | 'processing' | 'error';
+type ProcessPhase = 'preparing' | 'uploading' | 'reading' | 'finishing';
+
+const PARSE_HINTS = [
+  'Finding line items…',
+  'Reading tax and tip…',
+  'Double-checking the total…',
+  'Almost there…',
+] as const;
 
 function receiptFlowErrorMessage(err: unknown, phase: 'upload' | 'parse'): string {
   if (!isApiRequestError(err)) {
@@ -37,10 +45,42 @@ function receiptFlowErrorMessage(err: unknown, phase: 'upload' | 'parse'): strin
   return err.message;
 }
 
+function phaseLabel(phase: ProcessPhase, parseHintIndex: number): string {
+  switch (phase) {
+    case 'preparing':
+      return 'Preparing photo…';
+    case 'uploading':
+      return 'Uploading receipt…';
+    case 'reading':
+      return PARSE_HINTS[parseHintIndex] ?? PARSE_HINTS[0];
+    case 'finishing':
+      return 'Opening your review…';
+    default:
+      return 'Working…';
+  }
+}
+
+function phaseStepIndex(phase: ProcessPhase): number {
+  switch (phase) {
+    case 'preparing':
+      return 0;
+    case 'uploading':
+      return 1;
+    case 'reading':
+      return 2;
+    case 'finishing':
+      return 3;
+    default:
+      return 0;
+  }
+}
+
 export function ReceiptPreviewScreen({ navigation, route }: Props) {
   const { eventId, imageUri } = route.params;
   const insets = useSafeAreaInsets();
   const [uploadState, setUploadState] = useState<UploadState>('idle');
+  const [processPhase, setProcessPhase] = useState<ProcessPhase>('preparing');
+  const [parseHintIndex, setParseHintIndex] = useState(0);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [pendingUpload, setPendingUpload] = useState<{
     uploadUrl: string;
@@ -50,11 +90,23 @@ export function ReceiptPreviewScreen({ navigation, route }: Props) {
   } | null>(null);
   const [uploadedStoragePath, setUploadedStoragePath] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (uploadState !== 'processing' || processPhase !== 'reading') {
+      return undefined;
+    }
+    setParseHintIndex(0);
+    const timer = setInterval(() => {
+      setParseHintIndex((index) => (index + 1) % PARSE_HINTS.length);
+    }, 2800);
+    return () => clearInterval(timer);
+  }, [uploadState, processPhase]);
+
   const finishAfterParse = useCallback(
     async (
       storagePath: string,
       parseResult: Awaited<ReturnType<typeof receiptsService.parseReceipt>>,
     ) => {
+      setProcessPhase('finishing');
       navigation.replace('ItemReview', {
         eventId,
         storagePath,
@@ -66,6 +118,7 @@ export function ReceiptPreviewScreen({ navigation, route }: Props) {
 
   const runParse = useCallback(
     async (storagePath: string) => {
+      setProcessPhase('reading');
       const parseResult = await receiptsService.parseReceipt(eventId, storagePath);
       await finishAfterParse(storagePath, parseResult);
     },
@@ -80,6 +133,7 @@ export function ReceiptPreviewScreen({ navigation, route }: Props) {
       uploadToken: string,
     ) => {
       setUploadState('processing');
+      setProcessPhase('uploading');
       setErrorMessage(null);
       try {
         await receiptsService.uploadReceiptToSignedUrl(
@@ -112,6 +166,7 @@ export function ReceiptPreviewScreen({ navigation, route }: Props) {
     if (uploadState === 'processing') return;
 
     setUploadState('processing');
+    setProcessPhase('preparing');
     setErrorMessage(null);
     setUploadedStoragePath(null);
 
@@ -149,6 +204,7 @@ export function ReceiptPreviewScreen({ navigation, route }: Props) {
   const handleRetryParse = useCallback(() => {
     if (!uploadedStoragePath) return;
     setUploadState('processing');
+    setProcessPhase('reading');
     setErrorMessage(null);
     void runParse(uploadedStoragePath).catch((err) => {
       setUploadState('error');
@@ -164,6 +220,9 @@ export function ReceiptPreviewScreen({ navigation, route }: Props) {
     navigation.replace('SplitEntry', { eventId, mode: 'manual' });
   }, [navigation, eventId]);
 
+  const activeStep = phaseStepIndex(processPhase);
+  const steps = ['Prepare', 'Upload', 'Read', 'Review'] as const;
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
@@ -173,8 +232,11 @@ export function ReceiptPreviewScreen({ navigation, route }: Props) {
           accessibilityRole="button"
           accessibilityLabel="Go back"
           onPress={() => navigation.goBack()}
+          disabled={uploadState === 'processing'}
         >
-          <Text style={styles.backText}>Back</Text>
+          <Text style={[styles.backText, uploadState === 'processing' && styles.disabledText]}>
+            Back
+          </Text>
         </Pressable>
         <Text style={styles.title}>Review scan</Text>
         <View style={styles.topBarSpacer} />
@@ -222,11 +284,39 @@ export function ReceiptPreviewScreen({ navigation, route }: Props) {
       </View>
 
       {uploadState === 'processing' ? (
-        <View style={styles.overlay}>
-          <ActivityIndicator color="#fff" size="large" />
-          <Text style={styles.overlayText}>
-            {uploadedStoragePath ? 'Reading receipt…' : 'Uploading receipt…'}
-          </Text>
+        <View style={styles.overlay} accessibilityLiveRegion="polite">
+          <View style={styles.overlayCard}>
+            <ActivityIndicator color="#fff" size="large" />
+            <Text style={styles.overlayTitle}>{phaseLabel(processPhase, parseHintIndex)}</Text>
+            <Text style={styles.overlaySubtitle}>
+              This usually takes a few seconds. Keep the app open.
+            </Text>
+            <View style={styles.stepRow}>
+              {steps.map((label, index) => {
+                const done = index < activeStep;
+                const current = index === activeStep;
+                return (
+                  <View key={label} style={styles.stepItem}>
+                    <View
+                      style={[
+                        styles.stepDot,
+                        done && styles.stepDotDone,
+                        current && styles.stepDotCurrent,
+                      ]}
+                    />
+                    <Text
+                      style={[
+                        styles.stepLabel,
+                        (done || current) && styles.stepLabelActive,
+                      ]}
+                    >
+                      {label}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
         </View>
       ) : null}
 
@@ -269,6 +359,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     minWidth: 56,
+  },
+  disabledText: {
+    opacity: 0.4,
   },
   title: {
     flex: 1,
@@ -323,16 +416,69 @@ const styles = StyleSheet.create({
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(0,0,0,0.72)',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 28,
     zIndex: 3,
   },
-  overlayText: {
+  overlayCard: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'rgba(20,20,20,0.92)',
+    paddingHorizontal: 22,
+    paddingVertical: 28,
+    alignItems: 'center',
+  },
+  overlayTitle: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 18,
+    fontWeight: '700',
+    marginTop: 18,
+    textAlign: 'center',
+  },
+  overlaySubtitle: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  stepRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: 22,
+    gap: 6,
+  },
+  stepItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+  },
+  stepDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+  },
+  stepDotDone: {
+    backgroundColor: 'rgba(110, 231, 183, 0.9)',
+  },
+  stepDotCurrent: {
+    backgroundColor: '#fff',
+    transform: [{ scale: 1.25 }],
+  },
+  stepLabel: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 11,
     fontWeight: '600',
-    marginTop: 16,
+  },
+  stepLabelActive: {
+    color: 'rgba(255,255,255,0.9)',
   },
   errorBanner: {
     position: 'absolute',

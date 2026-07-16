@@ -175,8 +175,7 @@ export function MemberDetailScreen({ navigation, route }: Props) {
   const [nudgeLoading, setNudgeLoading] = useState(false);
 
   const refresh = useCallback(async () => {
-    await loadMemberDetail(userId);
-    await loadEventLedger();
+    await Promise.all([loadMemberDetail(userId), loadEventLedger()]);
   }, [loadMemberDetail, loadEventLedger, userId]);
 
   useEffect(() => {

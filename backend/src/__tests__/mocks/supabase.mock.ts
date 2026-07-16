@@ -110,6 +110,12 @@ export interface StorageBucketMock {
       error: null | { message: string };
     }>
   >;
+  download: jest.Mock<
+    (path: string) => Promise<{
+      data: Blob | null;
+      error: null | { message: string };
+    }>
+  >;
   list: jest.Mock<
     (
       path: string,
@@ -163,6 +169,14 @@ function createStorageBucket(bucket: string): StorageBucketMock {
           data: {
             signedUrl: `https://test.supabase.co/object/${bucket}/${path}?token=mock-download-token`,
           },
+          error: null,
+        }),
+      ),
+    download: jest
+      .fn<(path: string) => Promise<{ data: Blob | null; error: null | { message: string } }>>()
+      .mockImplementation(() =>
+        Promise.resolve({
+          data: new Blob([Buffer.from('fake-receipt-bytes')], { type: 'image/jpeg' }),
           error: null,
         }),
       ),

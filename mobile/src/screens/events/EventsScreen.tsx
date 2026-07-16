@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import type { CompositeScreenProps } from '@react-navigation/native';
 import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
@@ -118,6 +118,7 @@ export function EventsScreen({ navigation }: Props) {
   const [listError, setListError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isRegenerating, setIsRegenerating] = useState(false);
+  const hasLoadedListRef = useRef(false);
 
   const activeCreatedEvents = useMemo(
     () => filterEventsBySegment(createdEvents, 'active'),
@@ -147,7 +148,9 @@ export function EventsScreen({ navigation }: Props) {
 
   const refreshList = useCallback(async () => {
     setListError(false);
-    setIsLoading(true);
+    if (!hasLoadedListRef.current) {
+      setIsLoading(true);
+    }
     try {
       const [createdPage, joinedPage] = await Promise.all([
         fetchEvents(undefined, { role: 'creator' }),
@@ -155,6 +158,7 @@ export function EventsScreen({ navigation }: Props) {
       ]);
       setCreatedEvents(createdPage.events);
       setJoinedEvents(joinedPage.events);
+      hasLoadedListRef.current = true;
     } catch {
       setListError(true);
     } finally {
@@ -162,13 +166,8 @@ export function EventsScreen({ navigation }: Props) {
     }
   }, []);
 
-  useEffect(() => {
-    void refreshList();
-  }, [refreshList]);
-
   useFocusEffect(
     useCallback(() => {
-      useEventStore.getState().resetCurrentEvent();
       void refreshList();
     }, [refreshList]),
   );

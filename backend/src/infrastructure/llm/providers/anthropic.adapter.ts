@@ -38,10 +38,11 @@ export class AnthropicAdapter implements LLMProvider {
     messages: LLMMessage[],
     options: LLMCompletionOptions = {},
   ): Promise<LLMResponse> {
-    const { maxTokens = 1024, timeout = 20_000 } = options;
+    const { maxTokens = 1024, timeout = 20_000, maxAttempts = MAX_ATTEMPTS } = options;
+    const attempts = Math.max(1, Math.min(maxAttempts, MAX_ATTEMPTS));
     let lastError: Error | null = null;
 
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    for (let attempt = 1; attempt <= attempts; attempt++) {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeout);
 
@@ -84,7 +85,7 @@ export class AnthropicAdapter implements LLMProvider {
         };
       } catch (err) {
         lastError = err instanceof Error ? err : new Error(String(err));
-        if (!isRetriable(err) || attempt === MAX_ATTEMPTS) break;
+        if (!isRetriable(err) || attempt === attempts) break;
         await sleep(jitteredDelay(attempt));
       } finally {
         clearTimeout(timer);

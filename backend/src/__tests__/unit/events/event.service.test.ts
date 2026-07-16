@@ -111,7 +111,10 @@ describe('event.service', () => {
         ],
         error: null,
       });
-      mockSupabase.__pushMockResultForTable('participants', { data: [{ id: 'p1' }], error: null });
+      mockSupabase.__pushMockResultForTable('participants', {
+        data: [{ event_id: 'event-2' }],
+        error: null,
+      });
 
       const page1 = await listEvents(USER_ID, { limit: 1 });
       expect(page1.events).toHaveLength(1);
@@ -133,7 +136,10 @@ describe('event.service', () => {
         ],
         error: null,
       });
-      mockSupabase.__pushMockResultForTable('participants', { data: [{ id: 'p1' }], error: null });
+      mockSupabase.__pushMockResultForTable('participants', {
+        data: [{ event_id: 'event-1' }],
+        error: null,
+      });
 
       const page2 = await listEvents(USER_ID, {
         limit: 1,
@@ -186,7 +192,15 @@ describe('event.service', () => {
         error: null,
       });
       mockSupabase.__pushMockResultForTable('participants', {
-        data: [{ payment_status: 'pending' }],
+        data: [
+          { event_id: EVENT_ID },
+          { event_id: participantEventId },
+          { event_id: participantEventId },
+        ],
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('participants', {
+        data: [{ event_id: participantEventId, payment_status: 'pending' }],
         error: null,
       });
 
@@ -197,6 +211,8 @@ describe('event.service', () => {
       expect(result.events[1]?.id).toBe(participantEventId);
       expect(result.events[1]?.role).toBe('participant');
       expect(result.events[1]?.creator_name).toBe('Bob');
+      expect(result.events[1]?.viewer_payment_status).toBe('pending');
+      expect(result.events[1]?.participant_count).toBe(2);
     });
   });
 
