@@ -6,7 +6,7 @@ import type {
 } from '@letssplyt/shared/receipt.types';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { getSupabase } from '../lib/supabase';
-import { ApiRequestError, apiPostAuth } from './api';
+import { ApiRequestError, apiPostAuth, isApiRequestError } from './api';
 
 const MAX_RECEIPT_WIDTH = 1200;
 const JPEG_QUALITY = 0.7;
@@ -85,6 +85,51 @@ export async function parseReceipt(
   });
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** Transient parse failures the UI should absorb with one silent retry. */
+export function isRetriableParseError(err: unknown): boolean {
+  if (!isApiRequestError(err)) {
+    return true;
+  }
+  if (err.code === 'RECEIPT_UNREADABLE' || err.code === 'AI_QUOTA_EXCEEDED') {
+    return false;
+  }
+  return (
+    err.code === 'PARSE_FAILED' ||
+    err.code === 'NETWORK_ERROR' ||
+    err.code === 'ALREADY_PROCESSING' ||
+    err.status === 409 ||
+    err.status >= 500
+  );
+}
+
+/**
+ * Call parse once; on transient failure wait briefly and try again before
+ * surfacing an error to the user (matches the "tap Retry and it works" case).
+ */
+export async function parseReceiptWithRetry(
+  eventId: string,
+  storagePath: string,
+  options?: { onRetry?: () => void },
+): Promise<ReceiptParseResponse> {
+  try {
+    return await parseReceipt(eventId, storagePath);
+  } catch (err) {
+    if (!isRetriableParseError(err)) {
+      throw err;
+    }
+
+    options?.onRetry?.();
+    const waitMs =
+      isApiRequestError(err) && err.code === 'ALREADY_PROCESSING' ? 2000 : 900;
+    await sleep(waitMs);
+    return parseReceipt(eventId, storagePath);
+  }
+}
+
 export async function uploadAndParseReceipt(
   imageUri: string,
   eventId: string,
@@ -92,5 +137,5 @@ export async function uploadAndParseReceipt(
   const compressedUri = await compressReceiptImage(imageUri);
   const { upload_url, storage_path, upload_token } = await requestUploadUrl(eventId);
   await uploadReceiptToSignedUrl(upload_url, compressedUri, storage_path, upload_token);
-  return parseReceipt(eventId, storage_path);
+  return parseReceiptWithRetry(eventId, storage_path);
 }

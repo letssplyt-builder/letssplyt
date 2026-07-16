@@ -78,8 +78,16 @@ export class GeminiAdapter implements LLMProvider {
           abortPromise,
         ]);
 
-        const text = result.response.text();
-        const usage = result.response.usageMetadata;
+        const response = result.response;
+        let text: string;
+        try {
+          text = response.text();
+        } catch (textErr) {
+          const detail = textErr instanceof Error ? textErr.message : String(textErr);
+          throw new Error(`Empty or blocked Gemini response: ${detail}`);
+        }
+
+        const usage = response.usageMetadata;
         return {
           text,
           usage: {

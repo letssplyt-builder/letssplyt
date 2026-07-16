@@ -1,15 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { formatSplitMoney } from '../../screens/splits/splitEntry.utils';
+import { formatSplitMoney, type SplitPricedItem } from '../../screens/splits/splitEntry.utils';
 import { useTheme } from '../../theme/ThemeContext';
 import type { Theme } from '../../theme/types';
 import { ItemAssignPopup } from './ItemAssignPopup';
-
-interface LineItem {
-  id: string;
-  name: string;
-  price: number;
-}
 
 interface ParticipantOption {
   id: string;
@@ -17,11 +11,12 @@ interface ParticipantOption {
 }
 
 interface ItemisedSplitPanelProps {
-  items: LineItem[];
+  items: SplitPricedItem[];
   currency: string;
   assignedCount: number;
   participants: ParticipantOption[];
   assignments: Map<string, string[]>;
+  showBillDiscountNote?: boolean;
   onAssignItem: (itemId: string, participantIds: string[]) => void;
 }
 
@@ -111,6 +106,12 @@ function makeStyles(theme: Theme) {
       marginBottom: 2,
       fontFamily: theme.fontBody,
     },
+    billNote: {
+      fontSize: 12,
+      color: theme.ink3,
+      lineHeight: 17,
+      fontFamily: theme.fontBody,
+    },
     itemList: {
       gap: 8,
     },
@@ -142,6 +143,7 @@ function makeStyles(theme: Theme) {
     },
     itemBody: {
       flex: 1,
+      minWidth: 0,
     },
     itemName: {
       fontSize: 15,
@@ -155,6 +157,24 @@ function makeStyles(theme: Theme) {
       color: theme.ink3,
       marginTop: 1,
       fontFamily: theme.fontBody,
+    },
+    itemDiscountMeta: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: theme.good,
+      marginTop: 2,
+      fontFamily: theme.fontBody,
+    },
+    priceCol: {
+      alignItems: 'flex-end',
+      gap: 2,
+    },
+    itemPriceGross: {
+      fontSize: 11,
+      fontWeight: '600',
+      color: theme.ink3,
+      textDecorationLine: 'line-through',
+      fontFamily: theme.fontDisplay,
     },
     itemPrice: {
       fontSize: 13,
@@ -171,6 +191,7 @@ export function ItemisedSplitPanel({
   assignedCount,
   participants,
   assignments,
+  showBillDiscountNote = false,
   onAssignItem,
 }: ItemisedSplitPanelProps) {
   const { theme } = useTheme();
@@ -209,6 +230,11 @@ export function ItemisedSplitPanel({
       </View>
 
       <Text style={styles.listHint}>Tap a line item to choose who shared it.</Text>
+      {showBillDiscountNote ? (
+        <Text style={styles.billNote}>
+          Bill discounts are shared by each person&apos;s item share after product discounts.
+        </Text>
+      ) : null}
 
       <View style={styles.itemList}>
         {items.map((item) => {
@@ -218,12 +244,13 @@ export function ItemisedSplitPanel({
           const assigneeNames = assignedIds
             .map((id) => participants.find((p) => p.id === id)?.display_name)
             .filter(Boolean);
+          const hasDiscount = item.lineDiscount > 0;
 
           return (
             <Pressable
               key={item.id}
               accessibilityRole="button"
-              accessibilityLabel={`${item.name}, ${formatSplitMoney(item.price, currency)}${isAssigned ? `, assigned to ${assigneeNames.join(', ')}` : ', not assigned'}`}
+              accessibilityLabel={`${item.name}, ${formatSplitMoney(item.netPrice, currency)}${hasDiscount ? ` after ${formatSplitMoney(item.lineDiscount, currency)} off` : ''}${isAssigned ? `, assigned to ${assigneeNames.join(', ')}` : ', not assigned'}`}
               onPress={() => setActiveItemId(item.id)}
               style={[styles.itemCard, isUnassigned && styles.itemCardUnassigned]}
             >
@@ -233,8 +260,22 @@ export function ItemisedSplitPanel({
                 <Text style={styles.itemMeta} numberOfLines={1}>
                   {isAssigned ? assigneeNames.join(', ') : 'Tap to assign'}
                 </Text>
+                {hasDiscount ? (
+                  <Text style={styles.itemDiscountMeta} numberOfLines={1}>
+                    −{formatSplitMoney(item.lineDiscount, currency)} off
+                  </Text>
+                ) : null}
               </View>
-              <Text style={styles.itemPrice}>{formatSplitMoney(item.price, currency)}</Text>
+              <View style={styles.priceCol}>
+                {hasDiscount ? (
+                  <Text style={styles.itemPriceGross}>
+                    {formatSplitMoney(item.price, currency)}
+                  </Text>
+                ) : null}
+                <Text style={styles.itemPrice}>
+                  {formatSplitMoney(item.netPrice, currency)}
+                </Text>
+              </View>
             </Pressable>
           );
         })}
@@ -245,6 +286,8 @@ export function ItemisedSplitPanel({
           visible={activeItemId !== null}
           itemName={activeItem.name}
           itemPrice={activeItem.price}
+          lineDiscount={activeItem.lineDiscount}
+          netPrice={activeItem.netPrice}
           currency={currency}
           participants={participants}
           selectedIds={assignments.get(activeItem.id) ?? []}

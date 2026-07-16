@@ -14,6 +14,8 @@ interface ItemAssignPopupProps {
   visible: boolean;
   itemName: string;
   itemPrice: number;
+  lineDiscount?: number;
+  netPrice?: number;
   currency: string;
   participants: ParticipantOption[];
   selectedIds: string[];
@@ -60,6 +62,13 @@ function makeStyles(theme: Theme) {
       fontWeight: '700',
       color: theme.accent,
       fontFamily: theme.fontDisplay,
+    },
+    itemPriceMath: {
+      fontSize: 13,
+      fontWeight: '600',
+      color: theme.ink2,
+      marginTop: 4,
+      fontFamily: theme.fontBody,
     },
     closeBtn: {
       padding: 4,
@@ -160,6 +169,8 @@ export function ItemAssignPopup({
   visible,
   itemName,
   itemPrice,
+  lineDiscount = 0,
+  netPrice,
   currency,
   participants,
   selectedIds,
@@ -169,6 +180,8 @@ export function ItemAssignPopup({
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [pendingIds, setPendingIds] = useState<string[]>(selectedIds);
+  const resolvedNet = netPrice ?? Number(Math.max(0, itemPrice - lineDiscount).toFixed(2));
+  const hasDiscount = lineDiscount > 0;
 
   useEffect(() => {
     if (visible) {
@@ -208,7 +221,16 @@ export function ItemAssignPopup({
           <View style={styles.header}>
             <View style={styles.headerText}>
               <Text style={styles.itemName} numberOfLines={2}>{itemName}</Text>
-              <Text style={styles.itemPrice}>{formatSplitMoney(itemPrice, currency)}</Text>
+              <Text style={styles.itemPrice}>
+                {formatSplitMoney(resolvedNet, currency)}
+              </Text>
+              {hasDiscount ? (
+                <Text style={styles.itemPriceMath}>
+                  {formatSplitMoney(itemPrice, currency)} −{' '}
+                  {formatSplitMoney(lineDiscount, currency)} ={' '}
+                  {formatSplitMoney(resolvedNet, currency)}
+                </Text>
+              ) : null}
             </View>
             <Pressable
               accessibilityRole="button"

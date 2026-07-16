@@ -9,7 +9,7 @@ import logger from '../../infrastructure/logger';
 import { sanitizePromptInput } from '../../infrastructure/security/sanitize';
 import { supabaseAdmin } from '../../infrastructure/supabase';
 import { buildA1DevStubResult, isA1DevStubEnabled } from './a1-dev-stub';
-import { isAiQuotaError, toA1AppError } from './a1-llm-errors';
+import { isAiQuotaError, isTransientAiError, toA1AppError } from './a1-llm-errors';
 import {
   claimParsingSlot,
   getAiStage,
@@ -32,8 +32,12 @@ import {
 } from './receipt-parser/receipt-parser.schema';
 
 const RECEIPTS_BUCKET = 'receipts';
-/** Parse-level retries for bad JSON / validation. Provider retries are disabled (maxAttempts: 1). */
-const MAX_RETRIES = parseInt(process.env.RECEIPT_PARSE_MAX_RETRIES ?? '2', 10);
+/**
+ * Outer A1 retries cover bad JSON/schema and transient Gemini failures.
+ * Provider uses maxAttempts: 2 so a single A1 attempt can absorb one blip
+ * without nesting into 9× calls (previous default).
+ */
+const MAX_RETRIES = parseInt(process.env.RECEIPT_PARSE_MAX_RETRIES ?? '3', 10);
 const A1_MAX_OUTPUT_TOKENS = parseInt(process.env.A1_MAX_OUTPUT_TOKENS ?? '4096', 10);
 const LOW_CONFIDENCE_THRESHOLD = parseFloat(process.env.A1_ITEM_CONFIDENCE_THRESHOLD ?? '0.75');
 
@@ -262,7 +266,8 @@ async function callA1Model(
         maxTokens: A1_MAX_OUTPUT_TOKENS,
         timeout: 60_000,
         responseJson: true,
-        maxAttempts: 1,
+        // One provider-level retry for flaky Gemini; outer loop covers JSON/schema.
+        maxAttempts: 2,
       });
       rawText = response.text.trim();
 
@@ -321,18 +326,13 @@ async function callA1Model(
         throw toA1AppError(err);
       }
 
-      const providerMessage = lastError.message.toLowerCase();
-      const isProviderHardFailure =
-        providerMessage.includes('timeout') ||
-        providerMessage.includes('gemini request failed') ||
-        providerMessage.includes('anthropic request failed');
-
       const outputPreview = rawText ? previewModelOutput(rawText) : undefined;
       logger.warn(
         {
           eventId,
           attempt,
           error: errorMessage,
+          transient: isTransientAiError(err),
           outputPreview,
         },
         'A1 receipt parse attempt failed',
@@ -352,10 +352,6 @@ async function callA1Model(
         latencyMs: Date.now() - start,
         attempts: attempt,
       });
-
-      if (isProviderHardFailure) {
-        throw toA1AppError(lastError);
-      }
 
       if (attempt < MAX_RETRIES) {
         await sleep(getRetryDelay(attempt));

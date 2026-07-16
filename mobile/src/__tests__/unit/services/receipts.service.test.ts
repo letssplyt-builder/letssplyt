@@ -4,11 +4,14 @@ import * as SecureStore from 'expo-secure-store';
 import { AUTH_TOKEN_KEY } from '../../../store/authStore';
 import {
   compressReceiptImage,
+  isRetriableParseError,
   parseReceipt,
+  parseReceiptWithRetry,
   requestUploadUrl,
   uploadAndParseReceipt,
   uploadReceiptToSignedUrl,
 } from '../../../services/receipts.service';
+import { ApiRequestError } from '../../../services/api';
 
 const EVENT_ID = 'event-44444444-4444-4444-4444-444444444444';
 
@@ -142,5 +145,48 @@ describe('receipts.service', () => {
 
     const result = await parseReceipt(EVENT_ID, `${EVENT_ID}/receipt.jpg`);
     expect(result.items).toHaveLength(1);
+  });
+
+  it('parseReceiptWithRetry silently retries transient PARSE_FAILED once', async () => {
+    const fetchMock = global.fetch as jest.MockedFunction<typeof fetch>;
+    fetchMock
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 500,
+        json: async () => ({
+          error: {
+            code: 'PARSE_FAILED',
+            message: 'We could not read this receipt. Try again or enter the total manually.',
+          },
+        }),
+      } as Response)
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          items: [{ name: 'Burger', unit_price: 12, quantity: 1 }],
+          additional_charges: [],
+          tax_amount: 1,
+          tip_amount: 2,
+          fees_amount: 0,
+          total_amount: 15,
+          currency: 'USD',
+          storage_path: `${EVENT_ID}/receipt.jpg`,
+        }),
+      } as Response);
+
+    const onRetry = jest.fn();
+    const result = await parseReceiptWithRetry(EVENT_ID, `${EVENT_ID}/receipt.jpg`, { onRetry });
+
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(result.items).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not treat RECEIPT_UNREADABLE as retriable', () => {
+    expect(
+      isRetriableParseError(new ApiRequestError('RECEIPT_UNREADABLE', 'blurry', 400)),
+    ).toBe(false);
+    expect(isRetriableParseError(new ApiRequestError('PARSE_FAILED', 'fail', 500))).toBe(true);
   });
 });
