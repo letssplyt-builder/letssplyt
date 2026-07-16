@@ -1,4 +1,3 @@
-import { createLLMProvider } from '../../infrastructure/llm/factory';
 import { getRedisClient } from '../../infrastructure/redis';
 import { supabaseAdmin } from '../../infrastructure/supabase';
 import { telnyxClient } from '../../infrastructure/telnyx';
@@ -51,20 +50,16 @@ async function checkRedis(): Promise<HealthCheckStatus> {
   }
 }
 
+/**
+ * Config-only AI check — never call the model from /health.
+ * Railway/CI probes would otherwise burn paid Gemini quota and add latency
+ * contention with real receipt parses.
+ */
 async function checkGemini(): Promise<HealthCheckStatus> {
   if (process.env.APP_ENV === 'production') {
-    return 'skipped';
+    return process.env.ANTHROPIC_API_KEY || process.env.GEMINI_API_KEY ? 'ok' : 'error';
   }
-  if (!process.env.GEMINI_API_KEY) {
-    return 'error';
-  }
-  try {
-    const provider = createLLMProvider('A1');
-    await provider.complete([{ role: 'user', content: 'ping' }], { maxTokens: 1, timeout: 10_000 });
-    return 'ok';
-  } catch {
-    return 'error';
-  }
+  return process.env.GEMINI_API_KEY ? 'ok' : 'error';
 }
 
 async function checkTwilioSms(): Promise<HealthCheckStatus> {

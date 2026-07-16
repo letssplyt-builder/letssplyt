@@ -40,18 +40,19 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     const profileErrors: unknown[] = [];
 
     try {
-      try {
-        const profileUser = await profileService.fetchMyProfile();
-        set({ user: profileUser });
-      } catch (err) {
-        profileErrors.push(err);
+      const [profileResult, handlesResult] = await Promise.allSettled([
+        profileService.fetchMyProfile(),
+        profileService.fetchMyHandles(),
+      ]);
+
+      if (profileResult.status === 'fulfilled') {
+        set({ user: profileResult.value });
+      } else {
+        profileErrors.push(profileResult.reason);
       }
 
-      try {
-        const handles = await profileService.fetchMyHandles();
-        set({ handles: sortHandles(handles) });
-      } catch {
-        // Handles can load independently — profile name/avatar still usable.
+      if (handlesResult.status === 'fulfilled') {
+        set({ handles: sortHandles(handlesResult.value) });
       }
 
       if (profileErrors.length > 0 && !get().user) {

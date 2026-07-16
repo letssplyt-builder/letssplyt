@@ -152,6 +152,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const loadEventLedger = useSettlementStore((state) => state.loadEventLedger);
   const getIOweForEvent = useSettlementStore((state) => state.getIOweForEvent);
   const skipFocusRefreshRef = useRef(false);
+  const realtimeRefreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isFocused = useIsFocused();
   const { theme } = useTheme();
   const themed = useThemedStyles();
@@ -199,14 +200,23 @@ export function EventDetailScreen({ navigation, route }: Props) {
           filter: `event_id=eq.${eventId}`,
         },
         () => {
-          void loadEventDetail(eventId).catch(() => {
-            // Realtime refresh failures must not surface as unhandled rejections (red screen).
-          });
+          if (realtimeRefreshTimerRef.current) {
+            clearTimeout(realtimeRefreshTimerRef.current);
+          }
+          realtimeRefreshTimerRef.current = setTimeout(() => {
+            void loadEventDetail(eventId).catch(() => {
+              // Realtime refresh failures must not surface as unhandled rejections (red screen).
+            });
+          }, 400);
         },
       )
       .subscribe();
 
     return () => {
+      if (realtimeRefreshTimerRef.current) {
+        clearTimeout(realtimeRefreshTimerRef.current);
+        realtimeRefreshTimerRef.current = null;
+      }
       channel.unsubscribe();
       supabase.removeChannel(channel);
     };

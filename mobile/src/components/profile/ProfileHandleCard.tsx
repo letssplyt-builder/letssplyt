@@ -10,6 +10,7 @@ interface ProfileHandleCardProps {
   isDragging?: boolean;
   onPress: () => void;
   onDrag: () => void;
+  showDeleteRail?: boolean;
 }
 
 function makeStyles(theme: Theme) {
@@ -24,6 +25,19 @@ function makeStyles(theme: Theme) {
       borderColor: theme.line,
       paddingHorizontal: 12,
       paddingVertical: 14,
+      overflow: 'hidden',
+    },
+    cardRailRight: {
+      paddingRight: 14,
+    },
+    railRight: {
+      position: 'absolute',
+      right: 0,
+      top: 0,
+      bottom: 0,
+      width: 5,
+      backgroundColor: theme.bad,
+      opacity: 0.85,
     },
     cardDragging: {
       opacity: 0.96,
@@ -109,13 +123,21 @@ export function ProfileHandleCard({
   isDragging,
   onPress,
   onDrag,
+  showDeleteRail = true,
 }: ProfileHandleCardProps) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const visual = providerVisual(handle.provider);
 
   return (
-    <View style={[styles.card, isDragging && styles.cardDragging]}>
+    <View
+      style={[
+        styles.card,
+        isDragging && styles.cardDragging,
+        showDeleteRail && styles.cardRailRight,
+      ]}
+    >
+      {showDeleteRail ? <View style={styles.railRight} /> : null}
       <Pressable
         onLongPress={onDrag}
         delayLongPress={160}

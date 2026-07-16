@@ -74,7 +74,15 @@ export const useSettlementStore = create<SettlementState>((set, get) => ({
   },
 
   loadDashboardCounterparties: async () => {
-    set({ isLoadingCounterparties: true, counterpartyError: false });
+    const hasCached =
+      get().membersOweYou.length > 0 ||
+      get().membersYouOwe.length > 0 ||
+      get().guests.length > 0;
+    if (!hasCached) {
+      set({ isLoadingCounterparties: true, counterpartyError: false });
+    } else {
+      set({ counterpartyError: false });
+    }
     const [membersResult, guestsResult] = await Promise.allSettled([
       settlementService.fetchMemberCounterparties(),
       settlementService.fetchGuestCounterparties(),

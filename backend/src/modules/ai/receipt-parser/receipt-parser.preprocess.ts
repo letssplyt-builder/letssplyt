@@ -14,13 +14,12 @@ export async function preprocessReceiptImage(base64: string): Promise<string> {
 
   const processed = await sharp(buffer)
     .rotate()
-    .resize(2048, 2048, {
+    .resize(1600, 1600, {
       fit: 'inside',
       withoutEnlargement: true,
     })
     .normalize()
-    .sharpen()
-    .jpeg({ quality: 85 })
+    .jpeg({ quality: 80 })
     .toBuffer();
 
   return processed.toString('base64');

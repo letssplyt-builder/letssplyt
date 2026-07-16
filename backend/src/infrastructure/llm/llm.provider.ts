@@ -32,6 +32,8 @@ export interface LLMCompletionOptions {
   timeout?: number;
   /** When true, Gemini uses responseMimeType application/json (A1 receipt parse). */
   responseJson?: boolean;
+  /** Provider-level retries (default 3). A1 passes 1 so parse-level retries do not nest. */
+  maxAttempts?: number;
 }
 
 export interface LLMProvider {

@@ -32,8 +32,9 @@ import {
 } from './receipt-parser/receipt-parser.schema';
 
 const RECEIPTS_BUCKET = 'receipts';
-const MAX_RETRIES = parseInt(process.env.RECEIPT_PARSE_MAX_RETRIES ?? '3', 10);
-const A1_MAX_OUTPUT_TOKENS = parseInt(process.env.A1_MAX_OUTPUT_TOKENS ?? '8192', 10);
+/** Parse-level retries for bad JSON / validation. Provider retries are disabled (maxAttempts: 1). */
+const MAX_RETRIES = parseInt(process.env.RECEIPT_PARSE_MAX_RETRIES ?? '2', 10);
+const A1_MAX_OUTPUT_TOKENS = parseInt(process.env.A1_MAX_OUTPUT_TOKENS ?? '4096', 10);
 const LOW_CONFIDENCE_THRESHOLD = parseFloat(process.env.A1_ITEM_CONFIDENCE_THRESHOLD ?? '0.75');
 
 function sha256(value: string): string {
@@ -104,9 +105,9 @@ async function fetchReceiptImageBase64(storagePath: string): Promise<{
 }> {
   const { data, error } = await supabaseAdmin.storage
     .from(RECEIPTS_BUCKET)
-    .createSignedUrl(storagePath, 3600);
+    .download(storagePath);
 
-  if (error || !data?.signedUrl) {
+  if (error || !data) {
     throw new AppError(
       'STORAGE_READ_FAILED',
       'Could not read receipt image from storage',
@@ -115,25 +116,18 @@ async function fetchReceiptImageBase64(storagePath: string): Promise<{
     );
   }
 
-  const response = await fetch(data.signedUrl);
-  if (!response.ok) {
-    throw new AppError(
-      'STORAGE_READ_FAILED',
-      'Could not download receipt image',
-      500,
-      { status: response.status },
-    );
-  }
+  const buffer = Buffer.from(await data.arrayBuffer());
+  const lower = storagePath.toLowerCase();
+  const mimeType: 'image/jpeg' | 'image/png' | 'image/webp' = lower.endsWith('.png')
+    ? 'image/png'
+    : lower.endsWith('.webp')
+      ? 'image/webp'
+      : 'image/jpeg';
 
-  const buffer = Buffer.from(await response.arrayBuffer());
-  const mimeType =
-    storagePath.endsWith('.png')
-      ? 'image/png'
-      : storagePath.endsWith('.webp')
-        ? 'image/webp'
-        : 'image/jpeg';
-
-  return { base64: buffer.toString('base64'), mimeType };
+  return {
+    base64: buffer.toString('base64'),
+    mimeType,
+  };
 }
 
 async function persistParseResult(
@@ -268,6 +262,7 @@ async function callA1Model(
         maxTokens: A1_MAX_OUTPUT_TOKENS,
         timeout: 60_000,
         responseJson: true,
+        maxAttempts: 1,
       });
       rawText = response.text.trim();
 
@@ -326,6 +321,12 @@ async function callA1Model(
         throw toA1AppError(err);
       }
 
+      const providerMessage = lastError.message.toLowerCase();
+      const isProviderHardFailure =
+        providerMessage.includes('timeout') ||
+        providerMessage.includes('gemini request failed') ||
+        providerMessage.includes('anthropic request failed');
+
       const outputPreview = rawText ? previewModelOutput(rawText) : undefined;
       logger.warn(
         {
@@ -351,6 +352,10 @@ async function callA1Model(
         latencyMs: Date.now() - start,
         attempts: attempt,
       });
+
+      if (isProviderHardFailure) {
+        throw toA1AppError(lastError);
+      }
 
       if (attempt < MAX_RETRIES) {
         await sleep(getRetryDelay(attempt));

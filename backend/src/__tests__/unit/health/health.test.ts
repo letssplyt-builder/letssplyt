@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import express from 'express';
 import request from 'supertest';
 import healthRouter from '../../../modules/health/health.routes';
-import { mockLLMProvider } from '../../mocks/llm.mock';
 import { mockRedisPing } from '../../mocks/redis.mock';
 import { mockTwilio } from '../../mocks/twilio.mock';
 import { mockSupabase } from '../../mocks/supabase.mock';
@@ -20,14 +19,10 @@ describe('GET /api/v1/health', () => {
     mockSupabase.__resetMock();
     process.env.APP_ENV = 'test';
     process.env.SMS_PROVIDER = 'twilio';
+    process.env.GEMINI_API_KEY = 'test-gemini-key';
 
     mockSupabase.__setMockResultForTable('users', { data: [{ id: 'u1' }], error: null });
     mockRedisPing.mockResolvedValue('PONG');
-    mockLLMProvider.complete.mockResolvedValue({
-      text: 'ok',
-      usage: { inputTokens: 1, outputTokens: 1 },
-      modelUsed: 'mock-model',
-    });
     mockTwilio.api.accounts.mockImplementation((sid: string) => ({
       fetch: jest.fn<() => Promise<{ sid: string }>>().mockResolvedValue({ sid }),
     }));
@@ -74,7 +69,7 @@ describe('GET /api/v1/health', () => {
       error: { code: '500', message: 'storage down' },
     });
     mockRedisPing.mockRejectedValue(new Error('redis down'));
-    mockLLMProvider.complete.mockRejectedValue(new Error('ai down'));
+    delete process.env.GEMINI_API_KEY;
     mockTwilio.api.accounts.mockImplementation(() => ({
       fetch: jest.fn<() => Promise<{ sid: string }>>().mockRejectedValue(new Error('twilio down')),
     }));

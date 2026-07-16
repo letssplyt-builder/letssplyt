@@ -102,7 +102,11 @@ export const useEventStore = create<EventState>((set, get) => ({
   },
 
   loadEventDetail: async (eventId) => {
-    set({ isLoadingDetail: true });
+    const keepVisible =
+      get().currentEvent?.event?.id === eventId && get().currentEvent != null;
+    if (!keepVisible) {
+      set({ isLoadingDetail: true });
+    }
     try {
       const detail = await eventService.fetchEventById(eventId);
       set({ currentEvent: detail, isLoadingDetail: false });
