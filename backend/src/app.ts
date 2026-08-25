@@ -22,6 +22,7 @@ import settlementRoutes from './modules/settlement/settlement.routes';
 import twilioWebhookRouter from './modules/webhooks/twilio.routes';
 import telnyxWebhookRouter from './modules/webhooks/telnyx.routes';
 import breakdownRoutes from './modules/messages/breakdown.routes';
+import nudgePageRoutes from './modules/messages/nudge-page.routes';
 import jobsRoutes from './modules/jobs/jobs.routes';
 import analyticsRoutes from './modules/analytics/analytics.routes';
 import healthRoutes from './modules/health/health.routes';
@@ -97,6 +98,7 @@ app.use('/webhooks/telnyx', telnyxWebhookRouter);
 app.use('/join', htmlSecurityHeaders, joinWebRoutes);
 app.use('/split', htmlSecurityHeaders, breakdownRoutes);
 app.use('/s', htmlSecurityHeaders, breakdownRoutes);
+app.use('/nudge', htmlSecurityHeaders, nudgePageRoutes);
 
 app.use('/api/v1/join', joinAppRoutes);
 

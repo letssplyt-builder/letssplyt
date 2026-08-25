@@ -87,6 +87,18 @@ export async function nudgeParticipant(
   return apiPostAuth(`/events/${eventId}/messages/nudge/${participantId}`, {});
 }
 
+export async function nudgeMemberOutstanding(
+  counterpartyUserId: string,
+): Promise<{ sent: boolean; nudged_count?: number; next_nudge_available_at?: string }> {
+  return apiPostAuth(`/settlement/member/${counterpartyUserId}/nudge`, {});
+}
+
+export async function nudgeGuestOutstanding(
+  phoneHash: string,
+): Promise<{ sent: boolean; nudged_count?: number; next_nudge_available_at?: string }> {
+  return apiPostAuth(`/settlement/guest/${phoneHash}/nudge`, {});
+}
+
 export async function memberSelfReportAll(
   counterpartyUserId: string,
   paymentMethod: SelfReportPaymentMethod,

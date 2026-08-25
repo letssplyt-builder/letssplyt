@@ -13,7 +13,7 @@
 
 ---
 
-## Apply order (24 migrations)
+## Apply order (37 migrations)
 
 Run from **repository root** (`letssplyt/`), not `supabase/`:
 
@@ -72,6 +72,8 @@ If CLI reports *"Found local migration files to be inserted before the last migr
 | 33 | `20260627000001_receipt_discounts_item_scope.sql` | E07+ | `receipt_discounts.receipt_item_id` for item-scoped discounts | `ADD COLUMN IF NOT EXISTS` |
 | 34 | `20260705140000_money_column_scale.sql` | Post-audit PA-04 | Money columns `NUMERIC(12,3)` for 3-decimal currencies | `ALTER TYPE` |
 | 35 | `20260705160000_otp_atomic_attempt_increment.sql` | Post-audit PA-06 | Atomic `increment_otp_attempt` RPC | `CREATE OR REPLACE FUNCTION` |
+| 36 | `20260821120000_claim_participant_nudge.sql` | Settlement nudge | Atomic `claim_participant_nudge` RPC (48h cooldown before SMS) | `CREATE OR REPLACE FUNCTION` |
+| 37 | `20260825140000_nudge_links.sql` | Settlement nudge | `nudge_links` capability tokens for consolidated member/guest nudge SMS | `IF NOT EXISTS` + RLS deny-all |
 
 ---
 

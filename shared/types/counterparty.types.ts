@@ -33,8 +33,9 @@ export interface CounterpartyEventRow {
   direction: 'owed_to_me' | 'i_owe';
   payment_status: string;
   participant_id: string;
-  /** False for name-only guests / participants without a reachable phone. */
+  /** False for name-only guests / participants without a reachable phone, or during 48h cooldown. */
   can_nudge?: boolean;
+  last_nudged_at?: string | null;
 }
 
 export interface MemberDetailResponse {
@@ -59,6 +60,8 @@ export interface GuestDetailResponse {
     amount: number;
     payment_status: string;
     participant_id: string;
+    can_nudge?: boolean;
+    last_nudged_at?: string | null;
   }>;
   history: Array<{
     event_id: string;

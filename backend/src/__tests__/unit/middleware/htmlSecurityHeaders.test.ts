@@ -11,6 +11,9 @@ function createTestApp(): express.Express {
   app.use('/split', htmlSecurityHeaders, (_req, res) => {
     res.type('html').setHeader('Cache-Control', 'private, no-store').send('<html><body>ok</body></html>');
   });
+  app.use('/nudge', htmlSecurityHeaders, (_req, res) => {
+    res.type('html').setHeader('Cache-Control', 'private, no-store').send('<html><body>ok</body></html>');
+  });
   app.get('/api/v1/health', (_req, res) => {
     res.json({ ok: true });
   });
@@ -34,6 +37,15 @@ describe('htmlSecurityHeaders', () => {
 
   it('sets the same security headers on /split HTML routes', async () => {
     const response = await request(app).get('/split/test-token');
+
+    expect(response.status).toBe(200);
+    expect(response.headers['content-security-policy']).toBeDefined();
+    expect(response.headers['referrer-policy']).toBe('no-referrer');
+    expect(response.headers['cache-control']).toBe('private, no-store');
+  });
+
+  it('sets the same security headers on /nudge HTML routes', async () => {
+    const response = await request(app).get('/nudge/test-token');
 
     expect(response.status).toBe(200);
     expect(response.headers['content-security-policy']).toBeDefined();

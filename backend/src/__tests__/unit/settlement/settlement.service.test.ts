@@ -88,6 +88,12 @@ describe('settlement.service', () => {
       resolvedCountry: 'US',
       channel: 'sms',
     });
+    mockSupabase.rpc.mockImplementation((fn) => {
+      if (fn === 'claim_participant_nudge') {
+        return Promise.resolve({ data: new Date().toISOString(), error: null });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
   });
 
   it('self-report rejects when status is already confirmed', async () => {
@@ -242,6 +248,8 @@ describe('settlement.service', () => {
       code: 'NUDGE_COOLDOWN',
       statusCode: 429,
     });
+    expect(sendOutboundMessage).not.toHaveBeenCalled();
+    expect(mockSupabase.rpc).not.toHaveBeenCalled();
   });
 
   it('mark-paid sets confirmed and may settle event', async () => {
@@ -290,7 +298,6 @@ describe('settlement.service', () => {
       data: { display_name: 'Alex' },
       error: null,
     });
-    mockSupabase.__pushMockResultForTable('participants', { data: null, error: null });
     mockSupabase.__pushMockResultForTable('notification_log', { data: null, error: null });
     mockSupabase.__pushMockResultForTable('settlement_log', { data: null, error: null });
 
@@ -298,6 +305,50 @@ describe('settlement.service', () => {
 
     expect(result.sent).toBe(true);
     expect(sendOutboundMessage).toHaveBeenCalledTimes(1);
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('claim_participant_nudge', {
+      p_participant_id: PARTICIPANT_ID,
+      p_event_id: EVENT_ID,
+    });
     expect(result.next_nudge_available_at).toBeTruthy();
+  });
+
+  it('nudge does not send SMS when the atomic claim loses a race', async () => {
+    pushEvent();
+    pushParticipantRow({ last_nudged_at: null });
+    mockSupabase.__pushMockResultForTable('users', {
+      data: { display_name: 'Alex' },
+      error: null,
+    });
+    mockSupabase.rpc.mockImplementationOnce((fn) => {
+      if (fn === 'claim_participant_nudge') {
+        return Promise.resolve({ data: null, error: null });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    await expect(nudgeParticipant(PAYER_ID, EVENT_ID, PARTICIPANT_ID)).rejects.toMatchObject({
+      code: 'NUDGE_COOLDOWN',
+      statusCode: 429,
+    });
+    expect(sendOutboundMessage).not.toHaveBeenCalled();
+  });
+
+  it('keeps the cooldown claim if Telnyx send fails after claim', async () => {
+    pushEvent();
+    pushParticipantRow({ last_nudged_at: null });
+    mockSupabase.__pushMockResultForTable('users', {
+      data: { display_name: 'Alex' },
+      error: null,
+    });
+    jest.mocked(sendOutboundMessage).mockRejectedValueOnce(new Error('telnyx down'));
+
+    await expect(nudgeParticipant(PAYER_ID, EVENT_ID, PARTICIPANT_ID)).rejects.toThrow(
+      'telnyx down',
+    );
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('claim_participant_nudge', {
+      p_participant_id: PARTICIPANT_ID,
+      p_event_id: EVENT_ID,
+    });
+    expect(sendOutboundMessage).toHaveBeenCalledTimes(1);
   });
 });

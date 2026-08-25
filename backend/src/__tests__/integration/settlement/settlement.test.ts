@@ -252,6 +252,111 @@ describe('Settlement API integration', () => {
     expect(response.status).toBe(429);
     expect(response.body.error.code).toBe('NUDGE_COOLDOWN');
     expect(response.body.error.details.next_nudge_available_at).toBeTruthy();
+    expect(sendOutboundMessage).not.toHaveBeenCalled();
+  });
+
+  it('claims the nudge slot before sending SMS', async () => {
+    mockAuth(PAYER_ID);
+    pushEventRow({
+      id: EVENT_ID,
+      payer_id: PAYER_ID,
+      title: 'Dinner',
+      status: 'sent',
+      currency: 'USD',
+      locale: 'en-US',
+      deleted_at: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: {
+        id: PARTICIPANT_ID,
+        event_id: EVENT_ID,
+        user_id: PARTICIPANT_USER,
+        display_name: 'Jordan',
+        amount_owed: 15,
+        payment_status: 'pending',
+        disputed_count: 0,
+        last_nudged_at: null,
+        nudge_count: 0,
+        guest_pii_token: null,
+        country_code: 'US',
+        join_method: 'manual_phone',
+      },
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('users', {
+      data: { display_name: 'Alex' },
+      error: null,
+    });
+    mockSupabase.rpc.mockImplementationOnce((fn) => {
+      if (fn === 'claim_participant_nudge') {
+        return Promise.resolve({ data: new Date().toISOString(), error: null });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+    mockSupabase.__pushMockResultForTable('notification_log', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('settlement_log', { data: null, error: null });
+
+    const response = await request(app)
+      .post(`/api/v1/events/${EVENT_ID}/messages/nudge/${PARTICIPANT_ID}`)
+      .set(AUTH_PAYER)
+      .send();
+
+    expect(response.status).toBe(200);
+    expect(response.body.sent).toBe(true);
+    expect(sendOutboundMessage).toHaveBeenCalledTimes(1);
+    expect(mockSupabase.rpc).toHaveBeenCalledWith('claim_participant_nudge', {
+      p_participant_id: PARTICIPANT_ID,
+      p_event_id: EVENT_ID,
+    });
+  });
+
+  it('returns 429 without SMS when the nudge claim loses a race', async () => {
+    mockAuth(PAYER_ID);
+    pushEventRow({
+      id: EVENT_ID,
+      payer_id: PAYER_ID,
+      title: 'Dinner',
+      status: 'sent',
+      currency: 'USD',
+      locale: 'en-US',
+      deleted_at: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: {
+        id: PARTICIPANT_ID,
+        event_id: EVENT_ID,
+        user_id: PARTICIPANT_USER,
+        display_name: 'Jordan',
+        amount_owed: 15,
+        payment_status: 'pending',
+        disputed_count: 0,
+        last_nudged_at: null,
+        nudge_count: 0,
+        guest_pii_token: null,
+        country_code: 'US',
+        join_method: 'manual_phone',
+      },
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('users', {
+      data: { display_name: 'Alex' },
+      error: null,
+    });
+    mockSupabase.rpc.mockImplementationOnce((fn) => {
+      if (fn === 'claim_participant_nudge') {
+        return Promise.resolve({ data: null, error: null });
+      }
+      return Promise.resolve({ data: null, error: null });
+    });
+
+    const response = await request(app)
+      .post(`/api/v1/events/${EVENT_ID}/messages/nudge/${PARTICIPANT_ID}`)
+      .set(AUTH_PAYER)
+      .send();
+
+    expect(response.status).toBe(429);
+    expect(response.body.error.code).toBe('NUDGE_COOLDOWN');
+    expect(sendOutboundMessage).not.toHaveBeenCalled();
   });
 
   it('event settles when all owing participants are confirmed or opted_out', async () => {

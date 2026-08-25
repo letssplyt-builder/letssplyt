@@ -42,6 +42,8 @@ const EXPECTED_MIGRATIONS = [
   '20260627000001_receipt_discounts_item_scope.sql',
   '20260705140000_money_column_scale.sql',
   '20260705160000_otp_atomic_attempt_increment.sql',
+  '20260821120000_claim_participant_nudge.sql',
+  '20260825140000_nudge_links.sql',
 ] as const;
 
 const REPO_ROOT = path.resolve(__dirname, '../../../../..');

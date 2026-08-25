@@ -38,7 +38,7 @@ function escapeHref(url: string): string {
   return url.replace(/"/g, '&quot;');
 }
 
-const BREAKDOWN_PAY_OPENER_SCRIPT = `
+export const BREAKDOWN_PAY_OPENER_SCRIPT = `
 function letsSplytOpenPay(anchor, event) {
   var web = anchor.getAttribute('href');
   var app = anchor.getAttribute('data-app-url');

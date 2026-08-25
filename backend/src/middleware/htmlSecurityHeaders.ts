@@ -1,7 +1,7 @@
 import helmet from 'helmet';
 
 /**
- * Security headers for server-rendered guest HTML (/join, /split, /s).
+ * Security headers for server-rendered guest HTML (/join, /split, /s, /nudge).
  * Templates use inline CSS/JS only — no third-party assets.
  */
 export const htmlSecurityHeaders = helmet({

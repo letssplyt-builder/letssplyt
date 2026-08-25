@@ -156,4 +156,42 @@ describe('counterparties.service', () => {
       },
     ]);
   });
+
+  it('keeps name-only guests off the phone-guest path even if PII exists', async () => {
+    mockSupabase.__pushMockResultForTable('events', {
+      data: [{ id: EVENT_CREATED }],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: [
+        {
+          id: 'part-name-only',
+          event_id: EVENT_CREATED,
+          display_name: 'Chris',
+          amount_owed: 18,
+          payment_status: 'pending',
+          guest_pii_token: 'pii-orphan',
+          join_method: 'manual_name_only',
+        },
+      ],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('guest_pii', {
+      data: [{ id: 'pii-orphan', phone_hash: 'hash-chris' }],
+      error: null,
+    });
+
+    const result = await getGuestCounterparties(VIEWER_ID);
+
+    expect(result.guests).toEqual([
+      {
+        guest_key: 'part-name-only',
+        kind: 'name_only',
+        display_name: 'Chris',
+        amount: 18,
+        event_id: EVENT_CREATED,
+        participant_id: 'part-name-only',
+      },
+    ]);
+  });
 });

@@ -5,6 +5,7 @@ import { useSettlementStore } from '../../../store/settlementStore';
 
 jest.mock('../../../services/settlement.service', () => ({
   memberSelfReportAll: jest.fn(),
+  nudgeMemberOutstanding: jest.fn(),
 }));
 
 const mockNavigate = jest.fn();

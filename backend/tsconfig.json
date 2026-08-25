@@ -10,7 +10,8 @@
       "@letssplyt/shared/paymentLinks": ["../shared/dist/utils/paymentLinks"],
       "@letssplyt/shared/utils/splitCalculator": ["../shared/dist/utils/splitCalculator"],
       "@letssplyt/shared/utils/receiptDiscounts": ["../shared/dist/utils/receiptDiscounts"],
-      "@letssplyt/shared/utils/formatCurrency": ["../shared/dist/utils/formatCurrency"]
+      "@letssplyt/shared/utils/formatCurrency": ["../shared/dist/utils/formatCurrency"],
+      "@letssplyt/shared/utils/nudgeCooldown": ["../shared/dist/utils/nudgeCooldown"]
     }
   },
   "include": ["src/**/*"]

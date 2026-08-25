@@ -1,11 +1,14 @@
+import { NUDGE_COOLDOWN_MS, nextNudgeAvailableAt } from '@letssplyt/shared/utils/nudgeCooldown';
 import { formatCurrency } from '../../infrastructure/security';
 import { AppError } from '../../infrastructure/errors';
+import logger from '../../infrastructure/logger';
 import { isPhoneOptedOut } from '../../infrastructure/notification/opt-out';
 import { sendOutboundMessage } from '../../infrastructure/notification/outbound-messaging.service';
 import { supabaseAdmin } from '../../infrastructure/supabase';
 import { assertEventOwner, fetchEventRow } from '../events/event.service';
 import { buildNudgeMessage } from '../messages/nudge.builder';
 import { resolveParticipantPhoneContext } from '../messages/participant-phone';
+import { claimParticipantNudgeSlot } from './nudge-claim';
 import {
   notifyCreatorMemberPaid,
   notifyCreatorEventFullySettled,
@@ -16,8 +19,6 @@ import {
   isSettlementCompleteStatus,
   type PaymentStatus,
 } from './settlement.state-machine';
-
-const NUDGE_COOLDOWN_MS = 48 * 60 * 60 * 1000;
 
 const SELF_REPORT_METHODS = new Set([
   'venmo',
@@ -652,13 +653,12 @@ export async function nudgeParticipant(
 
   if (participant.last_nudged_at) {
     const lastNudge = new Date(participant.last_nudged_at).getTime();
-    const nextAvailable = lastNudge + NUDGE_COOLDOWN_MS;
-    if (Date.now() < nextAvailable) {
+    if (Date.now() < lastNudge + NUDGE_COOLDOWN_MS) {
       throw new AppError(
         'NUDGE_COOLDOWN',
         'Nudge cooldown active for this participant',
         429,
-        { next_nudge_available_at: new Date(nextAvailable).toISOString() },
+        { next_nudge_available_at: nextNudgeAvailableAt(participant.last_nudged_at) },
       );
     }
   }
@@ -698,27 +698,38 @@ export async function nudgeParticipant(
     eventTitle: eventRow.title,
   });
 
-  const outboundResult = await sendOutboundMessage(
-    phoneContext.phoneE164,
-    phoneContext.channel,
-    messageText,
-  );
+  const claimedAtIso = await claimParticipantNudgeSlot(eventId, participantId);
 
-  const now = new Date();
-  const sentAt = now.toISOString();
-  const nextNudgeAvailableAt = new Date(now.getTime() + NUDGE_COOLDOWN_MS).toISOString();
-
-  const { error: updateError } = await supabaseAdmin
-    .from('participants')
-    .update({
-      last_nudged_at: sentAt,
-      nudge_count: participant.nudge_count + 1,
-    })
-    .eq('id', participantId);
-
-  if (updateError) {
-    throw new AppError('DB_WRITE_FAILED', updateError.message, 500);
+  if (!claimedAtIso) {
+    throw new AppError(
+      'NUDGE_COOLDOWN',
+      'Nudge cooldown active for this participant',
+      429,
+      {
+        next_nudge_available_at: new Date(Date.now() + NUDGE_COOLDOWN_MS).toISOString(),
+      },
+    );
   }
+
+  let outboundResult: { messageId: string; channel: 'sms' | 'whatsapp' };
+  try {
+    outboundResult = await sendOutboundMessage(
+      phoneContext.phoneE164,
+      phoneContext.channel,
+      messageText,
+    );
+  } catch (err) {
+    logger.error({
+      msg: 'Nudge SMS send failed after cooldown claim',
+      eventId,
+      participantId,
+      err,
+    });
+    throw err;
+  }
+
+  const sentAt = new Date().toISOString();
+  const nextNudgeAvailable = nextNudgeAvailableAt(claimedAtIso);
 
   const { error: logError } = await supabaseAdmin.from('notification_log').insert({
     user_id: participant.user_id,
@@ -761,6 +772,6 @@ export async function nudgeParticipant(
     sent: true,
     channel: outboundResult.channel,
     twilio_sid: outboundResult.messageId,
-    next_nudge_available_at: nextNudgeAvailableAt,
+    next_nudge_available_at: nextNudgeAvailable,
   };
 }
