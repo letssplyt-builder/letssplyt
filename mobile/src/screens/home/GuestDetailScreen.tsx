@@ -158,32 +158,24 @@ export function GuestDetailScreen({ navigation, route }: Props) {
     openEventDetail(navigation, eventId);
   };
 
-  const nudgeableOutstanding =
+  const pendingOutstanding =
     guestDetail?.outstanding.filter((row) => row.payment_status === 'pending') ?? [];
+  const nudgeableOutstanding = pendingOutstanding.filter((row) => row.can_nudge === true);
+  const coolingDownOutstanding = pendingOutstanding.filter(
+    (row) => row.can_nudge === false && Boolean(row.last_nudged_at),
+  );
 
   const handleNudge = async () => {
     if (nudgeableOutstanding.length === 0) return;
     setNudgeLoading(true);
-    let sentCount = 0;
     try {
-      for (const row of nudgeableOutstanding) {
-        try {
-          await settlementService.nudgeParticipant(row.event_id, row.participant_id);
-          sentCount += 1;
-        } catch (err) {
-          if (isApiRequestError(err) && err.code === 'NUDGE_COOLDOWN') {
-            Alert.alert('Nudge cooldown', 'Try again later for this guest.');
-            break;
-          }
-        }
-      }
-      if (sentCount > 0) {
-        Alert.alert(
-          'Nudge sent',
-          sentCount === 1 ? 'Reminder sent.' : `${sentCount} reminder(s) sent.`,
-        );
-        await refresh();
-      } else if (nudgeableOutstanding.length > 0) {
+      await settlementService.nudgeGuestOutstanding(phoneHash);
+      Alert.alert('Nudge sent', 'One reminder sent with everything they still owe.');
+      await refresh();
+    } catch (err) {
+      if (isApiRequestError(err) && err.code === 'NUDGE_COOLDOWN') {
+        Alert.alert('Nudge cooldown', 'Try again later for this guest.');
+      } else {
         Alert.alert('Could not nudge', 'Try again in a moment.');
       }
     } finally {
@@ -235,6 +227,15 @@ export function GuestDetailScreen({ navigation, route }: Props) {
                 <Text style={styles.nudgeButtonText}>
                   {nudgeLoading ? 'Sending…' : 'Nudge'}
                 </Text>
+              </Pressable>
+            ) : coolingDownOutstanding.length > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Nudge cooldown"
+                disabled
+                style={[styles.nudgeButton, styles.nudgeButtonDisabled]}
+              >
+                <Text style={styles.nudgeButtonText}>Nudged</Text>
               </Pressable>
             ) : null}
 

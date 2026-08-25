@@ -10,6 +10,7 @@
       "@letssplyt/shared/paymentLinks": ["../shared/utils/paymentLinks.ts"],
       "@letssplyt/shared/utils/splitCalculator": ["../shared/utils/splitCalculator.ts"],
       "@letssplyt/shared/utils/receiptDiscounts": ["../shared/utils/receiptDiscounts.ts"],
+      "@letssplyt/shared/utils/nudgeCooldown": ["../shared/utils/nudgeCooldown.ts"],
       "@/*": ["./src/*"]
     }
   },

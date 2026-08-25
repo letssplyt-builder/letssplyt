@@ -33,8 +33,7 @@ describe('GuestDetailScreen', () => {
     useSettlementStore.setState({
       guestDetail: {
         display_name: 'Sam Guest',
-        phone_hash: 'hash-1',
-        net_amount: 18,
+        amount: 18,
         outstanding: [
           {
             event_id: 'event-guest-1',
@@ -42,6 +41,8 @@ describe('GuestDetailScreen', () => {
             participant_id: 'part-guest-1',
             amount: 18,
             direction: 'owed_to_me',
+            payment_status: 'pending',
+            can_nudge: true,
           },
         ],
         history: [],
@@ -71,5 +72,99 @@ describe('GuestDetailScreen', () => {
       screen: 'EventDetail',
       params: { eventId: 'event-guest-1' },
     });
+  });
+
+  it('shows Nudge for guests with a phone number', async () => {
+    render(
+      <GuestDetailScreen
+        navigation={createHomeNavigationMock() as never}
+        route={{
+          key: 'GuestDetail-1',
+          name: 'GuestDetail',
+          params: { phoneHash: 'hash-1' },
+        }}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText('Nudge')).toBeTruthy());
+    expect(screen.getByText('Nudge')).toBeTruthy();
+  });
+
+  it('hides Nudge for guests without a phone number', async () => {
+    useSettlementStore.setState({
+      guestDetail: {
+        display_name: 'Name Only',
+        amount: 18,
+        outstanding: [
+          {
+            event_id: 'event-guest-1',
+            event_title: 'Lunch',
+            participant_id: 'part-guest-1',
+            amount: 18,
+            direction: 'owed_to_me',
+            payment_status: 'pending',
+            can_nudge: false,
+          },
+        ],
+        history: [],
+      },
+      isLoadingDetail: false,
+      loadGuestDetail: jest.fn(async () => {}),
+      clearDetail: jest.fn(),
+    } as never);
+
+    render(
+      <GuestDetailScreen
+        navigation={createHomeNavigationMock() as never}
+        route={{
+          key: 'GuestDetail-1',
+          name: 'GuestDetail',
+          params: { phoneHash: 'hash-1' },
+        }}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('Lunch')).toBeTruthy());
+    expect(screen.queryByLabelText('Nudge')).toBeNull();
+    expect(screen.queryByLabelText('Nudge cooldown')).toBeNull();
+  });
+
+  it('disables Nudge during the 48-hour cooldown', async () => {
+    useSettlementStore.setState({
+      guestDetail: {
+        display_name: 'Sam Guest',
+        amount: 18,
+        outstanding: [
+          {
+            event_id: 'event-guest-1',
+            event_title: 'Lunch',
+            participant_id: 'part-guest-1',
+            amount: 18,
+            direction: 'owed_to_me',
+            payment_status: 'pending',
+            can_nudge: false,
+            last_nudged_at: '2026-08-21T12:00:00.000Z',
+          },
+        ],
+        history: [],
+      },
+      isLoadingDetail: false,
+      loadGuestDetail: jest.fn(async () => {}),
+      clearDetail: jest.fn(),
+    } as never);
+
+    render(
+      <GuestDetailScreen
+        navigation={createHomeNavigationMock() as never}
+        route={{
+          key: 'GuestDetail-1',
+          name: 'GuestDetail',
+          params: { phoneHash: 'hash-1' },
+        }}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText('Nudge cooldown')).toBeTruthy());
+    expect(screen.queryByLabelText('Nudge')).toBeNull();
   });
 });

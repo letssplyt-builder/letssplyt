@@ -8,9 +8,11 @@ import {
   handleGuestConfirmAll,
   handleGuestDisputeAll,
   handleGuestMarkPaidAll,
+  handleGuestNudgeOutstanding,
   handleMemberConfirmAll,
   handleMemberDisputeAll,
   handleMemberMarkPaidAll,
+  handleMemberNudgeOutstanding,
   handleMemberSelfReportAll,
 } from './settlement.controller';
 
@@ -26,9 +28,11 @@ router.post('/member/:userId/self-report-all', handleMemberSelfReportAll);
 router.post('/member/:userId/confirm-all', handleMemberConfirmAll);
 router.post('/member/:userId/dispute-all', handleMemberDisputeAll);
 router.post('/member/:userId/mark-paid-all', handleMemberMarkPaidAll);
+router.post('/member/:userId/nudge', handleMemberNudgeOutstanding);
 router.get('/guest/:phoneHash', handleGetGuestDetail);
 router.post('/guest/:phoneHash/confirm-all', handleGuestConfirmAll);
 router.post('/guest/:phoneHash/dispute-all', handleGuestDisputeAll);
 router.post('/guest/:phoneHash/mark-paid-all', handleGuestMarkPaidAll);
+router.post('/guest/:phoneHash/nudge', handleGuestNudgeOutstanding);
 
 export default router;

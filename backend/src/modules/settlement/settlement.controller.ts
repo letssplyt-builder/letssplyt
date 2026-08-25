@@ -14,6 +14,7 @@ import {
   memberMarkPaidAll,
   memberSelfReportAll,
 } from './bulk-settlement.service';
+import { nudgeGuestOutstanding, nudgeMemberOutstanding } from './bulk-nudge.service';
 import {
   confirmPayment,
   disputePayment,
@@ -373,6 +374,42 @@ export async function handleGuestMarkPaidAll(
     const phoneHash = req.params.phoneHash as string;
     const body = markPaidBodySchema.parse(req.body);
     const result = await guestMarkPaidAll(userId, phoneHash, body);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleMemberNudgeOutstanding(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new AppError('AUTH_REQUIRED', 'Unauthorized', 401);
+    }
+    const counterpartyUserId = req.params.userId as string;
+    const result = await nudgeMemberOutstanding(userId, counterpartyUserId);
+    res.status(200).json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function handleGuestNudgeOutstanding(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      throw new AppError('AUTH_REQUIRED', 'Unauthorized', 401);
+    }
+    const phoneHash = req.params.phoneHash as string;
+    const result = await nudgeGuestOutstanding(userId, phoneHash);
     res.status(200).json(result);
   } catch (err) {
     next(err);

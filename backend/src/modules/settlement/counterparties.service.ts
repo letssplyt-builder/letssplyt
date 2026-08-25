@@ -137,7 +137,10 @@ export async function getGuestCounterparties(viewerId: string): Promise<GuestsCo
     const token = row.guest_pii_token;
     const phoneHash = token ? phoneHashByToken.get(token) : undefined;
 
-    if (phoneHash) {
+    const hasReachablePhone =
+      row.join_method !== 'manual_name_only' && Boolean(phoneHash);
+
+    if (hasReachablePhone && phoneHash) {
       const existing = phoneAggregates.get(phoneHash);
       if (existing) {
         existing.amount += amount;

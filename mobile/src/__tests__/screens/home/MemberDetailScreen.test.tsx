@@ -45,6 +45,8 @@ describe('MemberDetailScreen', () => {
             participant_id: 'part-1',
             amount: 25,
             direction: 'owed_to_me',
+            payment_status: 'pending',
+            can_nudge: true,
           },
         ],
         history: [],
@@ -70,5 +72,57 @@ describe('MemberDetailScreen', () => {
       screen: 'EventDetail',
       params: { eventId: 'event-1' },
     });
+  });
+
+  it('shows Nudge when the member can still be reminded', async () => {
+    render(
+      <MemberDetailScreen
+        navigation={createHomeNavigationMock() as never}
+        route={{ key: 'MemberDetail-1', name: 'MemberDetail', params: { userId: 'member-1' } }}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText('Nudge')).toBeTruthy());
+    expect(screen.getByText('Nudge')).toBeTruthy();
+  });
+
+  it('disables Nudge during the 48-hour cooldown', async () => {
+    useSettlementStore.setState({
+      memberDetail: {
+        counterparty: {
+          user_id: 'member-1',
+          display_name: 'Jordan',
+          avatar_colour: '#4F46E5',
+        },
+        net_amount: 25,
+        outstanding: [
+          {
+            event_id: 'event-1',
+            event_title: 'Friday Dinner',
+            participant_id: 'part-1',
+            amount: 25,
+            direction: 'owed_to_me',
+            payment_status: 'pending',
+            can_nudge: false,
+            last_nudged_at: '2026-08-21T12:00:00.000Z',
+          },
+        ],
+        history: [],
+      },
+      isLoadingDetail: false,
+      loadMemberDetail: jest.fn(async () => {}),
+      clearDetail: jest.fn(),
+    } as never);
+
+    render(
+      <MemberDetailScreen
+        navigation={createHomeNavigationMock() as never}
+        route={{ key: 'MemberDetail-1', name: 'MemberDetail', params: { userId: 'member-1' } }}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText('Nudge cooldown')).toBeTruthy());
+    expect(screen.getByText('Nudged')).toBeTruthy();
+    expect(screen.queryByLabelText('Nudge')).toBeNull();
   });
 });

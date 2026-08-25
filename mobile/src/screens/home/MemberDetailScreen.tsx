@@ -192,15 +192,27 @@ export function MemberDetailScreen({ navigation, route }: Props) {
     );
   }, [memberDetail]);
 
-  const owedToMeNudgeable = useMemo(() => {
+  const owedToMePending = useMemo(() => {
     if (!memberDetail) return [];
     return memberDetail.outstanding.filter(
       (row) =>
         row.direction === 'owed_to_me' &&
-        row.payment_status === 'pending' &&
-        row.can_nudge !== false,
+        row.payment_status === 'pending',
     );
   }, [memberDetail]);
+
+  const owedToMeNudgeable = useMemo(
+    () => owedToMePending.filter((row) => row.can_nudge === true),
+    [owedToMePending],
+  );
+
+  const owedToMeCoolingDown = useMemo(
+    () =>
+      owedToMePending.filter(
+        (row) => row.can_nudge === false && Boolean(row.last_nudged_at),
+      ),
+    [owedToMePending],
+  );
 
   const payAllContext = useMemo(() => {
     if (iOweOutstanding.length === 0) return null;
@@ -239,26 +251,14 @@ export function MemberDetailScreen({ navigation, route }: Props) {
   const handleNudge = async () => {
     if (owedToMeNudgeable.length === 0) return;
     setNudgeLoading(true);
-    let sentCount = 0;
     try {
-      for (const row of owedToMeNudgeable) {
-        try {
-          await settlementService.nudgeParticipant(row.event_id, row.participant_id);
-          sentCount += 1;
-        } catch (err) {
-          if (isApiRequestError(err) && err.code === 'NUDGE_COOLDOWN') {
-            Alert.alert('Nudge cooldown', 'Try again later for this member.');
-            break;
-          }
-        }
-      }
-      if (sentCount > 0) {
-        Alert.alert(
-          'Nudge sent',
-          sentCount === 1 ? 'Reminder sent.' : `${sentCount} reminder(s) sent.`,
-        );
-        await refresh();
-      } else if (owedToMeNudgeable.length > 0) {
+      await settlementService.nudgeMemberOutstanding(userId);
+      Alert.alert('Nudge sent', 'One reminder sent with everything they still owe.');
+      await refresh();
+    } catch (err) {
+      if (isApiRequestError(err) && err.code === 'NUDGE_COOLDOWN') {
+        Alert.alert('Nudge cooldown', 'Try again later for this member.');
+      } else {
         Alert.alert('Could not nudge', 'Try again in a moment.');
       }
     } finally {
@@ -348,6 +348,15 @@ export function MemberDetailScreen({ navigation, route }: Props) {
                 <Text style={styles.nudgeButtonText}>
                   {nudgeLoading ? 'Sending…' : 'Nudge'}
                 </Text>
+              </Pressable>
+            ) : owedToMeCoolingDown.length > 0 ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Nudge cooldown"
+                disabled
+                style={[styles.nudgeButton, styles.nudgeButtonDisabled]}
+              >
+                <Text style={styles.nudgeButtonText}>Nudged</Text>
               </Pressable>
             ) : null}
 

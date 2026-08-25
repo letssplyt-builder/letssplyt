@@ -11,6 +11,7 @@ const config: Config = {
     '@letssplyt/shared/paymentLinks': '<rootDir>/../shared/utils/paymentLinks.ts',
     '@letssplyt/shared/utils/splitCalculator': '<rootDir>/../shared/utils/splitCalculator.ts',
     '@letssplyt/shared/utils/receiptDiscounts': '<rootDir>/../shared/utils/receiptDiscounts.ts',
+    '@letssplyt/shared/utils/nudgeCooldown': '<rootDir>/../shared/utils/nudgeCooldown.ts',
     '@letssplyt/shared/(.*)': '<rootDir>/../shared/types/$1',
     '^expo-haptics$': '<rootDir>/src/__tests__/mocks/expo-haptics.ts',
     '^expo-constants$': '<rootDir>/src/__tests__/mocks/expo-constants.ts',

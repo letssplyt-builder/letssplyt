@@ -46,6 +46,7 @@ const config: Config = {
     '@letssplyt/shared/utils/splitCalculator': '<rootDir>/../shared/utils/splitCalculator.ts',
     '@letssplyt/shared/utils/receiptDiscounts': '<rootDir>/../shared/utils/receiptDiscounts.ts',
     '@letssplyt/shared/utils/formatCurrency': '<rootDir>/../shared/utils/formatCurrency.ts',
+    '@letssplyt/shared/utils/nudgeCooldown': '<rootDir>/../shared/utils/nudgeCooldown.ts',
     '@letssplyt/shared/(.*)': '<rootDir>/../shared/types/$1',
   },
 };

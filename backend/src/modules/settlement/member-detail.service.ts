@@ -1,10 +1,14 @@
 import { AppError, NotFoundError } from '../../infrastructure/errors';
 import { supabaseAdmin } from '../../infrastructure/supabase';
 import type { MemberDetailResponse } from '@letssplyt/shared/counterparty.types';
+import { canReceiveNudge } from '@letssplyt/shared/utils/nudgeCooldown';
 import { isOutstandingPaymentStatus } from './outstanding';
 
-function participantCanReceiveNudge(joinMethod: string): boolean {
-  return joinMethod !== 'manual_name_only';
+function participantCanReceiveNudge(
+  joinMethod: string,
+  lastNudgedAt: string | null,
+): boolean {
+  return canReceiveNudge({ joinMethod, lastNudgedAt });
 }
 
 export async function getMemberDetail(
@@ -69,7 +73,7 @@ export async function getMemberDetail(
   if (viewerPayerEventIds.length > 0) {
     const { data: theyOweRows, error } = await supabaseAdmin
       .from('participants')
-      .select('id, event_id, amount_owed, payment_status, join_method')
+      .select('id, event_id, amount_owed, payment_status, join_method, last_nudged_at')
       .in('event_id', viewerPayerEventIds)
       .eq('user_id', counterpartyUserId);
 
@@ -83,6 +87,7 @@ export async function getMemberDetail(
       const amount = row.amount_owed as number | null;
       const status = row.payment_status as string;
       const joinMethod = row.join_method as string;
+      const lastNudgedAt = (row.last_nudged_at as string | null) ?? null;
       const eventRow = {
         event_id: row.event_id as string,
         event_title: meta.title,
@@ -91,7 +96,8 @@ export async function getMemberDetail(
         direction: 'owed_to_me' as const,
         payment_status: status,
         participant_id: row.id as string,
-        can_nudge: participantCanReceiveNudge(joinMethod),
+        last_nudged_at: lastNudgedAt,
+        can_nudge: participantCanReceiveNudge(joinMethod, lastNudgedAt),
       };
       if (isOutstandingPaymentStatus(status) && amount !== null && amount > 0) {
         rows.push(eventRow);

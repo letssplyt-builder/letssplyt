@@ -1,6 +1,7 @@
 import { AppError } from '../../infrastructure/errors';
 import { supabaseAdmin } from '../../infrastructure/supabase';
 import type { GuestDetailResponse } from '@letssplyt/shared/counterparty.types';
+import { canReceiveNudge } from '@letssplyt/shared/utils/nudgeCooldown';
 import { isOutstandingPaymentStatus } from './outstanding';
 
 export async function getGuestDetail(
@@ -37,7 +38,7 @@ export async function getGuestDetail(
 
   const { data: guestParticipants, error: participantsError } = await supabaseAdmin
     .from('participants')
-    .select('id, event_id, display_name, amount_owed, payment_status, guest_pii_token')
+    .select('id, event_id, display_name, amount_owed, payment_status, guest_pii_token, last_nudged_at, join_method')
     .in('event_id', eventIds)
     .is('user_id', null)
     .not('guest_pii_token', 'is', null);
@@ -80,12 +81,16 @@ export async function getGuestDetail(
 
     const amount = row.amount_owed as number | null;
     const status = row.payment_status as string;
+    const lastNudgedAt = (row.last_nudged_at as string | null) ?? null;
+    const joinMethod = row.join_method as string;
     const eventRow = {
       event_id: row.event_id as string,
       event_title: meta.title,
       amount: amount ?? 0,
       payment_status: status,
       participant_id: row.id as string,
+      last_nudged_at: lastNudgedAt,
+      can_nudge: canReceiveNudge({ joinMethod, lastNudgedAt }),
     };
 
     if (isOutstandingPaymentStatus(status) && amount !== null && amount > 0) {

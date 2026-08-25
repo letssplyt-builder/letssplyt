@@ -59,6 +59,10 @@
     "./utils/formatCurrency": {
       "types": "./dist/utils/formatCurrency.d.ts",
       "default": "./dist/utils/formatCurrency.js"
+    },
+    "./utils/nudgeCooldown": {
+      "types": "./dist/utils/nudgeCooldown.d.ts",
+      "default": "./dist/utils/nudgeCooldown.js"
     }
   },
   "scripts": {
