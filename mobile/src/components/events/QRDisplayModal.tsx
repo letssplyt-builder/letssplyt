@@ -131,9 +131,6 @@ export function QRDisplayModal({
               <View style={[styles.qrFrame, { backgroundColor: theme.accentSoft, borderColor: theme.accentSoft }]}>
                 <QRCode value={joinUrl} size={200} backgroundColor="transparent" color={theme.ink} />
               </View>
-              <Text style={styles.linkText} numberOfLines={2}>
-                {joinUrl}
-              </Text>
             </ThemedSurface>
           )}
 
@@ -193,13 +190,6 @@ function makeStyles(theme: ReturnType<typeof useTheme>['theme']) {
       padding: 16,
       borderRadius: theme.radiusSm,
       borderWidth: 1,
-      marginBottom: 14,
-    },
-    linkText: {
-      fontSize: 12,
-      color: theme.ink2,
-      textAlign: 'center',
-      fontFamily: theme.fontBody,
     },
     expiredCard: {
       padding: 24,
