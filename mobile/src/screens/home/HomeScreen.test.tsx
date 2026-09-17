@@ -207,4 +207,26 @@ describe('HomeScreen', () => {
       dismissQrPresentation,
     );
   });
+
+  it('does not show the join URL under the post-create QR code', async () => {
+    useEventStore.setState({
+      qrPresentation: {
+        eventId: 'event-new',
+        title: 'Friday Dinner',
+        joinUrl: 'https://letssplyt.app/join/abc',
+        tokenExpiresAt: '2099-01-01T00:00:00.000Z',
+      },
+      dismissQrPresentation: jest.fn(),
+    });
+
+    render(
+      <HomeScreen
+        navigation={navigation}
+        route={{ key: 'Home', name: 'Home' } as never}
+      />,
+    );
+
+    expect(screen.getByText('Friday Dinner')).toBeTruthy();
+    expect(screen.queryByText('https://letssplyt.app/join/abc')).toBeNull();
+  });
 });
