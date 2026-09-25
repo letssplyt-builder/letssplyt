@@ -145,6 +145,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
     {},
   );
   const settlementSwipeHintPlayedRef = useRef(false);
+  const settlementSwipeHintTargetRef = useRef<string | null>(null);
   const [selfReportLoading, setSelfReportLoading] = useState(false);
   const [paySheetOpen, setPaySheetOpen] = useState(false);
   const [allPaidSheetOpen, setAllPaidSheetOpen] = useState(false);
@@ -359,6 +360,13 @@ export function EventDetailScreen({ navigation, route }: Props) {
     );
     return match?.id ?? null;
   }, [settlementRosterParticipants, showOrganiserCollectionActions]);
+
+  if (
+    settlementSwipeHintTargetRef.current == null &&
+    firstSettlementSwipeHintParticipantId
+  ) {
+    settlementSwipeHintTargetRef.current = firstSettlementSwipeHintParticipantId;
+  }
 
   const settlementSummary = useMemo(() => {
     if (!currentEvent?.summary) {
@@ -932,7 +940,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
                     playMountHint={
                       showOrganiserCollectionActions &&
                       !settlementSwipeHintPlayedRef.current &&
-                      participant.id === firstSettlementSwipeHintParticipantId
+                      participant.id === settlementSwipeHintTargetRef.current
                     }
                     onSwipeHintPlayed={() => {
                       settlementSwipeHintPlayedRef.current = true;

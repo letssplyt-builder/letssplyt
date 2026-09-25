@@ -64,6 +64,57 @@ describe('SettlementRosterRow', () => {
     expect(screen.getByLabelText('Dispute')).toBeTruthy();
   });
 
+  it('keeps a second pending row swipeable after the first is marked paid', () => {
+    const onMarkCashFirst = jest.fn();
+    const onMarkCashSecond = jest.fn();
+
+    const { rerender } = renderWithTheme(
+      <>
+        <SettlementRosterRow
+          displayName="Jordan"
+          paymentStatus="pending"
+          amountOwed={24}
+          userId="user-2"
+          onMarkCash={onMarkCashFirst}
+        />
+        <SettlementRosterRow
+          displayName="Sam"
+          paymentStatus="pending"
+          amountOwed={18}
+          userId="user-3"
+          onMarkCash={onMarkCashSecond}
+        />
+      </>,
+    );
+
+    fireEvent.press(screen.getAllByLabelText('Mark paid')[0]);
+    expect(onMarkCashFirst).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <>
+        <SettlementRosterRow
+          displayName="Jordan"
+          paymentStatus="payer_marked"
+          amountOwed={24}
+          userId="user-2"
+          onMarkCash={onMarkCashFirst}
+          onDispute={jest.fn()}
+        />
+        <SettlementRosterRow
+          displayName="Sam"
+          paymentStatus="pending"
+          amountOwed={18}
+          userId="user-3"
+          onMarkCash={onMarkCashSecond}
+        />
+      </>,
+    );
+
+    expect(screen.getByLabelText('Mark paid')).toBeTruthy();
+    fireEvent.press(screen.getByLabelText('Mark paid'));
+    expect(onMarkCashSecond).toHaveBeenCalledTimes(1);
+  });
+
   it('calls mark paid handler from the revealed action button', () => {
     const onMarkCash = jest.fn();
 

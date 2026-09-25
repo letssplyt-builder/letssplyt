@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Animated,
   PanResponder,
+  type PanResponderGestureState,
   Pressable,
   StyleSheet,
   Text,
@@ -37,6 +38,7 @@ const ACTION_BUTTON_WIDTH = 84;
 const ACTION_SLOT_GAP = 8;
 const ACTION_SLOT_WIDTH = ACTION_BUTTON_WIDTH + ACTION_SLOT_GAP;
 const SWIPE_OPEN_THRESHOLD = 48;
+const SWIPE_CAPTURE_THRESHOLD = 8;
 
 type SettlementSwipeHandle = {
   close: () => void;
@@ -75,6 +77,18 @@ function closeOtherSwipeables(current: SettlementSwipeHandle | null): void {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
+}
+
+function readAnimatedValue(value: Animated.Value): number {
+  const raw = (value as Animated.Value & { _value?: number })._value;
+  return typeof raw === 'number' ? raw : 0;
+}
+
+function shouldCaptureHorizontalSwipe(gesture: PanResponderGestureState): boolean {
+  return (
+    Math.abs(gesture.dx) > Math.abs(gesture.dy) &&
+    Math.abs(gesture.dx) > SWIPE_CAPTURE_THRESHOLD
+  );
 }
 
 function statusToneColor(
@@ -247,7 +261,12 @@ export function SettlementRosterRow({
 
   const panX = useRef(new Animated.Value(0)).current;
   const dragStartX = useRef(0);
-  const swipeHandleRef = useRef<SettlementSwipeHandle | null>(null);
+  const isSwipeActiveRef = useRef(false);
+  const swipeHandleRef = useRef<SettlementSwipeHandle>({
+    close: () => undefined,
+    openLeft: () => undefined,
+    openRight: () => undefined,
+  });
   const previousPaymentStatusRef = useRef(paymentStatus);
   const mountHintPlayedRef = useRef(false);
 
@@ -292,11 +311,10 @@ export function SettlementRosterRow({
   );
 
   const closeSwipe = useCallback(() => {
+    isSwipeActiveRef.current = false;
     dragStartX.current = 0;
     animateTo(0, () => {
-      if (swipeHandleRef.current) {
-        openSettlementSwipeables.delete(swipeHandleRef.current);
-      }
+      openSettlementSwipeables.delete(swipeHandleRef.current);
     });
   }, [animateTo]);
 
@@ -305,11 +323,10 @@ export function SettlementRosterRow({
       return;
     }
     closeOtherSwipeables(swipeHandleRef.current);
+    isSwipeActiveRef.current = true;
     dragStartX.current = ACTION_SLOT_WIDTH;
     animateTo(ACTION_SLOT_WIDTH, () => {
-      if (swipeHandleRef.current) {
-        openSettlementSwipeables.add(swipeHandleRef.current);
-      }
+      openSettlementSwipeables.add(swipeHandleRef.current);
     });
   }, [animateTo, hasDisputeAction]);
 
@@ -318,19 +335,23 @@ export function SettlementRosterRow({
       return;
     }
     closeOtherSwipeables(swipeHandleRef.current);
+    isSwipeActiveRef.current = true;
     dragStartX.current = -ACTION_SLOT_WIDTH;
     animateTo(-ACTION_SLOT_WIDTH, () => {
-      if (swipeHandleRef.current) {
-        openSettlementSwipeables.add(swipeHandleRef.current);
-      }
+      openSettlementSwipeables.add(swipeHandleRef.current);
     });
   }, [animateTo, hasPaidAction]);
 
-  swipeHandleRef.current = {
-    close: closeSwipe,
-    openLeft,
-    openRight,
-  };
+  swipeHandleRef.current.close = closeSwipe;
+  swipeHandleRef.current.openLeft = openLeft;
+  swipeHandleRef.current.openRight = openRight;
+
+  useEffect(() => {
+    const handle = swipeHandleRef.current;
+    return () => {
+      openSettlementSwipeables.delete(handle);
+    };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -400,20 +421,22 @@ export function SettlementRosterRow({
 
   const panResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gesture) => {
-        const config = swipeGestureRef.current;
-        if (!config.hasSwipeActions) {
+      onMoveShouldSetPanResponderCapture: (_, gesture) => {
+        if (!swipeGestureRef.current.hasSwipeActions) {
           return false;
         }
-        return (
-          Math.abs(gesture.dx) > Math.abs(gesture.dy) &&
-          Math.abs(gesture.dx) > 8
-        );
+        return shouldCaptureHorizontalSwipe(gesture);
+      },
+      onMoveShouldSetPanResponder: (_, gesture) => {
+        if (!swipeGestureRef.current.hasSwipeActions) {
+          return false;
+        }
+        return shouldCaptureHorizontalSwipe(gesture);
       },
       onPanResponderGrant: () => {
-        panX.stopAnimation((value) => {
-          dragStartX.current = value ?? 0;
-        });
+        isSwipeActiveRef.current = true;
+        panX.stopAnimation();
+        dragStartX.current = readAnimatedValue(panX);
       },
       onPanResponderMove: (_, gesture) => {
         const { minPanX: minX, maxPanX: maxX } = swipeGestureRef.current;
@@ -442,10 +465,8 @@ export function SettlementRosterRow({
         }
 
         dragStartX.current = target;
+        isSwipeActiveRef.current = target !== 0;
         config.animateTo(target, () => {
-          if (!swipeHandleRef.current) {
-            return;
-          }
           if (target === 0) {
             openSettlementSwipeables.delete(swipeHandleRef.current);
           } else {
@@ -454,8 +475,9 @@ export function SettlementRosterRow({
           }
         });
       },
-      onPanResponderTerminationRequest: () => true,
+      onPanResponderTerminationRequest: () => !isSwipeActiveRef.current,
       onPanResponderTerminate: () => {
+        isSwipeActiveRef.current = false;
         swipeGestureRef.current.animateTo(dragStartX.current);
       },
     }),
