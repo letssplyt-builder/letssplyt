@@ -19,7 +19,11 @@ import type { EventsStackParamList } from '../../navigation/types';
 import * as eventService from '../../services/event.service';
 import { finishEventFlowToEventDetail } from '../../navigation/eventNavigation';
 import { useEventStore } from '../../store/eventStore';
-import { retryParticipantMessage, type SendResultStatus } from '../../services/messages.service';
+import {
+  retryParticipantMessage,
+  sendEventMessages,
+  type SendResultStatus,
+} from '../../services/messages.service';
 import { isApiRequestError } from '../../services/api';
 import { useTheme } from '../../theme/ThemeContext';
 import type { Theme } from '../../theme/types';
@@ -157,6 +161,9 @@ function makeStyles(theme: Theme) {
       color: theme.bad,
       fontFamily: theme.fontBody,
     },
+    retryFailedButton: {
+      marginTop: 12,
+    },
   });
 }
 
@@ -169,6 +176,7 @@ export function DeliveryTrackingScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [retryingId, setRetryingId] = useState<string | null>(null);
+  const [retryingFailed, setRetryingFailed] = useState(false);
 
   const sendResultMap = useMemo(() => {
     const map = new Map<string, SendResultStatus>();
@@ -271,27 +279,32 @@ export function DeliveryTrackingScreen({ navigation, route }: Props) {
     rows.every((row) => isTerminalMessageDeliveryStatus(row.status));
   const failedCount = rows.filter((row) => row.status === 'failed').length;
 
+  const applyRetryResults = (results: Array<{ participant_id: string; status: SendResultStatus }>) => {
+    const resultById = new Map(results.map((row) => [row.participant_id, row.status]));
+    setRows((prev) =>
+      prev.map((row) => {
+        const retryStatus = resultById.get(row.id);
+        if (!retryStatus) return row;
+        return {
+          ...row,
+          status: deriveMessageDeliveryStatus(
+            {
+              message_sent_at: retryStatus === 'sent' ? new Date().toISOString() : null,
+              message_delivered_at: null,
+              message_failed: retryStatus === 'failed',
+            },
+            retryStatus,
+          ),
+        };
+      }),
+    );
+  };
+
   const handleRetry = async (participantId: string) => {
     setRetryingId(participantId);
     try {
       const result = await retryParticipantMessage(eventId, participantId);
-      const retryRow = result.results.find((row) => row.participant_id === participantId);
-      setRows((prev) =>
-        prev.map((row) => {
-          if (row.id !== participantId) return row;
-          return {
-            ...row,
-            status: deriveMessageDeliveryStatus(
-              {
-                message_sent_at: retryRow?.status === 'sent' ? new Date().toISOString() : null,
-                message_delivered_at: null,
-                message_failed: retryRow?.status === 'failed',
-              },
-              retryRow?.status,
-            ),
-          };
-        }),
-      );
+      applyRetryResults(result.results);
     } catch (err) {
       const message = isApiRequestError(err)
         ? err.message
@@ -299,6 +312,23 @@ export function DeliveryTrackingScreen({ navigation, route }: Props) {
       setLoadError(message);
     } finally {
       setRetryingId(null);
+    }
+  };
+
+  const handleRetryFailed = async () => {
+    const failedIds = rows.filter((row) => row.status === 'failed').map((row) => row.id);
+    if (failedIds.length === 0) return;
+    setRetryingFailed(true);
+    try {
+      const result = await sendEventMessages(eventId, failedIds);
+      applyRetryResults(result.results);
+    } catch (err) {
+      const message = isApiRequestError(err)
+        ? err.message
+        : 'Could not retry messages. Try again.';
+      setLoadError(message);
+    } finally {
+      setRetryingFailed(false);
     }
   };
 
@@ -312,7 +342,13 @@ export function DeliveryTrackingScreen({ navigation, route }: Props) {
       });
   };
 
-  const subtitle = allTerminal ? 'All messages sent' : 'Sending to members…';
+  const subtitle =
+    failedCount > 0
+      ? `${failedCount} message${failedCount === 1 ? '' : 's'} didn't send`
+      : allTerminal
+        ? 'All messages sent'
+        : 'Sending to members…';
+  const doneLabel = failedCount > 0 ? 'Continue anyway' : 'Done';
 
   return (
     <AuthGradientLayout
@@ -320,10 +356,10 @@ export function DeliveryTrackingScreen({ navigation, route }: Props) {
       footerStyle={splitActionBarFooterStyle(rawBottom)}
       footer={
         <PrimaryButton
-          label="Done"
+          label={doneLabel}
           disabled={!allTerminal || loading}
           onPress={handleDone}
-          accessibilityLabel="Done"
+          accessibilityLabel={doneLabel}
           variant="inverse"
         />
       }
@@ -347,7 +383,10 @@ export function DeliveryTrackingScreen({ navigation, route }: Props) {
           <View style={styles.list} accessibilityLiveRegion="polite">
             {rows.map((row) => {
               const color = avatarColorFromName(row.display_name);
-              const showSpinner = row.status === 'queued' || retryingId === row.id;
+              const showSpinner =
+                row.status === 'queued' ||
+                retryingId === row.id ||
+                (retryingFailed && row.status === 'failed');
 
               return (
                 <View
@@ -389,7 +428,7 @@ export function DeliveryTrackingScreen({ navigation, route }: Props) {
                     <Pressable
                       accessibilityRole="button"
                       accessibilityLabel={`Retry message for ${row.display_name}`}
-                      disabled={retryingId === row.id}
+                      disabled={retryingId === row.id || retryingFailed}
                       onPress={() => void handleRetry(row.id)}
                       style={styles.retryBtn}
                     >
@@ -402,10 +441,20 @@ export function DeliveryTrackingScreen({ navigation, route }: Props) {
           </View>
 
           {failedCount > 0 && allTerminal ? (
-            <Text style={styles.failedSummary}>
-              {failedCount} message{failedCount === 1 ? '' : 's'} failed to send. Tap Retry on a
-              row to try again.
-            </Text>
+            <>
+              <Text style={styles.failedSummary}>
+                {failedCount} message{failedCount === 1 ? '' : 's'} failed to send. Retry those
+                people, or continue and retry later from the event.
+              </Text>
+              <PrimaryButton
+                label="Retry failed"
+                accessibilityLabel="Retry failed"
+                loading={retryingFailed}
+                disabled={retryingId !== null}
+                onPress={() => void handleRetryFailed()}
+                style={styles.retryFailedButton}
+              />
+            </>
           ) : null}
         </ScrollView>
       )}

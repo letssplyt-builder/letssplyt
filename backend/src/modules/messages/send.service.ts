@@ -120,6 +120,12 @@ export async function sendEventMessages(
 
     const preview = previewMap.get(participantId);
     if (!preview) {
+      failedCount += 1;
+      await supabaseAdmin
+        .from('participants')
+        .update({ message_failed: true })
+        .eq('id', participantId);
+      results.push({ participant_id: participantId, status: 'failed' });
       continue;
     }
 
@@ -187,15 +193,17 @@ export async function sendEventMessages(
 
   const { data: appMemberRows, error: appMembersError } = await supabaseAdmin
     .from('participants')
-    .select('user_id, amount_owed')
+    .select('id, user_id, amount_owed')
     .eq('event_id', eventId)
     .not('user_id', 'is', null);
 
   if (!appMembersError) {
     for (const memberRow of appMemberRows ?? []) {
       const memberUserId = memberRow.user_id as string | null;
+      const memberParticipantId = memberRow.id as string;
       if (!memberUserId || memberUserId === eventRow.payer_id) continue;
       if (Number(memberRow.amount_owed ?? 0) <= 0) continue;
+      if (filterIds && !filterIds.has(memberParticipantId)) continue;
       notifyMemberShareReady(memberUserId, eventRow.title, eventId);
     }
   }

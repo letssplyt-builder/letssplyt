@@ -9,6 +9,21 @@ describe('EventDetailOverflowMenu', () => {
     expect(screen.queryByLabelText('More options')).toBeNull();
   });
 
+  it('shows Message status after send', () => {
+    const onMessageStatus = jest.fn();
+
+    render(
+      <EventDetailOverflowMenu
+        showMessageStatus
+        onMessageStatus={onMessageStatus}
+      />,
+    );
+
+    fireEvent.press(screen.getByLabelText('More options'));
+    fireEvent.press(screen.getByLabelText('Message status'));
+    expect(onMessageStatus).toHaveBeenCalledTimes(1);
+  });
+
   it('opens dropdown with reopen, reset, and delete actions', () => {
     const onReopen = jest.fn();
     const onReset = jest.fn();

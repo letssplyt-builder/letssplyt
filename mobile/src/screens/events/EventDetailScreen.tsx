@@ -48,6 +48,7 @@ import { navigateInEventFlow } from '../../navigation/eventFlowNavigation';
 import type { EventsStackParamList, MainTabParamList } from '../../navigation/types';
 import { getApiErrorCode, isApiRequestError } from '../../services/api';
 import * as eventService from '../../services/event.service';
+import * as messagesService from '../../services/messages.service';
 import * as settlementService from '../../services/settlement.service';
 import { useAuthStore } from '../../store/authStore';
 import { useEventStore } from '../../store/eventStore';
@@ -55,6 +56,10 @@ import { useSettlementStore } from '../../store/settlementStore';
 import { useSplitStore } from '../../store/splitStore';
 import { receiptReviewToParseResult } from '../receipts/itemReview.utils';
 import { formatMoney, isPayerParticipant, statusChipLabel } from '../../utils/events';
+import {
+  formatFailedRecipientNames,
+  listFailedSmsRecipients,
+} from '../../utils/messageDeliveryStatus';
 import { openMessagePreviewOrComplete } from '../../utils/messageFlow';
 import { canViewSharedReceipt } from '../../utils/receiptQuickView';
 import {
@@ -150,6 +155,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const [paySheetOpen, setPaySheetOpen] = useState(false);
   const [allPaidSheetOpen, setAllPaidSheetOpen] = useState(false);
   const [receiptQuickViewOpen, setReceiptQuickViewOpen] = useState(false);
+  const [retryingFailedMessages, setRetryingFailedMessages] = useState(false);
   const loadEventLedger = useSettlementStore((state) => state.loadEventLedger);
   const getIOweForEvent = useSettlementStore((state) => state.getIOweForEvent);
   const skipFocusRefreshRef = useRef(false);
@@ -291,10 +297,17 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const canEditShare = Boolean(
     event && canEditEventShare(event.messages_sent_at, participants),
   );
+  const showMessageStatus = Boolean(isPayer && event?.messages_sent_at);
+  const failedSmsRecipients = useMemo(
+    () => (showMessageStatus ? listFailedSmsRecipients(participants) : []),
+    [participants, showMessageStatus],
+  );
   const showOverflowMenu = Boolean(
     isPayer &&
       event &&
-      (showDeleteEvent || (!joining && (event.status === 'locked' || showResetExpenses))),
+      (showMessageStatus ||
+        showDeleteEvent ||
+        (!joining && (event.status === 'locked' || showResetExpenses))),
   );
   const selfParticipant = participants.find((row) => row.is_self);
   const showOrganiserCollectionActions = canOrganiserNudgeOrMarkCash(event?.messages_sent_at);
@@ -463,6 +476,31 @@ export function EventDetailScreen({ navigation, route }: Props) {
     void openMessagePreviewOrComplete(navigation, eventId, participants).catch(() => {
       setToast('Could not open messages. Try again.');
     });
+  };
+
+  const openMessageStatus = () => {
+    navigateInEventFlow(navigation, 'DeliveryTracking', { eventId });
+  };
+
+  const retryFailedMessages = async () => {
+    if (failedSmsRecipients.length === 0) return;
+    setRetryingFailedMessages(true);
+    try {
+      const result = await messagesService.sendEventMessages(
+        eventId,
+        failedSmsRecipients.map((row) => row.id),
+      );
+      await loadEventDetail(eventId);
+      if (result.failed_count > 0) {
+        setToast('Some messages still failed. Try again.');
+      } else {
+        setToast('Messages sent');
+      }
+    } catch {
+      setToast('Could not retry messages. Try again.');
+    } finally {
+      setRetryingFailedMessages(false);
+    }
   };
 
   const confirmReopenJoinWindow = () => {
@@ -730,6 +768,8 @@ export function EventDetailScreen({ navigation, route }: Props) {
               ) : null}
               {showOverflowMenu ? (
                 <EventDetailOverflowMenu
+                  showMessageStatus={showMessageStatus}
+                  onMessageStatus={openMessageStatus}
                   showReopen={event.status === 'locked'}
                   reopenLoading={isReopening}
                   onReopen={confirmReopenJoinWindow}
@@ -928,6 +968,31 @@ export function EventDetailScreen({ navigation, route }: Props) {
               participantCount={settlementProgress.participantCount}
             />
 
+            {failedSmsRecipients.length > 0 ? (
+              <View
+                style={styles.messageFailedBanner}
+                accessibilityLabel={`${failedSmsRecipients.length} people didn't get the message`}
+              >
+                <Text style={styles.messageFailedTitle}>
+                  {failedSmsRecipients.length === 1
+                    ? "1 person didn't get the message"
+                    : `${failedSmsRecipients.length} people didn't get the message`}
+                </Text>
+                <Text style={styles.messageFailedNames}>
+                  {formatFailedRecipientNames(
+                    failedSmsRecipients.map((row) => row.display_name),
+                  )}
+                </Text>
+                <PrimaryButton
+                  label="Retry"
+                  accessibilityLabel="Retry failed messages"
+                  loading={retryingFailedMessages}
+                  onPress={() => void retryFailedMessages()}
+                  style={styles.messageFailedRetry}
+                />
+              </View>
+            ) : null}
+
             <Text style={themed.sectionTitle}>
               Members · {settlementRosterParticipants.length}
             </Text>
@@ -1099,6 +1164,29 @@ function makeEventDetailStyles(theme: Theme, themed: ThemedStyles) {
     padding: 12,
     borderRadius: 12,
     marginBottom: 12,
+  },
+  messageFailedBanner: {
+    backgroundColor: theme.warnSoft,
+    borderWidth: 1,
+    borderColor: theme.warn,
+    borderRadius: theme.radiusSm,
+    padding: 14,
+    marginBottom: 16,
+  },
+  messageFailedTitle: {
+    color: theme.ink,
+    fontSize: 15,
+    fontWeight: '700',
+    fontFamily: theme.fontBody,
+  },
+  messageFailedNames: {
+    color: theme.ink2,
+    fontSize: 13,
+    marginTop: 4,
+    fontFamily: theme.fontBody,
+  },
+  messageFailedRetry: {
+    marginTop: 12,
   },
   qrCard: {
     alignSelf: 'center',

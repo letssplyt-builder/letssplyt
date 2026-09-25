@@ -1431,7 +1431,7 @@ Generate per-participant message previews (without sending). Runs A3 composition
 ### POST `/events/:eventId/messages/send`
 **Auth:** `[AUTH]` | `[PAYER]` | **Rate limit:** 3 per event per 24 hours
 
-Send all participant messages via Twilio as **text-only SMS/WhatsApp** (no `mediaUrl` / MMS). Each body includes the participant's `breakdown_url` line. Checks opt-out for every number before sending.
+Send all participant messages via Twilio as **text-only SMS/WhatsApp** (no `mediaUrl` / MMS). Each body includes the participant's `breakdown_url` line. Checks opt-out for every number before sending. A reachable phone with no generated preview is recorded as `failed` (`message_failed = true`) so the organiser can retry — never silently omitted. Optional body `{ participant_ids?: string[] }` retries only those rows (empty/omitted = all).
 
 **Request body:** none (uses confirmed split data)
 

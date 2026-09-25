@@ -120,11 +120,11 @@ describe('DeliveryTrackingScreen', () => {
     );
 
     await waitFor(() => {
-      const done = screen.getByLabelText('Done');
+      const done = screen.getByLabelText('Continue anyway');
       expect(done.props.accessibilityState?.disabled ?? done.props.disabled).toBeFalsy();
     });
 
-    fireEvent.press(screen.getByLabelText('Done'));
+    fireEvent.press(screen.getByLabelText('Continue anyway'));
     await waitFor(() => {
       expect(mockDispatch).toHaveBeenCalled();
     });
@@ -156,11 +156,43 @@ describe('DeliveryTrackingScreen', () => {
     await waitFor(() =>
       expect(screen.getByLabelText('Retry message for Sam')).toBeTruthy(),
     );
+    expect(screen.getByLabelText('Retry failed')).toBeTruthy();
+    expect(screen.getByText("1 message didn't send")).toBeTruthy();
 
     fireEvent.press(screen.getByLabelText('Retry message for Sam'));
 
     await waitFor(() => {
       expect(messagesService.retryParticipantMessage).toHaveBeenCalledWith('event-1', 'p2');
+    });
+  });
+
+  it('retries every failed participant from Retry failed', async () => {
+    jest.mocked(messagesService.sendEventMessages).mockResolvedValue({
+      sent_count: 1,
+      skipped_count: 0,
+      failed_count: 0,
+      event_status: 'sent',
+      results: [{ participant_id: 'p2', status: 'sent', twilio_sid: 'SM999' }],
+    });
+
+    render(
+      <DeliveryTrackingScreen
+        navigation={{ dispatch: mockDispatch } as never}
+        route={{
+          key: 'DeliveryTracking-1',
+          name: 'DeliveryTracking',
+          params: {
+            eventId: 'event-1',
+            sendResults: [{ participant_id: 'p2', status: 'failed' }],
+          },
+        }}
+      />,
+    );
+
+    fireEvent.press(await screen.findByLabelText('Retry failed'));
+
+    await waitFor(() => {
+      expect(messagesService.sendEventMessages).toHaveBeenCalledWith('event-1', ['p2']);
     });
   });
 

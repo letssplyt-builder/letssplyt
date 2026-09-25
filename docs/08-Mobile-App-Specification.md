@@ -1000,6 +1000,10 @@ Re-confirm on Item Review (`POST /receipts/confirm`) **preserves `item_assignmen
 
 **Post-send edit (P20a):** Same **Edit share** CTA — no separate modal or overflow item. Gated by `canEditEventShare(messages_sent_at, participants)` in `eventSplitFooter.ts`. Blocked when any participant has `self_reported`, `confirmed`, or `settled`; re-opens after dispute returns that participant to `pending` and no other blockers exist. Toast: *"Split is locked — resolve self-reported or confirmed payments first."*
 
+**Message delivery (post-send, payer only):**
+- If any SMS-eligible participant has `message_failed`: amber banner above the roster — *N people didn’t get the message*, names, **Retry** (`POST /messages/send` with those participant ids). Name-only / cash guests are never in this set.
+- Overflow **Message status** reopens `DeliveryTrackingScreen` (no `sendResults` — status from participant rows + Realtime). Always available after `messages_sent_at`.
+
 **Reset expenses** shows a destructive confirmation alert, then calls `POST /events/:id/expenses/reset`. On success: optimistic store patch (`applyExpensesResetLocal`), clear split store, refetch event detail, toast success. Footer returns to **Scan receipt** + **Enter total**. Hidden when `messages_sent_at` is set (`canResetEventExpenses()`). Available from overflow menu (not footer).
 
 **Delete event** (overflow menu, payer only): destructive confirmation → `DELETE /events/:id` via `eventStore.deleteEvent()`. On success: `removeEvent()` from list, clear split store if needed, `navigation.navigate('Events')`. Hidden when `messages_sent_at` is set (`canDeleteEvent()`). 409 → alert *"Payment messages were already sent for this event."*
@@ -1167,7 +1171,7 @@ Entry:
 - "All sent!" state with confetti animation (lottie or simple)
 - "Done" button → navigate back to EventDetailScreen (settlement phase)
 
-**Error state:** If a message fails to deliver for a specific participant, their row shows a red ✗ and a "Retry" button next to their name. The overall flow continues for other participants — a single failure does not block the rest. After all attempts complete, show "X messages failed to send. Tap to retry." at the bottom if any failures exist.
+**Error state:** If a message fails to deliver for a specific participant, their row shows a red ✗ and a "Retry" button next to their name. The overall flow continues for other participants — a single failure does not block the rest. After all attempts complete, subtitle is *"N messages didn't send"*, footer is **Continue anyway**, and **Retry failed** resends every failed row. Leaving with failures still lets the organiser retry from Event Detail.
 
 **Accessibility:** Each participant row: `accessibilityLabel="[Name] — message [sending | sent | failed]"`. The row state updates are announced via `accessibilityLiveRegion="polite"`.
 

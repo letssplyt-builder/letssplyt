@@ -11,6 +11,8 @@ import { useTheme } from '../../theme/ThemeContext';
 import type { Theme } from '../../theme/types';
 
 interface EventDetailOverflowMenuProps {
+  showMessageStatus?: boolean;
+  onMessageStatus?: () => void;
   showReopen?: boolean;
   reopenLoading?: boolean;
   onReopen?: () => void;
@@ -106,6 +108,8 @@ function makeStyles(theme: Theme) {
 
 /** Compact ⋮ menu for infrequent payer actions on Event Detail. */
 export function EventDetailOverflowMenu({
+  showMessageStatus,
+  onMessageStatus,
   showReopen,
   reopenLoading,
   onReopen,
@@ -120,11 +124,16 @@ export function EventDetailOverflowMenu({
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [open, setOpen] = useState(false);
 
-  if (!showReopen && !showReset && !showDelete) {
+  if (!showMessageStatus && !showReopen && !showReset && !showDelete) {
     return <View style={styles.placeholder} />;
   }
 
   const close = () => setOpen(false);
+
+  const handleMessageStatus = () => {
+    close();
+    onMessageStatus?.();
+  };
 
   const handleReopen = () => {
     close();
@@ -162,6 +171,24 @@ export function EventDetailOverflowMenu({
         <Pressable style={styles.backdrop} onPress={close} accessibilityLabel="Close menu" />
         <View style={styles.dropdown} pointerEvents="box-none">
           <View style={styles.menuCard}>
+            {showMessageStatus ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Message status"
+                onPress={handleMessageStatus}
+                style={({ pressed }) => [
+                  styles.menuItem,
+                  pressed && styles.menuItemPressed,
+                ]}
+              >
+                <Text style={styles.menuLabel}>Message status</Text>
+              </Pressable>
+            ) : null}
+
+            {showMessageStatus && (showReopen || showReset || showDelete) ? (
+              <View style={styles.divider} />
+            ) : null}
+
             {showReopen ? (
               <Pressable
                 accessibilityRole="button"

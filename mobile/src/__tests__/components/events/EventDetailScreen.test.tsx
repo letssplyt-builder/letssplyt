@@ -27,6 +27,9 @@ jest.mock('@react-navigation/native', () => {
 });
 
 jest.mock('../../../services/event.service');
+jest.mock('../../../services/messages.service', () => ({
+  sendEventMessages: jest.fn(),
+}));
 jest.mock('../../../services/settlement.service', () => ({
   confirmPayment: jest.fn(),
   disputePayment: jest.fn(),
@@ -35,6 +38,7 @@ jest.mock('../../../services/settlement.service', () => ({
   selfReportPayment: jest.fn(),
 }));
 
+import * as messagesService from '../../../services/messages.service';
 import * as settlementService from '../../../services/settlement.service';
 
 let mockAuthUser: { id: string; display_name: string; avatar_colour: string } | null = {
@@ -1237,6 +1241,79 @@ describe('EventDetailScreen', () => {
       expect(screen.queryByLabelText('Nudge')).toBeNull();
       expect(screen.queryByLabelText('Mark cash')).toBeNull();
     });
+  });
+
+  it('shows a retry banner and Message status after some messages fail', async () => {
+    jest.mocked(eventService.fetchEventById).mockResolvedValue({
+      ...mockDetailLocked,
+      event: {
+        ...mockDetailLocked.event,
+        status: 'sent',
+        messages_sent_at: '2026-06-08T12:00:00.000Z',
+      },
+      participants: [
+        {
+          id: 'p-organiser',
+          display_name: 'Alex',
+          join_method: 'qr_app',
+          payment_status: 'pending',
+          amount_owed: 40,
+          is_organiser: true,
+          is_self: true,
+        },
+        {
+          id: 'p-1',
+          display_name: 'Sam',
+          join_method: 'qr_web',
+          payment_status: 'pending',
+          amount_owed: 30,
+          message_failed: true,
+        },
+        {
+          id: 'p-2',
+          display_name: 'Mia',
+          join_method: 'manual_name_only',
+          payment_status: 'pending',
+          amount_owed: 0,
+          message_failed: true,
+        },
+      ],
+      summary: {
+        total: 70,
+        collected: 0,
+        outstanding: 30,
+        confirmed_count: 0,
+        pending_count: 1,
+      },
+    });
+    jest.mocked(messagesService.sendEventMessages).mockResolvedValue({
+      sent_count: 1,
+      skipped_count: 0,
+      failed_count: 0,
+      event_status: 'sent',
+      results: [{ participant_id: 'p-1', status: 'sent' }],
+    });
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("1 person didn't get the message")).toBeTruthy();
+      expect(screen.getByLabelText('Retry failed messages')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByLabelText('Retry failed messages'));
+    await waitFor(() => {
+      expect(messagesService.sendEventMessages).toHaveBeenCalledWith('event-1', ['p-1']);
+    });
+
+    fireEvent.press(screen.getByLabelText('More options'));
+    fireEvent.press(screen.getByLabelText('Message status'));
+    expect(navigation.navigate).toHaveBeenCalledWith('DeliveryTracking', { eventId: 'event-1' });
   });
 
   it('organiser sees Expenses Share status after messages sent', async () => {

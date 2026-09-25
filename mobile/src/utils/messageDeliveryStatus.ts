@@ -45,6 +45,31 @@ export function isTerminalMessageDeliveryStatus(status: MessageDeliveryStatus): 
   );
 }
 
+export function listFailedSmsRecipients<
+  T extends {
+    id: string;
+    display_name: string;
+    is_organiser?: boolean;
+    join_method?: string;
+    message_failed?: boolean;
+  },
+>(participants: T[]): T[] {
+  return participants.filter(
+    (row) =>
+      !row.is_organiser &&
+      row.join_method !== 'manual_name_only' &&
+      row.message_failed === true,
+  );
+}
+
+export function formatFailedRecipientNames(names: string[]): string {
+  if (names.length === 0) return '';
+  if (names.length === 1) return names[0] ?? '';
+  if (names.length === 2) return `${names[0]} and ${names[1]}`;
+  const leading = names.slice(0, -1).join(', ');
+  return `${leading}, and ${names[names.length - 1]}`;
+}
+
 export function messageDeliveryAccessibilityLabel(
   displayName: string,
   status: MessageDeliveryStatus,
