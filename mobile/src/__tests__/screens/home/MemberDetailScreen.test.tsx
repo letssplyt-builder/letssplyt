@@ -84,6 +84,7 @@ describe('MemberDetailScreen', () => {
 
     await waitFor(() => expect(screen.getByLabelText('Nudge')).toBeTruthy());
     expect(screen.getByText('Nudge')).toBeTruthy();
+    expect(screen.getByLabelText('Mark all paid')).toBeTruthy();
   });
 
   it('disables Nudge during the 48-hour cooldown', async () => {
@@ -124,5 +125,6 @@ describe('MemberDetailScreen', () => {
     await waitFor(() => expect(screen.getByLabelText('Nudge cooldown')).toBeTruthy());
     expect(screen.getByText('Nudged')).toBeTruthy();
     expect(screen.queryByLabelText('Nudge')).toBeNull();
+    expect(screen.getByLabelText('Mark all paid')).toBeTruthy();
   });
 });

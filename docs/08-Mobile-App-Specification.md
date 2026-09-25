@@ -872,8 +872,9 @@ Refer to `prototype/home.html` (dashboard states). **MVP: USD only.**
 - **Data:** `GET /api/v1/settlement/member/:userId`
 - Header: counterparty avatar, name, signed net amount
 - **Nudge** when counterparty has pending `owed_to_me` rows (`can_nudge` true)
+- When counterparty owes (`owed_to_me` + `pending`): **Mark all paid** (confirm → `POST /settlement/member/:userId/mark-paid-all` with `payment_method=cash`, same path as Event Detail swipe). Disputed rows stay on Event Detail swipe.
 - When viewer owes (`net_amount <= 0` and pending/disputed `i_owe` rows): **Pay all** (`PayHandlesSheet`) + **I've paid all** (`AllPaidSheet` → `POST /settlement/member/:userId/self-report-all`)
-- On successful **I've paid all**: refresh detail, `loadCounterparties('members')`, `loadEventLedger()`
+- On successful **I've paid all** or **Mark all paid**: refresh detail, `loadCounterparties('members')`, `loadEventLedger()`
 - **Outstanding** events (from `outstanding[]`): event title, per-event amount, direction implied by list
 - **"See more events"** → `history[]` (settled / non-outstanding rows)
 - Tap event row → `openEventDetail()` (Events stack `EventDetailScreen`)
@@ -889,10 +890,11 @@ Refer to `prototype/home.html` (dashboard states). **MVP: USD only.**
 - **Data:** `GET /api/v1/settlement/guest/:phoneHash`
 - Header: guest display name, total outstanding
 - Same outstanding / "See more events" / history pattern as Member detail
-- Payer bulk CTAs: **Mark all paid**, **Confirm all**, **Dispute all** (`POST /settlement/guest/:phoneHash/...-all`)
+- **Nudge** when pending rows have `can_nudge` true
+- **Mark all paid** when any outstanding row is `pending` (confirm → `POST /settlement/guest/:phoneHash/mark-paid-all` with `payment_method=cash`). No Confirm all / Dispute all — those stay on Event Detail swipe.
 - Tap event → `EventDetailScreen` (payer settlement view)
 
-**Not used for name-only guests** — those navigate straight from `HomeScreen`.
+**Not used for name-only guests** — those navigate straight from `HomeScreen` to Event Detail (one row per event; no phone identity to bulk-settle).
 
 ---
 

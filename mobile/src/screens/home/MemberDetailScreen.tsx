@@ -15,6 +15,7 @@ import {
 import { AllPaidSheet } from '../../components/settlement/AllPaidSheet';
 import { PayHandlesSheet } from '../../components/settlement/PayHandlesSheet';
 import { ParticipantPayActions } from '../../components/settlement/ParticipantPayActions';
+import { PrimaryButton } from '../../components/PrimaryButton';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { ScreenTopBar } from '../../components/navigation/ScreenTopBar';
 import { useAppInsets } from '../../hooks/useAppInsets';
@@ -102,6 +103,9 @@ function makeStyles(theme: Theme) {
       fontWeight: '700',
       fontFamily: theme.fontBody,
     },
+    markAllPaidButton: {
+      marginBottom: 16,
+    },
     empty: {
       color: theme.ink2,
       fontSize: 14,
@@ -173,6 +177,7 @@ export function MemberDetailScreen({ navigation, route }: Props) {
   const [allPaidSheetOpen, setAllPaidSheetOpen] = useState(false);
   const [allPaidLoading, setAllPaidLoading] = useState(false);
   const [nudgeLoading, setNudgeLoading] = useState(false);
+  const [markAllPaidLoading, setMarkAllPaidLoading] = useState(false);
 
   const refresh = useCallback(async () => {
     await Promise.all([loadMemberDetail(userId), loadEventLedger()]);
@@ -244,6 +249,12 @@ export function MemberDetailScreen({ navigation, route }: Props) {
     iOweOutstanding.length > 0 &&
     payAllContext !== null;
 
+  const showMarkAllPaid = owedToMePending.length > 0;
+  const markAllPaidTotal = useMemo(
+    () => owedToMePending.reduce((sum, row) => sum + row.amount, 0),
+    [owedToMePending],
+  );
+
   const openEvent = (eventId: string) => {
     openEventDetail(navigation, eventId);
   };
@@ -264,6 +275,32 @@ export function MemberDetailScreen({ navigation, route }: Props) {
     } finally {
       setNudgeLoading(false);
     }
+  };
+
+  const submitMarkAllPaid = async () => {
+    setMarkAllPaidLoading(true);
+    try {
+      const result = await settlementService.memberMarkPaidAll(userId, 'cash');
+      await Promise.all([refresh(), loadCounterparties('members'), loadEventLedger()]);
+      Alert.alert('Updated', `${result.updated_count} payment(s) marked as paid.`);
+    } catch {
+      Alert.alert('Could not mark payments', 'Try again in a moment.');
+    } finally {
+      setMarkAllPaidLoading(false);
+    }
+  };
+
+  const confirmMarkAllPaid = () => {
+    if (!memberDetail || owedToMePending.length === 0) return;
+    const eventLabel = owedToMePending.length === 1 ? 'event' : 'events';
+    Alert.alert(
+      'Mark all paid?',
+      `Mark ${owedToMePending.length} ${eventLabel} paid for ${memberDetail.counterparty.display_name}? Total ${formatMoney(markAllPaidTotal, memberDetail.currency)}.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Mark paid', onPress: () => void submitMarkAllPaid() },
+      ],
+    );
   };
 
   const submitAllPaid = async (method: settlementService.SelfReportPaymentMethod) => {
@@ -358,6 +395,16 @@ export function MemberDetailScreen({ navigation, route }: Props) {
               >
                 <Text style={styles.nudgeButtonText}>Nudged</Text>
               </Pressable>
+            ) : null}
+
+            {showMarkAllPaid ? (
+              <PrimaryButton
+                label="Mark all paid"
+                accessibilityLabel="Mark all paid"
+                loading={markAllPaidLoading}
+                onPress={confirmMarkAllPaid}
+                style={styles.markAllPaidButton}
+              />
             ) : null}
 
             {showPayActions ? (

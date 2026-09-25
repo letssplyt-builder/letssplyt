@@ -3,9 +3,9 @@ import type {
   MemberCounterpartyRow,
 } from '@letssplyt/shared/counterparty.types';
 
-export type HomeSegment = 'pay' | 'collect' | 'guests';
+export type HomeSegment = 'pay' | 'collect';
 
-/** Pick the first dashboard tab that has list data; otherwise Pay to. */
+/** Pick Collect from when anyone owes the viewer; otherwise Pay to. */
 export function pickDefaultHomeSegment(
   membersYouOwe: MemberCounterpartyRow[],
   membersOweYou: MemberCounterpartyRow[],
@@ -14,11 +14,16 @@ export function pickDefaultHomeSegment(
   if (membersYouOwe.length > 0) {
     return 'pay';
   }
-  if (membersOweYou.length > 0) {
+  if (membersOweYou.length > 0 || guests.length > 0) {
     return 'collect';
   }
-  if (guests.length > 0) {
-    return 'guests';
-  }
   return 'pay';
+}
+
+export function sumMemberCollectTotal(rows: MemberCounterpartyRow[]): number {
+  return rows.reduce((sum, row) => sum + row.net_amount, 0);
+}
+
+export function sumGuestCollectTotal(rows: GuestCounterpartyRow[]): number {
+  return rows.reduce((sum, row) => sum + row.amount, 0);
 }

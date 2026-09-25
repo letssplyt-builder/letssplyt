@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
+import { PrimaryButton } from '../../components/PrimaryButton';
 import { ScreenTopBar } from '../../components/navigation/ScreenTopBar';
 import { useAppInsets } from '../../hooks/useAppInsets';
 import { useThemedStyles } from '../../hooks/useThemedStyles';
@@ -79,6 +80,9 @@ function makeStyles(theme: Theme) {
       fontWeight: '700',
       fontFamily: theme.fontBody,
     },
+    markAllPaidButton: {
+      marginBottom: 16,
+    },
     empty: {
       color: theme.ink2,
       fontSize: 14,
@@ -140,10 +144,13 @@ export function GuestDetailScreen({ navigation, route }: Props) {
   const guestDetail = useSettlementStore((state) => state.guestDetail);
   const isLoadingDetail = useSettlementStore((state) => state.isLoadingDetail);
   const loadGuestDetail = useSettlementStore((state) => state.loadGuestDetail);
+  const loadCounterparties = useSettlementStore((state) => state.loadCounterparties);
+  const loadEventLedger = useSettlementStore((state) => state.loadEventLedger);
   const clearDetail = useSettlementStore((state) => state.clearDetail);
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [nudgeLoading, setNudgeLoading] = useState(false);
+  const [markAllPaidLoading, setMarkAllPaidLoading] = useState(false);
 
   const refresh = useCallback(async () => {
     await loadGuestDetail(phoneHash);
@@ -164,6 +171,8 @@ export function GuestDetailScreen({ navigation, route }: Props) {
   const coolingDownOutstanding = pendingOutstanding.filter(
     (row) => row.can_nudge === false && Boolean(row.last_nudged_at),
   );
+  const showMarkAllPaid = pendingOutstanding.length > 0;
+  const markAllPaidTotal = pendingOutstanding.reduce((sum, row) => sum + row.amount, 0);
 
   const handleNudge = async () => {
     if (nudgeableOutstanding.length === 0) return;
@@ -181,6 +190,36 @@ export function GuestDetailScreen({ navigation, route }: Props) {
     } finally {
       setNudgeLoading(false);
     }
+  };
+
+  const submitMarkAllPaid = async () => {
+    setMarkAllPaidLoading(true);
+    try {
+      const result = await settlementService.guestMarkPaidAll(phoneHash, 'cash');
+      await Promise.all([
+        refresh(),
+        loadCounterparties('guests'),
+        loadEventLedger(),
+      ]);
+      Alert.alert('Updated', `${result.updated_count} payment(s) marked as paid.`);
+    } catch {
+      Alert.alert('Could not mark payments', 'Try again in a moment.');
+    } finally {
+      setMarkAllPaidLoading(false);
+    }
+  };
+
+  const confirmMarkAllPaid = () => {
+    if (!guestDetail || pendingOutstanding.length === 0) return;
+    const eventLabel = pendingOutstanding.length === 1 ? 'event' : 'events';
+    Alert.alert(
+      'Mark all paid?',
+      `Mark ${pendingOutstanding.length} ${eventLabel} paid for ${guestDetail.display_name}? Total ${formatMoney(markAllPaidTotal, guestDetail.currency)}.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Mark paid', onPress: () => void submitMarkAllPaid() },
+      ],
+    );
   };
 
   return (
@@ -237,6 +276,16 @@ export function GuestDetailScreen({ navigation, route }: Props) {
               >
                 <Text style={styles.nudgeButtonText}>Nudged</Text>
               </Pressable>
+            ) : null}
+
+            {showMarkAllPaid ? (
+              <PrimaryButton
+                label="Mark all paid"
+                accessibilityLabel="Mark all paid"
+                loading={markAllPaidLoading}
+                onPress={confirmMarkAllPaid}
+                style={styles.markAllPaidButton}
+              />
             ) : null}
 
             <Text style={themed.sectionTitle}>Outstanding</Text>
