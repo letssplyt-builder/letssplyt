@@ -46,7 +46,14 @@ WITH expected AS (
     '20260624000001',
     '20260624000002',
     '20260625000000',
-    '20260626000000'
+    '20260626000000',
+    '20260627000000',
+    '20260627000001',
+    '20260705140000',
+    '20260705160000',
+    '20260821120000',
+    '20260825140000',
+    '20260925120000'
   ]) AS version
 ),
 applied AS (
@@ -147,3 +154,46 @@ SELECT
   file_size_limit
 FROM storage.buckets
 WHERE id = 'receipts';
+
+-- ─── 10. Client write policies must be gone (migration #38) ─────────────────
+SELECT
+  policyname,
+  tablename,
+  'UNEXPECTED CLIENT WRITE POLICY' AS status
+FROM pg_policies
+WHERE schemaname = 'public'
+  AND policyname IN (
+    'participants_update_self_safe',
+    'participants_update_payer',
+    'events_insert_payer',
+    'events_update_payer',
+    'receipt_items_insert_payer',
+    'receipt_items_update_payer',
+    'receipt_items_delete_payer',
+    'item_assignments_insert_payer',
+    'item_assignments_delete_payer',
+    'receipt_discounts_insert_payer',
+    'receipt_discounts_update_payer',
+    'receipt_discounts_delete_payer',
+    'handles_insert_own',
+    'handles_update_own',
+    'handles_delete_own',
+    'user_notifications_update_own',
+    'analytics_insert_authenticated'
+  );
+
+SELECT
+  'enforce_users_protected_columns' AS check_name,
+  CASE WHEN EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname = 'enforce_users_protected_columns'
+  ) THEN 'ok' ELSE 'MISSING FUNCTION' END AS status;
+
+SELECT
+  'reject_client_row_mutation' AS check_name,
+  CASE WHEN EXISTS (
+    SELECT 1 FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public' AND p.proname = 'reject_client_row_mutation'
+  ) THEN 'ok' ELSE 'MISSING FUNCTION' END AS status;

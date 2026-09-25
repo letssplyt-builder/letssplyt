@@ -27,6 +27,7 @@
     "smoke:jobs": "ts-node scripts/smoke-jobs.ts",
     "smoke:analytics-health": "ts-node scripts/smoke-analytics-health.ts",
     "smoke:notifications": "ts-node scripts/smoke-notifications.ts",
+    "smoke:rls": "ts-node scripts/smoke-rls-writes.ts",
     "cleanup:phone": "ts-node scripts/cleanup-auth-by-phone.ts"
   },
   "dependencies": {

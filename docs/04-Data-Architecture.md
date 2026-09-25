@@ -783,7 +783,7 @@ CREATE INDEX idx_user_notifications_user_unread
 - **Badge / unread count:** `read_at IS NULL` AND `created_at` within last 30 days
 - **List:** `created_at` within last 30 days AND (`read_at IS NULL` OR `read_at` within last 24 hours)
 
-**RLS:** `SELECT` and `UPDATE` where `user_id = auth.uid()`. Inserts are service-role only (`recordInboxNotification`).
+**RLS:** `SELECT` where `user_id = auth.uid()`. Inserts and mark-read updates are service-role only (`inbox-notification.service.ts`).
 
 ---
 
@@ -1054,6 +1054,15 @@ CREATE TRIGGER trg_participants_updated_at
   EXECUTE FUNCTION set_updated_at();
 ```
 
+### 4.4a Client write guards (service-role only)
+
+Added in `20260925120000_lock_client_writes_to_service_role.sql`.
+
+- `enforce_users_protected_columns` — `BEFORE UPDATE ON users`. Client JWTs (`authenticated` / `anon`) cannot change phone/PII, counters, opt-out, or `deleted_at`. Profile fields (`display_name`, avatar, notification prefs) remain writable via `users_update_own` + `getSupabaseForUser`.
+- `reject_client_row_mutation` — `BEFORE INSERT OR UPDATE OR DELETE` on financial and vault tables (`participants`, `events`, receipt items/assignments/discounts, handles, settlement/notification logs, `guest_pii`, `user_notifications`, analytics, OTP, nudge links, opt-outs, AI audit, funnel). Service-role and SECURITY DEFINER RPCs pass because `auth.role()` is not `authenticated`/`anon`.
+
+`device_sessions` is intentionally excluded so `PATCH /users/me` can upsert push tokens with the user JWT.
+
 ### 4.5 `trg_events_created_count`
 
 Increments `users.total_events_created` whenever a new event is inserted. References `payer_id` (the correct column name on `events`).
@@ -1316,7 +1325,9 @@ CREATE POLICY "users_insert_own" ON users
   FOR INSERT
   WITH CHECK (auth.uid() = id);
 
--- A user can update their own profile (display_name, avatar, etc.)
+-- A user can update their own profile (display_name, avatar, notification prefs).
+-- Identity / PII columns are blocked by trg_users_protect_sensitive_columns
+-- even though this policy is row-scoped only.
 CREATE POLICY "users_update_own" ON users
   FOR UPDATE
   USING (auth.uid() = id)
@@ -1339,22 +1350,11 @@ CREATE POLICY "users_service_role_all" ON users
 ### 6.3 `user_payment_handles` Policies
 
 ```sql
--- Full CRUD for own payment handles
+-- Clients may read their own ciphertext rows (never plaintext).
+-- INSERT/UPDATE/DELETE go through the backend service role only
+-- (encryptHandle / decryptHandle in profile.service.ts).
 CREATE POLICY "handles_select_own" ON user_payment_handles
   FOR SELECT
-  USING (user_id = auth.uid());
-
-CREATE POLICY "handles_insert_own" ON user_payment_handles
-  FOR INSERT
-  WITH CHECK (user_id = auth.uid());
-
-CREATE POLICY "handles_update_own" ON user_payment_handles
-  FOR UPDATE
-  USING (user_id = auth.uid())
-  WITH CHECK (user_id = auth.uid());
-
-CREATE POLICY "handles_delete_own" ON user_payment_handles
-  FOR DELETE
   USING (user_id = auth.uid());
 ```
 
@@ -1377,19 +1377,10 @@ CREATE POLICY "events_select_participant" ON events
     )
   );
 
--- Only the payer can create events
-CREATE POLICY "events_insert_payer" ON events
-  FOR INSERT
-  WITH CHECK (payer_id = auth.uid());
-
--- Only the payer can update their event (title, status, split_mode, etc.)
-CREATE POLICY "events_update_payer" ON events
-  FOR UPDATE
-  USING (payer_id = auth.uid())
-  WITH CHECK (payer_id = auth.uid());
-
--- Soft delete: payer sets deleted_at via UPDATE (see events_update_payer above)
--- No hard DELETE policy — backend service role handles final cleanup if ever needed
+-- INSERT/UPDATE/DELETE: no client policies. Event lifecycle writes
+-- (create, lock, totals, ai_stage, soft delete) use the backend service role.
+-- trg_events_service_role_writes rejects authenticated/anon mutations if a
+-- write policy is ever re-added.
 ```
 
 ### 6.5 `event_join_tokens` Policies
@@ -1425,79 +1416,25 @@ CREATE POLICY "participants_select_self" ON participants
   FOR SELECT
   USING (user_id = auth.uid());
 
--- INSERT is handled by the backend service role (participant creation spans
--- multiple tables: participants + guest_pii + notification_log)
--- No client INSERT policy on participants
-
--- REMOVED: broad "participants_update_self" policy — replaced below with restricted version.
--- DROP POLICY "participants_update_self" ON participants;  -- (if it exists from a prior migration)
-
--- Restricted participant self-update policy.
--- Participants may update their own row via the mobile app (e.g. display_name changes).
--- Financial fields (payment_status, amount_owed) MUST only be written via backend service role.
--- Supabase does not support column-level RLS in FOR UPDATE policies; column restriction
--- is enforced at the API layer (see 05-API-Specification.md).
--- The mobile app uses the anon key which is rate-limited and authenticated.
-CREATE POLICY "participants_update_self_safe" ON participants
-  FOR UPDATE
-  USING (user_id = auth.uid())
-  WITH CHECK (
-    user_id = auth.uid()
-    -- Participants may only update their own non-financial fields via this policy.
-    -- payment_status and amount_owed are updated ONLY by service role (backend).
-    -- Enforce this at the application layer: backend uses service role key for
-    -- all payment_status and amount_owed writes.
-    -- Supabase does not support column-level RLS in FOR UPDATE policies,
-    -- so column restriction is enforced at the API layer (see 05-API-Specification.md).
-    -- The mobile app uses the anon key which is rate-limited and authenticated.
-  );
-
-COMMENT ON POLICY "participants_update_self_safe" ON participants IS
-  'Participants may read/update their own row. Financial fields (payment_status, amount_owed) must only be written via backend service role. The mobile app never writes these fields directly.';
-
--- Payer can update any participant in their events (confirm, dispute, nudge, mark cash)
-CREATE POLICY "participants_update_payer" ON participants
-  FOR UPDATE
-  USING (
-    event_id IN (SELECT id FROM events WHERE payer_id = auth.uid())
-  )
-  WITH CHECK (
-    event_id IN (SELECT id FROM events WHERE payer_id = auth.uid())
-  );
+-- INSERT/UPDATE/DELETE: no client policies. Settlement, amounts, SMS state,
+-- and display_name sync use the backend service role (ADR PA-11).
+-- Previous policies participants_update_self_safe / participants_update_payer
+-- allowed any column change (including amount_owed and payment_status) via
+-- PostgREST — removed in 20260925120000_lock_client_writes_to_service_role.sql.
+-- trg_participants_service_role_writes rejects authenticated/anon mutations.
 ```
 
 ### 6.7 `receipt_items` Policies
 
 ```sql
--- Payer can read and write receipt items for their events
+-- Payer and participants can read receipt items. Writes are service role only
+-- (A1 confirm, item review, expenses reset).
 CREATE POLICY "receipt_items_select_payer" ON receipt_items
   FOR SELECT
   USING (
     event_id IN (SELECT id FROM events WHERE payer_id = auth.uid())
   );
 
-CREATE POLICY "receipt_items_insert_payer" ON receipt_items
-  FOR INSERT
-  WITH CHECK (
-    event_id IN (SELECT id FROM events WHERE payer_id = auth.uid())
-  );
-
-CREATE POLICY "receipt_items_update_payer" ON receipt_items
-  FOR UPDATE
-  USING (
-    event_id IN (SELECT id FROM events WHERE payer_id = auth.uid())
-  )
-  WITH CHECK (
-    event_id IN (SELECT id FROM events WHERE payer_id = auth.uid())
-  );
-
-CREATE POLICY "receipt_items_delete_payer" ON receipt_items
-  FOR DELETE
-  USING (
-    event_id IN (SELECT id FROM events WHERE payer_id = auth.uid())
-  );
-
--- Participants can read receipt items for events they are in (to see their breakdown)
 CREATE POLICY "receipt_items_select_participant" ON receipt_items
   FOR SELECT
   USING (
@@ -1521,26 +1458,7 @@ CREATE POLICY "item_assignments_select_payer" ON item_assignments
     )
   );
 
--- Payer can create and delete assignments (drag-and-drop; NLP; even split)
-CREATE POLICY "item_assignments_insert_payer" ON item_assignments
-  FOR INSERT
-  WITH CHECK (
-    item_id IN (
-      SELECT ri.id FROM receipt_items ri
-      JOIN events e ON e.id = ri.event_id
-      WHERE e.payer_id = auth.uid()
-    )
-  );
-
-CREATE POLICY "item_assignments_delete_payer" ON item_assignments
-  FOR DELETE
-  USING (
-    item_id IN (
-      SELECT ri.id FROM receipt_items ri
-      JOIN events e ON e.id = ri.event_id
-      WHERE e.payer_id = auth.uid()
-    )
-  );
+-- Assignment writes (drag-and-drop, NLP, even split) use the backend service role.
 
 -- Participants can read their own assignments
 CREATE POLICY "item_assignments_select_self" ON item_assignments
@@ -1604,13 +1522,8 @@ CREATE POLICY "notif_log_select_own" ON notification_log
 ### 6.13 `analytics_events` Policies
 
 ```sql
--- App users and pre-auth sessions can INSERT analytics events (fire-and-forget)
--- user_id is nullable for pre-auth events (QR scans, browser opens)
-CREATE POLICY "analytics_insert_authenticated" ON analytics_events
-  FOR INSERT
-  WITH CHECK (user_id = auth.uid() OR user_id IS NULL);
-
--- No SELECT policy for clients — analytics data is read by the backend only
+-- Analytics writes go through the backend service role only.
+-- No client INSERT/SELECT policies (removed analytics_insert_authenticated).
 ```
 
 ---
@@ -2206,5 +2119,5 @@ At 10 active events × 10 participants each = 100 joining-phase connections + 10
 
 *End of Data Architecture.*
 
-**Version:** 1.1 | **Updated:** June 2026 | **Changes:** Fixed circular FK (users.acquisition_event_id moved to ALTER TABLE post-creation), added funnel_checkpoints (Section 3.11), added device_sessions (Section 3.12), corrected DISPUTED transition to PENDING (PRD §10), added pending→confirmed direct cash path, fixed participants_update_self RLS to restricted participants_update_self_safe, replaced exec_sql RPC with defined create_analytics_partition PostgreSQL function, fixed guest_pii purge_after to NULL at creation with trigger-based settlement date, corrected analytics_events PRIMARY KEY to composite (id, created_at) for partitioned table, added Section 11 seed data spec, added Section 12 Realtime channel spec.
+**Version:** 1.2 | **Updated:** September 2026 | **Changes:** Client write RLS on events/participants/receipts/handles/notifications removed — service role + `reject_client_row_mutation` / `enforce_users_protected_columns` (migration `20260925120000`). Prior 1.1 notes: Fixed circular FK (users.acquisition_event_id moved to ALTER TABLE post-creation), added funnel_checkpoints (Section 3.11), added device_sessions (Section 3.12), corrected DISPUTED transition to PENDING (PRD §10), added pending→confirmed direct cash path, replaced exec_sql RPC with defined create_analytics_partition PostgreSQL function, fixed guest_pii purge_after to NULL at creation with trigger-based settlement date, corrected analytics_events PRIMARY KEY to composite (id, created_at) for partitioned table, added Section 11 seed data spec, added Section 12 Realtime channel spec.
 *This document supersedes the schema sketches in 01-PRD.md. When this document and any other conflict, this document wins.*

@@ -32,6 +32,7 @@ The prior `supabase.ts` docstring stated "NEVER use supabaseAdmin in user-facing
 - New event-scoped routes must declare `requireEventAccess('owner' | 'member')` in the router.
 - Integration test matrix (`event-scoped-routes.test.ts`) guards all event-scoped endpoints against stranger access.
 - CLAUDE.md and `supabase.ts` docstrings reflect the adopted model.
+- **Defense in depth (2026-09-25):** Client JWT write policies on financial tables (`participants`, `events`, receipt items/assignments/discounts, payment handles) were removed. Triggers `reject_client_row_mutation` and `enforce_users_protected_columns` reject authenticated/anon mutations even if a write policy is re-added. Profile PATCH and device-session upsert still use `getSupabaseForUser` (allowed columns / `device_sessions` only). See migration `20260925120000_lock_client_writes_to_service_role.sql`.
 
 ## Alternatives considered
 

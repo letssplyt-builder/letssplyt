@@ -44,6 +44,7 @@ const EXPECTED_MIGRATIONS = [
   '20260705160000_otp_atomic_attempt_increment.sql',
   '20260821120000_claim_participant_nudge.sql',
   '20260825140000_nudge_links.sql',
+  '20260925120000_lock_client_writes_to_service_role.sql',
 ] as const;
 
 const REPO_ROOT = path.resolve(__dirname, '../../../../..');
@@ -64,5 +65,19 @@ describe('supabase migration manifest', () => {
     for (let i = 1; i < versions.length; i++) {
       expect(versions[i] > versions[i - 1]).toBe(true);
     }
+  });
+
+  it('locks client writes on financial tables', () => {
+    const sql = fs.readFileSync(
+      path.join(MIGRATIONS_DIR, '20260925120000_lock_client_writes_to_service_role.sql'),
+      'utf8',
+    );
+
+    expect(sql).toContain('DROP POLICY IF EXISTS "participants_update_self_safe"');
+    expect(sql).toContain('DROP POLICY IF EXISTS "participants_update_payer"');
+    expect(sql).toContain('DROP POLICY IF EXISTS "events_update_payer"');
+    expect(sql).toContain('DROP POLICY IF EXISTS "handles_insert_own"');
+    expect(sql).toContain('enforce_users_protected_columns');
+    expect(sql).toContain('reject_client_row_mutation');
   });
 });

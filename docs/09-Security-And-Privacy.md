@@ -52,7 +52,7 @@ LetsSplyt handles phone numbers, payment handles (Venmo/PayPal usernames), and f
 | **Likelihood** | Medium — API bugs, RLS misconfiguration, or log exposure are common causes |
 | **Impact** | High — phone numbers and payment handles are directly exploitable for fraud and phishing |
 | **Primary mitigation** | PII scrubbing middleware strips any field matching E.164 phone patterns, `phone_hash`, `phone_encrypted`, `name_encrypted`, or `handle_encrypted` from all API responses before they are sent to clients. Any response containing these fields is treated as a bug (see Section 4) |
-| **Secondary mitigation** | RLS policies ensure each user can only query their own profile data and the events/participants they are authorised to see. Participant rows returned to the mobile app contain `display_name` only — never raw phone numbers |
+| **Secondary mitigation** | RLS policies ensure each user can only query their own profile data and the events/participants they are authorised to see. Client JWTs cannot UPDATE settlement or amount columns — those writes require the service role. Participant rows returned to the mobile app contain `display_name` only — never raw phone numbers |
 
 ---
 
