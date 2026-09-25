@@ -19,6 +19,7 @@ import { QRDisplayModal } from '../../components/events/QRDisplayModal';
 import { SegmentedControl } from '../../components/events/SegmentedControl';
 import { NotificationBellButton } from '../../components/notifications/NotificationBellButton';
 import { ScreenTopBar } from '../../components/navigation/ScreenTopBar';
+import { CollectDisclosureSection } from '../../components/settlement/CollectDisclosureSection';
 import { CounterpartyRow } from '../../components/settlement/CounterpartyRow';
 import { SCREEN_HORIZONTAL_PADDING } from '../../constants/layout';
 import { useAppInsets } from '../../hooks/useAppInsets';
@@ -35,7 +36,12 @@ import { useSettlementStore } from '../../store/settlementStore';
 import { useThemedStyles } from '../../hooks/useThemedStyles';
 import { useTheme } from '../../theme/ThemeContext';
 import { appRefreshControl } from '../../utils/refreshControl';
-import { pickDefaultHomeSegment, type HomeSegment } from '../../utils/dashboardSegments';
+import {
+  pickDefaultHomeSegment,
+  sumGuestCollectTotal,
+  sumMemberCollectTotal,
+  type HomeSegment,
+} from '../../utils/dashboardSegments';
 
 type Props = CompositeScreenProps<
   NativeStackScreenProps<HomeStackParamList, 'Home'>,
@@ -45,12 +51,11 @@ type Props = CompositeScreenProps<
   >
 >;
 
-const HOME_SEGMENTS = ['collect', 'pay', 'guests'] as const;
+const HOME_SEGMENTS = ['collect', 'pay'] as const;
 
 const HOME_SEGMENT_LABELS: Record<HomeSegment, string> = {
   collect: 'Collect from',
   pay: 'Pay to',
-  guests: 'Guests',
 };
 
 export function HomeScreen({ navigation }: Props) {
@@ -80,6 +85,8 @@ export function HomeScreen({ navigation }: Props) {
 
   const [segment, setSegment] = useState<HomeSegment>('pay');
   const [segmentPinned, setSegmentPinned] = useState(false);
+  const [membersExpanded, setMembersExpanded] = useState(true);
+  const [guestsExpanded, setGuestsExpanded] = useState(true);
   const [titleDraft, setTitleDraft] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
   const [balance, setBalance] = useState<BalanceSummary | null>(null);
@@ -181,27 +188,69 @@ export function HomeScreen({ navigation }: Props) {
     return null;
   };
 
-  const renderOweYouList = () => {
+  const renderCollectList = () => {
     const loadingOrError = renderCounterpartyLoadingOrError();
     if (loadingOrError) {
       return loadingOrError;
     }
 
-    if (membersOweYou.length === 0) {
-      return <Text style={styles.emptySection}>No members owe you right now.</Text>;
+    const hasMembers = membersOweYou.length > 0;
+    const hasGuests = guests.length > 0;
+    if (!hasMembers && !hasGuests) {
+      return <Text style={styles.emptySection}>Nobody owes you right now.</Text>;
     }
 
-    return membersOweYou.map((row) => (
-      <CounterpartyRow
-        key={row.user_id}
-        displayName={row.display_name}
-        amount={row.net_amount}
-        avatarColour={row.avatar_colour}
-        directionLabel="owe you"
-        amountTone="positive"
-        onPress={() => navigation.navigate('MemberDetail', { userId: row.user_id })}
-      />
-    ));
+    return (
+      <>
+        {hasMembers ? (
+          <CollectDisclosureSection
+            title="Members"
+            count={membersOweYou.length}
+            total={sumMemberCollectTotal(membersOweYou)}
+            expanded={membersExpanded}
+            onToggle={() => setMembersExpanded((open) => !open)}
+          >
+            {membersOweYou.map((row) => (
+              <CounterpartyRow
+                key={row.user_id}
+                displayName={row.display_name}
+                amount={row.net_amount}
+                avatarColour={row.avatar_colour}
+                directionLabel="owe you"
+                amountTone="positive"
+                onPress={() => navigation.navigate('MemberDetail', { userId: row.user_id })}
+              />
+            ))}
+          </CollectDisclosureSection>
+        ) : null}
+        {hasGuests ? (
+          <CollectDisclosureSection
+            title="Guests"
+            count={guests.length}
+            total={sumGuestCollectTotal(guests)}
+            expanded={guestsExpanded}
+            onToggle={() => setGuestsExpanded((open) => !open)}
+          >
+            {guests.map((guest) => (
+              <CounterpartyRow
+                key={guest.guest_key}
+                displayName={guest.display_name}
+                amount={guest.amount}
+                directionLabel={guest.kind === 'name_only' ? 'Cash' : 'Guest'}
+                amountTone="positive"
+                onPress={() => {
+                  if (guest.kind === 'name_only' && guest.event_id) {
+                    handleOpenEvent(guest.event_id);
+                    return;
+                  }
+                  navigation.navigate('GuestDetail', { phoneHash: guest.guest_key });
+                }}
+              />
+            ))}
+          </CollectDisclosureSection>
+        ) : null}
+      </>
+    );
   };
 
   const renderYouOweList = () => {
@@ -227,45 +276,11 @@ export function HomeScreen({ navigation }: Props) {
     ));
   };
 
-  const renderGuestsList = () => {
-    const loadingOrError = renderCounterpartyLoadingOrError();
-    if (loadingOrError) {
-      return loadingOrError;
-    }
-
-    if (guests.length === 0) {
-      return <Text style={styles.emptySection}>No guests owe you right now.</Text>;
-    }
-
-    return guests.map((guest) => (
-      <CounterpartyRow
-        key={guest.guest_key}
-        displayName={guest.display_name}
-        amount={guest.amount}
-        directionLabel="to collect from"
-        amountTone="positive"
-        onPress={() => {
-          if (guest.kind === 'name_only' && guest.event_id) {
-            handleOpenEvent(guest.event_id);
-            return;
-          }
-          navigation.navigate('GuestDetail', { phoneHash: guest.guest_key });
-        }}
-      />
-    ));
-  };
-
   const renderSegmentList = () => {
-    switch (segment) {
-      case 'pay':
-        return renderYouOweList();
-      case 'collect':
-        return renderOweYouList();
-      case 'guests':
-        return renderGuestsList();
-      default:
-        return null;
+    if (segment === 'pay') {
+      return renderYouOweList();
     }
+    return renderCollectList();
   };
 
   return (

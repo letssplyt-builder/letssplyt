@@ -2,7 +2,10 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { HomeScreen } from './HomeScreen';
 import * as eventService from '../../services/event.service';
-import { closePostCreateQrAndOpenEventDetail } from '../../navigation/eventNavigation';
+import {
+  closePostCreateQrAndOpenEventDetail,
+  openEventDetail,
+} from '../../navigation/eventNavigation';
 import { useAuthStore } from '../../store/authStore';
 import { useEventStore } from '../../store/eventStore';
 import { useSettlementStore } from '../../store/settlementStore';
@@ -113,7 +116,18 @@ describe('HomeScreen', () => {
     });
   });
 
-  it('shows pay, collect, and guests tabs', async () => {
+  it('shows collect and pay tabs and guests under Collect from', async () => {
+    useSettlementStore.setState({
+      guests: [
+        {
+          guest_key: 'g-1',
+          kind: 'phone',
+          display_name: 'Priya',
+          amount: 18,
+        },
+      ],
+    });
+
     render(
       <HomeScreen
         navigation={navigation}
@@ -124,7 +138,16 @@ describe('HomeScreen', () => {
     await waitFor(() => {
       expect(screen.getByLabelText('Pay to tab')).toBeTruthy();
       expect(screen.getByLabelText('Collect from tab')).toBeTruthy();
-      expect(screen.getByLabelText('Guests tab')).toBeTruthy();
+      expect(screen.queryByLabelText('Guests tab')).toBeNull();
+      expect(screen.getByText('Members · 1 · $25.00')).toBeTruthy();
+      expect(screen.getByText('Guests · 1 · $18.00')).toBeTruthy();
+      expect(screen.getByText('Priya')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByLabelText('Guests, 1 person, $18.00'));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Priya')).toBeNull();
     });
 
     fireEvent.press(screen.getByLabelText('Pay to tab'));
@@ -228,5 +251,36 @@ describe('HomeScreen', () => {
 
     expect(screen.getByText('Friday Dinner')).toBeTruthy();
     expect(screen.queryByText('https://letssplyt.app/join/abc')).toBeNull();
+  });
+
+  it('opens Event Detail for name-only guests instead of Guest Detail', async () => {
+    useSettlementStore.setState({
+      guests: [
+        {
+          guest_key: 'part-name-only',
+          kind: 'name_only',
+          display_name: 'Alex Cash',
+          amount: 12,
+          event_id: 'event-cash-1',
+          participant_id: 'part-name-only',
+        },
+      ],
+    });
+
+    render(
+      <HomeScreen
+        navigation={navigation}
+        route={{ key: 'Home', name: 'Home' } as never}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByText('Alex Cash')).toBeTruthy());
+    fireEvent.press(screen.getByText('Alex Cash'));
+
+    expect(openEventDetail).toHaveBeenCalledWith(navigation, 'event-cash-1');
+    expect(navigation.navigate).not.toHaveBeenCalledWith(
+      'GuestDetail',
+      expect.anything(),
+    );
   });
 });
