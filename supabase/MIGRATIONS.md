@@ -13,7 +13,7 @@
 
 ---
 
-## Apply order (37 migrations)
+## Apply order (38 migrations)
 
 Run from **repository root** (`letssplyt/`), not `supabase/`:
 
@@ -74,6 +74,7 @@ If CLI reports *"Found local migration files to be inserted before the last migr
 | 35 | `20260705160000_otp_atomic_attempt_increment.sql` | Post-audit PA-06 | Atomic `increment_otp_attempt` RPC | `CREATE OR REPLACE FUNCTION` |
 | 36 | `20260821120000_claim_participant_nudge.sql` | Settlement nudge | Atomic `claim_participant_nudge` RPC (48h cooldown before SMS) | `CREATE OR REPLACE FUNCTION` |
 | 37 | `20260825140000_nudge_links.sql` | Settlement nudge | `nudge_links` capability tokens for consolidated member/guest nudge SMS | `IF NOT EXISTS` + RLS deny-all |
+| 38 | `20260925120000_lock_client_writes_to_service_role.sql` | Security / RLS | Drop client write policies on financial tables; trigger-lock mutations to service role; protect `users` PII columns | `DROP POLICY IF EXISTS` + `CREATE OR REPLACE FUNCTION` |
 
 ---
 
@@ -118,6 +119,7 @@ After `supabase db push` on staging or production:
    doppler run -- npm run smoke:expenses-reset
    doppler run -- npm run smoke:messages-preview
    doppler run -- npm run smoke:split-revision
+   doppler run -- npm run smoke:rls
    ```
 
 4. **Manual** — create event → lock → enter total → reset expenses → scan/enter total again.
