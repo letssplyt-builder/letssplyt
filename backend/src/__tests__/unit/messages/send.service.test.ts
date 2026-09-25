@@ -161,6 +161,75 @@ describe('sendEventMessages', () => {
     expect(sendOutboundMessage).toHaveBeenCalledTimes(1);
   });
 
+  it('marks a phone participant failed when their preview is missing', async () => {
+    mockSupabase.__resetMock();
+    jest.mocked(buildMessagePreviewsForEvent).mockResolvedValue([]);
+    mockSupabase.__pushMockResultForTable('events', {
+      data: {
+        id: EVENT_ID,
+        payer_id: PAYER_ID,
+        title: 'Dinner',
+        status: 'locked',
+        ai_stage: 'messaging',
+        currency: 'USD',
+        locale: 'en-US',
+        total_amount: 40,
+      },
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: [
+        {
+          id: PARTICIPANT_ORGANISER,
+          user_id: PAYER_ID,
+          guest_pii_token: null,
+          country_code: 'US',
+          join_method: 'qr_app',
+          display_name: 'Payer',
+          amount_owed: 20,
+        },
+        {
+          id: PARTICIPANT_A,
+          user_id: MEMBER_USER_ID,
+          guest_pii_token: null,
+          country_code: 'US',
+          join_method: 'qr_app',
+          display_name: 'Alex',
+          amount_owed: 20,
+        },
+        {
+          id: PARTICIPANT_B,
+          user_id: null,
+          guest_pii_token: null,
+          country_code: null,
+          join_method: 'manual_name_only',
+          display_name: 'Jordan',
+          amount_owed: 20,
+        },
+      ],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('events', {
+      data: [{ id: EVENT_ID }],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', { data: [], error: null });
+
+    const result = await sendEventMessages(PAYER_ID, EVENT_ID);
+
+    expect(sendOutboundMessage).not.toHaveBeenCalled();
+    expect(result.failed_count).toBe(1);
+    expect(result.results).toContainEqual({
+      participant_id: PARTICIPANT_A,
+      status: 'failed',
+    });
+    expect(result.results).toContainEqual({
+      participant_id: PARTICIPANT_B,
+      status: 'skipped_no_phone',
+    });
+  });
+
   it('skips opted-out participants', async () => {
     jest.mocked(isPhoneOptedOut).mockResolvedValue(true);
 
