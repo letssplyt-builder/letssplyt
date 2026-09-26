@@ -101,6 +101,20 @@ export function formatAmountInput(value: number): string {
   return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2);
 }
 
+/** Keep a typed decimal in the field (e.g. "12.") instead of snapping back to an integer. */
+export function sanitizeAmountDraft(text: string, maxDecimals = 2): string {
+  const cleaned = text.replace(/,/g, '').replace(/[^0-9.]/g, '');
+  if (!cleaned) return '';
+  const dot = cleaned.indexOf('.');
+  if (dot === -1) return cleaned;
+  const whole = cleaned.slice(0, dot);
+  const frac = cleaned
+    .slice(dot + 1)
+    .replace(/\./g, '')
+    .slice(0, maxDecimals);
+  return `${whole === '' ? '0' : whole}.${frac}`;
+}
+
 export function parseAmountInput(value: string): number {
   const parsed = Number.parseFloat(value.replace(/,/g, '').trim());
   return Number.isFinite(parsed) ? parsed : 0;

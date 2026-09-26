@@ -7,6 +7,7 @@ import { assertEventOwner, fetchEventRow } from '../events/event.service';
 import { composeParticipantMessage } from './a3.agent';
 import { assembleParticipantMessage, buildStandardOpeningLine } from './message-assembler';
 import type { PayerHandleInput } from './deepLinks';
+import { hasPositiveBillShare } from './message-eligibility';
 import { resolveParticipantPhoneContext } from './participant-phone';
 import { ensureParticipantBreakdownUrl } from './breakdown-token.service';
 
@@ -168,6 +169,9 @@ export async function buildMessagePreviewsForEvent(
 
   for (const row of memberRows) {
     const amountOwed = Number(row.amount_owed);
+    if (!hasPositiveBillShare(amountOwed)) {
+      continue;
+    }
     const displayName = row.display_name as string;
     const phoneContext = await resolveParticipantPhoneContext({
       user_id: row.user_id as string | null,
@@ -290,6 +294,9 @@ export async function buildRevisionMessagesForParticipants(
     }
 
     const amountOwed = Number(row.amount_owed);
+    if (!hasPositiveBillShare(amountOwed)) {
+      continue;
+    }
     const displayName = row.display_name as string;
     const phoneContext = await resolveParticipantPhoneContext({
       user_id: row.user_id as string | null,

@@ -16,7 +16,8 @@ export function deriveMessageDeliveryStatus(
   if (
     fields.join_method === 'manual_name_only' ||
     sendResult === 'skipped_opt_out' ||
-    sendResult === 'skipped_no_phone'
+    sendResult === 'skipped_no_phone' ||
+    sendResult === 'skipped_zero_share'
   ) {
     return 'skipped';
   }

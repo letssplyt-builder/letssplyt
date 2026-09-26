@@ -10,6 +10,7 @@ import {
 } from '../events/event.service';
 import { getHandles } from '../profile/profile.service';
 import { buildMessagePreviewsForEvent, buildRevisionMessagesForParticipants } from './messages.service';
+import { hasPositiveBillShare, isSmsEligibleParticipant } from './message-eligibility';
 import { notifyMemberShareEdited, notifyMemberShareReady } from './messages-push';
 import { resolveParticipantPhoneContext } from './participant-phone';
 
@@ -17,6 +18,7 @@ export type SendResultStatus =
   | 'sent'
   | 'skipped_opt_out'
   | 'skipped_no_phone'
+  | 'skipped_zero_share'
   | 'failed';
 
 export interface SendMessagesResult {
@@ -31,17 +33,13 @@ export interface SendMessagesResult {
   event_status: 'sent';
 }
 
-function isSmsEligibleParticipant(
-  row: { user_id?: string | null; join_method?: string | null },
-  payerId: string,
-): boolean {
-  if ((row.user_id ?? null) === payerId) return false;
-  return row.join_method !== 'manual_name_only';
-}
-
 async function assertOrganizerHasPaymentHandle(
   organizerId: string,
-  participants: Array<{ user_id?: string | null; join_method?: string | null }>,
+  participants: Array<{
+    user_id?: string | null;
+    join_method?: string | null;
+    amount_owed?: number | null;
+  }>,
   payerId: string,
 ): Promise<void> {
   const needsHandle = participants.some((row) => isSmsEligibleParticipant(row, payerId));
@@ -133,6 +131,12 @@ export async function sendEventMessages(
     }
 
     if (filterIds && !filterIds.has(participantId)) {
+      continue;
+    }
+
+    if (!hasPositiveBillShare(row.amount_owed as number | null)) {
+      skippedCount += 1;
+      results.push({ participant_id: participantId, status: 'skipped_zero_share' });
       continue;
     }
 
@@ -266,7 +270,7 @@ export async function resendRevisionMessages(
   const { data: participantRows, error: participantsError } = await supabaseAdmin
     .from('participants')
     .select(
-      'id, user_id, guest_pii_token, country_code, join_method, revision_count, payment_status',
+      'id, user_id, guest_pii_token, country_code, join_method, revision_count, payment_status, amount_owed',
     )
     .eq('event_id', eventId)
     .eq('payment_status', 'pending')
@@ -307,6 +311,12 @@ export async function resendRevisionMessages(
 
   for (const row of revisionRows) {
     const participantId = row.id as string;
+    if (!hasPositiveBillShare(row.amount_owed as number | null)) {
+      skippedCount += 1;
+      results.push({ participant_id: participantId, status: 'skipped_zero_share' });
+      continue;
+    }
+
     const pkg = messageMap.get(participantId);
     if (!pkg) {
       continue;
@@ -387,9 +397,9 @@ export async function resendRevisionMessages(
 
   for (const row of revisionRows) {
     const memberUserId = row.user_id as string | null;
-    if (memberUserId && memberUserId !== eventRow.payer_id) {
-      notifyMemberShareEdited(memberUserId, eventRow.title, eventId);
-    }
+    if (!memberUserId || memberUserId === eventRow.payer_id) continue;
+    if (!hasPositiveBillShare(row.amount_owed as number | null)) continue;
+    notifyMemberShareEdited(memberUserId, eventRow.title, eventId);
   }
 
   return {

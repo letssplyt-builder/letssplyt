@@ -3,6 +3,7 @@ import {
   attachLineDiscountsToFoodItems,
   buildSplitPersonExplainers,
   hasBillScopedDiscounts,
+  parsePortionInput,
   toPricedSplitItems,
 } from '../../../screens/splits/splitEntry.utils';
 
@@ -79,5 +80,14 @@ describe('splitEntry discount helpers', () => {
 
     expect(explainers[0]?.lines[0]?.detail).toContain('÷ 2');
     expect(explainers[0]?.lines[0]?.detail).toContain('$7.50');
+  });
+});
+
+describe('parsePortionInput', () => {
+  it('treats 0 and empty as no share', () => {
+    expect(parsePortionInput('0')).toBe(0);
+    expect(parsePortionInput('')).toBe(0);
+    expect(parsePortionInput('2')).toBe(2);
+    expect(parsePortionInput('1.9')).toBe(1);
   });
 });

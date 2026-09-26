@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -5,6 +6,7 @@ import {
   TextInput,
   View,
   type StyleProp,
+  type TextInputProps,
   type ViewStyle,
 } from 'react-native';
 import { Swipeable } from 'react-native-gesture-handler';
@@ -18,6 +20,7 @@ import {
   formatAmountInput,
   itemLabelForDiscount,
   parseAmountInput,
+  sanitizeAmountDraft,
   type EditableReviewDiscount,
   type EditableReviewItem,
 } from '../../screens/receipts/itemReview.utils';
@@ -91,6 +94,32 @@ function ExpandedEditToolbar({
         </Pressable>
       ) : null}
     </View>
+  );
+}
+
+function AmountDraftInput({
+  numericValue,
+  onNumericChange,
+  style,
+  ...rest
+}: {
+  numericValue: number;
+  onNumericChange: (value: number) => void;
+} & Omit<TextInputProps, 'value' | 'onChangeText'>) {
+  const [draft, setDraft] = useState(() => formatAmountInput(numericValue));
+
+  return (
+    <TextInput
+      {...rest}
+      style={style}
+      value={draft}
+      keyboardType="decimal-pad"
+      onChangeText={(text) => {
+        const next = sanitizeAmountDraft(text);
+        setDraft(next);
+        onNumericChange(parseAmountInput(next));
+      }}
+    />
   );
 }
 
@@ -168,11 +197,10 @@ function FoodLineRow({
               value={item.quantity}
               onChange={(qty) => onChange({ quantity: qty })}
             />
-            <TextInput
+            <AmountDraftInput
               style={styles.expandedPriceInput}
-              value={formatAmountInput(item.unit_price)}
-              keyboardType="decimal-pad"
-              onChangeText={(text) => onChange({ unit_price: parseAmountInput(text) })}
+              numericValue={item.unit_price}
+              onNumericChange={(unit_price) => onChange({ unit_price })}
               placeholderTextColor={PAPER.inkFaint}
               accessibilityLabel={`${item.name || 'Item'} price`}
             />
@@ -257,12 +285,12 @@ function ChargeLineRow({
             placeholder="Fee label"
             placeholderTextColor={PAPER.inkFaint}
           />
-          <TextInput
+          <AmountDraftInput
             style={styles.expandedPriceInput}
-            value={formatAmountInput(charge.amount)}
-            keyboardType="decimal-pad"
-            onChangeText={(text) => onChange({ amount: parseAmountInput(text) })}
+            numericValue={charge.amount}
+            onNumericChange={(amount) => onChange({ amount })}
             placeholderTextColor={PAPER.inkFaint}
+            accessibilityLabel={`${charge.name || 'Fee'} amount`}
           />
         </View>
       </View>
@@ -346,13 +374,13 @@ function DiscountLineRow({
                 </Pressable>
               );
             })}
-            <TextInput
+            <AmountDraftInput
               style={styles.discountValueInput}
-              value={formatAmountInput(discount.value)}
-              keyboardType="decimal-pad"
-              onChangeText={(text) => onChange({ value: parseAmountInput(text) })}
+              numericValue={discount.value}
+              onNumericChange={(value) => onChange({ value })}
               placeholder={discount.type === 'percent' ? '10' : '5.00'}
               placeholderTextColor={PAPER.inkFaint}
+              accessibilityLabel={`${discount.name || 'Discount'} value`}
             />
           </View>
         </View>

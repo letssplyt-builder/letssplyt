@@ -6,7 +6,7 @@ jest.mock('../../../modules/splits/a2-idempotency', () => ({
 }));
 
 import { createLLMProvider, mockLLMProvider } from '../../mocks/llm.mock';
-import { assignItems } from '../../../modules/splits/a2.agent';
+import { assignItems, calculatePortionSplits } from '../../../modules/splits/a2.agent';
 import { claimCalculatingSlot, setAiStage } from '../../../modules/splits/a2-idempotency';
 
 const EVENT_ID = 'event-55555555-5555-5555-5555-555555555555';
@@ -124,5 +124,21 @@ describe('a2.agent', () => {
 
     expect(mockLLMProvider.complete).toHaveBeenCalledTimes(2);
     expect(result.status).toBe('complete');
+  });
+
+  it('calculatePortionSplits keeps a 0 weight as a $0 share', () => {
+    const splits = calculatePortionSplits(
+      30,
+      [
+        { name: 'Alex', weight: 0 },
+        { name: 'Jordan', weight: 100 },
+      ],
+      'USD',
+    );
+
+    expect(splits).toEqual([
+      { participantName: 'Alex', amountOwed: 0 },
+      { participantName: 'Jordan', amountOwed: 30 },
+    ]);
   });
 });

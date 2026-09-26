@@ -334,7 +334,7 @@ const client = twilio(
 
 export interface SendMessageResult {
   participantId: string;
-  status: 'sent' | 'skipped_opt_out' | 'skipped_no_phone' | 'failed';
+  status: 'sent' | 'skipped_opt_out' | 'skipped_no_phone' | 'skipped_zero_share' | 'failed';
   twilioSid?: string;
   errorCode?: number;
 }

@@ -16,11 +16,17 @@ export function canParticipantReceiveSms(joinMethod: string): boolean {
 }
 
 export function eventHasSmsRecipients(
-  participants: Array<{ is_organiser?: boolean; join_method: string }>,
+  participants: Array<{
+    is_organiser?: boolean;
+    join_method: string;
+    amount_owed?: number | null;
+  }>,
 ): boolean {
   return participants.some(
     (participant) =>
-      !participant.is_organiser && canParticipantReceiveSms(participant.join_method),
+      !participant.is_organiser &&
+      canParticipantReceiveSms(participant.join_method) &&
+      (participant.amount_owed == null || participant.amount_owed > 0),
   );
 }
 

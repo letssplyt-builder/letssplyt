@@ -507,4 +507,61 @@ describe('sendEventMessages', () => {
     });
     expect(sendOutboundMessage).not.toHaveBeenCalled();
   });
+
+  it('skips $0-share members: no SMS, no push, no payment-handle requirement', async () => {
+    jest.mocked(getHandles).mockResolvedValue([]);
+    mockSupabase.__resetMock();
+    jest.mocked(buildMessagePreviewsForEvent).mockResolvedValue([]);
+    mockSupabase.__pushMockResultForTable('events', {
+      data: {
+        id: EVENT_ID,
+        payer_id: PAYER_ID,
+        title: 'Dinner',
+        status: 'locked',
+        ai_stage: 'messaging',
+        currency: 'USD',
+        locale: 'en-US',
+        total_amount: 20,
+      },
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: [
+        {
+          id: PARTICIPANT_ORGANISER,
+          user_id: PAYER_ID,
+          guest_pii_token: null,
+          country_code: 'US',
+          join_method: 'qr_app',
+          display_name: 'Payer',
+          amount_owed: 20,
+        },
+        {
+          id: PARTICIPANT_A,
+          user_id: MEMBER_USER_ID,
+          guest_pii_token: null,
+          country_code: 'US',
+          join_method: 'qr_app',
+          display_name: 'Alex',
+          amount_owed: 0,
+        },
+      ],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', { data: null, error: null });
+    mockSupabase.__pushMockResultForTable('events', {
+      data: [{ id: EVENT_ID }],
+      error: null,
+    });
+
+    const result = await sendEventMessages(PAYER_ID, EVENT_ID);
+
+    expect(sendOutboundMessage).not.toHaveBeenCalled();
+    expect(result.sent_count).toBe(0);
+    expect(result.skipped_count).toBe(1);
+    expect(result.results).toEqual([
+      { participant_id: PARTICIPANT_A, status: 'skipped_zero_share' },
+    ]);
+    expect(result.event_status).toBe('sent');
+  });
 });

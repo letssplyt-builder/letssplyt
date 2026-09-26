@@ -21,6 +21,7 @@ describe('messageDeliveryStatus', () => {
     ).toBe('delivered');
     expect(deriveMessageDeliveryStatus({ message_failed: true })).toBe('failed');
     expect(deriveMessageDeliveryStatus({}, 'skipped_opt_out')).toBe('skipped');
+    expect(deriveMessageDeliveryStatus({}, 'skipped_zero_share')).toBe('skipped');
     expect(
       deriveMessageDeliveryStatus({ join_method: 'manual_name_only' }),
     ).toBe('skipped');

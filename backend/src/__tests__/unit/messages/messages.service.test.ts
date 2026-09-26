@@ -123,4 +123,45 @@ describe('buildMessagePreviewsForEvent', () => {
       expect.objectContaining({ join_method: 'manual_name_only' }),
     );
   });
+
+  it('omits $0-share members from previews and does not compose a message', async () => {
+    mockSupabase.__pushMockResultForTable('events', {
+      data: {
+        id: EVENT_ID,
+        payer_id: PAYER_ID,
+        title: 'Dinner',
+        status: 'locked',
+        ai_stage: 'messaging',
+        currency: 'USD',
+        locale: 'en-US',
+        total_amount: 20,
+      },
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('users', {
+      data: { display_name: 'Alex Payer' },
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: [
+        {
+          id: PARTICIPANT_WITH_PHONE,
+          user_id: MEMBER_USER_ID,
+          display_name: 'Jordan',
+          amount_owed: 0,
+          guest_pii_token: null,
+          country_code: 'US',
+          join_method: 'qr_app',
+        },
+      ],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('item_assignments', { data: [], error: null });
+
+    const previews = await buildMessagePreviewsForEvent(EVENT_ID, PAYER_ID);
+
+    expect(previews).toEqual([]);
+    expect(composeParticipantMessage).not.toHaveBeenCalled();
+    expect(ensureParticipantBreakdownUrl).not.toHaveBeenCalled();
+  });
 });

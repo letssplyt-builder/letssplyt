@@ -277,12 +277,16 @@ export function SplitReviewScreen({ navigation, route }: Props) {
     s.currentEvent?.event.id === eventId ? s.currentEvent.event.messages_sent_at : null,
   );
   const isPostSendRevision = Boolean(messagesSentAt);
-  const hasSmsRecipients = useMemo(
-    () => eventHasSmsRecipients(participants),
-    [participants],
-  );
-
   const splits = useSplitStore((s) => s.splits);
+  const hasSmsRecipients = useMemo(() => {
+    const amountById = new Map(splits.map((row) => [row.participant_id, row.amount_owed]));
+    return eventHasSmsRecipients(
+      participants.map((participant) => ({
+        ...participant,
+        amount_owed: amountById.get(participant.id) ?? participant.amount_owed,
+      })),
+    );
+  }, [participants, splits]);
   const billTotal = useSplitStore((s) => s.billTotal);
   const currency = useSplitStore((s) => s.currency);
   const totalCheck = useSplitStore((s) => s.totalCheck);
@@ -304,8 +308,8 @@ export function SplitReviewScreen({ navigation, route }: Props) {
     [billTotal, currency, totalCheck],
   );
 
-  const allHaveAmounts = splits.every((row) => row.amount_owed > 0);
-  const canSend = sumBalanced && allHaveAmounts && splits.length > 0;
+  const amountsValid = splits.length > 0 && splits.every((row) => row.amount_owed >= 0);
+  const canSend = sumBalanced && amountsValid;
 
   const primaryLabel = isPostSendRevision
     ? 'Save and notify →'
