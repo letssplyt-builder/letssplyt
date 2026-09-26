@@ -1,7 +1,9 @@
 # LetsSplyt Privacy Policy
 
 **Effective Date:** June 7, 2026
-**Last Updated:** June 7, 2026
+**Last Updated:** September 26, 2026
+
+**Public URL:** [https://letssplyt.com/privacy.html](https://letssplyt.com/privacy.html) (`/privacy` and `/legal/privacy` redirect here). Also available in the app under Settings → Privacy Policy.
 
 ---
 
@@ -39,8 +41,10 @@ Address: California, United States
 
 - **Event data:** Restaurant bill details, item names, prices, tax, tip, and total amounts you enter or scan
 - **Participant data:** Names and phone numbers of people you add to a bill-split event on their behalf (see Section 5.1)
-- **Usage data:** App interactions, feature usage, and error logs. No advertising identifiers are collected.
+- **Device information:** Device type (iOS or Android) and app version, used for compatibility and support
+- **Usage data:** App interactions, feature usage, and crash/error reports. No advertising identifiers are collected.
 - **Push notification token:** A device token used solely to deliver in-app notifications about your share of a bill
+- **Approximate network data:** IP address used for rate limiting (OTP abuse prevention). Analytics events store only a hashed identifier, not your raw IP or phone number.
 
 ### 3.3 Information Collected from Guests (Non-App Users)
 
@@ -54,7 +58,7 @@ Guest data is automatically and permanently deleted **90 days** after the event 
 
 When you use the receipt scanning feature, you upload a photo of a restaurant receipt. This image is:
 - Transmitted securely to our servers over an encrypted connection
-- Processed by an AI service (Google Gemini) to extract item names, prices, tax, tip, and currency
+- Processed by an AI service to extract item names, prices, tax, tip, and currency. Development and staging use Google Gemini. Production uses Anthropic Claude when that provider is configured.
 - Stored in private, access-controlled cloud storage for the duration of the event
 - Deleted when the event is closed or your account is deleted
 
@@ -65,6 +69,17 @@ We do not use your receipt images or any data derived from them to train AI mode
 ### 3.5 Biometric Authentication
 
 LetsSplyt offers optional biometric authentication (Face ID, Touch ID) as a convenience feature. **LetsSplyt does not collect, transmit, receive, or store any biometric data.** Biometric authentication is performed entirely by your device's operating system (iOS Secure Enclave or Android Biometric API). We never have access to your biometric information at any point.
+
+### 3.6 Device Permissions (Camera and Contacts)
+
+The Android and iOS apps request two optional operating-system permissions. Neither is required to create an account.
+
+| Permission | When we ask | What we use | What we do not do |
+|---|---|---|---|
+| **Camera** | When you scan a restaurant receipt | Photograph the receipt so AI can extract line items | We do not access your camera roll, do not record video, and do not use the camera for advertising |
+| **Contacts** | When you add people to an event from your address book | Read names and phone numbers you select so you do not have to type them | We do not upload your full address book. Only the contacts you choose are sent to our servers, stored as participant data (see Section 5.1) |
+
+You can deny either permission and still use LetsSplyt by typing names and phone numbers, or by entering receipt amounts manually.
 
 ---
 
@@ -104,10 +119,16 @@ We use the following third-party services to operate LetsSplyt. Each provider is
 
 | Provider | Purpose | Data shared | Privacy Policy |
 |---|---|---|---|
-| **Twilio** | Sending OTP verification codes and payment request SMS | Phone number (encrypted in transit) | [twilio.com/en-us/legal/privacy](https://www.twilio.com/en-us/legal/privacy) |
-| **Supabase** | Database and file storage (hosted in the United States) | All account and event data | [supabase.com/privacy](https://supabase.com/privacy) |
-| **Google (Gemini)** | AI processing of receipt images | Receipt images, extracted item text | [policies.google.com/privacy](https://policies.google.com/privacy) |
-| **Expo / React Native** | Mobile app delivery and push notifications | Push notification device token | [expo.dev/privacy](https://expo.dev/privacy) |
+| **Telnyx** | Delivering OTP verification codes and payment request SMS | Phone number (encrypted in transit) | [telnyx.com/privacy-policy](https://telnyx.com/privacy-policy) |
+| **Supabase** | Database, authentication tokens, and private receipt-image storage (United States) | Account and event data; temporary OTP codes (deleted after 10 minutes) | [supabase.com/privacy](https://supabase.com/privacy) |
+| **Google (Gemini)** | AI processing of receipt images in development and staging | Receipt images, extracted item text | [policies.google.com/privacy](https://policies.google.com/privacy) |
+| **Anthropic (Claude)** | AI processing of receipt images in production when configured | Receipt images, extracted item text | [anthropic.com/privacy](https://www.anthropic.com/privacy) |
+| **Expo** | App delivery and push notification routing | Push notification device token | [expo.dev/privacy](https://expo.dev/privacy) |
+| **Sentry** | Crash and error diagnostics | Anonymised error reports, device type, app version. Phone numbers and payment handles are scrubbed before send. | [sentry.io/privacy](https://sentry.io/privacy) |
+| **Upstash** | Rate limiting and background jobs | IP address for OTP abuse limits; no phone numbers or receipt images | [upstash.com/trust/privacy](https://upstash.com/trust/privacy) |
+| **Twilio** | Optional SMS rollback only (`SMS_PROVIDER=twilio`) | Phone number (encrypted in transit), if that fallback is enabled | [twilio.com/en-us/legal/privacy](https://www.twilio.com/en-us/legal/privacy) |
+
+**Note on OTP verification:** LetsSplyt generates and verifies one-time passcodes on its own servers. The code is stored temporarily in Supabase and expires after 10 minutes. Telnyx (or Twilio, if rollback is enabled) only delivers the SMS. Neither provider generates or checks the code.
 
 ### 5.3 Legal Requirements
 
@@ -129,6 +150,7 @@ We retain your personal information only as long as necessary for the purposes d
 | Event data (items, amounts, splits) | Until you delete your account | Required to maintain your event history and settlement records |
 | Receipt images | Until the event closes or your account is deleted | Required only during active event; no purpose thereafter |
 | Guest data (display name, phone number) | 90 days after the event closes, then automatically and permanently deleted | Sufficient time for settlement to complete; retained no longer than necessary |
+| OTP verification codes | 10 minutes, then automatically and permanently deleted | Temporary code used solely to prove phone-number ownership |
 | SMS delivery logs | 30 days | Retained to investigate delivery failures; no purpose thereafter |
 | Error and usage logs (anonymised) | 90 days | Sufficient for reliability analysis; no personal data retained after anonymisation |
 
@@ -145,7 +167,8 @@ We implement industry-standard security measures:
 - **All data in transit** is encrypted using TLS 1.2 or higher.
 - **Receipt images** are stored in a private, access-controlled storage bucket. No public URLs are generated.
 - **Authentication tokens** are stored in your device's secure hardware enclave (iOS Secure Enclave / Android Keystore) and are never written to unprotected device storage.
-- We do not log phone numbers or payment handles in application logs. Our logging infrastructure automatically scrubs personal information before writing to log storage.
+- **OTP codes** expire after 10 minutes and are deleted on successful verification or expiry, whichever comes first.
+- We do not log phone numbers or payment handles in application logs. Our logging infrastructure automatically scrubs personal information before writing to log storage. Error reports sent to Sentry are scrubbed the same way.
 
 Despite these measures, no method of electronic storage or transmission over the internet is 100% secure. We cannot guarantee absolute security.
 
@@ -222,7 +245,7 @@ These are transactional messages directly related to your use of the Service. Th
 
 ## 12. Data Location
 
-Your data is stored and processed in the United States. Our service providers (Twilio, Supabase, Google, Anthropic) operate globally and may process certain data outside the United States. Where they do so, we rely on their data processing terms to ensure equivalent standards of data protection are maintained.
+Your data is stored and processed in the United States. Our service providers (Telnyx, Supabase, Google, Anthropic, Expo, Sentry, Upstash, and Twilio if rollback is enabled) operate globally and may process certain data outside the United States. Where they do so, we rely on their data processing terms to ensure equivalent standards of data protection are maintained.
 
 ---
 
@@ -241,8 +264,27 @@ For privacy questions, data requests, or concerns:
 
 **Email:** builder@letssplyt.com
 **Web:** https://letssplyt.com
+**Privacy Policy (canonical):** https://letssplyt.com/privacy.html
+**Terms of Service:** https://letssplyt.com/terms.html
 
 We aim to respond to all privacy inquiries within 5 business days.
+
+---
+
+## 15. Google Play Data Safety
+
+This section is the source for the Google Play Data Safety form. We collect the following data types. None of it is sold. None of it is used for advertising or cross-app tracking.
+
+| Play data type | Collected? | Optional? | Purpose | Shared with |
+|---|---|---|---|---|
+| Personal info → Name | Yes (display name) | Required to use the Service | App functionality | Other people in your event (display name only) |
+| Personal info → Phone number | Yes | Required to create an account or join as a guest | Account management; app functionality (OTP and payment SMS) | Telnyx (SMS delivery). Not shown to other participants |
+| Contacts | Yes, only contacts you pick when adding members | Optional (you can type a number instead) | App functionality | Stored as participant data; SMS sent to that number |
+| Photos and videos → Photos | Yes (receipt image you capture) | Optional (you can enter the bill manually) | App functionality | Google Gemini and/or Anthropic for extraction; stored privately in Supabase |
+| App info and performance → Crash logs | Yes | Automatic when the app reports an error | Analytics / diagnostics | Sentry (scrubbed) |
+| Device or other IDs | Yes (push token; hashed analytics id) | Push is optional; you can skip notification permission | App functionality; diagnostics | Expo (push routing) |
+
+**Camera** is an Android/iOS permission, not a Play “data type.” We use it only to photograph a receipt (Section 3.6). We do not collect precise or approximate location, financial account numbers, payment card numbers, or advertising IDs.
 
 ---
 

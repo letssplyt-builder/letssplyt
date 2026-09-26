@@ -10,6 +10,9 @@ describe('legal static pages', () => {
 
     expect(html).toContain('Information We Collect');
     expect(html).toContain('Receipt Images and AI Processing');
+    expect(html).toContain('Telnyx');
+    expect(html).toContain('Google Play Data Safety');
+    expect(html).toContain('https://letssplyt.com/privacy.html');
     expect(html).toContain('href="/terms.html"');
     expect(html).not.toContain('mobile app under Settings');
   });
@@ -19,7 +22,9 @@ describe('legal static pages', () => {
 
     expect(html).toContain('Acceptance of Terms');
     expect(html).toContain('mandatory arbitration');
+    expect(html).toContain('https://letssplyt.com/privacy.html');
     expect(html).toContain('href="/privacy.html"');
+    expect(html).not.toContain('https://letssplyt.com/legal/privacy');
     expect(html).not.toContain('mobile app under Settings');
   });
 });

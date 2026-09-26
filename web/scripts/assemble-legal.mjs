@@ -140,7 +140,7 @@ for (const page of pages) {
     <div class="container">
       <p class="legal-hero-eyebrow">Legal</p>
       <h1>${page.heroTitle}</h1>
-      <p class="legal-hero-meta"><strong>Effective:</strong> June 7, 2026 · <strong>Last updated:</strong> June 7, 2026</p>
+      <p class="legal-hero-meta"><strong>Effective:</strong> June 7, 2026 · <strong>Last updated:</strong> September 26, 2026</p>
     </div>
   </div>
   <main class="legal-main">

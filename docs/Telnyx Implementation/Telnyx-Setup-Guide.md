@@ -449,7 +449,7 @@ Redeploy Railway staging after updating Doppler.
 
 5. Save → wait for identity status in portal (email when updated)
 
-**Before submitting:** Ensure live **Privacy Policy** and **Terms** (e.g. `https://letssplyt.com/privacy` and `/terms` or in-app legal URLs).
+**Before submitting:** Ensure live **Privacy Policy** and **Terms** at `https://letssplyt.com/privacy.html` and `https://letssplyt.com/terms.html` (also in-app under Settings).
 
 ### 6.2 Create campaign
 

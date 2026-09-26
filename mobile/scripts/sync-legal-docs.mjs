@@ -7,7 +7,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '../../');
 const outDir = path.join(root, 'mobile/src/content/legal');
 
-const LEGAL_DATE = 'June 7, 2026';
+const LEGAL_DATE = 'September 26, 2026';
 const DATE_PLACEHOLDER = /\[INSERT DATE BEFORE PUBLISHING\]/g;
 
 function prepareMarkdown(sourceRelativePath) {

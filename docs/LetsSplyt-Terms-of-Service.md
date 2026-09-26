@@ -1,7 +1,7 @@
 # LetsSplyt — Terms of Service
 
 **Effective Date:** June 7, 2026
-**Last Updated:** June 7, 2026
+**Last Updated:** September 26, 2026
 
 ---
 
@@ -167,7 +167,7 @@ LetsSplyt supports multiple currencies. AI-assisted receipt scanning attempts to
 
 ### 7.1 AI-Assisted Extraction Is Not Guaranteed to Be Accurate
 
-LetsSplyt uses an AI service (Google Gemini) to extract item names, prices, tax, tip, and totals from receipt photos you upload. **This AI process is not infallible.** It may misread numbers, misidentify items, miss line items, or incorrectly total amounts, particularly on low-quality photos, receipts with unusual formatting, handwritten receipts, or receipts from non-US jurisdictions.
+LetsSplyt uses an AI service (Google Gemini in development and staging; Anthropic Claude in production when configured) to extract item names, prices, tax, tip, and totals from receipt photos you upload. **This AI process is not infallible.** It may misread numbers, misidentify items, miss line items, or incorrectly total amounts, particularly on low-quality photos, receipts with unusual formatting, handwritten receipts, or receipts from non-US jurisdictions.
 
 ### 7.2 User Must Review All AI Output
 
@@ -274,7 +274,7 @@ If you provide suggestions, ideas, or feedback about LetsSplyt, you grant me the
 
 ## 11. Privacy
 
-Your use of LetsSplyt is also governed by my Privacy Policy, located at https://letssplyt.com/legal/privacy, which is incorporated into these Terms by reference. By agreeing to these Terms, you also agree to the Privacy Policy.
+Your use of LetsSplyt is also governed by my Privacy Policy, located at https://letssplyt.com/privacy.html (also at Settings → Privacy Policy in the app). `/privacy` and `/legal/privacy` redirect to that page. The Privacy Policy is incorporated into these Terms by reference. By agreeing to these Terms, you also agree to the Privacy Policy.
 
 ---
 
@@ -512,4 +512,4 @@ I aim to respond to all inquiries within 5 business days.
 
 ---
 
-*Last updated: June 7, 2026*
+*Last updated: September 26, 2026*

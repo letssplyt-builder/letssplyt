@@ -824,7 +824,7 @@ The older Twilio A2P steps below apply only if you roll transport back to `SMS_P
 ./setup.sh prod
 ```
 
-⚠️ **Do not run this until staging is fully tested with at least 10 real events.**
+**Staging soak:** Completed 26 September 2026 (at least 10 real events on staging). Production setup may proceed when the remaining launch checklist items are done.
 
 ---
 
@@ -873,7 +873,7 @@ eas submit --platform ios
 
 ### 4.0 — Host Privacy Policy and Terms of Service
 
-Both app stores require these pages to be live at public URLs before accepting your app submission. The content is already written in files/09-Security-And-Privacy.md Section 6.
+Both app stores require these pages to be live at public URLs before accepting your app submission. Source of truth: `docs/LetsSplyt-Privacy-Policy.md` (includes the Play Data Safety table in §15) and `docs/LetsSplyt-Terms-of-Service.md`. Canonical URLs: `https://letssplyt.com/privacy.html` and `https://letssplyt.com/terms.html`.
 
 **Option A — Serve from your backend (simplest)**
 
@@ -916,15 +916,16 @@ ios: {
 
 ### 4.6 — Pre-Launch Checklist
 
-- [ ] Privacy Policy live at your domain/privacy
-- [ ] Terms of Service live at your domain/terms
+- [x] Privacy Policy published at `/privacy.html` (canonical `https://letssplyt.com/privacy.html`; `/privacy` and `/legal/privacy` redirect). Content includes Telnyx, camera/contacts, and Play Data Safety mapping (updated 2026-09-26).
+- [x] Terms of Service published at `/terms.html` (canonical `https://letssplyt.com/terms.html`)
+- [ ] Host those same URLs on the production domain used in the Play Console listing (content is ready; production deploy still required)
 - [ ] Sentry connected: `SENTRY_DSN` + `EXPO_PUBLIC_SENTRY_DSN` in all three Doppler environments; test event seen in Sentry with `environment: staging`; production `APP_ENV` / `EXPO_PUBLIC_APP_ENV` = `production` (see §2.4B)
 - [ ] Telnyx production uses the staging sender; Messaging Profile webhook pointed at production `APP_URL`. 10DLC only if that number is a US local long-code (Twilio A2P only if `SMS_PROVIDER=twilio`)
 - [ ] Production Supabase on Pro plan
 - [ ] Anthropic spending limit set to $100/month
 - [ ] Railway production service healthy
 - [ ] EAS production builds submitted to both stores
-- [ ] At least 10 complete end-to-end tests on staging
+- [x] At least 10 complete end-to-end tests on staging (soak completed 2026-09-26)
 - [ ] All three Supabase projects have `receipts` storage bucket
 - [ ] Realtime enabled on `participants` table in all three projects
 
