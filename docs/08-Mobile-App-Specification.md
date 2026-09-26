@@ -56,7 +56,8 @@ RootNavigator (NativeStack)
 │   ├── PhoneEntryScreen
 │   ├── OTPVerifyScreen
 │   ├── BiometricOptInScreen   ← after first OTP when device has biometrics enrolled (skippable)
-│   └── PushPermissionScreen  ← shown once after first OTP verify (is_new_user === true)
+│   ├── PushPermissionScreen  ← shown once after first OTP verify (is_new_user === true)
+│   └── PaymentHandlePromptScreen ← skippable first-login handle ask (new users only)
 │
 ├── BiometricLockScreen    ← shown when stored credentials exist but app is locked (cold start or idle)
 │
@@ -742,7 +743,8 @@ The backend still supports `context: 'login'` for other entry points (e.g. web j
   1. If device biometrics enrolled → `BiometricOptInScreen` (user can Enable or Skip)
   2. Else if pending join deep link → `AppJoinScreen`
   3. Else if `is_new_user` → `PushPermissionScreen`
-  4. Else → `MainTabs`
+  4. Else if `is_new_user` (after push, unless a join token is pending) → `PaymentHandlePromptScreen`
+  5. Else → `MainTabs`
 - Back button → PhoneEntryScreen
 
 **Error state:** If OTP is incorrect, show red text below the input boxes: "Incorrect code. Try again." and clear all boxes. If expired: "That code has expired. Tap Resend to get a new one."
@@ -758,7 +760,7 @@ Shown when `authStore.pendingBiometricOptIn === true` (device has Face ID / fing
 - Heading: faster sign-in with Face ID or fingerprint
 - **Enable** → `enrollBiometricStorage()` — user confirms with biometrics; refresh token moves to biometric-gated SecureStore; plain refresh deleted
 - **Skip** → `skipBiometricStorage()` (**Option B**) — refresh stays in plain SecureStore; user still gets **idle app lock** (5 min background) but cold start restores without biometric gate
-- Navigation: `RootNavigator` resets to this screen; completing either path proceeds to join flow / push permission / main tabs per `resolveAuthenticatedRoute`
+- Navigation: `RootNavigator` resets to this screen; completing either path proceeds to join flow / push permission / payment-handle prompt / main tabs per `resolveAuthenticatedRoute`
 
 ---
 
@@ -790,13 +792,27 @@ This screen appears in the AuthStack **only once** — after the very first succ
 
 **"Allow" behaviour:**
 1. Call `Notifications.requestPermissionsAsync()`
-2. If `status === 'granted'`: call `Notifications.getExpoPushTokenAsync()` → POST `/api/v1/users/me/push-token` with body `{ device_id, token, platform }` → navigate to MainTabs
-3. If `status === 'denied'` (user denied the system prompt): navigate to MainTabs (do not show an error — the user made a valid choice)
+2. If `status === 'granted'`: call `Notifications.getExpoPushTokenAsync()` → POST `/api/v1/users/me/push-token` with body `{ device_id, token, platform }` → continue to `PaymentHandlePromptScreen` (new users) or MainTabs
+3. If `status === 'denied'` (user denied the system prompt): continue to the handle prompt or MainTabs (do not show an error — the user made a valid choice)
 
 **"Maybe later" behaviour:**
 - Store `hasSeenPushPermissionScreen: true` in AsyncStorage
-- Navigate to MainTabs
+- Continue to `PaymentHandlePromptScreen` when `needsPaymentHandlePrompt` is set; otherwise MainTabs
 - The notification permission prompt can be triggered later from ProfileScreen → "Enable notifications"
+
+---
+
+#### PaymentHandlePromptScreen (AuthStack — skippable, new users only)
+
+Shown once after first OTP, **after** `PushPermissionScreen`, and **not** when a pending join token is present (`AppJoin` wins). Returning users never see this screen — `is_new_user === false` does not set `needsPaymentHandlePrompt`.
+
+**Layout:**
+- Heading: "Get paid back"
+- Body: add how friends pay you back; they can skip and will be asked again before sending payment requests
+- Primary CTA: "Add payment method" → inline Venmo / PayPal / Cash App / Zelle form (`PaymentHandleSetupForm`)
+- Secondary: "Skip for now" → `dismissPaymentHandlePrompt()` → MainTabs
+
+Saving a handle also dismisses the prompt and goes to MainTabs. Create Event does **not** nag for a handle. Cash-only (name-only) events can complete without one.
 
 **Accessibility:** Allow button: `accessibilityRole="button"`, `accessibilityLabel="Allow LetsSplyt to send notifications"`. Skip link: `accessibilityRole="button"`, `accessibilityLabel="Skip for now"`.
 
@@ -1835,7 +1851,7 @@ export class ErrorBoundary extends React.Component<
 
 ### First-Time Permission Flow
 
-Described in Section 3 (PushPermissionScreen). The screen appears once — after the first successful OTP verification.
+Described in Section 3 (PushPermissionScreen). The screen appears once — after the first successful OTP verification. New users then see skippable `PaymentHandlePromptScreen` (unless they arrived via a join link).
 
 ### Token Lifecycle
 
@@ -2204,6 +2220,7 @@ Payment request messages are **SMS or WhatsApp text only** — no MMS `mediaUrl`
 - UI: tappable card "View split breakdown" — opens `breakdown_url` via `Linking.openURL`
 - Do **not** fetch Supabase Storage PNGs or use `<Image>` for split preview on the send path
 - **Empty previews** (all members name-only or no phone): screen auto-completes via `completeEventWithoutSms` — never show a dead-end with disabled Send
+- **Payment handle required** when previews exist and the organiser has no saved handle: `PaymentHandleRequiredSheet` (no skip). Send stays disabled until a handle is saved. Backend `POST /messages/send` and `POST /splits/resend` also return `PAYMENT_HANDLE_REQUIRED` 409 if any SMS-eligible participant exists (`join_method !== manual_name_only`, not the payer) and the organiser has zero handles.
 - **Event Detail → Send messages** uses `openMessagePreviewOrComplete` with the same skip logic
 
 #### MessagePreviewModal (sheet, tall)

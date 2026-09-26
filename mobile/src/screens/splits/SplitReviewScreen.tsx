@@ -4,6 +4,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { ScreenTopBar } from '../../components/navigation/ScreenTopBar';
+import { PaymentHandleRequiredSheet } from '../../components/profile/PaymentHandleRequiredSheet';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { splitActionBarFooterStyle } from '../../constants/layout';
 import { useAppInsets } from '../../hooks/useAppInsets';
@@ -11,6 +12,7 @@ import type { EventsStackParamList } from '../../navigation/types';
 import { confirmEventSplit } from '../../services/messages.service';
 import { isApiRequestError } from '../../services/api';
 import { useEventStore } from '../../store/eventStore';
+import { useProfileStore } from '../../store/profileStore';
 import { useSplitStore } from '../../store/splitStore';
 import { useTheme } from '../../theme/ThemeContext';
 import type { Theme } from '../../theme/types';
@@ -294,6 +296,8 @@ export function SplitReviewScreen({ navigation, route }: Props) {
 
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [showHandleSheet, setShowHandleSheet] = useState(false);
+  const handles = useProfileStore((state) => state.handles);
 
   const sumBalanced = useMemo(
     () => isWithinMoneyTolerance(totalCheck, billTotal, currency),
@@ -351,6 +355,9 @@ export function SplitReviewScreen({ navigation, route }: Props) {
                     isPostSendRevision,
                   });
                 } catch (err) {
+                  if (isApiRequestError(err) && err.code === 'PAYMENT_HANDLE_REQUIRED') {
+                    setShowHandleSheet(true);
+                  }
                   setConfirmError(
                     isApiRequestError(err)
                       ? err.message
@@ -485,6 +492,13 @@ export function SplitReviewScreen({ navigation, route }: Props) {
         ) : null}
         {confirmError ? <Text style={styles.hintError}>{confirmError}</Text> : null}
       </ScrollView>
+      <PaymentHandleRequiredSheet
+        visible={showHandleSheet && handles.length === 0}
+        onSaved={() => {
+          setShowHandleSheet(false);
+          setConfirmError(null);
+        }}
+      />
     </AuthGradientLayout>
   );
 }

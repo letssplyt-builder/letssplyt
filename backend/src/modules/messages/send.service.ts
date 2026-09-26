@@ -1,5 +1,5 @@
 import type { AiStage } from '@letssplyt/shared/event.types';
-import { AppError } from '../../infrastructure/errors';
+import { AppError, Errors } from '../../infrastructure/errors';
 import { isPhoneOptedOut } from '../../infrastructure/notification/opt-out';
 import { isMessagingDevBypassEnabled } from '../../infrastructure/notification/messaging-dev-bypass';
 import { sendOutboundMessage } from '../../infrastructure/notification/outbound-messaging.service';
@@ -8,6 +8,7 @@ import {
   assertEventOwner,
   fetchEventRow,
 } from '../events/event.service';
+import { getHandles } from '../profile/profile.service';
 import { buildMessagePreviewsForEvent, buildRevisionMessagesForParticipants } from './messages.service';
 import { notifyMemberShareEdited, notifyMemberShareReady } from './messages-push';
 import { resolveParticipantPhoneContext } from './participant-phone';
@@ -28,6 +29,31 @@ export interface SendMessagesResult {
     twilio_sid?: string;
   }>;
   event_status: 'sent';
+}
+
+function isSmsEligibleParticipant(
+  row: { user_id?: string | null; join_method?: string | null },
+  payerId: string,
+): boolean {
+  if ((row.user_id ?? null) === payerId) return false;
+  return row.join_method !== 'manual_name_only';
+}
+
+async function assertOrganizerHasPaymentHandle(
+  organizerId: string,
+  participants: Array<{ user_id?: string | null; join_method?: string | null }>,
+  payerId: string,
+): Promise<void> {
+  const needsHandle = participants.some((row) => isSmsEligibleParticipant(row, payerId));
+  if (!needsHandle) return;
+
+  const handles = await getHandles(organizerId);
+  if (handles.length === 0) {
+    throw Errors.conflict(
+      'Add a payment method before sending payment requests.',
+      'PAYMENT_HANDLE_REQUIRED',
+    );
+  }
 }
 
 async function assertSendableStage(eventId: string, stage: AiStage): Promise<void> {
@@ -89,6 +115,11 @@ export async function sendEventMessages(
   }
 
   const rows = participantRows ?? [];
+
+  const considered = filterIds
+    ? rows.filter((row) => filterIds.has(row.id as string))
+    : rows;
+  await assertOrganizerHasPaymentHandle(userId, considered, eventRow.payer_id);
 
   const results: SendMessagesResult['results'] = [];
   let sentCount = 0;
@@ -258,6 +289,8 @@ export async function resendRevisionMessages(
       event_status: 'sent',
     };
   }
+
+  await assertOrganizerHasPaymentHandle(userId, revisionRows, eventRow.payer_id);
 
   const participantIds = revisionRows.map((row) => row.id as string);
   const messagePackages = await buildRevisionMessagesForParticipants(

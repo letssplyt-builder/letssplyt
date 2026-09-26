@@ -12,6 +12,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { AuthGradientLayout } from '../../components/auth/AuthGradientLayout';
 import { ScreenTopBar } from '../../components/navigation/ScreenTopBar';
+import { PaymentHandleRequiredSheet } from '../../components/profile/PaymentHandleRequiredSheet';
 import { PrimaryButton } from '../../components/PrimaryButton';
 import { splitActionBarFooterStyle } from '../../constants/layout';
 import { useAppInsets } from '../../hooks/useAppInsets';
@@ -26,6 +27,7 @@ import {
   avatarColorFromName,
   formatSplitMoney,
 } from '../splits/splitEntry.utils';
+import { useProfileStore } from '../../store/profileStore';
 import { useSplitStore } from '../../store/splitStore';
 import { useTheme } from '../../theme/ThemeContext';
 import type { Theme } from '../../theme/types';
@@ -293,6 +295,10 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
   const [viewedIds, setViewedIds] = useState<Set<string>>(new Set());
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+  const [profileReady, setProfileReady] = useState(false);
+  const [showHandleSheet, setShowHandleSheet] = useState(false);
+  const handles = useProfileStore((state) => state.handles);
+  const loadProfile = useProfileStore((state) => state.loadProfile);
   const autoCompleteRef = useRef(false);
   const loadPreviews = useCallback(async () => {
     setLoading(true);
@@ -319,6 +325,10 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
   }, [loadPreviews]);
 
   useEffect(() => {
+    void loadProfile().finally(() => setProfileReady(true));
+  }, [loadProfile]);
+
+  useEffect(() => {
     if (loading || error || previews.length > 0 || autoCompleteRef.current) {
       return;
     }
@@ -331,6 +341,14 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
       setSending(false);
     });
   }, [error, eventId, loading, navigation, previews.length]);
+
+  const needsHandle = profileReady && previews.length > 0 && handles.length === 0;
+
+  useEffect(() => {
+    if (needsHandle) {
+      setShowHandleSheet(true);
+    }
+  }, [needsHandle]);
 
   const selected = previews[selectedIndex];
 
@@ -348,6 +366,11 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
   };
 
   const handleSendAll = async () => {
+    if (needsHandle) {
+      setShowHandleSheet(true);
+      return;
+    }
+
     setSending(true);
     setSendError(null);
     try {
@@ -357,6 +380,9 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
         sendResults: result.results,
       });
     } catch (err) {
+      if (isApiRequestError(err) && err.code === 'PAYMENT_HANDLE_REQUIRED') {
+        setShowHandleSheet(true);
+      }
       const message = isApiRequestError(err)
         ? err.message
         : 'Messages failed to send. Tap to retry.';
@@ -374,7 +400,9 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
         <PrimaryButton
           label="Send to all →"
           loading={sending}
-          disabled={loading || Boolean(error) || sending || previews.length === 0}
+          disabled={
+            loading || Boolean(error) || sending || previews.length === 0 || needsHandle
+          }
           onPress={() => void handleSendAll()}
           accessibilityLabel="Send to all"
           variant="inverse"
@@ -521,6 +549,10 @@ export function MessagePreviewScreen({ navigation, route }: Props) {
 
         </ScrollView>
       )}
+      <PaymentHandleRequiredSheet
+        visible={showHandleSheet && needsHandle}
+        onSaved={() => setShowHandleSheet(false)}
+      />
     </AuthGradientLayout>
   );
 }

@@ -11,6 +11,7 @@ import { AppJoinedScreen } from '../screens/join/AppJoinedScreen';
 import { AppJoinScreen } from '../screens/join/AppJoinScreen';
 import { AppLockedScreen } from '../screens/join/AppLockedScreen';
 import { MainTabNavigator } from './MainTabNavigator';
+import { PaymentHandlePromptScreen } from '../screens/profile/PaymentHandlePromptScreen';
 import { PushPermissionScreen } from '../screens/profile/PushPermissionScreen';
 import { LegalDocumentScreen } from '../screens/profile/LegalDocumentScreen';
 import { useAppLock } from '../hooks/useAppLock';
@@ -31,6 +32,7 @@ export function RootNavigator() {
   const isUnlocked = useAuthStore((state) => state.isUnlocked);
   const hasStoredCredentials = useAuthStore((state) => state.hasStoredCredentials);
   const needsPushPermission = useAuthStore((state) => state.needsPushPermission);
+  const needsPaymentHandlePrompt = useAuthStore((state) => state.needsPaymentHandlePrompt);
   const pendingBiometricOptIn = useAuthStore((state) => state.pendingBiometricOptIn);
   const pendingJoinToken = useJoinStore((state) => state.pendingJoinToken);
   const initAuthListener = useAuthStore((state) => state.initAuthListener);
@@ -67,6 +69,7 @@ export function RootNavigator() {
         pendingBiometricOptIn,
         pendingJoinToken,
         needsPushPermission,
+        needsPaymentHandlePrompt,
       );
       navigationRef.reset({
         index: 0,
@@ -91,6 +94,7 @@ export function RootNavigator() {
     pendingBiometricOptIn,
     pendingJoinToken,
     needsPushPermission,
+    needsPaymentHandlePrompt,
   ]);
 
   useEffect(() => {
@@ -101,7 +105,12 @@ export function RootNavigator() {
   const initialRouteName = showLockScreen
     ? 'BiometricLock'
     : isAuthenticated
-      ? resolveAuthenticatedRoute(pendingBiometricOptIn, pendingJoinToken, needsPushPermission)
+      ? resolveAuthenticatedRoute(
+          pendingBiometricOptIn,
+          pendingJoinToken,
+          needsPushPermission,
+          needsPaymentHandlePrompt,
+        )
       : pendingJoinToken
         ? 'PhoneEntry'
         : 'Welcome';
@@ -132,6 +141,7 @@ export function RootNavigator() {
         <RootStack.Screen name="OTPVerify" component={OTPVerifyScreen} />
         <RootStack.Screen name="BiometricOptIn" component={BiometricOptInScreen} />
         <RootStack.Screen name="PushPermission" component={PushPermissionScreen} />
+        <RootStack.Screen name="PaymentHandlePrompt" component={PaymentHandlePromptScreen} />
         <RootStack.Screen name="MainTabs" component={MainTabNavigator} />
         <RootStack.Screen
           name="AppJoin"

@@ -16,12 +16,17 @@ jest.mock('../../../modules/messages/participant-phone', () => ({
   resolveParticipantPhoneContext: jest.fn(),
 }));
 
+jest.mock('../../../modules/profile/profile.service', () => ({
+  getHandles: jest.fn(),
+}));
+
 import { mockTwilio } from '../../mocks/twilio.mock';
 import { mockSupabase } from '../../mocks/supabase.mock';
 import { isPhoneOptedOut } from '../../../infrastructure/notification/opt-out';
 import { sendOutboundMessage } from '../../../infrastructure/notification/outbound-messaging.service';
 import { buildMessagePreviewsForEvent } from '../../../modules/messages/messages.service';
 import { resolveParticipantPhoneContext } from '../../../modules/messages/participant-phone';
+import { getHandles } from '../../../modules/profile/profile.service';
 import { sendEventMessages } from '../../../modules/messages/send.service';
 
 const EVENT_ID = 'event-eeee-eeee-eeee-eeee-eeee-eeee-eeee';
@@ -36,6 +41,9 @@ describe('sendEventMessages', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockSupabase.__resetMock();
+    jest.mocked(getHandles).mockResolvedValue([
+      { id: 'handle-1', provider: 'venmo', handle_value: '@host', display_order: 0 },
+    ]);
     jest.mocked(isPhoneOptedOut).mockResolvedValue(false);
     jest.mocked(sendOutboundMessage).mockResolvedValue({ messageId: 'SMtest123', channel: 'sms' });
     jest.mocked(buildMessagePreviewsForEvent).mockResolvedValue([
@@ -431,5 +439,72 @@ describe('sendEventMessages', () => {
       ]);
       expect(result.event_status).toBe('sent');
     });
+
+    it('completes name-only events without a payment handle', async () => {
+      jest.mocked(getHandles).mockResolvedValue([]);
+      mockSupabase.__resetMock();
+      jest.mocked(buildMessagePreviewsForEvent).mockResolvedValue([]);
+      jest.mocked(resolveParticipantPhoneContext).mockResolvedValue({
+        phoneE164: null,
+        resolvedCountry: undefined,
+        channel: 'sms',
+      });
+
+      mockSupabase.__pushMockResultForTable('events', {
+        data: {
+          id: EVENT_ID,
+          payer_id: PAYER_ID,
+          title: 'Dinner',
+          status: 'locked',
+          ai_stage: 'messaging',
+          currency: 'USD',
+          locale: 'en-US',
+          total_amount: 20,
+        },
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('participants', {
+        data: [
+          {
+            id: PARTICIPANT_ORGANISER,
+            user_id: PAYER_ID,
+            guest_pii_token: null,
+            country_code: 'US',
+            join_method: 'qr_app',
+            display_name: 'Payer',
+            amount_owed: 0,
+          },
+          {
+            id: PARTICIPANT_B,
+            user_id: null,
+            guest_pii_token: null,
+            country_code: null,
+            join_method: 'manual_name_only',
+            display_name: 'Raj',
+            amount_owed: 20,
+          },
+        ],
+        error: null,
+      });
+      mockSupabase.__pushMockResultForTable('participants', { data: null, error: null });
+      mockSupabase.__pushMockResultForTable('events', {
+        data: [{ id: EVENT_ID }],
+        error: null,
+      });
+
+      const result = await sendEventMessages(PAYER_ID, EVENT_ID);
+      expect(result.event_status).toBe('sent');
+      expect(sendOutboundMessage).not.toHaveBeenCalled();
+    });
+  });
+
+  it('rejects send when SMS recipients exist and the organiser has no handle', async () => {
+    jest.mocked(getHandles).mockResolvedValue([]);
+
+    await expect(sendEventMessages(PAYER_ID, EVENT_ID)).rejects.toMatchObject({
+      code: 'PAYMENT_HANDLE_REQUIRED',
+      statusCode: 409,
+    });
+    expect(sendOutboundMessage).not.toHaveBeenCalled();
   });
 });

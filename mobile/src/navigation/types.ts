@@ -70,6 +70,7 @@ export type RootStackParamList = {
     joinToken?: string;
   };
   PushPermission: undefined;
+  PaymentHandlePrompt: undefined;
   BiometricOptIn: undefined;
   BiometricLock: undefined;
   MainTabs: NavigatorScreenParams<MainTabParamList> | undefined;
