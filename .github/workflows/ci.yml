@@ -65,9 +65,12 @@ jobs:
           node-version: '22'
           cache: 'npm'
 
-      - uses: supabase/setup-cli@v1
+      # Pin the CLI so CI does not resolve `latest` via the GitHub Releases API
+      # (unauthenticated lookups hit rate limits and fail the job before tests run).
+      # v3 installs from npm instead of GitHub release archives.
+      - uses: supabase/setup-cli@v3
         with:
-          version: latest
+          version: 2.118.0
 
       - name: Start local Supabase
         run: supabase start
