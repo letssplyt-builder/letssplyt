@@ -90,8 +90,8 @@ Sends payment-request SMS after split confirm, OTP codes (Integration 1), nudge 
 | Environment | Behaviour |
 |-------------|-----------|
 | Development | `SMS_PROVIDER=telnyx` + on-net numbers, or `twilio` + magic numbers. `MESSAGING_DEV_BYPASS=true` skips provider API (logs only). |
-| Staging | LIVE credentials; real messages. Telnyx toll-free verified for off-net. |
-| Production | LIVE credentials; Twilio 10DLC or Telnyx campaign registered. |
+| Staging | LIVE Telnyx credentials; real off-net SMS to US mobiles (confirmed 2026-09-26). |
+| Production | Same Telnyx sender as staging (`TELNYX_FROM_NUMBER`). 10DLC only if that number is a US local long-code; skip if it is an already-delivering toll-free. Point the Messaging Profile webhook at production `APP_URL` at cutover. |
 
 ### Authentication
 

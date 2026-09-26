@@ -341,7 +341,7 @@ Document in E12-S01 prompt when E11-S07 completes.
 
 1. Deploy code with `SMS_PROVIDER=twilio` (no behavior change except custom OTP — see rollout §10)
 2. Add Telnyx vars without switching provider
-3. Switch `SMS_PROVIDER=telnyx` in dev → staging → prod (after 10DLC)
+3. Switch `SMS_PROVIDER=telnyx` in dev → staging → prod. Staging Telnyx is live (2026-09-26). Production reuses the staging sender; 10DLC only if that number is a local long-code.
 
 ---
 
@@ -366,7 +366,8 @@ Document in E12-S01 prompt when E11-S07 completes.
 
 ### Phase D — Production (E11-S07)
 
-- 10DLC approved, production Messaging Profile
+- **Current (2026-09-26):** Staging Telnyx already delivers off-net to US mobiles. Production reuses that sender. 10DLC only if the number is a local long-code.
+- At cutover: same `TELNYX_FROM_NUMBER`, Messaging Profile webhook → production `APP_URL`
 - Smoke scripts green, legal docs synced (Telnyx Privacy variant)
 
 ### Rollback

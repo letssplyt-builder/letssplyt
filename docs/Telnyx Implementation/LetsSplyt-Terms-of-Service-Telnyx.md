@@ -279,7 +279,7 @@ If you provide suggestions, ideas, or feedback about LetsSplyt, you grant me the
 
 ## 11. Privacy
 
-Your use of LetsSplyt is also governed by my Privacy Policy, located at https://letssplyt.com/legal/privacy, which is incorporated into these Terms by reference. By agreeing to these Terms, you also agree to the Privacy Policy.
+Your use of LetsSplyt is also governed by my Privacy Policy, located at https://letssplyt.com/privacy.html, which is incorporated into these Terms by reference. By agreeing to these Terms, you also agree to the Privacy Policy.
 
 ---
 

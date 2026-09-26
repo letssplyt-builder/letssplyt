@@ -7,7 +7,7 @@ export const TERMS_SECTIONS: LegalSection[] = [
   },
   {
     "type": "p",
-    "text": "**Effective Date:** June 7, 2026\n**Last Updated:** June 7, 2026"
+    "text": "**Effective Date:** June 7, 2026\n**Last Updated:** September 26, 2026"
   },
   {
     "type": "hr"
@@ -292,7 +292,7 @@ export const TERMS_SECTIONS: LegalSection[] = [
   },
   {
     "type": "p",
-    "text": "LetsSplyt uses an AI service (Google Gemini) to extract item names, prices, tax, tip, and totals from receipt photos you upload. **This AI process is not infallible.** It may misread numbers, misidentify items, miss line items, or incorrectly total amounts, particularly on low-quality photos, receipts with unusual formatting, handwritten receipts, or receipts from non-US jurisdictions."
+    "text": "LetsSplyt uses an AI service (Google Gemini in development and staging; Anthropic Claude in production when configured) to extract item names, prices, tax, tip, and totals from receipt photos you upload. **This AI process is not infallible.** It may misread numbers, misidentify items, miss line items, or incorrectly total amounts, particularly on low-quality photos, receipts with unusual formatting, handwritten receipts, or receipts from non-US jurisdictions."
   },
   {
     "type": "h3",
@@ -496,7 +496,7 @@ export const TERMS_SECTIONS: LegalSection[] = [
   },
   {
     "type": "p",
-    "text": "Your use of LetsSplyt is also governed by my Privacy Policy, located at https://letssplyt.com/legal/privacy, which is incorporated into these Terms by reference. By agreeing to these Terms, you also agree to the Privacy Policy."
+    "text": "Your use of LetsSplyt is also governed by my Privacy Policy, located at https://letssplyt.com/privacy.html (also at Settings → Privacy Policy in the app). `/privacy` and `/legal/privacy` redirect to that page. The Privacy Policy is incorporated into these Terms by reference. By agreeing to these Terms, you also agree to the Privacy Policy."
   },
   {
     "type": "hr"
@@ -938,6 +938,6 @@ export const TERMS_SECTIONS: LegalSection[] = [
   },
   {
     "type": "p",
-    "text": "*Last updated: June 7, 2026*"
+    "text": "*Last updated: September 26, 2026*"
   }
 ];

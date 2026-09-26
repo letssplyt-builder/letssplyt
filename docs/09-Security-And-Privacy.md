@@ -844,7 +844,7 @@ GDPR applies to any user with an EU or UK phone number. LetsSplyt does not geo-b
 
 ### Required Privacy Policy Statements
 
-The following statements are ready for inclusion in the Privacy Policy at `[your-domain]/privacy`. This page must be publicly accessible without login and must be live before App Store and Play Store submission.
+The published Privacy Policy is `docs/LetsSplyt-Privacy-Policy.md`, served at `/privacy.html` (canonical public URL: `https://letssplyt.com/privacy.html`). `/privacy` and `/legal/privacy` redirect there. The statements below are the original draft blocks; if they conflict with the published policy, the published policy wins.
 
 ---
 
@@ -881,10 +881,12 @@ We do not use your personal data for advertising. We do not sell your data to an
 We share your data only with the following service providers, and only to the extent necessary to operate LetsSplyt:
 
 - **Supabase** — our database and authentication provider. Stores your encrypted account data. Privacy policy: supabase.com/privacy
-- **Twilio** — our SMS and WhatsApp delivery provider. Receives phone numbers solely to deliver payment request messages. Privacy policy: twilio.com/legal/privacy
+- **Telnyx** — our SMS delivery provider. Receives phone numbers solely to deliver OTP and payment request messages. Privacy policy: telnyx.com/privacy-policy
 - **Google (Gemini API)** — used in our development and staging environments to process receipt images for bill splitting. Receives receipt image data only. Privacy policy: policies.google.com/privacy
-- **Anthropic (Claude API)** — used in our production environment to process receipt images for bill splitting. Receives receipt image data only. Privacy policy: anthropic.com/privacy
+- **Anthropic (Claude API)** — used in our production environment to process receipt images for bill splitting when configured. Receives receipt image data only. Privacy policy: anthropic.com/privacy
+- **Sentry** — crash and error diagnostics. Receives scrubbed error reports (no phone numbers or payment handles). Privacy policy: sentry.io/privacy
 - **Upstash** — our background job and rate-limiting infrastructure provider. Does not receive personal data beyond IP addresses used for rate limiting. Privacy policy: upstash.com/trust/privacy
+- **Twilio** — optional SMS rollback only (`SMS_PROVIDER=twilio`). Privacy policy: twilio.com/legal/privacy
 
 We do not share your data with any other third party.
 
