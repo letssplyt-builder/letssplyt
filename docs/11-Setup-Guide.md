@@ -802,9 +802,14 @@ The build appears at expo.dev. Share the download link with your testers — the
 
 ---
 
-### 3.4 — Register for A2P 10DLC (required for real SMS)
+### 3.4 — SMS carrier registration (Telnyx is live on staging)
 
-Without A2P registration, US carriers may filter your messages:
+**Current path:** Staging already sends OTP and payment SMS via Telnyx to real US numbers (`SMS_PROVIDER=telnyx`). Production will reuse that same sender. See `docs/Telnyx Implementation/Telnyx-Setup-Guide.md`.
+
+10DLC is **not** required if the shared number is a verified US toll-free. It **is** required only if production sends from a US local (10-digit) long-code.
+
+The older Twilio A2P steps below apply only if you roll transport back to `SMS_PROVIDER=twilio`:
+
 1. Twilio Console → Messaging → Regulatory Compliance → A2P 10DLC
 2. Register Brand (Sole Proprietor is fine)
 3. Register Campaign (bill splitting payment requests + OTP)
@@ -914,7 +919,7 @@ ios: {
 - [ ] Privacy Policy live at your domain/privacy
 - [ ] Terms of Service live at your domain/terms
 - [ ] Sentry connected: `SENTRY_DSN` + `EXPO_PUBLIC_SENTRY_DSN` in all three Doppler environments; test event seen in Sentry with `environment: staging`; production `APP_ENV` / `EXPO_PUBLIC_APP_ENV` = `production` (see §2.4B)
-- [ ] A2P 10DLC approved by Twilio
+- [ ] Telnyx production uses the staging sender; Messaging Profile webhook pointed at production `APP_URL`. 10DLC only if that number is a US local long-code (Twilio A2P only if `SMS_PROVIDER=twilio`)
 - [ ] Production Supabase on Pro plan
 - [ ] Anthropic spending limit set to $100/month
 - [ ] Railway production service healthy

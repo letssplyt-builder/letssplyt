@@ -4,7 +4,9 @@
 **Audience:** Solo developer setting up Telnyx with no prior Telnyx experience  
 **Telnyx portal:** [Mission Control](https://portal.telnyx.com/)  
 **LetsSplyt backend webhook path:** `{APP_URL}/api/v1/webhooks/telnyx/messaging`  
-**Document version:** 2.0 — 2026-06-07 (aligned to current Mission Control UI)
+**Document version:** 2.1 — 2026-09-26 (staging Telnyx live; production reuses staging sender)
+
+**Current status (2026-09-26):** Staging sends real off-net SMS via Telnyx to US mobiles. Production will use **the same sender number**. 10DLC is not required unless that number is a US local long-code.
 
 ---
 
@@ -15,7 +17,7 @@
 3. [One-time account setup (all environments)](#3-one-time-account-setup-all-environments)
 4. [Development environment](#4-development-environment)
 5. [Staging environment](#5-staging-environment)
-6. [Production: A2P 10DLC (required for US long-code)](#6-production-a2p-10dlc-required-for-us-long-code)
+6. [Production: A2P 10DLC (only if the sender is a US long-code)](#6-production-a2p-10dlc-only-if-the-sender-is-a-us-long-code)
 7. [Production environment](#7-production-environment)
 8. [Doppler configuration](#8-doppler-configuration)
 9. [Webhooks (delivery + STOP/START)](#9-webhooks-delivery--stopstart)
@@ -33,15 +35,17 @@
 | **OTP SMS** | User registers, logs in, or joins via web | `Your LetsSplyt verification code is: 583920. Valid for 10 minutes.` |
 | **Payment request SMS** | Creator sends split after locking group | Share amount + Venmo/CashApp links + breakdown URL |
 
-**One Telnyx account** is enough. Use **separate Messaging Profiles** (and separate phone numbers) per environment: dev, staging, production.
+**One Telnyx account** is enough. Dev keeps its own on-net numbers. **Staging and production share one live sender** (decision 2026-09-26): the number already delivering on staging becomes production `TELNYX_FROM_NUMBER`.
+
+A number can only send delivery receipts and STOP replies to **one** webhook URL. At production cutover, point that Messaging Profile webhook at the production `APP_URL`. Do not send from staging and production on this number at the same time.
 
 ### Environment strategy
 
 | Environment | Phone number type | Recipient numbers | Registration needed |
 |---|---|---|---|
 | **Dev** | 2× US long-code (Telnyx numbers) | Second Telnyx number only (**on-net**) | Level 1 verification + payment |
-| **Staging** | 1× US toll-free | Your real mobile (**off-net**) | Toll-free verification (+ BRN fields if required) |
-| **Production** | 1× US long-code | Any US mobile (**off-net**) | 10DLC brand + campaign + number assignment |
+| **Staging** | Live Telnyx sender (off-net delivery confirmed 2026-09-26) | Real US mobiles | Already sending. Confirm toll-free **Verified**, or 10DLC if this is a local long-code. |
+| **Production** | **Same sender as staging** | Any US mobile (**off-net**) | Same registration as staging. 10DLC only if the shared number is a US local long-code. |
 
 ### Key terms
 
@@ -313,7 +317,9 @@ Use Number B as `phone_e164`.
 
 ## 5. Staging environment
 
-**Goal:** Send SMS to **your real phone** and real testers (off-net). Use a **toll-free** number — faster verification than full 10DLC.
+**Goal:** Send SMS to **your real phone** and real testers (off-net).
+
+**Status (2026-09-26):** Staging Telnyx is live. OTP and payment SMS are delivering to the US numbers tested so far. The original recommendation was a **toll-free** number (faster than full 10DLC). Keep using the number that is already delivering; do not buy a replacement just to match this section.
 
 **Railway staging `APP_URL` example:** `https://staging.letssplyt.app`  
 **Webhook URL:** `https://staging.letssplyt.app/api/v1/webhooks/telnyx/messaging`
@@ -411,9 +417,11 @@ Redeploy Railway staging after updating Doppler.
 
 ---
 
-## 6. Production: A2P 10DLC (required for US long-code)
+## 6. Production: A2P 10DLC (only if the sender is a US long-code)
 
-**When:** Before sending production SMS from a **US local (10-digit) number** to real users.
+**Chosen path (2026-09-26):** Production reuses the **staging Telnyx sender**. Skip this entire section if that number is a verified US toll-free — 10DLC does not apply to TFN.
+
+**When 10DLC is required:** Only if production sends from a **US local (10-digit) long-code** to real users.
 
 **Timeline:** Plan **5–10 business days** for brand + campaign approval.
 
@@ -477,17 +485,24 @@ Article: [How to assign a number to a campaign](https://support.telnyx.com/en/ar
 
 ## 7. Production environment
 
+**Preferred path (2026-09-26):** Reuse the staging sender. Set Doppler production `SMS_PROVIDER=telnyx` and `TELNYX_FROM_NUMBER` to the same E.164 as staging. At cutover, change that number’s Messaging Profile **webhook URL** to `https://<production-APP_URL>/api/v1/webhooks/telnyx/messaging`. Do not send from staging and production on this number at the same time.
+
+A separate production API key (below) is still a good idea for revocation. Buying a second long-code and running Section 6 is **optional**, only if you later want isolated staging/production numbers.
+
 ### 7.1 Create production API key
 
 1. https://portal.telnyx.com/#/api-keys → Create API Key
 2. Name: `letssplyt-production`
 3. Store only in Doppler **production** — never reuse in dev/staging
 
-### 7.2 Buy production US long-code (SMS)
+### 7.2 Optional: buy a separate production US long-code
+
+Skip this if you are reusing the staging sender.
 
 1. Search numbers → US → **Local** → SMS enabled
 2. Prefer California area codes if available (415, 408, 510, etc.)
 3. Purchase → record E.164 (e.g. `+14085551234`)
+4. This path **requires** Section 6 (10DLC) before off-net production send
 
 ### 7.3 Create Messaging Profile `letssplyt-production`
 
@@ -503,7 +518,7 @@ My Numbers → production number → Messaging Profile → `letssplyt-production
 
 ### 7.5 Link number to 10DLC campaign
 
-Section 6.3 — required before off-net production SMS from long-code.
+Required only if production uses a **new local long-code** (Section 6.3). Skip when reusing a staging toll-free (or any already-delivering TFN).
 
 ### 7.6 Doppler (production)
 
@@ -517,14 +532,14 @@ Redeploy production Railway service.
 
 ### 7.7 Production pre-launch checklist
 
-- [ ] 10DLC brand verified
-- [ ] 10DLC campaign **ACTIVE**
-- [ ] Production number assigned to campaign
-- [ ] Messaging profile webhook live (200 OK)
+- [x] Staging Telnyx sender already delivering off-net to US mobiles (2026-09-26)
+- [ ] Production `TELNYX_FROM_NUMBER` set to that same number
+- [ ] Messaging Profile webhook pointed at production `APP_URL` (200 OK)
+- [ ] If the shared number is a local long-code: 10DLC brand verified, campaign **ACTIVE**, number assigned
 - [ ] Privacy + Terms publicly accessible
 - [ ] App TCPA checkbox on phone entry / web join
-- [ ] STOP/START handled by backend (E11-S06)
-- [ ] One real OTP to your phone — end-to-end
+- [ ] STOP/START handled by backend (E11-S06) and tested from a handset
+- [ ] One real OTP to your phone on the production host — end-to-end
 - [ ] One real payment-request SMS — links work
 
 ---
@@ -539,11 +554,11 @@ Project: `letssplyt` (or your Doppler project name). Set per **config**: `dev`, 
 |---|---|---|---|
 | `SMS_PROVIDER` | `telnyx` | `telnyx` | `telnyx` |
 | `TELNYX_API_KEY` | `letssplyt-dev` key | `letssplyt-staging` key | `letssplyt-production` key |
-| `TELNYX_FROM_NUMBER` | Dev sender long-code | Staging toll-free | Prod long-code |
+| `TELNYX_FROM_NUMBER` | Dev sender long-code | Live staging sender | **Same E.164 as staging** |
 
 **Format:** E.164 with `+` — e.g. `+14155550123`
 
-### 8.2 Twilio fallback (keep until Telnyx proven)
+### 8.2 Twilio fallback (keep for rollback)
 
 LetsSplyt code uses `TWILIO_PHONE_NUMBER` (not `TWILIO_FROM_NUMBER`):
 
@@ -657,15 +672,17 @@ Update **letssplyt-dev** profile whenever ngrok URL changes.
 
 ### Staging (off-net)
 
-- [ ] Toll-free **Verified**
-- [ ] OTP to personal mobile
-- [ ] Payment SMS to personal mobile
+- [x] `SMS_PROVIDER=telnyx` in Doppler staging
+- [x] OTP to real US mobiles (confirmed 2026-09-26)
+- [x] Payment SMS to real US mobiles (confirmed 2026-09-26)
+- [ ] Confirm sender registration in Mission Control (TFN **Verified**, or 10DLC if local)
 - [ ] STOP opts out; START clears opt-out (E11-S06)
 
 ### Production
 
-- [ ] 10DLC brand + campaign active
-- [ ] Number on campaign + `letssplyt-production` profile
+- [ ] Reuse staging `TELNYX_FROM_NUMBER`
+- [ ] Webhook cut over to production `APP_URL`
+- [ ] 10DLC brand + campaign active — **only if** the shared number is a local long-code
 - [ ] Section 7.7 checklist complete
 
 ---
@@ -754,16 +771,16 @@ DEV
   3. Buy 2 long-codes → Profile letssplyt-dev → Assign Number A (sender)
   4. Doppler dev → test on-net: OTP to Number B via app/curl
 
-STAGING
-  5. Buy toll-free → Profile letssplyt-staging → Assign number
-  6. Toll-free verification → wait Verified
-  7. Doppler staging → test to real phone
+STAGING (done 2026-09-26)
+  5. Telnyx sender on staging profile; Doppler SMS_PROVIDER=telnyx
+  6. OTP + payment SMS delivering to real US mobiles
+  7. Remaining: confirm portal registration, STOP/START from handset, smoke script
 
-PRODUCTION
-  8. 10DLC brand → campaign → wait ACTIVE
-  9. Buy long-code → Profile letssplyt-production → Assign number
-  10. Assign number to 10DLC campaign
-  11. Doppler production → pre-launch checklist
+PRODUCTION (reuse staging sender)
+  8. Doppler production TELNYX_FROM_NUMBER = same E.164 as staging
+  9. Point Messaging Profile webhook at production APP_URL (do not dual-send)
+  10. 10DLC only if that number is a local long-code
+  11. Pre-launch checklist (Section 7.7)
 ```
 
 ---

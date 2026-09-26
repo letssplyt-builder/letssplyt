@@ -1847,7 +1847,7 @@ The `PRODUCTION_DATABASE_URL` is a Railway environment secret — never in code 
 | pg_cron availability | No | No (free) / Yes (Pro) | **Yes** (Pro required) |
 | pg_cron workaround | QStash cron job | QStash cron job | Not needed — use pg_cron |
 | AI provider | Google Gemini 2.5 Flash | Google Gemini 2.5 Flash | Anthropic Claude Haiku 4.5 |
-| Twilio credentials | Test credentials (no real SMS) | Live credentials (real SMS sent to test numbers) | Live credentials (A2P 10DLC registered) |
+| SMS (Telnyx) | Dev on-net / OTP bypass | Live Telnyx — real SMS to US test numbers (confirmed 2026-09-26) | Same Telnyx sender as staging. 10DLC only if the number is a local long-code |
 | Encryption keys | `.env.development` (local only) | Railway staging environment secrets | Railway production environment secrets |
 | Seed data strategy | `seed.sql` with 3 test users, 2 events, all payment states represented | Seeded from `seed.sql` on first deploy; subsequent deploys use real test data | No seed data — production starts empty |
 | Backup frequency | Manual (developer responsibility) | Manual before each migration | Daily automated (Supabase Pro, included) |
