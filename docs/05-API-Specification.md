@@ -1398,6 +1398,9 @@ Send revision SMS/WhatsApp to participants affected by a post-send `split/confir
 
 **Response `200`:** same shape as `POST /messages/send` (`sent_count`, `skipped_count`, `failed_count`, `results`, `event_status: "sent"`).
 
+**Error codes:**
+- `PAYMENT_HANDLE_REQUIRED` 409 — organiser has no payment handle and at least one SMS-eligible participant (`join_method !== manual_name_only`, not the payer) would be messaged
+
 ---
 
 ## Message Endpoints
@@ -1449,6 +1452,10 @@ Send all participant messages via Twilio as **text-only SMS/WhatsApp** (no `medi
   event_status: "sent";
 }
 ```
+
+**Error codes:**
+- `MESSAGES_NOT_READY` 409 — `ai_stage` is not `messaging` or `complete`
+- `PAYMENT_HANDLE_REQUIRED` 409 — organiser has no payment handle and at least one SMS-eligible participant exists. Name-only-only events may complete without a handle.
 
 ---
 

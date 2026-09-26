@@ -78,6 +78,8 @@ function resolveErrorMessage(
       );
     case 'INVALID_HANDLE':
       return apiMessage ?? 'That payment handle is not valid for this provider.';
+    case 'PAYMENT_HANDLE_REQUIRED':
+      return apiMessage ?? 'Add a payment method before sending payment requests.';
     case 'OUTSTANDING_BALANCE':
       return apiMessage ?? 'You must settle all outstanding payments before deleting your account.';
     default:

@@ -68,10 +68,15 @@ export function PushPermissionScreen({ navigation }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const dismissPushPermission = useAuthStore((state) => state.dismissPushPermission);
+  const needsPaymentHandlePrompt = useAuthStore((state) => state.needsPaymentHandlePrompt);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const goHome = () => {
     dismissPushPermission();
+    if (needsPaymentHandlePrompt) {
+      navigation.replace('PaymentHandlePrompt');
+      return;
+    }
     navigation.replace('MainTabs');
   };
 

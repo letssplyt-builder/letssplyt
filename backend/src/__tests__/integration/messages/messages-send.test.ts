@@ -23,12 +23,17 @@ jest.mock('../../../modules/messages/participant-phone', () => ({
   >(),
 }));
 
+jest.mock('../../../modules/profile/profile.service', () => ({
+  getHandles: jest.fn(),
+}));
+
 import { isPhoneOptedOut } from '../../../infrastructure/notification/opt-out';
 import {
   buildMessagePreviewsForEvent,
   loadParticipantItemNames,
 } from '../../../modules/messages/messages.service';
 import { resolveParticipantPhoneContext } from '../../../modules/messages/participant-phone';
+import { getHandles } from '../../../modules/profile/profile.service';
 
 const USER_A = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 const MEMBER_USER = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
@@ -87,6 +92,9 @@ describe('Messages send API integration', () => {
     jest.mocked(loadParticipantItemNames).mockResolvedValue(
       new Map([[PARTICIPANT_MEMBER, ['Pasta', 'Wine']]]),
     );
+    jest.mocked(getHandles).mockResolvedValue([
+      { id: 'handle-1', provider: 'venmo', handle_value: '@host', display_order: 0 },
+    ]);
     jest.mocked(isPhoneOptedOut).mockResolvedValue(false);
     jest.mocked(resolveParticipantPhoneContext).mockResolvedValue({
       phoneE164: '+15005550001',
@@ -181,6 +189,9 @@ describe('Messages send API integration', () => {
 
     mockSupabase.__resetMock();
     jest.clearAllMocks();
+    jest.mocked(getHandles).mockResolvedValue([
+      { id: 'handle-1', provider: 'venmo', handle_value: '@host', display_order: 0 },
+    ]);
     pushEventRow(EVENT_ROW);
     mockSupabase.__pushMockResultForTable('users', {
       data: { display_name: 'Alex Payer' },
@@ -241,5 +252,18 @@ describe('Messages send API integration', () => {
         },
       ]),
     );
+  });
+
+  it('POST /events/:id/messages/send returns 409 when the organiser has no handle', async () => {
+    mockAuth(USER_A);
+    jest.mocked(getHandles).mockResolvedValue([]);
+
+    const response = await request(app)
+      .post(`/api/v1/events/${EVENT_ID}/messages/send`)
+      .set(AUTH_A)
+      .send({});
+
+    expect(response.status).toBe(409);
+    expect(response.body.error.code).toBe('PAYMENT_HANDLE_REQUIRED');
   });
 });

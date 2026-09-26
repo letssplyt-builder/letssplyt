@@ -79,6 +79,7 @@ export function BiometricOptInScreen({ navigation }: Props) {
   const enrollBiometricStorage = useAuthStore((state) => state.enrollBiometricStorage);
   const skipBiometricStorage = useAuthStore((state) => state.skipBiometricStorage);
   const needsPushPermission = useAuthStore((state) => state.needsPushPermission);
+  const needsPaymentHandlePrompt = useAuthStore((state) => state.needsPaymentHandlePrompt);
   const [isEnabling, setIsEnabling] = useState(false);
 
   const goNext = useCallback(() => {
@@ -86,8 +87,12 @@ export function BiometricOptInScreen({ navigation }: Props) {
       navigation.replace('PushPermission');
       return;
     }
+    if (needsPaymentHandlePrompt) {
+      navigation.replace('PaymentHandlePrompt');
+      return;
+    }
     navigation.replace('MainTabs');
-  }, [navigation, needsPushPermission]);
+  }, [navigation, needsPaymentHandlePrompt, needsPushPermission]);
 
   const handleEnable = async () => {
     if (isEnabling) return;

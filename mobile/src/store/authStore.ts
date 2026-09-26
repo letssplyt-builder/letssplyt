@@ -37,6 +37,7 @@ interface AuthState {
   user: AppUser | null;
   isLoading: boolean;
   needsPushPermission: boolean;
+  needsPaymentHandlePrompt: boolean;
   isBootstrapping: boolean;
   isUnlocked: boolean;
   hasStoredCredentials: boolean;
@@ -52,6 +53,7 @@ interface AuthState {
   clearSession: () => Promise<void>;
   logout: () => Promise<void>;
   dismissPushPermission: () => void;
+  dismissPaymentHandlePrompt: () => void;
   setLoading: (loading: boolean) => void;
   initAuthListener: () => { unsubscribe: () => void };
 }
@@ -143,6 +145,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isLoading: false,
   needsPushPermission: false,
+  needsPaymentHandlePrompt: false,
   isBootstrapping: true,
   isUnlocked: false,
   hasStoredCredentials: false,
@@ -180,6 +183,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       session,
       user: session ? state.user : null,
       needsPushPermission: session ? state.needsPushPermission : false,
+      needsPaymentHandlePrompt: session ? state.needsPaymentHandlePrompt : false,
       isUnlocked: Boolean(session),
       hasStoredCredentials: Boolean(session?.refresh_token) || state.hasStoredCredentials,
     }));
@@ -198,6 +202,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       session: localSession,
       user: appUser,
       needsPushPermission: auth.user.is_new_user,
+      needsPaymentHandlePrompt: auth.user.is_new_user,
       isUnlocked: true,
       hasStoredCredentials: true,
       storageMode: 'plain',
@@ -391,6 +396,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       session: null,
       user: null,
       needsPushPermission: false,
+      needsPaymentHandlePrompt: false,
       isUnlocked: false,
       hasStoredCredentials: false,
       storageMode: null,
@@ -399,6 +405,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   dismissPushPermission: () => set({ needsPushPermission: false }),
+
+  dismissPaymentHandlePrompt: () => set({ needsPaymentHandlePrompt: false }),
 
   logout: async () => {
     const supabase = getSupabase();

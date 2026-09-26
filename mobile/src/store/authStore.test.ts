@@ -23,6 +23,7 @@ describe('authStore', () => {
       user: null,
       isLoading: false,
       needsPushPermission: false,
+      needsPaymentHandlePrompt: false,
       isBootstrapping: false,
       isUnlocked: false,
       hasStoredCredentials: false,
@@ -61,6 +62,29 @@ describe('authStore', () => {
     expect(useAuthStore.getState().storageMode).toBe('plain');
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith(AUTH_TOKEN_KEY, 'access-1');
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith(AUTH_REFRESH_TOKEN_KEY, 'refresh-1');
+    expect(useAuthStore.getState().needsPushPermission).toBe(false);
+    expect(useAuthStore.getState().needsPaymentHandlePrompt).toBe(false);
+  });
+
+  it('applyAuthResponse flags first-login prompts only for new users', async () => {
+    await useAuthStore.getState().applyAuthResponse({
+      access_token: 'access-1',
+      refresh_token: 'refresh-1',
+      expires_in: 3600,
+      user: {
+        id: 'user-2',
+        display_name: 'New',
+        avatar_colour: '#7C3AED',
+        is_new_user: true,
+      },
+    });
+
+    expect(useAuthStore.getState().needsPushPermission).toBe(true);
+    expect(useAuthStore.getState().needsPaymentHandlePrompt).toBe(true);
+
+    useAuthStore.getState().dismissPaymentHandlePrompt();
+    expect(useAuthStore.getState().needsPaymentHandlePrompt).toBe(false);
+    expect(useAuthStore.getState().needsPushPermission).toBe(true);
   });
 
   it('bootstrapFromStorage restores plain mode silently', async () => {

@@ -6,6 +6,7 @@ jest.mock('../../../navigation/eventNavigation', () => ({
 }));
 
 import * as messagesService from '../../../services/messages.service';
+import { useProfileStore } from '../../../store/profileStore';
 import { completeEventWithoutSms } from '../../../utils/messageFlow';
 
 const mockGoBack = jest.fn();
@@ -49,6 +50,11 @@ const PREVIEWS: messagesService.MessagePreviewItem[] = [
 describe('MessagePreviewScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(useProfileStore.getState(), 'loadProfile').mockResolvedValue();
+    useProfileStore.setState({
+      handles: [{ id: 'h1', provider: 'venmo', handle_value: '@host', display_order: 0 }],
+      isLoading: false,
+    });
     jest.spyOn(messagesService, 'fetchMessagePreviews').mockResolvedValue({ previews: PREVIEWS });
   });
 
@@ -156,6 +162,25 @@ describe('MessagePreviewScreen', () => {
         ],
       });
     });
+  });
+
+  it('blocks send and asks for a payment handle when the organiser has none', async () => {
+    useProfileStore.setState({ handles: [], isLoading: false });
+
+    render(
+      <MessagePreviewScreen
+        navigation={{ goBack: mockGoBack, navigate: mockNavigate, replace: mockReplace } as never}
+        route={{ key: 'MessagePreview-1', name: 'MessagePreview', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Add a payment method to send')).toBeTruthy(),
+    );
+
+    const send = screen.getByLabelText('Send to all');
+    expect(send.props.accessibilityState?.disabled ?? send.props.disabled).toBeTruthy();
+    expect(messagesService.sendEventMessages).not.toHaveBeenCalled();
   });
 
 });
