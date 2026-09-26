@@ -942,7 +942,7 @@ The toggle filters **both** sections via `isEventSettledForList()`:
 
 **Status chips** (`statusChipLabel`): `sent` → **Expenses Share**; creator `settled`/`archived` → **All settled**; participant paid → **Settled**.
 
-Each section lists only events matching the selected toggle. Event card: title, date, participant count, status chip. FAB: "＋ New event" → `CreateEventModal`. Tap card → `EventDetailScreen` (Events stack).
+Each section lists only events matching the selected toggle. **You created** / **You joined** group active events by status (`Open`, `Locked`, `Calculating`, `Expenses Share`). **Settled** splits into **Events you created** and **Events you joined**. Every subsection is collapsible (open by default); the header shows `{title} · {count}`. Event card: title, date, participant count, status chip. FAB: "＋ New event" → `CreateEventModal`. Tap card → `EventDetailScreen` (Events stack).
 
 **Tab navigation:** Tapping the **Events** bottom tab always resets the Events stack to this list (does not leave the user on a previously opened `EventDetailScreen`).
 
@@ -1042,8 +1042,9 @@ Note: Settlement **actions** execute in **Event Detail** (per participant swipe)
 
 Back button: pops to previous screen (`EventsScreen`, `HomeScreen`, or `MemberDetailScreen` / `GuestDetailScreen`).
 
-**Loading state (skeleton) — member list:**
-- Three rows, each ~48px tall: grey circle (32×32) on the left, two grey lines (name + chip) on the right, pulsing animation.
+**Stale detail:** `eventStore.currentEvent` is a singleton. Event Detail only renders it when `currentEvent.event.id` matches the route `eventId`. Opening event B after event A shows `EventDetailSkeleton` (shimmer title, hero, actions, four member rows) — never A's title, roster, or settlement UI. Revisiting the same event can still show the cached detail immediately.
+
+**Loading state:** Facebook-style shimmer skeleton (`ShimmerBone` + `EventDetailSkeleton`) while the opened event is fetched. Back remains available.
 
 **Error state:** If the Realtime subscription fails or the initial fetch errors, show a banner inside the screen (not replacing the whole screen): "Couldn't load member list. Pull to retry." If the error persists, the React error boundary (see Section 6) will catch it.
 

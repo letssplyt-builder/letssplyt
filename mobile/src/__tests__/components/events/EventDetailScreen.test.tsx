@@ -167,6 +167,75 @@ describe('EventDetailScreen', () => {
     expect(await screen.findByText('Sam')).toBeTruthy();
   });
 
+  it('does not flash a previous event while the opened event loads', async () => {
+    useEventStore.setState({
+      currentEvent: {
+        ...mockDetailOpen,
+        participants: [
+          {
+            id: 'p-old',
+            display_name: 'Sam',
+            join_method: 'qr_web',
+            payment_status: 'pending',
+            amount_owed: null,
+          },
+        ],
+      },
+      isLoadingDetail: false,
+    });
+
+    let resolveLoad: (value: typeof mockDetailOpen) => void = () => undefined;
+    jest.mocked(eventService.fetchEventById).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveLoad = resolve;
+        }),
+    );
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-2' } }}
+      />,
+    );
+
+    expect(screen.queryByText('Friday Dinner')).toBeNull();
+    expect(screen.queryByText('Sam')).toBeNull();
+    expect(screen.getByLabelText('Loading event')).toBeTruthy();
+
+    resolveLoad({
+      ...mockDetailOpen,
+      event: { ...mockDetailOpen.event, id: 'event-2', title: 'Team Lunch' },
+      participants: [
+        {
+          id: 'p-new',
+          display_name: 'Jordan',
+          join_method: 'qr_app',
+          payment_status: 'pending',
+          amount_owed: null,
+        },
+      ],
+    });
+
+    expect(await screen.findByText('Team Lunch')).toBeTruthy();
+    expect(screen.getByText('Jordan')).toBeTruthy();
+    expect(screen.queryByText('Friday Dinner')).toBeNull();
+  });
+
+  it('keeps the same event visible when revisiting it before refresh finishes', () => {
+    useEventStore.setState({ currentEvent: mockDetailOpen, isLoadingDetail: false });
+    jest.mocked(eventService.fetchEventById).mockImplementation(() => new Promise(() => undefined));
+
+    render(
+      <EventDetailScreen
+        navigation={navigation}
+        route={{ key: 'detail', name: 'EventDetail', params: { eventId: 'event-1' } }}
+      />,
+    );
+
+    expect(screen.getByText('Friday Dinner')).toBeTruthy();
+  });
+
   it('shows Lock button disabled with 0 participants', async () => {
     render(
       <EventDetailScreen

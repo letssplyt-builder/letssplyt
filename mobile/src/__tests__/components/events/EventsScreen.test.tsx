@@ -127,11 +127,30 @@ describe('EventsScreen', () => {
     );
 
     await waitFor(() => {
-      expect(screen.getAllByText('Expenses Share').length).toBeGreaterThan(0);
-      expect(screen.getAllByText('Open').length).toBeGreaterThan(0);
+      expect(screen.getByText('Expenses Share · 1')).toBeTruthy();
+      expect(screen.getByText('Open · 1')).toBeTruthy();
       expect(screen.getByText('Birthday Party')).toBeTruthy();
       expect(screen.getByText('Friday Dinner')).toBeTruthy();
     });
+  });
+
+  it('collapses an active subsection and keeps the event count in the header', async () => {
+    render(
+      <EventsScreen
+        navigation={navigation}
+        route={{ key: 'Events', name: 'Events' } as never}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Friday Dinner')).toBeTruthy();
+    });
+
+    fireEvent.press(screen.getByLabelText('Open, 1 event'));
+
+    expect(screen.queryByText('Friday Dinner')).toBeNull();
+    expect(screen.getByText('Open · 1')).toBeTruthy();
+    expect(screen.getByText('Birthday Party')).toBeTruthy();
   });
 
   it('shows only joined active events on You joined tab', async () => {
@@ -170,8 +189,8 @@ describe('EventsScreen', () => {
     fireEvent.press(screen.getByText('Settled'));
 
     await waitFor(() => {
-      expect(screen.getByText('Events you created')).toBeTruthy();
-      expect(screen.getByText('Events you joined')).toBeTruthy();
+      expect(screen.getByText('Events you created · 1')).toBeTruthy();
+      expect(screen.getByText('Events you joined · 1')).toBeTruthy();
       expect(screen.getByText('All settled — everyone has paid their share')).toBeTruthy();
       expect(screen.getByText('Settled — your share is paid')).toBeTruthy();
       expect(screen.getByText('Old Brunch')).toBeTruthy();

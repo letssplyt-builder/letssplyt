@@ -5,7 +5,6 @@ import type { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import {
-  ActivityIndicator,
   Alert,
   Pressable,
   RefreshControl,
@@ -30,6 +29,7 @@ import { PayHandlesSheet } from '../../components/settlement/PayHandlesSheet';
 import { ParticipantPayActions } from '../../components/settlement/ParticipantPayActions';
 import { SettlementProgressBar } from '../../components/settlement/SettlementProgressBar';
 import { SettlementRosterRow, hasSettlementSwipeActions } from '../../components/settlement/SettlementRosterRow';
+import { EventDetailSkeleton } from '../../components/events/EventDetailSkeleton';
 import { EventSplitActionBar } from '../../components/events/EventSplitActionBar';
 import { ParticipantEventDetail } from '../../components/events/ParticipantEventDetail';
 import { QRDisplayModal } from '../../components/events/QRDisplayModal';
@@ -124,7 +124,6 @@ export function EventDetailScreen({ navigation, route }: Props) {
   const authUser = useAuthStore((state) => state.user);
   const {
     currentEvent,
-    isLoadingDetail,
     isLocking,
     loadEventDetail,
     lockEvent,
@@ -187,7 +186,7 @@ export function EventDetailScreen({ navigation, route }: Props) {
   useEffect(() => {
     if (!isFocused) return undefined;
 
-    const event = currentEvent?.event;
+    const event = currentEvent?.event.id === eventId ? currentEvent.event : undefined;
     if (!event) return undefined;
 
     const subscribeSettlement = isSettlementEventStatus(event.status);
@@ -722,11 +721,28 @@ export function EventDetailScreen({ navigation, route }: Props) {
     }
   };
 
-  if (isLoadingDetail && !currentEvent) {
+  const detailMatchesRoute = currentEvent?.event.id === eventId;
+
+  if (!detailMatchesRoute) {
     return (
-      <AuthGradientLayout contentStyle={styles.loadingLayout}>
+      <AuthGradientLayout contentStyle={styles.layout}>
         <StatusBar style="light" />
-        <ActivityIndicator color={theme.ink} style={styles.centerLoader} />
+        <ScreenTopBar titleAlign="start" onBack={() => navigation.goBack()} />
+        {fetchError ? (
+          <View style={styles.mismatchError}>
+            <Text style={styles.bannerError}>Couldn&apos;t load this event.</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Try again"
+              onPress={() => void refreshDetail()}
+              style={styles.retryBtn}
+            >
+              <Text style={styles.retryText}>Try again</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <EventDetailSkeleton />
+        )}
       </AuthGradientLayout>
     );
   }
@@ -1138,12 +1154,23 @@ function makeEventDetailStyles(theme: Theme, themed: ThemedStyles) {
   layout: {
     paddingHorizontal: 0,
   },
-  loadingLayout: {
-    justifyContent: 'center',
+  mismatchError: {
     alignItems: 'center',
+    paddingHorizontal: 24,
+    gap: 12,
   },
-  centerLoader: {
-    marginTop: 40,
+  retryBtn: {
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: theme.surfaceStrong,
+    borderRadius: theme.radiusSm,
+    borderWidth: 1,
+    borderColor: theme.line,
+  },
+  retryText: {
+    color: theme.accent,
+    fontWeight: '700',
+    fontFamily: theme.fontBody,
   },
   scroll: {
     flex: 1,
