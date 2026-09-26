@@ -29,7 +29,7 @@ export type EventsStackParamList = {
     eventId: string;
     sendResults?: Array<{
       participant_id: string;
-      status: 'sent' | 'skipped_opt_out' | 'skipped_no_phone' | 'failed';
+      status: 'sent' | 'skipped_opt_out' | 'skipped_no_phone' | 'skipped_zero_share' | 'failed';
       twilio_sid?: string;
     }>;
   };

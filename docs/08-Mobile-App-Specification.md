@@ -1105,7 +1105,7 @@ This applies to both the joining phase (channel `event-members:{eventId}`, subsc
 
 **Path:** `mobile/src/screens/receipts/ItemReviewScreen.tsx` · **UI:** `ReceiptReviewSlip` (`mobile/src/components/receipts/ReceiptReviewSlip.tsx`)
 
-Receipt-slip layout on `AuthGradientLayout`: warm paper card on teal gradient. Compact lines by default (name + amount like a thermal receipt); **tap a line** to expand inline edit (name, qty stepper, price). Swipe left on compact food rows to delete.
+Receipt-slip layout on `AuthGradientLayout`: warm paper card on teal gradient. Compact lines by default (name + amount like a thermal receipt); **tap a line** to expand inline edit (name, qty stepper, price). Price, fee, and discount value fields keep a typed draft (`sanitizeAmountDraft`) so decimals like `12.` / `12.50` can be entered. Swipe left on compact food rows to delete.
 
 - Food lines from parse (`items` → `is_fee = false` in DB)
 - Fee/surcharge lines from `additional_charges` (`is_fee = true` in DB)
@@ -1147,6 +1147,7 @@ Entry:
 - NLP input field below participant list: "Describe who had what..."
 - CTA: "Review split →" → POST `/split/calculate` → SplitReviewScreen
 - CTA locked until sum constraint satisfied (see Section 4 for per-tab rules)
+- Custom-mode list sits in a `ScrollView` with `automaticallyAdjustKeyboardInsets` (and iOS `KeyboardAvoidingView`) so a long member list can scroll the focused amount/%/portion field above the keyboard
 
 **Item assignment drag-and-drop (accessible from "Assign items" button):**
 - Library: `react-native-draggable-flatlist` (v4+)
@@ -1166,10 +1167,11 @@ Entry:
 
 - Event **title** as subtitle (not event id); bill **total** pill in header
 - **Read-only** compact ledger: single card, columns **Member** | **Owes**; optional one-line item summary per row; split total footer with balance check
+- `$0.00` shares are valid (person stayed in the group with no amount). Footer CTA stays enabled when the ledger balances; do not require every `amount_owed > 0`
 - Amount edits happen on **SplitEntryScreen** only — Review is confirm-only
-- **Pre-send** (`messages_sent_at` null): footer CTA **Preview messages →** when any non-organiser can receive SMS; otherwise **Complete event →** (skips preview, calls send with all `skipped_no_phone`, lands on Event Detail). Flow: `POST /split/confirm` → `messageFlow.continueMessagingAfterSplitConfirm`
+- **Pre-send** (`messages_sent_at` null): footer CTA **Preview messages →** when any non-organiser can receive SMS **and** has `amount_owed > 0`; otherwise **Complete event →** (skips preview, calls send with skips, lands on Event Detail). A **$0.00** share is never previewed or texted. Flow: `POST /split/confirm` → `messageFlow.continueMessagingAfterSplitConfirm`
 - **Post-send:** footer CTA **Save and notify →** → `POST /split/confirm` → `POST /splits/resend` → `DeliveryTrackingScreen` when trackable SMS sent; otherwise Event Detail
-- **Name-only members** (`manual_name_only`): never shown on Message Preview; never queued on Delivery Tracking
+- **Name-only members** (`manual_name_only`) and **$0 shares**: never shown on Message Preview; never queued on Delivery Tracking; never sent SMS or share-ready push
 
 **Loading state (skeleton):**
 - Four grey rows (height 44px each) with pulsing animation, representing per-person rows.
@@ -1436,6 +1438,7 @@ SplitEntryScreen presents four tabs. The "Review split →" CTA is locked until 
 - The user types each person's exact share
 - Running total shown below the list: "Allocated: $X.XX / Total: $Y.YY"
 - Submit is locked until: `|sum(allocations) - total| ≤ 0.01`
+- `$0` is a valid share — that person stays in the group and appears on Review as **$0.00**
 - Any rounding difference within ±$0.01 is auto-assigned to the creator (they absorb the rounding)
 
 **UI:**
@@ -1454,6 +1457,7 @@ SplitEntryScreen presents four tabs. The "Review split →" CTA is locked until 
 **Behaviour:**
 - Each participant gets a percentage input field
 - The percentage total must equal exactly 100%
+- `0%` is a valid share — that person stays in the group and their computed amount is **$0.00**
 - System calculates each person's dollar amount from their percentage: `amount = (percentage / 100) × total`
 - Both the percentage and the computed dollar amount are shown per person
 - **Largest-remainder rounding** is applied when converting percentages to dollar amounts to ensure the sum of all dollar amounts equals the bill total exactly
@@ -1492,9 +1496,10 @@ function largestRemainderRound(percentages: number[], total: number): number[] {
 ### Tab 4 — Portions (⅟)
 
 **Behaviour:**
-- Each participant gets a whole-number input (minimum 1, no maximum)
+- Each participant gets a whole-number input (minimum 0, no maximum). `0` means no share.
 - System divides proportionally by portion count: `share = (portions / totalPortions) × total`
 - **Largest-remainder rounding** applied (same algorithm as Percent tab above, applied to the resulting dollar amounts)
+- Submit stays locked if every portion is `0` (weights must sum to a positive value)
 
 **Example:** Bill = $100.00. Three people, portions 1 + 1 + 2 = 4 total.
 - Person A: 1/4 = 25% → $25.00
@@ -1507,12 +1512,12 @@ function largestRemainderRound(percentages: number[], total: number): number[] {
 
 **UI:**
 - Participant list: each row shows avatar | name | stepper control (− | [number] | +) | computed dollar amount (greyed, read-only)
-- Stepper minimum value: 1 (cannot go below 1)
+- Stepper minimum value: 0 (no share)
 - Stepper buttons are 44×44pt minimum touch targets
 - Below list: "X total portions" counter
 - Dollar amounts update live as portions change
 
-**Submit condition:** Always satisfied when all participants have at least 1 portion (which is the default). CTA is immediately enabled on tab entry.
+**Submit condition:** CTA enabled when total portions > 0. Default is 1 per person (even split by portions). A person may be set to 0.
 
 **Accessibility:** Each stepper: `accessibilityRole="adjustable"`, `accessibilityLabel="Portions for [name]"`, `accessibilityValue={{ text: "[N] portion(s)" }}`. Use `accessibilityIncrement` and `accessibilityDecrement` for VoiceOver swipe-up/down adjustment.
 
@@ -2221,7 +2226,7 @@ Payment request messages are **SMS or WhatsApp text only** — no MMS `mediaUrl`
 - UI: tappable card "View split breakdown" — opens `breakdown_url` via `Linking.openURL`
 - Do **not** fetch Supabase Storage PNGs or use `<Image>` for split preview on the send path
 - **Empty previews** (all members name-only or no phone): screen auto-completes via `completeEventWithoutSms` — never show a dead-end with disabled Send
-- **Payment handle required** when previews exist and the organiser has no saved handle: `PaymentHandleRequiredSheet` (no skip). Send stays disabled until a handle is saved. Backend `POST /messages/send` and `POST /splits/resend` also return `PAYMENT_HANDLE_REQUIRED` 409 if any SMS-eligible participant exists (`join_method !== manual_name_only`, not the payer) and the organiser has zero handles.
+- **Payment handle required** when previews exist and the organiser has no saved handle: `PaymentHandleRequiredSheet` (no skip). Send stays disabled until a handle is saved. Backend `POST /messages/send` and `POST /splits/resend` also return `PAYMENT_HANDLE_REQUIRED` 409 if any SMS-eligible participant with `amount_owed > 0` exists (`join_method !== manual_name_only`, not the payer) and the organiser has zero handles.
 - **Event Detail → Send messages** uses `openMessagePreviewOrComplete` with the same skip logic
 
 #### MessagePreviewModal (sheet, tall)

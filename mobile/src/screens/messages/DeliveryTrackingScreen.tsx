@@ -193,6 +193,7 @@ export function DeliveryTrackingScreen({ navigation, route }: Props) {
         display_name: string;
         is_organiser?: boolean;
         join_method?: string;
+        amount_owed?: number | null;
         message_sent_at?: string | null;
         message_delivered_at?: string | null;
         message_failed?: boolean;
@@ -202,6 +203,7 @@ export function DeliveryTrackingScreen({ navigation, route }: Props) {
       participants
         .filter((participant) => !participant.is_organiser)
         .filter((participant) => participant.join_method !== 'manual_name_only')
+        .filter((participant) => Number(participant.amount_owed ?? 0) > 0)
         .map((participant) => ({
           id: participant.id,
           display_name: participant.display_name,

@@ -45,6 +45,7 @@ export type SendResultStatus =
   | 'sent'
   | 'skipped_opt_out'
   | 'skipped_no_phone'
+  | 'skipped_zero_share'
   | 'failed';
 
 export interface SendMessageResultRow {

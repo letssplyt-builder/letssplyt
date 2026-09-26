@@ -28,4 +28,21 @@ describe('messageFlow', () => {
       ]),
     ).toBe(true);
   });
+
+  it('does not treat a $0 share as an SMS recipient', () => {
+    expect(
+      eventHasSmsRecipients([
+        { is_organiser: true, join_method: 'qr_app', amount_owed: 40 },
+        { join_method: 'qr_web', amount_owed: 0 },
+      ]),
+    ).toBe(false);
+
+    expect(
+      eventHasSmsRecipients([
+        { is_organiser: true, join_method: 'qr_app', amount_owed: 20 },
+        { join_method: 'qr_web', amount_owed: 0 },
+        { join_method: 'manual_phone', amount_owed: 20 },
+      ]),
+    ).toBe(true);
+  });
 });

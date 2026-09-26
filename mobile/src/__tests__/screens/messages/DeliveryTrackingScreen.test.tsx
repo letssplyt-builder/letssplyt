@@ -265,6 +265,73 @@ describe('DeliveryTrackingScreen', () => {
     expect(screen.queryByLabelText(/Raj/)).toBeNull();
   });
 
+  it('excludes $0-share members from delivery tracking', async () => {
+    jest.mocked(eventService.fetchEventById).mockResolvedValue({
+      event: {
+        id: 'event-1',
+        payer_id: 'payer-1',
+        title: 'Dinner',
+        event_date: null,
+        total_amount: 25,
+        currency: 'USD',
+        status: 'sent',
+        split_mode: 'portion',
+        ai_stage: 'complete',
+        locale: 'en-US',
+        locked_at: '2026-01-01T00:00:00.000Z',
+        messages_sent_at: '2026-01-01T00:00:00.000Z',
+        fully_settled_at: null,
+        created_at: '2026-01-01T00:00:00.000Z',
+        updated_at: '2026-01-01T00:00:00.000Z',
+        payer: { id: 'payer-1', display_name: 'Alex', avatar_colour: '#000' },
+      },
+      participants: [
+        {
+          id: 'payer-1',
+          display_name: 'Alex',
+          join_method: 'qr_app',
+          payment_status: 'pending',
+          amount_owed: 0,
+          is_organiser: true,
+        },
+        {
+          id: 'zero-share',
+          display_name: 'Sam',
+          join_method: 'qr_web',
+          payment_status: 'pending',
+          amount_owed: 0,
+        },
+        {
+          id: 'p1',
+          display_name: 'Jordan',
+          join_method: 'qr_app',
+          payment_status: 'pending',
+          amount_owed: 25,
+          message_sent_at: '2026-01-01T00:00:00.000Z',
+          message_delivered_at: null,
+          message_failed: false,
+        },
+      ],
+      join_token: null,
+      summary: null,
+    });
+
+    render(
+      <DeliveryTrackingScreen
+        navigation={{ dispatch: mockDispatch } as never}
+        route={{
+          key: 'DeliveryTracking-1',
+          name: 'DeliveryTracking',
+          params: { eventId: 'event-1', sendResults: [] },
+        }}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByLabelText('Jordan — message sent')).toBeTruthy());
+    expect(screen.queryByText('Sam')).toBeNull();
+    expect(screen.queryByLabelText(/Sam/)).toBeNull();
+  });
+
   it('enables Done when only name-only members are excluded from tracking', async () => {
     jest.mocked(eventService.fetchEventById).mockResolvedValue({
       event: {

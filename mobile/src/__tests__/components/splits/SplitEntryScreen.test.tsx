@@ -122,4 +122,28 @@ describe('SplitEntryScreen', () => {
     expect(review.props.accessibilityState?.disabled ?? review.props.disabled).toBeTruthy();
   });
 
+  it('allows a $0 custom amount when the rest of the bill is allocated', async () => {
+    renderScreen();
+    await switchToCustomSplit();
+    await waitFor(() => expect(screen.getByLabelText('$ Amt')).toBeTruthy());
+    fireEvent.press(screen.getByLabelText('$ Amt'));
+    fireEvent.changeText(screen.getByLabelText('Amount for Alex'), '0');
+    fireEvent.changeText(screen.getByLabelText('Amount for Jordan'), '30');
+    const review = screen.getByLabelText('Review split');
+    expect(review.props.accessibilityState?.disabled ?? review.props.disabled).toBeFalsy();
+
+    fireEvent.press(review);
+    await waitFor(() => expect(splitsService.calculateSplit).toHaveBeenCalled());
+    expect(splitsService.calculateSplit).toHaveBeenCalledWith(
+      'event-1',
+      expect.objectContaining({
+        split_mode: 'portion',
+        manual_splits: [
+          { participant_id: 'p1', value: 0 },
+          { participant_id: 'p2', value: 30 },
+        ],
+      }),
+    );
+  });
+
 });

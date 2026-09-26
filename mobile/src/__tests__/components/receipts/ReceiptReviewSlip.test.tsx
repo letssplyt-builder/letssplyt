@@ -119,6 +119,41 @@ describe('ReceiptReviewSlip', () => {
     expect(onExpandedKeyChange).toHaveBeenCalledWith(null);
   });
 
+  it('keeps a decimal point while editing a line-item price', () => {
+    const onItemChange = jest.fn();
+
+    render(
+      <ReceiptReviewSlip
+        currency="USD"
+        items={items}
+        charges={[]}
+        {...noopDiscountHandlers}
+        taxInput="1"
+        tipInput="2"
+        runningTotal={13}
+        expandedKey="item-food-1"
+        onExpandedKeyChange={jest.fn()}
+        onItemChange={onItemChange}
+        onItemRemove={jest.fn()}
+        onAddItem={jest.fn()}
+        onChargeChange={jest.fn()}
+        onChargeRemove={jest.fn()}
+        onAddCharge={jest.fn()}
+        onTaxChange={jest.fn()}
+        onTipChange={jest.fn()}
+      />,
+    );
+
+    const price = screen.getByLabelText('Burger price');
+    fireEvent.changeText(price, '12.');
+    expect(price.props.value).toBe('12.');
+    expect(onItemChange).toHaveBeenCalledWith('food-1', { unit_price: 12 });
+
+    fireEvent.changeText(price, '12.50');
+    expect(price.props.value).toBe('12.50');
+    expect(onItemChange).toHaveBeenCalledWith('food-1', { unit_price: 12.5 });
+  });
+
   it('shows resolved discount amount on the slip', () => {
     render(
       <ReceiptReviewSlip

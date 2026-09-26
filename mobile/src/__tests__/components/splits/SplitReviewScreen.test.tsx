@@ -108,13 +108,32 @@ describe('SplitReviewScreen', () => {
     expect(screen.getByText(/\$30\.00 ✓/)).toBeTruthy();
   });
 
-  it('disables Send when amounts missing', () => {
+  it('allows Preview when a member has a $0 share and the total still balances', () => {
     useSplitStore.setState({
       splits: [
         { participant_id: 'p1', display_name: 'Alex', amount_owed: 0, item_names: [] },
         { participant_id: 'p2', display_name: 'Jordan', amount_owed: 30, item_names: [] },
       ],
       totalCheck: 30,
+    });
+    render(
+      <SplitReviewScreen
+        navigation={{ goBack: mockGoBack, navigate: mockNavigate } as never}
+        route={{ key: 'SplitReview-1', name: 'SplitReview', params: { eventId: 'event-1' } }}
+      />,
+    );
+    const preview = screen.getByLabelText('Preview messages');
+    expect(preview.props.accessibilityState?.disabled ?? preview.props.disabled).toBeFalsy();
+    expect(screen.getByLabelText('Alex, owes $0.00')).toBeTruthy();
+  });
+
+  it('disables Preview when the split total does not match the bill', () => {
+    useSplitStore.setState({
+      splits: [
+        { participant_id: 'p1', display_name: 'Alex', amount_owed: 10, item_names: [] },
+        { participant_id: 'p2', display_name: 'Jordan', amount_owed: 10, item_names: [] },
+      ],
+      totalCheck: 20,
     });
     render(
       <SplitReviewScreen

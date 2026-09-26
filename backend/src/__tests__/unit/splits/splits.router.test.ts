@@ -150,4 +150,37 @@ describe('Splits API', () => {
     expect(response.status).toBe(409);
     expect(response.body.error.code).toBe('RECEIPT_NOT_CONFIRMED');
   });
+
+  it('POST /events/:id/split/calculate accepts a 0 portion weight', async () => {
+    mockAuth(USER_A);
+    pushEventRow(EVENT_ROW);
+    mockSupabase.__pushMockResultForTable('participants', {
+      data: [
+        { id: PARTICIPANT_ALEX, display_name: 'Alex' },
+        { id: PARTICIPANT_JORDAN, display_name: 'Jordan' },
+      ],
+      error: null,
+    });
+    mockSupabase.__pushMockResultForTable('receipt_items', { data: [], error: null });
+    mockSupabase.__pushMockResultForTable('events', { data: null, error: null });
+
+    const response = await request(app)
+      .post(`/api/v1/events/${EVENT_ID}/split/calculate`)
+      .set(AUTH_A)
+      .send({
+        split_mode: 'portion',
+        manual_splits: [
+          { participant_id: PARTICIPANT_ALEX, value: 0 },
+          { participant_id: PARTICIPANT_JORDAN, value: 1 },
+        ],
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body.splits).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ participant_id: PARTICIPANT_ALEX, amount_owed: 0 }),
+        expect.objectContaining({ participant_id: PARTICIPANT_JORDAN, amount_owed: 35.4 }),
+      ]),
+    );
+  });
 });

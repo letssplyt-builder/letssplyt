@@ -70,6 +70,11 @@ export function parseNumericInput(text: string): number {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+export function parsePortionInput(text: string): number {
+  const parsed = Math.floor(parseNumericInput(text));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
 export function computeEvenAmounts(total: number, count: number, currency: string): number[] {
   if (count <= 0) return [];
   const share = total / count;

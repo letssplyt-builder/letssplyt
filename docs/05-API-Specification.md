@@ -1316,7 +1316,7 @@ Run A2. Provide item assignments (drag-and-drop, NLP, or even/custom mode).
   // For split_mode = "portion":
   manual_splits?: Array<{
     participant_id: string;
-    value: number;   // weight/portion (e.g. 1.0 = one share, 0.5 = half share)
+    value: number;   // weight/portion/amount/percent (0 = no share; e.g. 1.0 = one share, 0.5 = half share)
   }>;
 
   // For all modes where receipt wasn't scanned:
@@ -1399,7 +1399,7 @@ Send revision SMS/WhatsApp to participants affected by a post-send `split/confir
 **Response `200`:** same shape as `POST /messages/send` (`sent_count`, `skipped_count`, `failed_count`, `results`, `event_status: "sent"`).
 
 **Error codes:**
-- `PAYMENT_HANDLE_REQUIRED` 409 — organiser has no payment handle and at least one SMS-eligible participant (`join_method !== manual_name_only`, not the payer) would be messaged
+- `PAYMENT_HANDLE_REQUIRED` 409 — organiser has no payment handle and at least one SMS-eligible participant (`join_method !== manual_name_only`, not the payer, `amount_owed > 0`) would be messaged
 
 ---
 
@@ -1408,7 +1408,7 @@ Send revision SMS/WhatsApp to participants affected by a post-send `split/confir
 ### GET `/events/:eventId/messages/preview`
 **Auth:** `[AUTH]` | `[PAYER]` | Split must be confirmed
 
-Generate per-participant message previews (without sending). Runs A3 composition but does not trigger Twilio. Ensures each participant has a `breakdown_token` and returns the assembled URL.
+Generate per-participant message previews (without sending). Runs A3 composition but does not trigger Twilio. Ensures each participant has a `breakdown_token` and returns the assembled URL. Omits the organiser, name-only members, and anyone with `amount_owed <= 0` — they are not messaged.
 
 **Response `200`:**
 ```typescript
@@ -1442,11 +1442,11 @@ Send all participant messages via Twilio as **text-only SMS/WhatsApp** (no `medi
 ```typescript
 {
   sent_count: number;
-  skipped_count: number;       // opted-out or name-only participants
+  skipped_count: number;       // opted-out, name-only, or $0-share participants
   failed_count: number;
   results: Array<{
     participant_id: string;
-    status: "sent" | "skipped_opt_out" | "skipped_no_phone" | "failed";
+    status: "sent" | "skipped_opt_out" | "skipped_no_phone" | "skipped_zero_share" | "failed";
     twilio_sid?: string;
   }>;
   event_status: "sent";
@@ -1455,7 +1455,7 @@ Send all participant messages via Twilio as **text-only SMS/WhatsApp** (no `medi
 
 **Error codes:**
 - `MESSAGES_NOT_READY` 409 — `ai_stage` is not `messaging` or `complete`
-- `PAYMENT_HANDLE_REQUIRED` 409 — organiser has no payment handle and at least one SMS-eligible participant exists. Name-only-only events may complete without a handle.
+- `PAYMENT_HANDLE_REQUIRED` 409 — organiser has no payment handle and at least one SMS-eligible participant with `amount_owed > 0` exists. Name-only-only or all-$0 events may complete without a handle.
 
 ---
 

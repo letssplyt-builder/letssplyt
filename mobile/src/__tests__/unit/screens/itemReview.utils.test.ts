@@ -4,6 +4,7 @@ import {
   computeDiscountTotal,
   computeReviewTotal,
   parseAmountInput,
+  sanitizeAmountDraft,
   receiptReviewToParseResult,
   snapshotToEditable,
 } from '../../../screens/receipts/itemReview.utils';
@@ -111,6 +112,16 @@ describe('itemReview.utils', () => {
   it('parseAmountInput handles decimals', () => {
     expect(parseAmountInput('12.50')).toBe(12.5);
     expect(parseAmountInput('')).toBe(0);
+  });
+
+  it('sanitizeAmountDraft keeps a trailing decimal while typing', () => {
+    expect(sanitizeAmountDraft('12.')).toBe('12.');
+    expect(sanitizeAmountDraft('12.5')).toBe('12.5');
+    expect(sanitizeAmountDraft('12.50')).toBe('12.50');
+    expect(sanitizeAmountDraft('12.505')).toBe('12.50');
+    expect(sanitizeAmountDraft('.5')).toBe('0.5');
+    expect(sanitizeAmountDraft('12.5.9')).toBe('12.59');
+    expect(parseAmountInput(sanitizeAmountDraft('12.'))).toBe(12);
   });
 
   it('receiptReviewToParseResult builds parse response with discounted total', () => {

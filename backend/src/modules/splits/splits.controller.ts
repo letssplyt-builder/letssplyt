@@ -23,7 +23,7 @@ const calculateBodySchema = z.object({
     .array(
       z.object({
         participant_id: z.string().uuid(),
-        value: z.number().positive(),
+        value: z.number().nonnegative(),
       }),
     )
     .optional(),

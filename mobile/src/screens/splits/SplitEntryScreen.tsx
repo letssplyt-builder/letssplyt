@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -39,6 +41,7 @@ import {
   isPercentTotalValid,
   isWithinMoneyTolerance,
   parseNumericInput,
+  parsePortionInput,
   toPricedSplitItems,
   type SplitEntryTab,
   type SplitFoodItem,
@@ -58,9 +61,16 @@ function makeStyles(theme: Theme) {
       justifyContent: 'center',
       backgroundColor: theme.bgGradient[0],
     },
+    keyboardWrap: {
+      flex: 1,
+    },
+    scrollView: {
+      flex: 1,
+    },
     scroll: {
       paddingHorizontal: 20,
       paddingTop: 2,
+      flexGrow: 1,
     },
     hero: {
       marginBottom: 14,
@@ -287,11 +297,7 @@ export function SplitEntryScreen({ navigation, route }: Props) {
 
   const portionSum = useMemo(
     () =>
-      participants.reduce(
-        (sum, p) =>
-          sum + Math.max(1, Math.floor(parseNumericInput(portionInputs[p.id] ?? '1'))),
-        0,
-      ),
+      participants.reduce((sum, p) => sum + parsePortionInput(portionInputs[p.id] ?? '1'), 0),
     [portionInputs, participants],
   );
 
@@ -409,7 +415,7 @@ export function SplitEntryScreen({ navigation, route }: Props) {
                 }))
               : participants.map((p) => ({
                   participant_id: p.id,
-                  value: Math.max(1, Math.floor(parseNumericInput(portionInputs[p.id] ?? '1'))),
+                  value: parsePortionInput(portionInputs[p.id] ?? '1'),
                 }));
 
         response = await splitsService.calculateSplit(eventId, {
@@ -467,9 +473,16 @@ export function SplitEntryScreen({ navigation, route }: Props) {
     >
       <StatusBar style="light" />
       <ScreenTopBar title="Split bill" titleAlign="start" onBack={() => navigation.goBack()} />
+      <KeyboardAvoidingView
+        style={styles.keyboardWrap}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
       <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingBottom: 24 }]}
+        style={styles.scrollView}
+        contentContainerStyle={[styles.scroll, { paddingBottom: 48 }]}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="interactive"
+        automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.hero}>
@@ -548,6 +561,7 @@ export function SplitEntryScreen({ navigation, route }: Props) {
 
         {calculateError ? <Text style={styles.error}>{calculateError}</Text> : null}
       </ScrollView>
+      </KeyboardAvoidingView>
 
     </AuthGradientLayout>
   );
